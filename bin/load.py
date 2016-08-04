@@ -51,6 +51,14 @@ class item():
         self.pages = root.findall(searchpath)
         print("Issue contains {} pages.".format(len(self.pages)))
         
+        for p in self.pages:
+            for child in p:
+                print(child[0])
+                for k,v in child[0].items():
+                    print(v)
+                
+#            page(p)
+            
         '''
         self.volume = 
         self.issue = 
@@ -60,8 +68,10 @@ class item():
 
 class page():
     '''class representing the individual page (fileset)'''
-    def __init__(self, basename):
-        pass
+    def __init__(self, source):
+        tree = ET.parse(source)
+        root = tree.getroot()
+        print(root)
 
 
 #============================================================================

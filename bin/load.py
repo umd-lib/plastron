@@ -52,12 +52,14 @@ class item():
         print("Issue contains {} pages.".format(len(self.pages)))
         
         for p in self.pages:
+            print("PAGE", p)
             for child in p:
-                print(child[0])
-                for k,v in child[0].items():
-                    print(v)
-                
-#            page(p)
+                print("  => IMG", child[0])
+                print(child[0].get("{http://www.w3.org/1999/xlink}href"))
+
+#                for (k,v) in child[0].items():
+#                    print
+#                    print("    --", k, "=", v)
             
         '''
         self.volume = 

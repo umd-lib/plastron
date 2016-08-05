@@ -12,6 +12,7 @@ import requests
 import sys
 import yaml
 
+import metadata_map
 
 #============================================================================
 # HELPER FUNCTIONS 
@@ -33,11 +34,13 @@ class batch():
     def __init__(self, batchfile):
         tree = ET.parse(batchfile)
         root = tree.getroot()
+        md = metadata_map.batch
+        
         self.basepath = os.path.dirname(batchfile)
-        self.issues = root.findall('./{http://www.loc.gov/ndnp}issue')
+        self.issues = root.findall(md['issues'])
         print("Batch contains {} issues: ".format(len(self.issues)))
         for n, issue in enumerate(self.issues):
-            print("  {}. ".format(n+1), end='')
+            print("\n\n ISSUE {}. ".format(n+1), end='')
             i = item(os.path.join(self.basepath, issue.text))
             
 
@@ -46,34 +49,49 @@ class item():
     def __init__(self, path):
         tree = ET.parse(path)
         root = tree.getroot()
-        searchpath = ("{http://www.loc.gov/METS/}fileSec/"
-                      "{http://www.loc.gov/METS/}fileGrp")
-        self.pages = root.findall(searchpath)
-        print("Issue contains {} pages.".format(len(self.pages)))
+        m = metadata_map.issue
         
-        for p in self.pages:
-            print("PAGE", p)
-            for child in p:
-                print("  => IMG", child[0])
-                print(child[0].get("{http://www.w3.org/1999/xlink}href"))
-
-#                for (k,v) in child[0].items():
-#                    print
-#                    print("    --", k, "=", v)
-            
-        '''
-        self.volume = 
-        self.issue = 
-        self.edition = 
-        '''
+        self.volume  = root.find(m['volume']).text
+        self.issue   = root.find(m['issue']).text
+        self.edition = root.find(m['edition']).text
+        self.date    = root.find(m['date']).text
+        self.pages   = [
+            p for p in root.findall(m['pages']) \
+                if p.get('ID').startswith('pageModsBib')
+            ]
+        self.files   = [f for f in root.findall(m['files'])]
+        
+        print("Diamondback {0}: Vol. {1}.{2} (ed. {3})".format(
+            self.date, self.volume, self.issue, self.edition
+            ))
+        
+        for n, pagexml in enumerate(self.pages):
+            print("   > Page {0}: ".format(n+1), end='')
+            id = pagexml.get('ID').strip('pageModsBib')
+            filexml = next(
+                f for f in self.files if f.get('ID').endswith(id)
+                )
+            p = page(pagexml, filexml)
 
 
 class page():
-    '''class representing the individual page (fileset)'''
+    '''class representing the individual page'''
+    def __init__(self, pagexml, filexml):
+        m = metadata_map.page
+        self.reel   = pagexml.find(m['reel']).text
+        self.frame  = pagexml.find(m['frame']).text
+        self.files  = filexml.findall(m['files'])
+        
+        print("Reel {0}, Frame {1}".format(self.reel, self.frame))
+        
+        for f in self.files:
+            print(f)
+        
+        
+class file():
+    '''class representing the individual file'''
     def __init__(self, source):
-        tree = ET.parse(source)
-        root = tree.getroot()
-        print(root)
+        m = metadata_map.file
 
 
 #============================================================================
@@ -93,7 +111,8 @@ def main():
 
     with open(args.config, 'r') as configfile:
         globals().update(yaml.safe_load(configfile))
-        print("Successfully loaded configuration information.\n")
+        print("Successfully loaded configuration information.")
+        print("Successfully imported metadata mapping.")
     
     b = batch(args.path)
 

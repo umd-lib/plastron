@@ -40,8 +40,9 @@ class batch():
         self.issues = root.findall(md['issues'])
         print("Batch contains {} issues: ".format(len(self.issues)))
         for n, issue in enumerate(self.issues):
-            print("\n\n ISSUE {}. ".format(n+1), end='')
+            print("\n\n ISSUE {}: ".format(n+1))
             i = item(os.path.join(self.basepath, issue.text))
+            
             
 
 class item():
@@ -51,6 +52,7 @@ class item():
         root = tree.getroot()
         m = metadata_map.issue
         
+        self.dir     = os.path.dirname(path)
         self.volume  = root.find(m['volume']).text
         self.issue   = root.find(m['issue']).text
         self.edition = root.find(m['edition']).text
@@ -61,37 +63,49 @@ class item():
             ]
         self.files   = [f for f in root.findall(m['files'])]
         
-        print("Diamondback {0}: Vol. {1}.{2} (ed. {3})".format(
+        header = "Diamondback {0}: Vol. {1}.{2} (ed. {3})".format(
             self.date, self.volume, self.issue, self.edition
-            ))
+            )
+        border = "=" * (len(header) + 4)
+        
+        print(border)
+        print("|", header, "|")
+        print(border)
         
         for n, pagexml in enumerate(self.pages):
-            print("   > Page {0}: ".format(n+1), end='')
             id = pagexml.get('ID').strip('pageModsBib')
-            filexml = next(
+            filegroup = next(
                 f for f in self.files if f.get('ID').endswith(id)
                 )
-            p = page(pagexml, filexml)
+            p = page(pagexml, filegroup)
+
+            print("  Page {0}: Reel {1}, Frame {2}".format(
+                n+1, p.reel, p.frame
+                ))
+
+            for f in p.files:
+                f.path = os.path.join(self.dir, os.path.basename(f.relpath))
+                print('   => {0}: {1}'.format(f.use, f.path))
+
 
 
 class page():
     '''class representing the individual page'''
-    def __init__(self, pagexml, filexml):
+    def __init__(self, pagexml, filegroup):
         m = metadata_map.page
         self.reel   = pagexml.find(m['reel']).text
         self.frame  = pagexml.find(m['frame']).text
-        self.files  = filexml.findall(m['files'])
+        self.files  = [file(f) for f in filegroup.findall(m['files'])]
         
-        print("Reel {0}, Frame {1}".format(self.reel, self.frame))
-        
-        for f in self.files:
-            print(f)
-        
+               
         
 class file():
     '''class representing the individual file'''
-    def __init__(self, source):
+    def __init__(self, filexml):
         m = metadata_map.file
+        self.use  = filexml.get('USE')
+        elem = filexml.find(m['filepath'])
+        self.relpath = elem.get('{http://www.w3.org/1999/xlink}href')
 
 
 #============================================================================

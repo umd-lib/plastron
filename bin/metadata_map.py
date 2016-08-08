@@ -23,7 +23,7 @@ issue = {
     'pages':    (".//{http://www.loc.gov/METS/}dmdSec"
                 ),
     'files':    (".//{http://www.loc.gov/METS/}fileGrp"
-                )
+                ),
     }
 
 
@@ -39,12 +39,14 @@ page = {
                 "identifier[@type='reel sequence number']"
                 ),
     'files':    (".//{http://www.loc.gov/METS/}file"
-                )
+                ),
     }
     
     
 file = {
     'number':   (".//{http://www.loc.gov/mods/v3}start"
+                ),
+    'filepath': (".//{http://www.loc.gov/METS/}FLocat"
                 ),
     }
 

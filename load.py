@@ -134,6 +134,10 @@ def main():
     else:
         print(' no data handler specified.')
 
+    data = handler.load(args.path)
+    
+    print(data)
+
     print_footer()
 
 '''     Create collection (c) and set up ACL

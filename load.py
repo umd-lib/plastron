@@ -135,9 +135,15 @@ def main():
         print(' no data handler specified.')
 
     data = handler.load(args.path)
+    data.print_tree()
     
-    print(data)
-
+    for item in data.items:
+        print(item.title)
+        for page in item.pages:
+            print(page.title)
+            for file in page.files:
+                print(file.title)
+    
     print_footer()
 
 '''     Create collection (c) and set up ACL

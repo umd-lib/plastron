@@ -5,16 +5,32 @@ import lxml.etree as ET
 import os
 from classes import pcdm
 import rdflib
+from rdflib import Namespace
 
-bibo = rdflib.Namespace('http://purl.org/ontology/bibo/')
-dc   = rdflib.Namespace('http://purl.org/dc/elements/1.1/')
-foaf = rdflib.Namespace('http://xmlns.com/foaf/0.1/')
+bibo    = Namespace('http://purl.org/ontology/bibo/')
+dc      = Namespace('http://purl.org/dc/elements/1.1/')
+foaf    = Namespace('http://xmlns.com/foaf/0.1/')
+premis  = Namespace('http://www.loc.gov/premis/rdf/v1#')
+image   = Namespace('<http://www.modeshape.org/images/1.0')
+sv      = Namespace('http://www.jcp.org/jcr/sv/1.0')
+nt      = Namespace('http://www.jcp.org/jcr/nt/1.0')
+rdfs    = Namespace('http://www.w3.org/2000/01/rdf-schema#')
+xsi     = Namespace('http://www.w3.org/2001/XMLSchema-instance')
+mode    = Namespace('http://www.modeshape.org/1.0')
+xmlns   = Namespace('http://www.w3.org/2000/xmlns/')
+rdf     = Namespace('http://www.w3.org/1999/02/22-rdf-syntax-ns#')
+xml     = Namespace('http://www.w3.org/XML/1998 Namespace')
+jcr     = Namespace('http://www.jcp.org/jcr/1.0')
+ebucore = Namespace('http://www.ebu.ch/metadata/ontologies/ebucore/ebucore#')
+ldp     = Namespace('<http://www.w3.org/ns/ldp#')
+xs      = Namespace('<http://www.w3.org/2001/XMLSchema')
+mix     = Namespace('<http://www.jcp.org/jcr/mix/1.0')
+prov    = Namespace('<http://www.w3.org/ns/prov#')
 
 namespace_manager = rdflib.namespace.NamespaceManager(rdflib.Graph())
 namespace_manager.bind('bibo', bibo, override=False)
 namespace_manager.bind('dc', dc, override=False)
 namespace_manager.bind('foaf', foaf, override=False)
-
 
 
 #============================================================================
@@ -75,7 +91,7 @@ METAMAP = {
 # CLASSES
 #============================================================================
 
-class batch():
+class batch(pcdm.Resource):
 
     '''class representing the set of resources to be loaded'''
 
@@ -116,7 +132,7 @@ class batch():
 
 
 
-class item():
+class item(pcdm.Resource):
 
     '''class representing all components of an individual item'''
 
@@ -171,7 +187,7 @@ class item():
                 
     
 
-class page():
+class page(pcdm.Resource):
 
     '''class representing the individual page'''
 
@@ -221,7 +237,4 @@ class file():
 #============================================================================
 
 def load(path_to_batch_xml):
-    
-    b = batch(path_to_batch_xml)
-    b.print_tree()
-    return b
+    return batch(path_to_batch_xml)

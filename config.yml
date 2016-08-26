@@ -1,4 +1,4 @@
-REST_ENDPOINT: http://localhost:8080/fcrepo/rest/
+REST_ENDPOINT: http://fcrepolocal/fcrepo/rest/pcdm
 FEDORA_USER: fedoraAdmin
 FEDORA_PASSWORD: secret3
 

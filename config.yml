@@ -2,15 +2,3 @@ REST_ENDPOINT: http://localhost:8080/fcrepo/rest/
 FEDORA_USER: fedoraAdmin
 FEDORA_PASSWORD: secret3
 
-PREDICATES:
-    dcterms:title
-    dcterms:issued
-    dcterms:creator
-    dc:identifier@type:lccn
-    dc:isPartOf
-    bibo:volume
-    bibo:issue
-    bibo:edition
-    bibo:pageStart
-    
-    

@@ -1,6 +1,6 @@
-PyYAML==3.11
 isodate==0.5.4
-lxml==3.6.0
-pyparsing==2.1.5
+lxml==3.6.1
+pyparsing==2.1.7
+PyYAML==3.11
 rdflib==4.2.1
-requests==2.10.0
+requests==2.11.0

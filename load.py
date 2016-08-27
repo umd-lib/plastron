@@ -52,14 +52,14 @@ def load_batch():
             for file in page.files:
                 print('   => {0}: {1}'.format(file.use, file.path))
         
-        print("\nCreating LDP Container...")
+        print("\nCreating empty repository container...")
         response = requests.post(REST_ENDPOINT)
         if response.status_code == 201:
             uri = response.text
             print("  {0} Created! => {1}".format(response, uri))
         
-        print("\nCreating RDF Graph...")
-        props = rdflib.Graph()
+        print("\nBuilding RDF Graph...")
+        properties = rdflib.Graph()
 
 
 #============================================================================
@@ -106,7 +106,7 @@ def main():
                         )
     
     parser.add_argument('-d', '--dryrun', 
-                        help='Run through batch without POSTing assets.',
+                        help='Iterate over the batch without POSTing.',
                         action='store_true'
                         )
     
@@ -119,6 +119,7 @@ def main():
     args = parser.parse_args()
     
     
+    # Load config and check repository connection
     print("Configuring repo connection...", end='')
     if args.config:
         with open(args.config, 'r') as configfile:
@@ -127,13 +128,21 @@ def main():
     else:
         print(' no configuration specified.')
     
+    
+    # Define the specified data_handler function for the data being loaded
     print("Initializing data handler...", end='')
     if args.handler:
-        handler = import_module('handlers.' + args.handler)
+        handler = import_module('handler.' + args.handler)
         print(' loading "{0}" handler => Done!'.format(args.handler))
     else:
         print(' no data handler specified.')
-
+    
+    
+    b = handler.data_handler(args.path)
+    
+    
+    
+    # Conclude batch and report results
     print_footer()
 
 '''     Create collection (c) and set up ACL

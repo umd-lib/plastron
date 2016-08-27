@@ -89,6 +89,13 @@ class batch():
             self.items.append(item(p))
         
         print('\nDone!')
+        
+        for n, i in enumerate(self.items):
+            print('\n{0}. {1}'.format(n, i))
+            for p in i.pages:
+                print(" |--", p)
+                for f in p.files:
+                    print(" | |--", f)
 
 
 class item():
@@ -137,4 +144,17 @@ class file():
         self.use  = filexml.get('USE')
         elem = filexml.find(m['filepath'])
         self.relpath = elem.get('{http://www.w3.org/1999/xlink}href')
-        
+
+
+'''
+PREDICATES:
+    dcterms:title
+    dcterms:issued
+    dcterms:creator
+    dc:identifier@type:lccn
+    dc:isPartOf
+    bibo:volume
+    bibo:issue
+    bibo:edition
+    bibo:pageStart
+'''

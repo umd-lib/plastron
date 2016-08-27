@@ -136,27 +136,8 @@ def main():
         print(' loading "{0}" handler => Done!'.format(args.handler))
     else:
         print(' no data handler specified.')
-<<<<<<< HEAD
-    
     
     b = handler.data_handler(args.path)
-    
-    
-    
-    # Conclude batch and report results
-=======
-
-    data = handler.load(args.path)
-    data.print_tree()
-    
-    for item in data.items:
-        print(item.title)
-        for page in item.pages:
-            print(page.title)
-            for file in page.files:
-                print(file.title)
-    
->>>>>>> a9a2037931c07f1c29eb68ada4d6e0022e0b53ef
     print_footer()
 
 '''     Create collection (c) and set up ACL

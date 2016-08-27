@@ -9,10 +9,6 @@ from rdflib import Namespace
 
 class Resource():
 
-    '''A class representing a digital asset that can be understood as a 
-       self-cotained unit of description (for example a book, film, audio
-       recording, etc.'''
-
     def __init__(self):
         pass
 
@@ -23,7 +19,6 @@ class Resource():
             return True
         else:
             return False
-
 
     def createGraph(self):
     

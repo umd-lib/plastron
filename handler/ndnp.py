@@ -228,22 +228,6 @@ class file():
         self.use  = filexml.get('USE')
         elem = filexml.find(m['filepath'])
         self.relpath = elem.get('{http://www.w3.org/1999/xlink}href')
-<<<<<<< HEAD:handler/ndnp.py
-
-
-'''
-PREDICATES:
-    dcterms:title
-    dcterms:issued
-    dcterms:creator
-    dc:identifier@type:lccn
-    dc:isPartOf
-    bibo:volume
-    bibo:issue
-    bibo:edition
-    bibo:pageStart
-'''
-=======
         self.basename = os.path.basename(self.relpath)
         self.title = "{0} ({1})".format(self.basename, self.use)
         
@@ -261,4 +245,4 @@ PREDICATES:
 
 def load(path_to_batch_xml):
     return batch(path_to_batch_xml)
->>>>>>> a9a2037931c07f1c29eb68ada4d6e0022e0b53ef:handlers/ndnp.py
+    

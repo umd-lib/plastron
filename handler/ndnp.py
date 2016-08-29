@@ -7,6 +7,7 @@ from classes import pcdm
 import rdflib
 from rdflib import Namespace
 
+
 bibo    = Namespace('http://purl.org/ontology/bibo/')
 dc      = Namespace('http://purl.org/dc/elements/1.1/')
 foaf    = Namespace('http://xmlns.com/foaf/0.1/')
@@ -27,10 +28,12 @@ xs      = Namespace('<http://www.w3.org/2001/XMLSchema')
 mix     = Namespace('<http://www.jcp.org/jcr/mix/1.0')
 prov    = Namespace('<http://www.w3.org/ns/prov#')
 
+
 namespace_manager = rdflib.namespace.NamespaceManager(rdflib.Graph())
 namespace_manager.bind('bibo', bibo, override=False)
 namespace_manager.bind('dc', dc, override=False)
 namespace_manager.bind('foaf', foaf, override=False)
+
 
 
 #============================================================================
@@ -87,11 +90,12 @@ METAMAP = {
     }
 
 
+
 #============================================================================
 # CLASSES
 #============================================================================
 
-class batch(pcdm.Resource):
+class Batch():
 
     '''class representing the set of resources to be loaded'''
 
@@ -116,30 +120,20 @@ class batch(pcdm.Resource):
         for n, p in enumerate(self.paths):
             print("Processing item {0}/{1}...".format(n+1, 
                     self.num_items), end='\r')
-            self.items.append(item(p))
+            self.items.append(Item(p))
         
         print('\nDone!')
-        
-        for n, i in enumerate(self.items):
-            print('\n{0}. {1}'.format(n, i))
-            for p in i.pages:
-                print(" |--", p)
-                for f in p.files:
-                    print(" | |--", f)
 
     # print the hierarchy of items, pages, and files
     def print_tree(self):
         for n, i in enumerate(self.items):
-            print("\n  {0}. {1}".format(n + 1, i.title))
-            for p_num, p in enumerate(i.pages):
-                print("      p{0}: {1}".format(p_num + 1, p.title))
-                for f in p.files:
-                    print("          |--{0}".format(f.title))
+            print("\nITEM {0}".format(n))
+            i.print_item_tree()
         print('')
 
 
 
-class item(pcdm.Resource):
+class Item():
 
     '''class representing all components of an individual item'''
 
@@ -150,6 +144,7 @@ class item(pcdm.Resource):
         
         # gather metadata
         self.dir     = os.path.dirname(path)
+        self.path    = path
         self.title   = root.xpath('./@LABEL')[0]
         self.volume  = root.find(m['volume']).text
         self.issue   = root.find(m['issue']).text
@@ -158,18 +153,28 @@ class item(pcdm.Resource):
         self.pages   = []
         
         # store metadata as an RDF graph
-        self.id      = rdflib.BNode()
-        self.graph   = rdflib.Graph()
-        self.graph.namespace_manager = namespace_manager
+        self.id = rdflib.BNode()
+        self.metadata = rdflib.Graph()
+        self.metadata.namespace_manager = namespace_manager
         
-        self.graph.add( (self.id, dc.title, rdflib.Literal(self.title)) )
-        self.graph.add( (self.id, bibo.volume, rdflib.Literal(self.volume)) )
-        self.graph.add( (self.id, bibo.issue, rdflib.Literal(self.issue)) )
-        self.graph.add( (self.id, bibo.edition, rdflib.Literal(self.edition)) )
-        self.graph.add( (self.id, dc.date, rdflib.Literal(self.date)) )
+        self.metadata.add( 
+            (self.id, dc.title, rdflib.Literal(self.title)) 
+            )
+        self.metadata.add( 
+            (self.id, bibo.volume, rdflib.Literal(self.volume)) 
+            )
+        self.metadata.add( 
+            (self.id, bibo.issue, rdflib.Literal(self.issue)) 
+            )
+        self.metadata.add( 
+            (self.id, bibo.edition, rdflib.Literal(self.edition)) 
+            )
+        self.metadata.add( 
+            (self.id, dc.date, rdflib.Literal(self.date)) 
+            )
         
         # print the graph (uncomment to debug)
-        # print(self.graph.serialize(format='turtle'))
+        # print(self.metadata.serialize(format='turtle'))
         
         # gather all the page and file xml snippets
         filexml_snippets = [f for f in root.findall(m['files'])]
@@ -185,16 +190,24 @@ class item(pcdm.Resource):
                 )
             
             # create a page object for each page and append to list of pages
-            p = page(pagexml, filexml, self)
+            p = Page(pagexml, filexml, self)
             self.pages.append(p)
             
             # iterate over the files for each page, and set the path
             for f in p.files:
                 f.path = os.path.join(self.dir, os.path.basename(f.relpath))
-                
-    
 
-class page(pcdm.Resource):
+
+    def print_item_tree(self):
+        print(self.title)
+        for p_num, p in enumerate(self.pages):
+            print("  p{0}: {1}".format(p_num + 1, p.title))
+            for f in p.files:
+                print("   |--{0}".format(f.title))
+
+
+
+class Page():
 
     '''class representing the individual page'''
 
@@ -203,46 +216,52 @@ class page(pcdm.Resource):
         
         # gather metadata
         self.number = pagexml.find(m['number']).text
+        self.path   = issue.path + self.number
         self.reel   = pagexml.find(m['reel']).text
         self.frame  = pagexml.find(m['frame']).text
         self.title  = "{0}, page {1}".format(issue.title, self.number)
         
         # generate a file object for each file in the XML snippet
-        self.files  = [file(f) for f in filegroup.findall(m['files'])]
+        self.files  = [File(f) for f in filegroup.findall(m['files'])]
         
         # store metadata as an RDF graph
-        self.id      = rdflib.BNode()
-        self.graph   = rdflib.Graph()
-        self.graph.namespace_manager = namespace_manager
+        self.id = rdflib.BNode()
+        self.metadata = rdflib.Graph()
+        self.metadata.namespace_manager = namespace_manager
         
-        self.graph.add( (self.id, dc.title, rdflib.Literal(self.title)) )
-        self.graph.add( (self.id, dc.reel, rdflib.Literal(self.reel)) )
-        self.graph.add( (self.id, dc.frame, rdflib.Literal(self.frame)) )
-        
+        self.metadata.add( (self.id, dc.title, rdflib.Literal(self.title)) )
+        self.metadata.add( (self.id, dc.reel, rdflib.Literal(self.reel)) )
+        self.metadata.add( (self.id, dc.frame, rdflib.Literal(self.frame)) )
 
-        
-class file():
+
+
+class File():
+
     '''class representing the individual file'''
+    
     def __init__(self, filexml):
         m = METAMAP['file']
+        
         self.use  = filexml.get('USE')
         elem = filexml.find(m['filepath'])
         self.relpath = elem.get('{http://www.w3.org/1999/xlink}href')
         self.basename = os.path.basename(self.relpath)
         self.title = "{0} ({1})".format(self.basename, self.use)
+        self.path = os.path.join(self.relpath, self.basename)
         
         # store metadata as an RDF graph
         self.id      = rdflib.BNode()
-        self.graph   = rdflib.Graph()
-        self.graph.namespace_manager = namespace_manager
+        self.metadata   = rdflib.Graph()
+        self.metadata.namespace_manager = namespace_manager
         
-        self.graph.add( (self.id, dc.title, rdflib.Literal(self.title)) )
-        
-        
+        self.metadata.add( (self.id, dc.title, rdflib.Literal(self.title)) )
+
+
+
 #============================================================================
 # DATA LOADING FUNCTION
 #============================================================================
 
 def load(path_to_batch_xml):
-    return batch(path_to_batch_xml)
-    
+    return Batch(path_to_batch_xml)
+

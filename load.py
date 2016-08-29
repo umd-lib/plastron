@@ -6,6 +6,7 @@ from __future__ import print_function
 import argparse
 import logging
 from importlib import import_module
+import pprint
 import rdflib
 import requests
 import sys
@@ -28,7 +29,7 @@ def print_header():
 
 def print_footer():
     '''Report success or failure and resources created.'''
-    print('Script complete. Goodbye!')
+    print('\nScript complete. Goodbye!\n')
 
 
 def load_batch():
@@ -137,44 +138,24 @@ def main():
     else:
         print(' no data handler specified.')
     
-    b = handler.data_handler(args.path)
+    b = handler.load(args.path)
+    
+    for item in b.items:
+        resource = pcdm.ItemObj(item)
+        
+        if args.dryrun:
+            resource.uri = resource.path
+        else:
+            resource.get_uri(REST_ENDPOINT, FEDORA_USER, FEDORA_PASSWORD)
+        
+        resource.add_metadata_to_graph()
+        
+        response = resource.deposit(FEDORA_USER, FEDORA_PASSWORD)
+        
+        print(response)
+        
     print_footer()
-
-'''     Create collection (c) and set up ACL
-            <> a PCDM:Collection
-            
-        For each item (i) in collection:
-            c hasMember i
-            <> a pcdm:Object
-            <> pcdm:memberOf c
-            
-            for each page (p) in i
-                <> a pcdm:Object
-                
-                for each file (f) in p
-                    <> a pcdm:file
-                    <> pcdm:fileOf
-                
-                    attach binary to pcdm:File 
-                    
-def main():
     
-    myitem = Container(testdata, foo='bar')
-    
-    print(myitem)
-    
-    
-    myitem.getUri()
-    myitem.createGraph()
-    
-    print(myitem.uri)
-    
-    properties = (vars(myitem))
-    for k,v in properties.items():
-        print("{0} : {1}".format(k,v))
-
-'''
-
 
 if __name__ == "__main__":
     main()

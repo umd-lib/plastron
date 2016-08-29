@@ -39,25 +39,19 @@ class Resource():
 
 
     def deposit(self, user, password):
-        query = ["PREFIX dc: <http://purl.org/dc/elements/1.1/>",
-                 "PREFIX bibo: <http://purl.org/ontology/bibo/>",
-                 "PREFIX foaf: <http://xmlns.com/foaf/0.1/>",
-                 "INSERT {"]
+        print("Patching {0}...".format(self.uri))
+        query = ["INSERT DATA {"]
         for (s,p,o) in self.graph:
-            query.append("<> <{0}> '{1}' ;".format(p,o))
-        query[-1] = query[-1].rstrip(';') + '.'
+            query.append("<> <{0}> '{1}' .".format(p,o))
         query.append("}")
-        
         print("\n".join(query))
-        
         data = '\n'.join(query).encode('utf-8')
-
         headers = {'Content-Type': 'application/sparql-update'}
-        response = requests.patch(  self.uri, 
-                                    data=data, 
-                                    auth=(user, password),
-                                    headers=headers
-                                    )
+        response = requests.patch(self.uri, 
+                                  data=data, 
+                                  auth=(user, password),
+                                  headers=headers
+                                  )
         return response
 
 
@@ -73,6 +67,7 @@ class ItemObj(Resource):
         self.components = [CompObj(p) for p in data.pages]
         self.path = data.path
         self.metadata = data.metadata
+        self.title = data.title
 
 
 #============================================================================

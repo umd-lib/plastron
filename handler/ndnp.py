@@ -5,7 +5,7 @@ import lxml.etree as ET
 import os
 from classes import pcdm
 import rdflib
-from rdflib import Namespace
+from rdflib import Namespace, URIRef
 
 
 bibo    = Namespace('http://purl.org/ontology/bibo/')
@@ -153,8 +153,9 @@ class Item():
         self.pages   = []
         
         # store metadata as an RDF graph
-        self.id = rdflib.BNode()
         self.metadata = rdflib.Graph()
+        self.id = rdflib.resource.Resource(self.metadata, URIRef('')) 
+        # rdflib.BNode()
         self.metadata.namespace_manager = namespace_manager
         
         self.metadata.add( 

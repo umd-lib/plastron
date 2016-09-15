@@ -2,6 +2,8 @@ Utility for batch loading newspaper content into a Fedora 4 repository.
 
 ## Installation
 
+Requires Python 3.
+
 ```
 git clone git@github.com:jwestgard/newspaper-batchload.git
 cd newspaper-batchload

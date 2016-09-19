@@ -83,7 +83,8 @@ class Resource():
 
     # update existing repo object with SPARQL update
     def update_object(self, repository):
-        if type(self) == pcdm.File:
+        print(type(self))
+        if type(self) == 'handler.ndnp.File':
             patch_uri = str(self.uri) + "/fcr:metadata"
         else:
             patch_uri = str(self.uri)
@@ -240,13 +241,13 @@ class Item(Resource):
             proxy.graph.add( (proxy.uri, ore.ProxyIn, self.uri) )
             
             if position == 0:
-                self.graph.add( (self.uri, iana.first, component.uri) )
+                self.graph.add( (self.uri, iana.first, proxy.uri) )
             else:
                 prev = proxies[position - 1]
                 proxy.graph.add( (proxy.uri, iana.prev, prev.uri) )
                 
             if position == len(self.components) - 1:
-                self.graph.add( (self.uri, iana.last, component.uri) )
+                self.graph.add( (self.uri, iana.last, proxy.uri) )
             else:
                 next = proxies[position + 1]
                 proxy.graph.add( (proxy.uri, iana.next, next.uri) )

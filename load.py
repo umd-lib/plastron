@@ -15,6 +15,7 @@ import yaml
 from classes import pcdm
 
 
+
 #============================================================================
 # HELPER FUNCTIONS 
 #============================================================================
@@ -32,36 +33,6 @@ def print_footer():
     print('\nScript complete. Goodbye!\n')
 
 
-def load_batch():
-    b = batch(args.path)
-    
-    for n, item in enumerate(b.items):
-        print("\n\n ISSUE {}: ".format(n+1))
-        header = "Diamondback {0}: Vol. {1}.{2} (ed. {3})".format(
-            item.date, item.volume, item.issue, item.edition
-            )
-        border = "=" * (len(header) + 4)
-        
-        print(border)
-        print("|", header, "|")
-        print(border)
-        
-        for n, page in enumerate(item.pages):
-            print("  Page {0}: Reel {1}, Frame {2}".format(
-                n+1, page.reel, page.frame
-                ))
-            for file in page.files:
-                print('   => {0}: {1}'.format(file.use, file.path))
-        
-        print("\nCreating empty repository container...")
-        response = requests.post(REST_ENDPOINT)
-        if response.status_code == 201:
-            uri = response.text
-            print("  {0} Created! => {1}".format(response, uri))
-        
-        print("\nBuilding RDF Graph...")
-        properties = rdflib.Graph()
-
 
 #============================================================================
 # MAIN LOOP
@@ -75,24 +46,23 @@ def main():
         description='A configurable batch loader for Fedora 4.'
         )
     
-    # Path to the repo config (endpoint, credentials, and WebAC paths)
-    
     '''TODO: Config should support storage of a list of WebAC ACL URIs 
        according to the most common access control policies in use by the 
        repository, so the data handler can access and apply them.''' 
     
+    # Path to the repo config (endpoint, credentials, and WebAC paths)
     parser.add_argument('-c', '--config', 
                         help='Path to configuration file.',
-                        action='store'
+                        action='store',
+                        required=True
                         )
     
     # Data handler module to use
     parser.add_argument('-H', '--handler', 
                         help='Data handler module to use.',
-                        action='store'
+                        action='store',
+                        required=True
                         )
-    
-    # Support resuming interrupted jobs by storing URIs for completed items
     
     '''TODO: Loader needs to save resource ID and URI to a map file, and also
        support reading an existing map file and skipping previously created
@@ -100,14 +70,23 @@ def main():
        support PATCHing existing URIs that have incomplete resource objects
        attached to them; or perhaps better, should use transactions to prevent
        incomplete resources being created.''' 
-       
+    
+    ''' # Support resuming interrupted jobs by storing URIs for completed items
+        # NOT YET IMPLEMENTED
     parser.add_argument('-r', '--resume', 
                         help='Resume interrupted batch using results file.',
                         action='store'
-                        )
+                        ) '''
     
+    # Run through object preparation, but do not touch repository
     parser.add_argument('-d', '--dryrun', 
                         help='Iterate over the batch without POSTing.',
+                        action='store_true'
+                        )
+    
+    # Load without binaries; useful for testing when file loading is too slow
+    parser.add_argument('-n', '--nobinaries',
+                        help='Iterate without uploading binaries.',
                         action='store_true'
                         )
     
@@ -124,7 +103,9 @@ def main():
     print("Configuring repo connection...", end='')
     if args.config:
         with open(args.config, 'r') as configfile:
-            globals().update(yaml.safe_load(configfile))
+            config = yaml.safe_load(configfile)
+            auth = (config['FEDORA_USER'], config['FEDORA_PASSWORD'])
+            fcrepo = pcdm.Repository(config['REST_ENDPOINT'], auth)
             print(' loading {0} => Done!'.format(args.config))
     else:
         print(' no configuration specified.')
@@ -138,24 +119,27 @@ def main():
     else:
         print(' no data handler specified.')
     
-    b = handler.load(args.path)
     
-    for item in b.items:
-        resource = pcdm.ItemObj(item)
+    # The handler is always invoked by calling the load function defined in 
+    # the specified handler on a specified local path (file or directory).
+    batch = handler.load(args.path)
+    batch.print_tree()
         
-        if args.dryrun:
-            resource.uri = resource.path
-        else:
-            resource.get_uri(REST_ENDPOINT, FEDORA_USER, FEDORA_PASSWORD)
-        
-        resource.add_metadata_to_graph()
-        
-        response = resource.deposit(FEDORA_USER, FEDORA_PASSWORD)
-        
-        print(response)
-        
+    if not args.dryrun:
+        # create all batch objects in repository
+        for n, item in enumerate(batch.items):
+            print('\nLoading item {0}...'.format(n+1))
+            item.recursive_create(fcrepo, args.nobinaries)
+            print('\nCreating ordering proxies ...')
+            item.create_ordering(fcrepo)
+            print('\nUpdating relationship triples ...')
+            item.update_relationship_triples()
+            print('\nUpdating item {0}...'.format(n+1))
+            item.recursive_update(fcrepo, args.nobinaries)
+            
+    
     print_footer()
-    
+
 
 if __name__ == "__main__":
     main()

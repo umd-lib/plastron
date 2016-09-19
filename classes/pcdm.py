@@ -1,21 +1,304 @@
+import hashlib
 from io import BytesIO
+import mimetypes
+import os
 import pprint
 import requests
 import rdflib
 from rdflib import Namespace
 
 #============================================================================
-# PCDM RESOURCE
+# NAMESPACE BINDINGS
+#============================================================================
+
+namespace_manager = rdflib.namespace.NamespaceManager(rdflib.Graph())
+
+bibo = Namespace('http://purl.org/ontology/bibo/')
+namespace_manager.bind('bibo', bibo, override=False)
+
+dc = Namespace('http://purl.org/dc/elements/1.1/')
+namespace_manager.bind('dc', dc, override=False)
+
+ex = Namespace('http://www.example.org/terms/')
+namespace_manager.bind('ex', ex, override=False)
+
+foaf = Namespace('http://xmlns.com/foaf/0.1/')
+namespace_manager.bind('foaf', foaf, override=False)
+
+iana = Namespace('http://www.iana.org/assignments/relation/')
+namespace_manager.bind('iana', iana, override=False)
+
+ore = Namespace('http://www.openarchives.org/ore/terms/')
+namespace_manager.bind('ore', ore, override=False)
+
+pcdm = Namespace('http://pcdm.org/models#')
+namespace_manager.bind('pcdm', pcdm, override=False)
+
+rdf = Namespace('http://www.w3.org/1999/02/22-rdf-syntax-ns#')
+namespace_manager.bind('rdf', rdf, override=False)
+
+
+
+#============================================================================
+# REPOSITORY (REPRESENTING AN FCREPO INSTANCE)
+#============================================================================
+
+class Repository():
+    def __init__(self, endpoint, auth):
+        self.endpoint = endpoint
+        self.user = auth[0]
+        self.password = auth[1]
+
+
+
+#============================================================================
+# PCDM RESOURCE (COMMON METHODS FOR ALL OBJECTS)
 #============================================================================
 
 class Resource():
 
-    def __init__(self):
+    def __init__(self, uri=''):
         self.graph = rdflib.Graph()
+        self.uri = rdflib.URIRef(uri)
 
 
-    def get_uri(self, endpoint, user, password):
-        response = requests.post(endpoint, auth = (user, password))
+    # create repository object by POSTing object graph 
+    def create_object(self, repository):
+        if self.exists_in_repo(repository):
+            return False
+        else:
+            print("Creating {0}...".format(self.title), end='')
+            response = requests.post(
+                repository.endpoint, auth=(repository.user, repository.password)
+                )
+            if response.status_code == 201:
+                print("success.")
+                print(response.status_code, response.text)
+                self.uri = rdflib.URIRef(response.text)
+                return True
+            else:
+                print("failed!")
+                return False
+
+
+    # update existing repo object with SPARQL update
+    def update_object(self, repository):
+        if type(self) == pcdm.File:
+            patch_uri = str(self.uri) + "/fcr:metadata"
+        else:
+            patch_uri = str(self.uri)
+        print("Patching {0}...".format(patch_uri), end='')
+        query = "INSERT DATA {{{0}}}".format(
+            self.graph.serialize(format='nt').decode()
+            )
+        data = query.encode('utf-8')
+        headers = {'Content-Type': 'application/sparql-update'}
+        response = requests.patch(patch_uri, 
+                                  data=data, 
+                                  auth=(repository.user, repository.password),
+                                  headers=headers
+                                  )
+        if response.status_code == 204:
+            print("success.")
+        else:
+            print("failed!")
+            print(response.status_code, response.text)
+        return response
+
+
+    # recursively create an object and components and that don't yet exist
+    def recursive_create(self, repository, nobinaries):
+        if not self.exists_in_repo(repository):
+            self.create_object(repository)
+        else:
+            print('Object "{0}" exists. Skipping...'.format(self.title))
+            
+        if not nobinaries:
+            for file in self.files:
+                if not file.exists_in_repo(repository):
+                    file.create_nonrdf(repository)
+                else:
+                    print('File "{0}" exists. Skipping...'.format(file.title))
+
+        for component in self.components:
+            if not component.exists_in_repo(repository):
+                component.recursive_create(repository, nobinaries)
+            else:
+                print(
+                    'Component "{0}" exists. Skipping...'.format(
+                        component.title)
+                    )
+                    
+        if hasattr(self, 'collections'):
+            for collection in self.collections:
+                if not collection.exists_in_repo(repository):
+                    collection.create_object(repository)
+                else:
+                    print(
+                        'Collection "{0}" exists. Skipping...'.format(
+                            collection.title)
+                        )
+
+
+    # recursively update an object and all its components and files
+    def recursive_update(self, repository, nobinaries):
+        self.update_object(repository)
+        if not nobinaries:
+            for file in self.files:
+                file.update_object(repository)
+        for component in self.components:
+            component.recursive_update(repository, nobinaries)
+        if hasattr(self, 'collections'):
+            for collection in self.collections:
+                collection.update_object(repository)
+
+
+    # check for the existence of a local object in the repository
+    def exists_in_repo(self, repository):
+        if str(self.uri).startswith(repository.endpoint):
+            response = requests.head(
+                repository.endpoint, auth=(repository.user, repository.password)
+                )
+            if response.status_code == 200:
+                return True
+            else:
+                return False
+        else:
+            return False
+
+
+    # update object graph with URI
+    def update_subject_uri(self):
+        for (s, p, o) in self.graph:
+            self.graph.delete( (s, p, o) )
+            self.graph.add( (self.uri, p, o) )
+
+
+    # update membership triples (can be used after repository object creation
+    # to ensure repository URIs are present)
+    def update_relationship_triples(self):
+        for component in self.components:
+            self.graph.add( (self.uri, pcdm.hasMember, component.uri) )
+            component.graph.add( (component.uri, pcdm.memberOf, self.uri) )
+            
+        for file in self.files:
+            self.graph.add( (self.uri, pcdm.hasFile, file.uri) )
+            file.graph.add( (file.uri, pcdm.fileOf, self.uri) )
+            
+        for collection in self.collections:
+            self.graph.add( (self.uri, pcdm.memberOf, collection.uri) )
+            collection.graph.add( (collection.uri, pcdm.hasMember, self.uri) )
+
+
+    # show the object's graph, serialized as turtle
+    def print_graph(self):
+        print(self.graph.serialize(format="turtle").decode())
+
+
+    # show the item graph and tree of related objects
+    def print_item_tree(self):
+        print(self.title)
+        if self.components:
+            for n, p in enumerate(self.components):
+                print("  Part {0}: {1}".format(n+1, p.title))
+                for f in p.files:
+                    print("   |--{0}: {1}".format(f.title, f.localpath))
+
+
+
+#============================================================================
+# PCDM ITEM-OBJECT
+#============================================================================
+
+class Item(Resource):
+
+    def __init__(self):
+        Resource.__init__(self)
+        self.files = []
+        self.components = []
+        self.collections = []
+        self.graph.add( (self.uri, rdf.type, pcdm.Object) )
+    
+    
+    # iterate over each component and create ordering proxies
+    def create_ordering(self, repository):
+        
+        proxies = []
+        for component in self.components:
+            position = " ".join([self.sequence_attr[0], 
+                                getattr(component, self.sequence_attr[1])]
+                                )
+            proxies.append(Proxy(position, self.title))
+            
+        for proxy in proxies:
+            proxy.create_object(repository)
+            proxy.graph.namespace_manager = self.graph.namespace_manager
+            
+        for (position, component) in enumerate(self.components):
+            proxy = proxies[position]
+            proxy.graph.add( (proxy.uri, ore.ProxyFor, component.uri) )
+            proxy.graph.add( (proxy.uri, ore.ProxyIn, self.uri) )
+            
+            if position == 0:
+                self.graph.add( (self.uri, iana.first, component.uri) )
+            else:
+                prev = proxies[position - 1]
+                proxy.graph.add( (proxy.uri, iana.prev, prev.uri) )
+                
+            if position == len(self.components) - 1:
+                self.graph.add( (self.uri, iana.last, component.uri) )
+            else:
+                next = proxies[position + 1]
+                proxy.graph.add( (proxy.uri, iana.next, next.uri) )
+            
+            proxy.update_object(repository)
+
+
+
+#============================================================================
+# PCDM COMPONENT-OBJECT
+#============================================================================
+
+class Component(Resource):
+
+    def __init__(self):
+        Resource.__init__(self)
+        self.files = []
+        self.components = []
+        self.graph.add( (self.uri, rdf.type, pcdm.Object) )
+
+
+
+#============================================================================
+# PCDM FILE
+#============================================================================
+
+class File(Resource):
+
+    def __init__(self, localpath):
+        Resource.__init__(self)
+        self.localpath = localpath
+        self.checksum = self.sha1()
+        self.filename = os.path.basename(self.localpath)
+        self.mimetype = mimetypes.guess_type(self.localpath)[0]
+        self.graph.add( (self.uri, rdf.type, pcdm.File) )
+
+
+    # upload a binary resource
+    def create_nonrdf(self, repository):
+        print("Loading {0}...".format(self.filename))
+        with open(self.localpath, 'rb') as binaryfile:
+            data = binaryfile.read()
+        headers = {'Content-Type': self.mimetype,
+                   'Digest': 'sha1={0}'.format(self.checksum),
+                   'Content-Disposition': 
+                        'attachment; filename="{0}"'.format(self.filename)
+                    }
+        response = requests.post(repository.endpoint, 
+                                 auth=(repository.user, repository.password), 
+                                 data=data, 
+                                 headers=headers
+                                 )
         if response.status_code == 201:
             self.uri = response.text
             return True
@@ -23,82 +306,44 @@ class Resource():
             return False
 
 
-    def create_graph(self):
-        print('Building resource graph...')
-        s = self.uri
-        for (p,o) in self.metadata:
-            self.graph.add( (s, p, o) )
+    # generate SHA1 checksum on a file
+    def sha1(self):
+        BUF_SIZE = 65536
+        sha1 = hashlib.sha1()
+        with open(self.localpath, 'rb') as f:
+            while True:
+                data = f.read(BUF_SIZE)
+                if not data:
+                    break
+                sha1.update(data)
+        return sha1.hexdigest()
 
-
-    def add_metadata_to_graph(self, dryrun=True):
-        if not hasattr(self, 'uri'):
-            uri = self.path
-        s = rdflib.URIRef(self.uri)
-        for b,p,o in self.metadata:
-            self.graph.add( (s,p,o) )
-
-
-    def deposit(self, user, password):
-        print("Patching {0}...".format(self.uri))
-        query = ["INSERT DATA {"]
-        for (s,p,o) in self.graph:
-            query.append("<> <{0}> '{1}' .".format(p,o))
-        query.append("}")
-        print("\n".join(query))
-        data = '\n'.join(query).encode('utf-8')
-        headers = {'Content-Type': 'application/sparql-update'}
-        response = requests.patch(self.uri, 
-                                  data=data, 
-                                  auth=(user, password),
-                                  headers=headers
-                                  )
-        return response
 
 
 #============================================================================
-# PCDM ITEM-OBJECT
+# PCDM COLLECTION OBJECT
 #============================================================================
 
-class ItemObj(Resource):
-
-    def __init__(self, data):
+class Collection(Resource):
+    
+    def __init__(self):
         Resource.__init__(self)
-        self.graph = rdflib.Graph()
-        self.components = [CompObj(p) for p in data.pages]
-        self.path = data.path
-        self.metadata = data.metadata
-        self.title = data.title
+        self.files = None
+        self.graph.add( (self.uri, rdf.type, pcdm.Collection) )
 
-
-#============================================================================
-# PCDM COMPONENT-OBJECT
-#============================================================================
-
-class CompObj(Resource):
-
-    def __init__(self, data):
-        Resource.__init__(self)
-        self.graph = rdflib.Graph()
-        self.files = [FileObj(f) for f in data.files]
-
-
-#============================================================================
-# PCDM FILE
-#============================================================================
-
-class FileObj(Resource):
-
-    def __init__(self, data):
-        Resource.__init__(self)
 
 
 #============================================================================
 # PCDM PROXY OBJECT
 #============================================================================
 
-class ProxyObj(Resource):
+class Proxy(Resource):
     
-    def __init__(self):
+    def __init__(self, position, context):
         Resource.__init__(self)
+        self.title = 'Proxy for {0} in {1}'.format(position, context)
+        self.graph.add( (self.uri, rdf.type, ore.Proxy) )
+        self.graph.add( (self.uri, dc.title, rdflib.Literal(self.title)) )
+
 
 

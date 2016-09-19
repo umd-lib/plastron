@@ -83,17 +83,13 @@ class Resource():
 
     # update existing repo object with SPARQL update
     def update_object(self, repository):
-        if type(self) == pcdm.File:
-            patch_uri = str(self.uri) + "/fcr:metadata"
-        else:
-            patch_uri = str(self.uri)
-        print("Patching {0}...".format(patch_uri), end='')
+        print("Patching {0}...".format(str(self.uri)), end='')
         query = "INSERT DATA {{{0}}}".format(
             self.graph.serialize(format='nt').decode()
             )
         data = query.encode('utf-8')
         headers = {'Content-Type': 'application/sparql-update'}
-        response = requests.patch(patch_uri, 
+        response = requests.patch(str(self.uri), 
                                   data=data, 
                                   auth=(repository.user, repository.password),
                                   headers=headers
@@ -240,13 +236,13 @@ class Item(Resource):
             proxy.graph.add( (proxy.uri, ore.ProxyIn, self.uri) )
             
             if position == 0:
-                self.graph.add( (self.uri, iana.first, component.uri) )
+                self.graph.add( (self.uri, iana.first, proxy.uri) )
             else:
                 prev = proxies[position - 1]
                 proxy.graph.add( (proxy.uri, iana.prev, prev.uri) )
                 
             if position == len(self.components) - 1:
-                self.graph.add( (self.uri, iana.last, component.uri) )
+                self.graph.add( (self.uri, iana.last, proxy.uri) )
             else:
                 next = proxies[position + 1]
                 proxy.graph.add( (proxy.uri, iana.next, next.uri) )
@@ -304,6 +300,28 @@ class File(Resource):
             return True
         else:
             return False
+
+
+    # update existing binary resource metadata
+    def update_object(self, repository):
+        patch_uri = str(self.uri) + '/fcr:metadata'
+        print("Patching {0}...".format(patch_uri), end='')
+        query = "INSERT DATA {{{0}}}".format(
+            self.graph.serialize(format='nt').decode()
+            )
+        data = query.encode('utf-8')
+        headers = {'Content-Type': 'application/sparql-update'}
+        response = requests.patch(patch_uri, 
+                                  data=data, 
+                                  auth=(repository.user, repository.password),
+                                  headers=headers
+                                  )
+        if response.status_code == 204:
+            print("success.")
+        else:
+            print("failed!")
+            print(response.status_code, response.text)
+        return response
 
 
     # generate SHA1 checksum on a file

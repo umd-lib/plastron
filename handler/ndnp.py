@@ -34,6 +34,7 @@ ex = Namespace('http://www.example.org/terms/')
 namespace_manager.bind('ex', ex, override=False)
 
 
+
 #============================================================================
 # METADATA MAPPING
 #============================================================================
@@ -121,8 +122,12 @@ class Batch():
         m = XPATHMAP
         
         self.reel = Reel(batchfile)
-        dback = pcdm.Collection()
+        
+        dback = Collection()
         dback.title = "The Diamondback Newspaper Collection"
+        dback.graph.add( 
+            (dback.uri, dc.title, rdflib.Literal(dback.title)) 
+            )
         
         # read over the index XML file assembling a list of paths to the issues
         self.basepath = os.path.dirname(batchfile)
@@ -323,6 +328,20 @@ class File(pcdm.File):
         self.graph.add( (self.uri, dc.title, rdflib.Literal(self.title)) )
 
 
+
+#============================================================================
+# NDNP ISSUE OBJECT
+#============================================================================
+
+class Collection(pcdm.Collection):
+
+    ''' class representing a collection of newspaper resources '''
+    
+    def __init__(self):
+        pcdm.Collection.__init__(self)
+        
+        
+        
 
 #============================================================================
 # NDNP ARTICLE OBJECT

@@ -59,6 +59,7 @@ class Resource():
 
     def __init__(self, uri=''):
         self.graph = rdflib.Graph()
+        self.graph.namespace_manager = namespace_manager
         self.uri = rdflib.URIRef(uri)
 
 

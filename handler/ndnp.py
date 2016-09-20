@@ -1,4 +1,4 @@
-''' Classes for interpreting and loading metadata and files stored 
+''' Classes for interpreting and loading metadata and files stored
     according to the NDNP specification. '''
 
 import lxml.etree as ET
@@ -42,11 +42,11 @@ XPATHMAP = {
     'batch': {
         'issues':   "./{http://www.loc.gov/ndnp}issue"
         },
-        
+
     'reel': {
         'number':   "./{http://www.loc.gov/ndnp}reel"
         },
-        
+
     'issue': {
         'volume':   (".//{http://www.loc.gov/mods/v3}detail[@type='volume']/"
                     "{http://www.loc.gov/mods/v3}number"
@@ -67,7 +67,7 @@ XPATHMAP = {
         'files':    (".//{http://www.loc.gov/METS/}fileGrp"
                     ),
         },
-        
+
     'page': {
         'number':   (".//{http://www.loc.gov/mods/v3}start"
                     ),
@@ -82,14 +82,14 @@ XPATHMAP = {
         'files':    (".//{http://www.loc.gov/METS/}file"
                     ),
         },
-        
+
     'file': {
         'number':   (".//{http://www.loc.gov/mods/v3}start"
                     ),
         'filepath': (".//{http://www.loc.gov/METS/}FLocat"
                     ),
         },
-    
+
     'article': {
         'title':    (".//{http://www.loc.gov/mods/v3}title"
                     )
@@ -119,46 +119,51 @@ class Batch():
         tree = ET.parse(batchfile)
         root = tree.getroot()
         m = XPATHMAP
-        
+
         self.reel = Reel(batchfile)
         dback = pcdm.Collection()
         dback.title = "The Diamondback Newspaper Collection"
-        
+
         # read over the index XML file assembling a list of paths to the issues
         self.basepath = os.path.dirname(batchfile)
         self.paths = [
-            os.path.join(self.basepath, 
+            os.path.join(self.basepath,
                 i.text) for i in root.findall(m['batch']['issues'])
             ]
         self.length = len(self.paths)
-        
+
         print("Batch contains {} issues.".format(self.length))
-        
+
         self.items = []
-        
+
         # iterate over the paths to the issues and create an item from each one
         for n, p in enumerate(self.paths):
-            print("Preprocessing item {0}/{1}...".format(n+1, 
+            print("Preprocessing item {0}/{1}...".format(n+1,
                 self.length), end='\r')
+
+            if not os.path.isfile(p):
+                print("\nMissing item {0}, skipping".format(n+1))
+                continue
+
             issue = Issue(p)
             self.items.append(issue)
-            
+
             # add the collection to the issue
             issue.collections.append(dback)
-            
+
             # add issue's pages to the reel object
             for page in issue.components:
                 self.reel.components.append(page)
-            
+
         self.items.append(self.reel)
-        
+
         # iterate over the article-level XML and get articles
         articlexmlpath = os.path.dirname(batchfile) + "Article-Level"
         articlefiles = []
         for root, dirs, files in os.walk(articlexmlpath):
             for file in files:
                 articlefiles.append(os.path.join(root, file))
-        
+
         articles = {}
         for file in articlefiles:
             tree = ET.parse(file)
@@ -166,8 +171,8 @@ class Batch():
             articles[os.path.basename(file)] = [
                 art for art in root.findall(m['article']['title'])
                 ]
-            
-        
+
+
         print('\nPreprocessing complete!')
 
 
@@ -193,7 +198,7 @@ class Issue(pcdm.Item):
         tree = ET.parse(path)
         root = tree.getroot()
         m = XPATHMAP['issue']
-        
+
         # gather metadata
         self.dir        = os.path.dirname(path)
         self.path           = path
@@ -203,41 +208,41 @@ class Issue(pcdm.Item):
         self.edition        = root.find(m['edition']).text
         self.date           = root.find(m['date']).text
         self.sequence_attr  = ('Page', 'number')
-        
+
         # store metadata as an RDF graph
         self.graph.namespace_manager = namespace_manager
-        self.graph.add( 
-            (self.uri, dc.title, rdflib.Literal(self.title)) 
+        self.graph.add(
+            (self.uri, dc.title, rdflib.Literal(self.title))
             )
-        self.graph.add( 
-            (self.uri, bibo.volume, rdflib.Literal(self.volume)) 
+        self.graph.add(
+            (self.uri, bibo.volume, rdflib.Literal(self.volume))
             )
-        self.graph.add( 
-            (self.uri, bibo.issue, rdflib.Literal(self.issue)) 
+        self.graph.add(
+            (self.uri, bibo.issue, rdflib.Literal(self.issue))
             )
-        self.graph.add( 
-            (self.uri, bibo.edition, rdflib.Literal(self.edition)) 
+        self.graph.add(
+            (self.uri, bibo.edition, rdflib.Literal(self.edition))
             )
-        self.graph.add( 
-            (self.uri, dc.date, rdflib.Literal(self.date)) 
+        self.graph.add(
+            (self.uri, dc.date, rdflib.Literal(self.date))
             )
-      
+
         # gather all the page and file xml snippets
         filexml_snippets = [f for f in root.findall(m['files'])]
         pagexml_snippets = [p for p in root.findall(m['pages']) if \
             p.get('ID').startswith('pageModsBib')
             ]
-        
+
         # iterate over each page section matching it to its files
         for n, pagexml in enumerate(pagexml_snippets):
             id = pagexml.get('ID').strip('pageModsBib')
             filexml = next(
                 f for f in filexml_snippets if f.get('ID').endswith(id)
                 )
-            
+
             # create a page object for each page and append to list of pages
             page = Page(pagexml, filexml, self)
-            
+
             self.components.append(page)
 
 
@@ -249,7 +254,7 @@ class Issue(pcdm.Item):
 class Reel(pcdm.Item):
 
     ''' class representing an NDNP reel '''
-    
+
     def __init__(self, batchfile):
         pcdm.Item.__init__(self)
         tree = ET.parse(batchfile)
@@ -259,12 +264,12 @@ class Reel(pcdm.Item):
         self.id = elem.get('reelNumber')
         self.title = 'Reel Number {0}'.format(self.id)
         self.sequence_attr = ('Frame', 'frame')
-        
-        self.graph.add( 
-            (self.uri, dc.title, rdflib.Literal(self.title)) 
+
+        self.graph.add(
+            (self.uri, dc.title, rdflib.Literal(self.title))
             )
-        self.graph.add( 
-            (self.uri, dc.identifier, rdflib.Literal(self.id)) 
+        self.graph.add(
+            (self.uri, dc.identifier, rdflib.Literal(self.id))
             )
 
 
@@ -280,18 +285,18 @@ class Page(pcdm.Component):
     def __init__(self, pagexml, filegroup, issue):
         pcdm.Component.__init__(self)
         m = XPATHMAP['page']
-        
+
         # gather metadata
         self.number = pagexml.find(m['number']).text
         self.path   = issue.path + self.number
         self.reel   = pagexml.find(m['reel']).text
         self.frame  = pagexml.find(m['frame']).text
         self.title  = "{0}, page {1}".format(issue.title, self.number)
-        
+
         # generate a file object for each file in the XML snippet
         for f in filegroup.findall(m['files']):
             self.files.append(File(f, issue.dir))
-        
+
         # store metadata in object graph
         self.graph.namespace_manager = namespace_manager
         self.graph.add( (self.uri, dc.title, rdflib.Literal(self.title)) )
@@ -307,7 +312,7 @@ class Page(pcdm.Component):
 class File(pcdm.File):
 
     ''' class representing an individual file '''
-    
+
     def __init__(self, filexml, dir):
         m = XPATHMAP['file']
         elem = filexml.find(m['filepath'])
@@ -317,7 +322,7 @@ class File(pcdm.File):
         self.basename = os.path.basename(self.localpath)
         self.use  = filexml.get('USE')
         self.title = "{0} ({1})".format(self.basename, self.use)
-        
+
         # store metadata in object graph
         self.graph.namespace_manager = namespace_manager
         self.graph.add( (self.uri, dc.title, rdflib.Literal(self.title)) )
@@ -331,8 +336,8 @@ class File(pcdm.File):
 class Article(pcdm.Item):
 
     ''' class representing an article in a newspaper issue '''
-    
+
     def __init__(self, filexml):
         pass
-        
-        
+
+

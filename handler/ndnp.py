@@ -330,7 +330,7 @@ class File(pcdm.File):
 
 
 #============================================================================
-# NDNP ISSUE OBJECT
+# NDNP COLLECTION OBJECT
 #============================================================================
 
 class Collection(pcdm.Collection):

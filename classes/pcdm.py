@@ -63,7 +63,7 @@ class Resource():
         self.uri = rdflib.URIRef(uri)
 
 
-    # create repository object by POSTing object graph 
+    # create repository object by POSTing object graph
     def create_object(self, repository):
         if self.exists_in_repo(repository):
             return False
@@ -85,13 +85,20 @@ class Resource():
     # update existing repo object with SPARQL update
     def update_object(self, repository):
         print("Patching {0}...".format(str(self.uri)), end='')
-        query = "INSERT DATA {{{0}}}".format(
-            self.graph.serialize(format='nt').decode()
-            )
+        prolog = ''
+        #TODO: limit this to just the prefixes that are used in the graph
+        for (prefix, uri) in self.graph.namespace_manager.namespaces():
+            prolog += "PREFIX {0}: {1}\n".format(prefix, uri.n3())
+
+        triples = [ "<> {0} {1}.".format(
+            self.graph.namespace_manager.normalizeUri(p),
+            o.n3()) for (s, p, o) in self.graph ]
+
+        query = prolog + "INSERT DATA {{{0}}}".format("\n".join(triples))
         data = query.encode('utf-8')
         headers = {'Content-Type': 'application/sparql-update'}
-        response = requests.patch(str(self.uri), 
-                                  data=data, 
+        response = requests.patch(str(self.uri),
+                                  data=data,
                                   auth=(repository.user, repository.password),
                                   headers=headers
                                   )
@@ -109,7 +116,7 @@ class Resource():
             self.create_object(repository)
         else:
             print('Object "{0}" exists. Skipping...'.format(self.title))
-            
+
         if not nobinaries:
             for file in self.files:
                 if not file.exists_in_repo(repository):
@@ -125,7 +132,7 @@ class Resource():
                     'Component "{0}" exists. Skipping...'.format(
                         component.title)
                     )
-                    
+
         if hasattr(self, 'collections'):
             for collection in self.collections:
                 if not collection.exists_in_repo(repository):
@@ -177,11 +184,11 @@ class Resource():
         for component in self.components:
             self.graph.add( (self.uri, pcdm.hasMember, component.uri) )
             component.graph.add( (component.uri, pcdm.memberOf, self.uri) )
-            
+
         for file in self.files:
             self.graph.add( (self.uri, pcdm.hasFile, file.uri) )
             file.graph.add( (file.uri, pcdm.fileOf, self.uri) )
-            
+
         for collection in self.collections:
             self.graph.add( (self.uri, pcdm.memberOf, collection.uri) )
             collection.graph.add( (collection.uri, pcdm.hasMember, self.uri) )
@@ -215,39 +222,39 @@ class Item(Resource):
         self.components = []
         self.collections = []
         self.graph.add( (self.uri, rdf.type, pcdm.Object) )
-    
-    
+
+
     # iterate over each component and create ordering proxies
     def create_ordering(self, repository):
-        
+
         proxies = []
         for component in self.components:
-            position = " ".join([self.sequence_attr[0], 
+            position = " ".join([self.sequence_attr[0],
                                 getattr(component, self.sequence_attr[1])]
                                 )
             proxies.append(Proxy(position, self.title))
-            
+
         for proxy in proxies:
             proxy.create_object(repository)
             proxy.graph.namespace_manager = self.graph.namespace_manager
-            
+
         for (position, component) in enumerate(self.components):
             proxy = proxies[position]
             proxy.graph.add( (proxy.uri, ore.ProxyFor, component.uri) )
             proxy.graph.add( (proxy.uri, ore.ProxyIn, self.uri) )
-            
+
             if position == 0:
                 self.graph.add( (self.uri, iana.first, proxy.uri) )
             else:
                 prev = proxies[position - 1]
                 proxy.graph.add( (proxy.uri, iana.prev, prev.uri) )
-                
+
             if position == len(self.components) - 1:
                 self.graph.add( (self.uri, iana.last, proxy.uri) )
             else:
                 next = proxies[position + 1]
                 proxy.graph.add( (proxy.uri, iana.next, next.uri) )
-            
+
             proxy.update_object(repository)
 
 
@@ -288,12 +295,12 @@ class File(Resource):
             data = binaryfile.read()
         headers = {'Content-Type': self.mimetype,
                    'Digest': 'sha1={0}'.format(self.checksum),
-                   'Content-Disposition': 
+                   'Content-Disposition':
                         'attachment; filename="{0}"'.format(self.filename)
                     }
-        response = requests.post(repository.endpoint, 
-                                 auth=(repository.user, repository.password), 
-                                 data=data, 
+        response = requests.post(repository.endpoint,
+                                 auth=(repository.user, repository.password),
+                                 data=data,
                                  headers=headers
                                  )
         if response.status_code == 201:
@@ -312,8 +319,8 @@ class File(Resource):
             )
         data = query.encode('utf-8')
         headers = {'Content-Type': 'application/sparql-update'}
-        response = requests.patch(patch_uri, 
-                                  data=data, 
+        response = requests.patch(patch_uri,
+                                  data=data,
                                   auth=(repository.user, repository.password),
                                   headers=headers
                                   )
@@ -344,7 +351,7 @@ class File(Resource):
 #============================================================================
 
 class Collection(Resource):
-    
+
     def __init__(self):
         Resource.__init__(self)
         self.files = None
@@ -357,7 +364,7 @@ class Collection(Resource):
 #============================================================================
 
 class Proxy(Resource):
-    
+
     def __init__(self, position, context):
         Resource.__init__(self)
         self.title = 'Proxy for {0} in {1}'.format(position, context)

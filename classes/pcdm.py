@@ -44,11 +44,21 @@ namespace_manager.bind('rdf', rdf, override=False)
 #============================================================================
 
 class Repository():
-    def __init__(self, endpoint, auth):
-        self.endpoint = endpoint
-        self.user = auth[0]
-        self.password = auth[1]
+    def __init__(self, config):
+        self.endpoint = config['REST_ENDPOINT']
+        if 'FEDORA_USER' in config and 'FEDORA_PASSWORD' in config:
+            self.auth = (config['FEDORA_USER'], config['FEDORA_PASSWORD'])
+        else:
+            self.auth = ()
 
+    def post(self, url, **kwargs):
+        return requests.post(url, auth=self.auth, **kwargs)
+
+    def patch(self, url, **kwargs):
+        return requests.patch(url, auth=self.auth, **kwargs)
+
+    def head(self, url, **kwargs):
+        return requests.head(url, auth=repository.auth, **kwargs)
 
 
 #============================================================================
@@ -69,9 +79,7 @@ class Resource():
             return False
         else:
             print("Creating {0}...".format(self.title), end='')
-            response = requests.post(
-                repository.endpoint, auth=(repository.user, repository.password)
-                )
+            response = repository.post(repository.endpoint)
             if response.status_code == 201:
                 print("success.")
                 print(response.status_code, response.text)
@@ -97,11 +105,7 @@ class Resource():
         query = prolog + "INSERT DATA {{{0}}}".format("\n".join(triples))
         data = query.encode('utf-8')
         headers = {'Content-Type': 'application/sparql-update'}
-        response = requests.patch(str(self.uri),
-                                  data=data,
-                                  auth=(repository.user, repository.password),
-                                  headers=headers
-                                  )
+        response = repository.patch(str(self.uri), data=data, headers=headers)
         if response.status_code == 204:
             print("success.")
         else:
@@ -160,9 +164,7 @@ class Resource():
     # check for the existence of a local object in the repository
     def exists_in_repo(self, repository):
         if str(self.uri).startswith(repository.endpoint):
-            response = requests.head(
-                repository.endpoint, auth=(repository.user, repository.password)
-                )
+            response = repository.head(str(self.uri))
             if response.status_code == 200:
                 return True
             else:
@@ -298,8 +300,7 @@ class File(Resource):
                    'Content-Disposition':
                         'attachment; filename="{0}"'.format(self.filename)
                     }
-        response = requests.post(repository.endpoint,
-                                 auth=(repository.user, repository.password),
+        response = repository.post(repository.endpoint,
                                  data=data,
                                  headers=headers
                                  )
@@ -319,11 +320,7 @@ class File(Resource):
             )
         data = query.encode('utf-8')
         headers = {'Content-Type': 'application/sparql-update'}
-        response = requests.patch(patch_uri,
-                                  data=data,
-                                  auth=(repository.user, repository.password),
-                                  headers=headers
-                                  )
+        response = repository.patch(patch_uri, data=data, headers=headers)
         if response.status_code == 204:
             print("success.")
         else:

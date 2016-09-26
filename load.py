@@ -113,8 +113,7 @@ def main():
     if args.config:
         with open(args.config, 'r') as configfile:
             config = yaml.safe_load(configfile)
-            auth = (config['FEDORA_USER'], config['FEDORA_PASSWORD'])
-            fcrepo = pcdm.Repository(config['REST_ENDPOINT'], auth)
+            fcrepo = pcdm.Repository(config)
             print(' loading {0} => Done!'.format(args.config))
     else:
         print(' no configuration specified.')

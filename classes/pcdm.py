@@ -46,19 +46,30 @@ namespace_manager.bind('rdf', rdf, override=False)
 class Repository():
     def __init__(self, config):
         self.endpoint = config['REST_ENDPOINT']
-        if 'FEDORA_USER' in config and 'FEDORA_PASSWORD' in config:
+        self.auth = None
+        self.client_cert = None
+
+        if 'CLIENT_CERT' in config and 'CLIENT_KEY' in config:
+            self.client_cert = (config['CLIENT_CERT'], config['CLIENT_KEY'])
+        elif 'FEDORA_USER' in config and 'FEDORA_PASSWORD' in config:
             self.auth = (config['FEDORA_USER'], config['FEDORA_PASSWORD'])
+
+        if 'SERVER_CERT' in config:
+            self.server_cert = config['SERVER_CERT']
         else:
-            self.auth = ()
+            self.server_cert = None
 
     def post(self, url, **kwargs):
-        return requests.post(url, auth=self.auth, **kwargs)
+        return requests.post(url, cert=self.client_cert, auth=self.auth,
+                verify=self.server_cert, **kwargs)
 
     def patch(self, url, **kwargs):
-        return requests.patch(url, auth=self.auth, **kwargs)
+        return requests.patch(url, cert=self.client_cert, auth=self.auth,
+                verify=self.server_cert, **kwargs)
 
     def head(self, url, **kwargs):
-        return requests.head(url, auth=self.auth, **kwargs)
+        return requests.head(url, cert=self.client_cert, auth=self.auth,
+                verify=self.server_cert, **kwargs)
 
 
 #============================================================================
@@ -188,6 +199,7 @@ class Resource():
             component.graph.add( (component.uri, pcdm.memberOf, self.uri) )
 
         for file in self.files:
+            sys.stderr.write(str(self.uri))
             self.graph.add( (self.uri, pcdm.hasFile, file.uri) )
             file.graph.add( (file.uri, pcdm.fileOf, self.uri) )
 

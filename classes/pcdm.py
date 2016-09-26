@@ -58,7 +58,7 @@ class Repository():
         return requests.patch(url, auth=self.auth, **kwargs)
 
     def head(self, url, **kwargs):
-        return requests.head(url, auth=repository.auth, **kwargs)
+        return requests.head(url, auth=self.auth, **kwargs)
 
 
 #============================================================================

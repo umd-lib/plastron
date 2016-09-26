@@ -54,14 +54,22 @@ class Repository():
         elif 'FEDORA_USER' in config and 'FEDORA_PASSWORD' in config:
             self.auth = (config['FEDORA_USER'], config['FEDORA_PASSWORD'])
 
+        if 'SERVER_CERT' in config:
+            self.server_cert = config['SERVER_CERT']
+        else:
+            self.server_cert = None
+
     def post(self, url, **kwargs):
-        return requests.post(url, cert=self.client_cert, auth=self.auth, **kwargs)
+        return requests.post(url, cert=self.client_cert, auth=self.auth,
+                verify=self.server_cert, **kwargs)
 
     def patch(self, url, **kwargs):
-        return requests.patch(url, cert=self.client_cert, auth=self.auth, **kwargs)
+        return requests.patch(url, cert=self.client_cert, auth=self.auth,
+                verify=self.server_cert, **kwargs)
 
     def head(self, url, **kwargs):
-        return requests.head(url, cert=self.client_cert, auth=self.auth, **kwargs)
+        return requests.head(url, cert=self.client_cert, auth=self.auth,
+                verify=self.server_cert, **kwargs)
 
 
 #============================================================================

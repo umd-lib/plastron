@@ -142,7 +142,7 @@ def main():
     batch.print_tree()
 
     if not args.dryrun:
-        test_connection(repository)
+        test_connection(fcrepo)
         # create all batch objects in repository
         for n, item in enumerate(batch.items):
             if args.limit is not None and n >= args.limit:

@@ -258,8 +258,8 @@ class Item(Resource):
 
         for (position, component) in enumerate(self.components):
             proxy = proxies[position]
-            proxy.graph.add( (proxy.uri, ore.ProxyFor, component.uri) )
-            proxy.graph.add( (proxy.uri, ore.ProxyIn, self.uri) )
+            proxy.graph.add( (proxy.uri, ore.proxyFor, component.uri) )
+            proxy.graph.add( (proxy.uri, ore.proxyIn, self.uri) )
 
             if position == 0:
                 self.graph.add( (self.uri, iana.first, proxy.uri) )

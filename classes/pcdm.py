@@ -59,6 +59,10 @@ class Repository():
         else:
             self.server_cert = None
 
+    def is_reachable(self):
+        response = self.head(self.endpoint)
+        return response.status_code == 200
+
     def post(self, url, **kwargs):
         return requests.post(url, cert=self.client_cert, auth=self.auth,
                 verify=self.server_cert, **kwargs)

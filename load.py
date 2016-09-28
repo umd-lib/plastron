@@ -104,11 +104,15 @@ def main():
                         default=None
                         )
 
+    # Just ping the repository to see if the endpoint exists
+    parser.add_argument('-p', '--ping',
+                        help='Check the connection to the repository and exit.',
+                        action='store_true'
+                        )
 
     args = parser.parse_args()
 
-
-    # Load config and check repository connection
+    # Load config
     print("Configuring repo connection...", end='')
     if args.config:
         with open(args.config, 'r') as configfile:
@@ -118,6 +122,10 @@ def main():
     else:
         print(' no configuration specified.')
 
+    # "--ping" tests repository connection and exits
+    if args.ping:
+        test_connection(fcrepo)
+        exit(0)
 
     # Define the specified data_handler function for the data being loaded
     print("Initializing data handler...", end='')
@@ -134,6 +142,7 @@ def main():
     batch.print_tree()
 
     if not args.dryrun:
+        test_connection(fcrepo)
         # create all batch objects in repository
         for n, item in enumerate(batch.items):
             if args.limit is not None and n >= args.limit:
@@ -152,6 +161,15 @@ def main():
 
     print_footer()
 
+def test_connection(fcrepo):
+    # test connection to fcrepo
+    print("Testing connection to {0}".format(fcrepo.endpoint),
+            file=sys.stderr)
+    if fcrepo.is_reachable():
+        print("Connection successful.", file=sys.stderr)
+    else:
+        print("Unable to connect.", file=sys.stderr)
+        exit(1)
 
 if __name__ == "__main__":
     main()

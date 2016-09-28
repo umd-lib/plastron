@@ -6,6 +6,7 @@ import pprint
 import requests
 import rdflib
 from rdflib import Namespace
+import sys
 
 #============================================================================
 # NAMESPACE BINDINGS
@@ -201,6 +202,7 @@ class Resource():
         for component in self.components:
             self.graph.add( (self.uri, pcdm.hasMember, component.uri) )
             component.graph.add( (component.uri, pcdm.memberOf, self.uri) )
+            component.update_relationship_triples()
 
         for file in self.files:
             sys.stderr.write(str(self.uri))
@@ -287,6 +289,7 @@ class Component(Resource):
         Resource.__init__(self)
         self.files = []
         self.components = []
+        self.collections = []
         self.graph.add( (self.uri, rdf.type, pcdm.Object) )
 
 
@@ -321,7 +324,7 @@ class File(Resource):
                                  headers=headers
                                  )
         if response.status_code == 201:
-            self.uri = response.text
+            self.uri = rdflib.URIRef(response.text)
             return True
         else:
             return False

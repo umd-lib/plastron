@@ -264,6 +264,7 @@ class Item(Resource):
         self.files = []
         self.components = []
         self.collections = []
+        self.related = []
         self.graph.add( (self.uri, rdf.type, pcdm.Object) )
 
 

@@ -242,6 +242,7 @@ class Item(Resource):
         self.files = []
         self.components = []
         self.collections = []
+        self.related = []
         self.graph.add( (self.uri, rdf.type, pcdm.Object) )
 
 
@@ -360,9 +361,9 @@ class File(Resource):
                     break
                 sha1.update(data)
         return sha1.hexdigest()
-
-
-
+        
+        
+        
 #============================================================================
 # PCDM COLLECTION OBJECT
 #============================================================================

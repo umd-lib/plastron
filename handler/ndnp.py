@@ -73,6 +73,8 @@ XPATHMAP = {
                     ),
         'files':    (".//{http://www.loc.gov/METS/}fileGrp"
                     ),
+        'article':  (".//{http://www.loc.gov/mods/v3}title"
+                    )
         },
 
     'page': {
@@ -95,11 +97,6 @@ XPATHMAP = {
                     ),
         'filepath': (".//{http://www.loc.gov/METS/}FLocat"
                     ),
-        },
-
-    'article': {
-        'title':    (".//{http://www.loc.gov/mods/v3}title"
-                    )
         }
     }
 
@@ -137,10 +134,15 @@ class Batch():
 
         # read over the index XML file assembling a list of paths to the issues
         self.basepath = os.path.dirname(batchfile)
-        self.paths = [
-            os.path.join(self.basepath,
-                i.text) for i in root.findall(m['batch']['issues'])
-            ]
+        self.paths = []
+        for i in root.findall(m['batch']['issues']):
+            sanitized_path = i.text[:-6] + i.text[-4:]
+            self.paths.append(
+                (os.path.join(self.basepath, i.text),
+                 os.path.join(
+                    self.basepath, "Article-Level", sanitized_path)
+                    )
+                )
         self.length = len(self.paths)
 
         print("Batch contains {} issues.".format(self.length))
@@ -151,9 +153,11 @@ class Batch():
         for n, p in enumerate(self.paths):
             print("Preprocessing item {0}/{1}...".format(n+1,
                 self.length), end='\r')
-
-            if not os.path.isfile(p):
-                print("\nMissing item {0}, skipping".format(n+1))
+            
+            print(p)
+            
+            if not os.path.isfile(p[0]) or not os.path.isfile(p[1]):
+                print("\nMissing file for item {0}, skipping".format(n+1))
                 continue
 
             issue = Issue(p)
@@ -167,22 +171,6 @@ class Batch():
                 self.reel.components.append(page)
 
         self.items.append(self.reel)
-
-        # iterate over the article-level XML and get articles
-        articlexmlpath = os.path.dirname(batchfile) + "Article-Level"
-        articlefiles = []
-        for root, dirs, files in os.walk(articlexmlpath):
-            for file in files:
-                articlefiles.append(os.path.join(root, file))
-
-        articles = {}
-        for file in articlefiles:
-            tree = ET.parse(file)
-            root = tree.getroot()
-            articles[os.path.basename(file)] = [
-                art for art in root.findall(m['article']['title'])
-                ]
-
 
         print('\nPreprocessing complete!')
 
@@ -204,15 +192,16 @@ class Issue(pcdm.Item):
 
     ''' class representing all components of a newspaper issue '''
 
-    def __init__(self, path):
+    def __init__(self, paths):
+        (issue_path, article_path) = paths
         pcdm.Item.__init__(self)
-        tree = ET.parse(path)
+        tree = ET.parse(issue_path)
         root = tree.getroot()
         m = XPATHMAP['issue']
 
         # gather metadata
-        self.dir        = os.path.dirname(path)
-        self.path           = path
+        self.dir            = os.path.dirname(issue_path)
+        self.path           = issue_path
         self.title          = root.xpath('./@LABEL')[0]
         self.volume         = root.find(m['volume']).text
         self.issue          = root.find(m['issue']).text
@@ -255,6 +244,12 @@ class Issue(pcdm.Item):
             page = Page(pagexml, filexml, self)
 
             self.components.append(page)
+            
+        # iterate over the article XML and create objects for issue's articles
+        article_tree = ET.parse(article_path)
+        article_root = article_tree.getroot()
+        for article_title in article_root.findall(m['article']):
+            self.related.append(Article(article_title.text, self))
 
 
 
@@ -350,10 +345,9 @@ class Collection(pcdm.Collection):
 
     def __init__(self):
         pcdm.Collection.__init__(self)
-
-
-
-
+        
+        
+        
 #============================================================================
 # NDNP ARTICLE OBJECT
 #============================================================================
@@ -362,7 +356,14 @@ class Article(pcdm.Item):
 
     ''' class representing an article in a newspaper issue '''
 
-    def __init__(self, filexml):
-        pass
+    def __init__(self, title, issue):
+        pcdm.Item.__init__(self)
 
+        # gather metadata
+        self.title = title
+
+        # store metadata in object graph
+        self.graph.namespace_manager = namespace_manager
+        self.graph.add( (self.uri, dc.title, rdflib.Literal(self.title)) )
+        
 

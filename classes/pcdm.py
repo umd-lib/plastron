@@ -116,7 +116,8 @@ class Resource():
 
         triples = [ "<> {0} {1}.".format(
             self.graph.namespace_manager.normalizeUri(p),
-            o.n3()) for (s, p, o) in self.graph ]
+            o.n3(self.graph.namespace_manager)
+            ) for (s, p, o) in self.graph ]
 
         query = prolog + "INSERT DATA {{{0}}}".format("\n".join(triples))
         data = query.encode('utf-8')

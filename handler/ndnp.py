@@ -33,6 +33,12 @@ namespace_manager.bind('iana', iana, override=False)
 ex = Namespace('http://www.example.org/terms/')
 namespace_manager.bind('ex', ex, override=False)
 
+pcdm_ns = Namespace('http://pcdm.org/models#')
+namespace_manager.bind('pcdm', pcdm_ns, override=False)
+
+rdf = Namespace('http://www.w3.org/1999/02/22-rdf-syntax-ns#')
+namespace_manager.bind('rdf', rdf, override=False)
+
 
 
 #============================================================================
@@ -122,13 +128,13 @@ class Batch():
         m = XPATHMAP
 
         self.reel = Reel(batchfile)
-        
+
         dback = Collection()
         dback.title = "The Diamondback Newspaper Collection"
-        dback.graph.add( 
-            (dback.uri, dc.title, rdflib.Literal(dback.title)) 
+        dback.graph.add(
+            (dback.uri, dc.title, rdflib.Literal(dback.title))
             )
-        
+
         # read over the index XML file assembling a list of paths to the issues
         self.basepath = os.path.dirname(batchfile)
         self.paths = [
@@ -341,12 +347,12 @@ class File(pcdm.File):
 class Collection(pcdm.Collection):
 
     ''' class representing a collection of newspaper resources '''
-    
+
     def __init__(self):
         pcdm.Collection.__init__(self)
-        
-        
-        
+
+
+
 
 #============================================================================
 # NDNP ARTICLE OBJECT

@@ -8,6 +8,8 @@ import rdflib
 from rdflib import Namespace
 import sys
 
+
+
 #============================================================================
 # NAMESPACE BINDINGS
 #============================================================================
@@ -87,6 +89,7 @@ class Resource():
         self.graph = rdflib.Graph()
         self.graph.namespace_manager = namespace_manager
         self.uri = rdflib.URIRef(uri)
+        self.related = []
 
 
     # create repository object by POSTing object graph
@@ -153,6 +156,15 @@ class Resource():
                     'Component "{0}" exists. Skipping...'.format(
                         component.title)
                     )
+        
+        for related_object in self.related:
+            if not related_object.exists_in_repo(repository):
+                related_object.recursive_create(repository, nobinaries)
+            else:
+                print(
+                    'Related object "{0}" exists. Skipping...'.format(
+                        related_object.title)
+                    )
 
         if hasattr(self, 'collections'):
             for collection in self.collections:
@@ -173,6 +185,8 @@ class Resource():
                 file.update_object(repository)
         for component in self.components:
             component.recursive_update(repository, nobinaries)
+        for related_object in self.related:
+            related_object.recursive_update(repository, nobinaries)
         if hasattr(self, 'collections'):
             for collection in self.collections:
                 collection.update_object(repository)
@@ -213,6 +227,14 @@ class Resource():
         for collection in self.collections:
             self.graph.add( (self.uri, pcdm.memberOf, collection.uri) )
             collection.graph.add( (collection.uri, pcdm.hasMember, self.uri) )
+            
+        for related_object in self.related:
+            self.graph.add( 
+                (self.uri, pcdm.hasRelatedObject, related_object.uri) 
+                )
+            related_object.graph.add(
+                (related_object.uri, pcdm.relatedObjectOf, self.uri)
+                )
 
 
     # show the object's graph, serialized as turtle
@@ -242,7 +264,6 @@ class Item(Resource):
         self.files = []
         self.components = []
         self.collections = []
-        self.related = []
         self.graph.add( (self.uri, rdf.type, pcdm.Object) )
 
 

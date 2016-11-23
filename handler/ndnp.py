@@ -366,4 +366,6 @@ class Article(pcdm.Item):
         self.graph.namespace_manager = namespace_manager
         self.graph.add( (self.uri, dc.title, rdflib.Literal(self.title)) )
         
+        print("Creating Article object {0}".format(self.title))
+        
 

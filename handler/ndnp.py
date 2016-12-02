@@ -154,7 +154,7 @@ class Batch():
             print("Preprocessing item {0}/{1}...".format(n+1,
                 self.length), end='\r')
             
-            print(p)
+            # print(p)
             
             if not os.path.isfile(p[0]) or not os.path.isfile(p[1]):
                 print("\nMissing file for item {0}, skipping".format(n+1))

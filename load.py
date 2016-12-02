@@ -4,8 +4,10 @@
 from __future__ import print_function
 
 import argparse
+import csv
 import logging
 from importlib import import_module
+import os.path
 import pprint
 import rdflib
 import requests
@@ -63,20 +65,15 @@ def main():
                         action='store',
                         required=True
                         )
-
-    '''TODO: Loader needs to save resource ID and URI to a map file, and also
-       support reading an existing map file and skipping previously created
-       resources; because URIs are created first, the loader should also
-       support PATCHing existing URIs that have incomplete resource objects
-       attached to them; or perhaps better, should use transactions to prevent
-       incomplete resources being created.'''
-
-    ''' # Support resuming interrupted jobs by storing URIs for completed items
-        # NOT YET IMPLEMENTED
-    parser.add_argument('-r', '--resume',
-                        help='Resume interrupted batch using results file.',
-                        action='store'
-                        ) '''
+       
+    # The mapfile records path and URI of successfully created items.
+    # Transactions prevent orphan resource creation below the item level.
+    # Items in an existing map file are skipped upon subsequent runs.  
+    parser.add_argument('-m', '--map', 
+                        help='Mapfile to store results of load.',
+                        action='store',
+                        default="mapfile.csv"
+                        )
 
     # Run through object preparation, but do not touch repository
     parser.add_argument('-d', '--dryrun',
@@ -90,15 +87,10 @@ def main():
                         action='store_true'
                         )
 
-    # Path to the data set (metadata and files)
-    parser.add_argument('path',
-                        help='Path to data set to be loaded.',
-                        action='store'
-                        )
-
     # Limit the load to a specified number of top-level objects
     parser.add_argument('-l', '--limit',
-                        help='Limit the load to a specified number of top-level objects.',
+                        help='''Limit the load to a specified number of             
+                                top-level objects.''',
                         action='store',
                         type=int,
                         default=None
@@ -108,6 +100,12 @@ def main():
     parser.add_argument('-p', '--ping',
                         help='Check the connection to the repository and exit.',
                         action='store_true'
+                        )
+    
+    # Path to the data set (metadata and files)
+    parser.add_argument('path',
+                        help='Path to data set to be loaded.',
+                        action='store'
                         )
 
     args = parser.parse_args()
@@ -143,21 +141,53 @@ def main():
 
     if not args.dryrun:
         test_connection(fcrepo)
-        # create all batch objects in repository
-        for n, item in enumerate(batch.items):
-            if args.limit is not None and n >= args.limit:
-                print("Stopping after {0} item(s)".format(args.limit))
-                break
+        
+        # open mapfile, if it exists, and read completed files into list
+        fieldnames = ['number', 'title', 'path', 'uri']
+        if os.path.isfile(args.map):
+            with open(args.map, 'r') as infile:
+                reader = csv.DictReader(infile)
+                # check the validity of the map file's format
+                if not reader.fieldnames == fieldnames:
+                    print('ERROR: Non-standard map file specified!')
+                    sys.exit(1)
+                else:
+                    # read data from an existing file
+                    completed_items = [row for row in reader]
+                    skip_list = [row['path'] for row in completed_items]
+                    
+        # open new map file
+        with open(args.map, 'w+') as mapfile:
+            writer = csv.DictWriter(mapfile, fieldnames=fieldnames)
+            writer.writeheader()
+            # write out completed items
+            for row in completed_items:
+                writer.writerow(row)
+        
+            # create all batch objects in repository
+            for n, item in enumerate(batch.items):
+                if args.limit is not None and n >= args.limit:
+                    print("Stopping after {0} item(s)".format(args.limit))
+                    break
+                elif item.path in skip_list:
+                    continue
 
-            print('\nLoading item {0}...'.format(n+1))
-            item.recursive_create(fcrepo, args.nobinaries)
-            print('\nCreating ordering proxies ...')
-            item.create_ordering(fcrepo)
-            print('\nUpdating relationship triples ...')
-            item.update_relationship_triples()
-            print('\nUpdating item {0}...'.format(n+1))
-            item.recursive_update(fcrepo, args.nobinaries)
-
+                print('\nLoading item {0}...'.format(n+1))
+                item.recursive_create(fcrepo, args.nobinaries)
+                print('\nCreating ordering proxies ...')
+                item.create_ordering(fcrepo)
+                print('\nUpdating relationship triples ...')
+                item.update_relationship_triples()
+                print('\nUpdating item {0}...'.format(n+1))
+                item.recursive_update(fcrepo, args.nobinaries)
+                
+                # write item details to mapfile
+                row = {'number': n + 1, 
+                       'title': item.title, 
+                       'path': item.path, 
+                       'uri': item.uri
+                       }
+                writer.writerow(row)
 
     print_footer()
 

@@ -220,7 +220,7 @@ class Resource():
             component.update_relationship_triples()
 
         for file in self.files:
-            sys.stderr.write(str(self.uri))
+            # sys.stderr.write(str(self.uri))
             self.graph.add( (self.uri, pcdm.hasFile, file.uri) )
             file.graph.add( (file.uri, pcdm.fileOf, self.uri) )
 
@@ -264,6 +264,7 @@ class Item(Resource):
         self.files = []
         self.components = []
         self.collections = []
+        self.related = []
         self.graph.add( (self.uri, rdf.type, pcdm.Object) )
 
 

@@ -1,3 +1,4 @@
+from datetime import datetime as dt
 import hashlib
 from io import BytesIO
 import mimetypes
@@ -138,6 +139,7 @@ class Resource():
     def recursive_create(self, repository, nobinaries):
         if not self.exists_in_repo(repository):
             self.create_object(repository)
+            self.creation_timestamp = dt.now()
         else:
             print('Object "{0}" exists. Skipping...'.format(self.title))
 

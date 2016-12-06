@@ -106,8 +106,8 @@ XPATHMAP = {
 # DATA LOADING FUNCTION
 #============================================================================
 
-def load(path_to_batch_xml):
-    return Batch(path_to_batch_xml)
+def load(args):
+    return Batch(args.path, args.limit)
 
 
 
@@ -119,7 +119,7 @@ class Batch():
 
     '''class representing the set of resources to be loaded'''
 
-    def __init__(self, batchfile):
+    def __init__(self, batchfile, limit):
         tree = ET.parse(batchfile)
         root = tree.getroot()
         m = XPATHMAP
@@ -151,10 +151,13 @@ class Batch():
 
         # iterate over the paths to the issues and create an item from each one
         for n, p in enumerate(self.paths):
-            print("Preprocessing item {0}/{1}...".format(n+1,
-                self.length), end='\r')
+            print("Preprocessing item {0}/{1}...".format(
+                n+1, self.length), end='\r'
+                )
             
-            # print(p)
+            if len(self.items) >= limit:
+                print("Stopping preprocessing after {0} items".format(limit))
+                break
             
             if not os.path.isfile(p[0]) or not os.path.isfile(p[1]):
                 print("\nMissing file for item {0}, skipping".format(n+1))

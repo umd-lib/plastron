@@ -133,36 +133,41 @@ def main():
     else:
         print(' no data handler specified.')
 
-
     # The handler is always invoked by calling the load function defined in
     # the specified handler on a specified local path (file or directory).
-    batch = handler.load(args.path)
+    batch = handler.load(args)
     batch.print_tree()
 
     if not args.dryrun:
         test_connection(fcrepo)
         
         # open mapfile, if it exists, and read completed files into list
-        fieldnames = ['number', 'title', 'path', 'uri']
+        fieldnames = ['number', 'timestamp', 'title', 'path', 'uri']
+        completed_items = []
+        skip_list = []
         if os.path.isfile(args.map):
             with open(args.map, 'r') as infile:
                 reader = csv.DictReader(infile)
-                # check the validity of the map file's format
+                # check the validity of the map file data
                 if not reader.fieldnames == fieldnames:
                     print('ERROR: Non-standard map file specified!')
                     sys.exit(1)
                 else:
-                    # read data from an existing file
+                    # read the data from the existing file
                     completed_items = [row for row in reader]
                     skip_list = [row['path'] for row in completed_items]
                     
-        # open new map file
+        # open a new version of the map file
         with open(args.map, 'w+') as mapfile:
             writer = csv.DictWriter(mapfile, fieldnames=fieldnames)
             writer.writeheader()
             # write out completed items
             for row in completed_items:
                 writer.writerow(row)
+                print('Writing data for {0} existing items to mapfile.'.format(
+                        len(completed_items)
+                        )
+                     )
         
             # create all batch objects in repository
             for n, item in enumerate(batch.items):
@@ -183,6 +188,7 @@ def main():
                 
                 # write item details to mapfile
                 row = {'number': n + 1, 
+                       'timestamp': item.creation_timestamp,
                        'title': item.title, 
                        'path': item.path, 
                        'uri': item.uri

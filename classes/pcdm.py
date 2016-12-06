@@ -23,6 +23,9 @@ namespace_manager.bind('bibo', bibo, override=False)
 dc = Namespace('http://purl.org/dc/elements/1.1/')
 namespace_manager.bind('dc', dc, override=False)
 
+dcterms = Namespace('http://purl.org/dc/terms/')
+namespace_manager.bind('dcterms', dcterms, override=False)
+
 ex = Namespace('http://www.example.org/terms/')
 namespace_manager.bind('ex', ex, override=False)
 
@@ -411,7 +414,7 @@ class Proxy(Resource):
         Resource.__init__(self)
         self.title = 'Proxy for {0} in {1}'.format(position, context)
         self.graph.add( (self.uri, rdf.type, ore.Proxy) )
-        self.graph.add( (self.uri, dc.title, rdflib.Literal(self.title)) )
+        self.graph.add( (self.uri, dcterms.title, rdflib.Literal(self.title)) )
 
 
 

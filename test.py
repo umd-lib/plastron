@@ -127,7 +127,7 @@ class Resource():
         self.file = File(self.file_metadata)
         
         self.graph.add(
-            (self.uri, ns['dc'].title, Literal(self.title))
+            (self.uri, ns['dcterms'].title, Literal(self.title))
             )
         self.graph.add(
             (self.uri, ns['pcdm'].memberOf, self.collection)
@@ -199,7 +199,7 @@ class Binary(Resource):
         self.checksum = self.sha1()
         
         self.graph.add(
-            (self.uri, ns['dc'].title, Literal(self.title))
+            (self.uri, ns['dcterms'].title, Literal(self.title))
             )
         self.graph.add(
             (self.uri, ns['rdf'].type, ns['pcdm'].File)

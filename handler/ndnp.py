@@ -21,6 +21,9 @@ namespace_manager.bind('bibo', bibo, override=False)
 dc = Namespace('http://purl.org/dc/elements/1.1/')
 namespace_manager.bind('dc', dc, override=False)
 
+dcterms = Namespace('http://purl.org/dc/terms/')
+namespace_manager.bind('dcterms', dcterms, override=False)
+
 foaf = Namespace('http://xmlns.com/foaf/0.1/')
 namespace_manager.bind('foaf', foaf, override=False)
 
@@ -129,7 +132,7 @@ class Batch():
         dback = Collection()
         dback.title = "The Diamondback Newspaper Collection"
         dback.graph.add(
-            (dback.uri, dc.title, rdflib.Literal(dback.title))
+            (dback.uri, dcterms.title, rdflib.Literal(dback.title))
             )
 
         # read over the index XML file assembling a list of paths to the issues
@@ -215,7 +218,7 @@ class Issue(pcdm.Item):
         # store metadata as an RDF graph
         self.graph.namespace_manager = namespace_manager
         self.graph.add(
-            (self.uri, dc.title, rdflib.Literal(self.title))
+            (self.uri, dcterms.title, rdflib.Literal(self.title))
             )
         self.graph.add(
             (self.uri, bibo.volume, rdflib.Literal(self.volume))
@@ -275,7 +278,7 @@ class Reel(pcdm.Item):
         self.sequence_attr = ('Frame', 'frame')
 
         self.graph.add(
-            (self.uri, dc.title, rdflib.Literal(self.title))
+            (self.uri, dcterms.title, rdflib.Literal(self.title))
             )
         self.graph.add(
             (self.uri, dc.identifier, rdflib.Literal(self.id))
@@ -308,7 +311,7 @@ class Page(pcdm.Component):
 
         # store metadata in object graph
         self.graph.namespace_manager = namespace_manager
-        self.graph.add( (self.uri, dc.title, rdflib.Literal(self.title)) )
+        self.graph.add( (self.uri, dcterms.title, rdflib.Literal(self.title)) )
         self.graph.add( (self.uri, ex.reel, rdflib.Literal(self.reel)) )
         self.graph.add( (self.uri, ex.frame, rdflib.Literal(self.frame)) )
 
@@ -334,7 +337,7 @@ class File(pcdm.File):
 
         # store metadata in object graph
         self.graph.namespace_manager = namespace_manager
-        self.graph.add( (self.uri, dc.title, rdflib.Literal(self.title)) )
+        self.graph.add( (self.uri, dcterms.title, rdflib.Literal(self.title)) )
 
 
 

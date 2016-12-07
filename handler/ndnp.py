@@ -127,8 +127,6 @@ class Batch():
         root = tree.getroot()
         m = XPATHMAP
 
-        self.reel = Reel(batchfile)
-
         dback = Collection()
         dback.title = "The Diamondback Newspaper Collection"
         dback.graph.add(
@@ -147,6 +145,8 @@ class Batch():
                     )
                 )
         self.length = len(self.paths)
+        
+        self.reel = Reel(batchfile)
 
         print("Batch contains {} issues.".format(self.length))
 
@@ -158,7 +158,7 @@ class Batch():
                 n+1, self.length), end='\r'
                 )
             
-            if len(self.items) >= limit:
+            if limit is not None and len(self.items) >= limit:
                 print("Stopping preprocessing after {0} items".format(limit))
                 break
             
@@ -276,6 +276,9 @@ class Reel(pcdm.Item):
         self.id = elem.get('reelNumber')
         self.title = 'Reel Number {0}'.format(self.id)
         self.sequence_attr = ('Frame', 'frame')
+        self.basepath = os.path.dirname(batchfile)
+        self.path = os.path.join(self.basepath, elem.text)
+        print("Reel path = ", self.path)
 
         self.graph.add(
             (self.uri, dcterms.title, rdflib.Literal(self.title))

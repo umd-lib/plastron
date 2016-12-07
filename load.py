@@ -89,7 +89,7 @@ def main():
 
     # Limit the load to a specified number of top-level objects
     parser.add_argument('-l', '--limit',
-                        help='''Limit the load to a specified number of             
+                        help='''Limit the load to a specified number of 
                                 top-level objects.''',
                         action='store',
                         type=int,

@@ -58,12 +58,16 @@ docs/_build/
 # PyBuilder
 target/
 
-#Ipython Notebook
+# Ipython Notebook
 .ipynb_checkpoints
 
-#Mac stuff
+# Mac stuff
 .DS_Store
 
-#log files
+# log files
 logs/*
+
+# non-committable application files
+config.yml
+data/*
 

@@ -13,6 +13,7 @@ import rdflib
 import requests
 import sys
 import yaml
+import re
 
 from classes import pcdm
 
@@ -65,11 +66,11 @@ def main():
                         action='store',
                         required=True
                         )
-       
+
     # The mapfile records path and URI of successfully created items.
     # Transactions prevent orphan resource creation below the item level.
-    # Items in an existing map file are skipped upon subsequent runs.  
-    parser.add_argument('-m', '--map', 
+    # Items in an existing map file are skipped upon subsequent runs.
+    parser.add_argument('-m', '--map',
                         help='Mapfile to store results of load.',
                         action='store',
                         default="mapfile.csv"
@@ -89,7 +90,7 @@ def main():
 
     # Limit the load to a specified number of top-level objects
     parser.add_argument('-l', '--limit',
-                        help='''Limit the load to a specified number of 
+                        help='''Limit the load to a specified number of
                                 top-level objects.''',
                         action='store',
                         type=int,
@@ -101,7 +102,13 @@ def main():
                         help='Check the connection to the repository and exit.',
                         action='store_true'
                         )
-    
+
+    # Extra triples to add to each item
+    parser.add_argument('-x', '--extra',
+                        help='File containing extra triples to add to each item',
+                        action='store'
+                        )
+
     # Path to the data set (metadata and files)
     parser.add_argument('path',
                         help='Path to data set to be loaded.',
@@ -140,7 +147,7 @@ def main():
 
     if not args.dryrun:
         test_connection(fcrepo)
-        
+
         # open mapfile, if it exists, and read completed files into list
         fieldnames = ['number', 'timestamp', 'title', 'path', 'uri']
         completed_items = []
@@ -156,7 +163,7 @@ def main():
                     # read the data from the existing file
                     completed_items = [row for row in reader]
                     skip_list = [row['path'] for row in completed_items]
-                    
+
         # open a new version of the map file
         with open(args.map, 'w+') as mapfile:
             writer = csv.DictWriter(mapfile, fieldnames=fieldnames)
@@ -168,7 +175,7 @@ def main():
                         len(completed_items)
                         )
                      )
-        
+
             # create all batch objects in repository
             for n, item in enumerate(batch.items):
                 if args.limit is not None and n >= args.limit:
@@ -183,14 +190,23 @@ def main():
                 item.create_ordering(fcrepo)
                 print('\nUpdating relationship triples ...')
                 item.update_relationship_triples()
+
+                if args.extra:
+                    print('\nAdding additional triples ...')
+                    if re.search(r'\.(ttl|n3|nt)$', args.extra):
+                        rdf_format = 'n3'
+                    elif re.search(r'\.(rdf|xml)$', args.extra):
+                        rdf_format = 'xml'
+                    item.add_extra_properties(args.extra, rdf_format)
+
                 print('\nUpdating item {0}...'.format(n+1))
                 item.recursive_update(fcrepo, args.nobinaries)
-                
+
                 # write item details to mapfile
-                row = {'number': n + 1, 
+                row = {'number': n + 1,
                        'timestamp': item.creation_timestamp,
-                       'title': item.title, 
-                       'path': item.path, 
+                       'title': item.title,
+                       'path': item.path,
                        'uri': item.uri
                        }
                 writer.writerow(row)

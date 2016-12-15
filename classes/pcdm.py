@@ -161,7 +161,7 @@ class Resource():
                     'Component "{0}" exists. Skipping...'.format(
                         component.title)
                     )
-        
+
         for related_object in self.related:
             if not related_object.exists_in_repo(repository):
                 related_object.recursive_create(repository, nobinaries)
@@ -232,15 +232,17 @@ class Resource():
         for collection in self.collections:
             self.graph.add( (self.uri, pcdm.memberOf, collection.uri) )
             collection.graph.add( (collection.uri, pcdm.hasMember, self.uri) )
-            
+
         for related_object in self.related:
-            self.graph.add( 
-                (self.uri, pcdm.hasRelatedObject, related_object.uri) 
+            self.graph.add(
+                (self.uri, pcdm.hasRelatedObject, related_object.uri)
                 )
             related_object.graph.add(
                 (related_object.uri, pcdm.relatedObjectOf, self.uri)
                 )
 
+    def add_extra_properties(self, triples_file, rdf_format):
+        self.graph.parse(source=triples_file, format=rdf_format, publicID=self.uri)
 
     # show the object's graph, serialized as turtle
     def print_graph(self):
@@ -388,9 +390,9 @@ class File(Resource):
                     break
                 sha1.update(data)
         return sha1.hexdigest()
-        
-        
-        
+
+
+
 #============================================================================
 # PCDM COLLECTION OBJECT
 #============================================================================

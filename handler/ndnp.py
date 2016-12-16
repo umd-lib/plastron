@@ -268,14 +268,6 @@ class Issue(pcdm.Item):
         article_root = article_tree.getroot()
         for article_title in article_root.findall(m['article']):
             self.related.append(Article(article_title.text, self))
-        article_triples = rdflib.Graph()
-            article_triples.add( 
-                (self.uri, pcdm_ns.hasRelatedObject, article.uri) 
-                )
-            article_triples.add( 
-                (article.uri, pcdm_ns.relatedObjectOf, self.uri) 
-                )
-            self.related.append( (article, article_triples) )
 
 
 

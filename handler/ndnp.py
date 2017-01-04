@@ -18,8 +18,14 @@ namespace_manager = rdflib.namespace.NamespaceManager(rdflib.Graph())
 bibo = Namespace('http://purl.org/ontology/bibo/')
 namespace_manager.bind('bibo', bibo, override=False)
 
+carriers = Namespace('http://id.loc.gov/vocabulary/carriers/')
+namespace_manager.bind('carriers', carriers, override=False)
+
 dc = Namespace('http://purl.org/dc/elements/1.1/')
 namespace_manager.bind('dc', dc, override=False)
+
+dcmitype = Namespace('http://purl.org/dc/dcmitype/')
+namespace_manager.bind('dcmitype', dcmitype, override=False)
 
 dcterms = Namespace('http://purl.org/dc/terms/')
 namespace_manager.bind('dcterms', dcterms, override=False)
@@ -27,17 +33,20 @@ namespace_manager.bind('dcterms', dcterms, override=False)
 foaf = Namespace('http://xmlns.com/foaf/0.1/')
 namespace_manager.bind('foaf', foaf, override=False)
 
-ore = Namespace('http://www.openarchives.org/ore/terms/')
-namespace_manager.bind('ore', ore, override=False)
-
 iana = Namespace('http://www.iana.org/assignments/relation/')
 namespace_manager.bind('iana', iana, override=False)
 
-ex = Namespace('http://www.example.org/terms/')
-namespace_manager.bind('ex', ex, override=False)
+ndnp = Namespace('http://chroniclingamerica.loc.gov/terms/')
+namespace_manager.bind('ndnp', ndnp, override=False)
+
+ore = Namespace('http://www.openarchives.org/ore/terms/')
+namespace_manager.bind('ore', ore, override=False)
 
 pcdm_ns = Namespace('http://pcdm.org/models#')
 namespace_manager.bind('pcdm', pcdm_ns, override=False)
+
+pcdm_use = Namespace('http://pcdm.org/use#')
+namespace_manager.bind('pcdmuse', pcdm_use, override=False)
 
 rdf = Namespace('http://www.w3.org/1999/02/22-rdf-syntax-ns#')
 namespace_manager.bind('rdf', rdf, override=False)
@@ -232,6 +241,9 @@ class Issue(pcdm.Item):
         self.graph.add(
             (self.uri, dc.date, rdflib.Literal(self.date))
             )
+        self.graph.add(
+            (self.uri, rdf.type, bibo.Issue)
+            )
 
         # gather all the page and file xml snippets
         filexml_snippets = [f for f in root.findall(m['files'])]
@@ -286,7 +298,10 @@ class Reel(pcdm.Item):
         self.graph.add(
             (self.uri, dc.identifier, rdflib.Literal(self.id))
             )
-
+        self.graph.add(
+            (self.uri, rdf.type, carriers.hd)
+            )
+            
 
 
 #============================================================================
@@ -315,8 +330,9 @@ class Page(pcdm.Component):
         # store metadata in object graph
         self.graph.namespace_manager = namespace_manager
         self.graph.add( (self.uri, dcterms.title, rdflib.Literal(self.title)) )
-        self.graph.add( (self.uri, ex.reel, rdflib.Literal(self.reel)) )
-        self.graph.add( (self.uri, ex.frame, rdflib.Literal(self.frame)) )
+        self.graph.add( (self.uri, ndnp.number, rdflib.Literal(self.number)) )
+        self.graph.add( (self.uri, ndnp.sequence, rdflib.Literal(self.frame)) )
+        self.graph.add( (self.uri, rdf.type, ndnp.Page) )
 
 
 
@@ -341,7 +357,24 @@ class File(pcdm.File):
         # store metadata in object graph
         self.graph.namespace_manager = namespace_manager
         self.graph.add( (self.uri, dcterms.title, rdflib.Literal(self.title)) )
-
+        self.graph.add( (self.uri, dcterms.type, dcmitype.Text) )
+        
+        if self.basename.endswith('.tif'):
+            self.graph.add(
+                (self.uri, rdf.type, pcdm_use.PreservationMasterFile)
+                )
+        elif self.basename.endswith('.jp2'):
+            self.graph.add(
+                (self.uri, rdf.type, pcdm_use.IntermediateFile)
+                )
+        elif self.basename.endswith('.pdf'):
+            self.graph.add(
+                (self.uri, rdf.type, pcdm_use.ServiceFile)
+                )
+        elif self.basename.endswith('.xml'):
+            self.graph.add(
+                (self.uri, rdf.type, pcdm_use.ExtractedText)
+                )
 
 
 #============================================================================
@@ -374,6 +407,7 @@ class Article(pcdm.Item):
         # store metadata in object graph
         self.graph.namespace_manager = namespace_manager
         self.graph.add( (self.uri, dc.title, rdflib.Literal(self.title)) )
+        self.graph.add( (self.uri, rdf.type, bibo.Article) )
         
         print("Creating Article object {0}".format(self.title))
         

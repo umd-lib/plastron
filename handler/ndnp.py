@@ -154,7 +154,7 @@ class Batch():
                     )
                 )
         self.length = len(self.paths)
-        
+
         self.reel = Reel(batchfile)
 
         print("Batch contains {} issues.".format(self.length))
@@ -166,11 +166,11 @@ class Batch():
             print("Preprocessing item {0}/{1}...".format(
                 n+1, self.length), end='\r'
                 )
-            
+
             if limit is not None and len(self.items) >= limit:
                 print("Stopping preprocessing after {0} items".format(limit))
                 break
-            
+
             if not os.path.isfile(p[0]) or not os.path.isfile(p[1]):
                 print("\nMissing file for item {0}, skipping".format(n+1))
                 continue
@@ -262,7 +262,7 @@ class Issue(pcdm.Item):
             page = Page(pagexml, filexml, self)
 
             self.components.append(page)
-            
+
         # iterate over the article XML and create objects for issue's articles
         article_tree = ET.parse(article_path)
         article_root = article_tree.getroot()
@@ -301,7 +301,7 @@ class Reel(pcdm.Item):
         self.graph.add(
             (self.uri, rdf.type, carriers.hd)
             )
-            
+
 
 
 #============================================================================
@@ -358,7 +358,7 @@ class File(pcdm.File):
         self.graph.namespace_manager = namespace_manager
         self.graph.add( (self.uri, dcterms.title, rdflib.Literal(self.title)) )
         self.graph.add( (self.uri, dcterms.type, dcmitype.Text) )
-        
+
         if self.basename.endswith('.tif'):
             self.graph.add(
                 (self.uri, rdf.type, pcdm_use.PreservationMasterFile)
@@ -406,9 +406,9 @@ class Article(pcdm.Item):
 
         # store metadata in object graph
         self.graph.namespace_manager = namespace_manager
-        self.graph.add( (self.uri, dc.title, rdflib.Literal(self.title)) )
+        self.graph.add( (self.uri, dcterms.title, rdflib.Literal(self.title)) )
         self.graph.add( (self.uri, rdf.type, bibo.Article) )
-        
+
         print("Creating Article object {0}".format(self.title))
-        
+
 

@@ -143,7 +143,6 @@ def main():
     # The handler is always invoked by calling the load function defined in
     # the specified handler on a specified local path (file or directory).
     batch = handler.load(args)
-    batch.print_tree()
 
     if not args.dryrun:
         test_connection(fcrepo)
@@ -169,21 +168,25 @@ def main():
             writer = csv.DictWriter(mapfile, fieldnames=fieldnames)
             writer.writeheader()
             # write out completed items
+            print('Writing data for {0} existing items to mapfile.'.format(
+                    len(completed_items))
+                    )
             for row in completed_items:
                 writer.writerow(row)
-                print('Writing data for {0} existing items to mapfile.'.format(
-                        len(completed_items)
-                        )
-                     )
 
             # create all batch objects in repository
-            for n, item in enumerate(batch.items):
+            for n, item in enumerate(batch):
                 if args.limit is not None and n >= args.limit:
                     print("Stopping after {0} item(s)".format(args.limit))
                     break
                 elif item.path in skip_list:
                     continue
-
+                
+                print('')
+                print('=' * 80)
+                print('')
+                print("Processing item {0}/{1}...".format(n + 1, batch.length))
+                item.print_item_tree()
                 print('\nLoading item {0}...'.format(n+1))
                 item.recursive_create(fcrepo, args.nobinaries)
                 print('\nCreating ordering proxies ...')
@@ -215,8 +218,8 @@ def main():
 
 def test_connection(fcrepo):
     # test connection to fcrepo
-    print("Testing connection to {0}".format(fcrepo.endpoint),
-            file=sys.stderr)
+    print("Testing connection to {0}... ".format(fcrepo.endpoint),
+            file=sys.stderr, end='')
     if fcrepo.is_reachable():
         print("Connection successful.", file=sys.stderr)
     else:

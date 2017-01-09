@@ -129,7 +129,7 @@ def load(args):
 
 class Batch():
 
-    '''class representing the set of resources to be loaded'''
+    '''iterator class representing the set of resources to be loaded'''
 
     def __init__(self, batchfile, limit):
         tree = ET.parse(batchfile)
@@ -141,7 +141,9 @@ class Batch():
         dback.graph.add(
             (dback.uri, dcterms.title, rdflib.Literal(dback.title))
             )
-
+            
+        self.collection = dback
+        
         # read over the index XML file assembling a list of paths to the issues
         self.basepath = os.path.dirname(batchfile)
         self.paths = []
@@ -154,48 +156,45 @@ class Batch():
                     )
                 )
         self.length = len(self.paths)
-
+        self.num = 0
         self.reel = Reel(batchfile)
-
         print("Batch contains {} issues.".format(self.length))
 
-        self.items = []
 
-        # iterate over the paths to the issues and create an item from each one
-        for n, p in enumerate(self.paths):
-            print("Preprocessing item {0}/{1}...".format(
-                n+1, self.length), end='\r'
-                )
+    def __iter__(self):
+        return self
 
-            if limit is not None and len(self.items) >= limit:
-                print("Stopping preprocessing after {0} items".format(limit))
-                break
 
+    def __next__(self):
+        if self.num < self.length:
+            p = self.paths[self.num]
+            
             if not os.path.isfile(p[0]) or not os.path.isfile(p[1]):
-                print("\nMissing file for item {0}, skipping".format(n+1))
-                continue
+                print("\nMissing file for item {0}, skipping".format(
+                    self.num + 1
+                    ))
+                self.__next__()
 
             issue = Issue(p)
-            self.items.append(issue)
 
             # add the collection to the issue
-            issue.collections.append(dback)
+            issue.collections.append(self.collection)
 
             # add issue's pages to the reel object
             for page in issue.components:
                 self.reel.components.append(page)
+            
+            self.num += 1
+            return issue
 
-        self.items.append(self.reel)
-
-        print('\nPreprocessing complete!')
-
-
-    # print the hierarchy of items, pages, and files
-    def print_tree(self):
-        for n, i in enumerate(self.items):
-            print("\nITEM {0}".format(n+1))
-            i.print_item_tree()
-        print('')
+        # after processing all the issues, return the reel as the final object
+        elif self.num == self.length:
+            self.num += 1
+            return self.reel
+        
+        else:
+            print('\nProcessing complete!')
+            raise StopIteration()
 
 
 
@@ -290,7 +289,6 @@ class Reel(pcdm.Item):
         self.sequence_attr = ('Frame', 'frame')
         self.basepath = os.path.dirname(batchfile)
         self.path = os.path.join(self.basepath, elem.text)
-        print("Reel path = ", self.path)
 
         self.graph.add(
             (self.uri, dcterms.title, rdflib.Literal(self.title))
@@ -408,7 +406,4 @@ class Article(pcdm.Item):
         self.graph.namespace_manager = namespace_manager
         self.graph.add( (self.uri, dcterms.title, rdflib.Literal(self.title)) )
         self.graph.add( (self.uri, rdf.type, bibo.Article) )
-
-        print("Creating Article object {0}".format(self.title))
-
 

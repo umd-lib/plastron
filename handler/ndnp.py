@@ -59,7 +59,8 @@ namespace_manager.bind('rdf', rdf, override=False)
 
 XPATHMAP = {
     'batch': {
-        'issues':   "./{http://www.loc.gov/ndnp}issue"
+        'issues':   "./{http://www.loc.gov/ndnp}issue",
+        'reels':    "./{http://www.loc.gov/ndnp}reel"
         },
 
     'reel': {
@@ -146,19 +147,24 @@ class Batch():
         
         # read over the index XML file assembling a list of paths to the issues
         self.basepath = os.path.dirname(batchfile)
-        self.paths = []
+        
+        self.issues = []
         for i in root.findall(m['batch']['issues']):
             sanitized_path = i.text[:-6] + i.text[-4:]
-            self.paths.append(
+            self.issues.append(
                 (os.path.join(self.basepath, i.text),
                  os.path.join(
                     self.basepath, "Article-Level", sanitized_path)
                     )
                 )
-        self.length = len(self.paths)
+        
+        self.reels = []
+        for i in root.findall(m['batch']['reels']):
+            self.reels.append(i.get('reelNumber'))
+        
+        self.length = len(self.issues) + len(self.reels)
         self.num = 0
-        self.reel = Reel(batchfile)
-        print("Batch contains {} issues.".format(self.length))
+        print("Batch contains {} items (issues and reels).".format(self.length))
 
 
     def __iter__(self):
@@ -166,35 +172,22 @@ class Batch():
 
 
     def __next__(self):
-        if self.num < self.length:
-            p = self.paths[self.num]
-            
-            if not os.path.isfile(p[0]) or not os.path.isfile(p[1]):
+        for i in self.issues:
+            if not os.path.isfile(i[0]) or not os.path.isfile(i[1]):
                 print("\nMissing file for item {0}, skipping".format(
                     self.num + 1
                     ))
-                self.__next__()
-
-            issue = Issue(p)
-
+                continue
+            issue = Issue(i)
             # add the collection to the issue
             issue.collections.append(self.collection)
-
-            # add issue's pages to the reel object
-            for page in issue.components:
-                self.reel.components.append(page)
-            
-            self.num += 1
             return issue
-
-        # after processing all the issues, return the reel as the final object
-        elif self.num == self.length:
-            self.num += 1
-            return self.reel
         
-        else:
-            print('\nProcessing complete!')
-            raise StopIteration()
+        for r in self.reels:
+            return Reel(r)           
+        
+        print('\nProcessing complete!')
+        raise StopIteration()
 
 
 
@@ -278,13 +271,9 @@ class Reel(pcdm.Item):
 
     ''' class representing an NDNP reel '''
 
-    def __init__(self, batchfile):
+    def __init__(self, number):
         pcdm.Item.__init__(self)
-        tree = ET.parse(batchfile)
-        root = tree.getroot()
-        m = XPATHMAP['reel']
-        elem = root.find(m['number'])
-        self.id = elem.get('reelNumber')
+        self.id = number
         self.title = 'Reel Number {0}'.format(self.id)
         self.sequence_attr = ('Frame', 'frame')
         self.basepath = os.path.dirname(batchfile)
@@ -373,6 +362,7 @@ class File(pcdm.File):
             self.graph.add(
                 (self.uri, rdf.type, pcdm_use.ExtractedText)
                 )
+
 
 
 #============================================================================

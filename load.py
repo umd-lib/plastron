@@ -185,7 +185,7 @@ def main():
                 print('')
                 print('=' * 80)
                 print('')
-                print("Processing item {0}/{1}...".format(n + 1, batch.length))
+                print("Processing item {0}/{1}...".format(n+1, batch.length))
                 item.print_item_tree()
                 print('\nLoading item {0}...'.format(n+1))
                 item.recursive_create(fcrepo, args.nobinaries)

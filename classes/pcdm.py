@@ -242,7 +242,9 @@ class Resource():
                 )
 
     def add_extra_properties(self, triples_file, rdf_format):
-        self.graph.parse(source=triples_file, format=rdf_format, publicID=self.uri)
+        self.graph.parse(
+            source=triples_file, format=rdf_format, publicID=self.uri
+            )
 
     # show the object's graph, serialized as turtle
     def print_graph(self):

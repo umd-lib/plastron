@@ -120,7 +120,7 @@ XPATHMAP = {
 #============================================================================
 
 def load(args):
-    return Batch(args.path, args.limit)
+    return Batch(args)
 
 
 
@@ -132,8 +132,8 @@ class Batch():
 
     '''iterator class representing the set of resources to be loaded'''
 
-    def __init__(self, batchfile, limit):
-        tree = ET.parse(batchfile)
+    def __init__(self, args):
+        tree = ET.parse(args.path)
         root = tree.getroot()
         m = XPATHMAP
 
@@ -146,7 +146,7 @@ class Batch():
         self.collection = dback
         
         # read over the index XML file assembling a list of paths to the issues
-        self.basepath = os.path.dirname(batchfile)
+        self.basepath = os.path.dirname(args.path)
         
         self.issues = []
         for i in root.findall(m['batch']['issues']):
@@ -158,9 +158,11 @@ class Batch():
                     )
                 )
         
-        self.reels = []
+        self.reels = {}
         for i in root.findall(m['batch']['reels']):
-            self.reels.append(i.get('reelNumber'))
+            key = i.get('reelNumber')
+            if key not in self.reels.keys():
+                self.reels[key] = []
         
         self.length = len(self.issues) + len(self.reels)
         self.num = 0
@@ -182,8 +184,12 @@ class Batch():
             return issue
         elif self.num >= len(self.issues) and self.num < total_length:
             n = self.num - len(self.issues)
+            print(self.reels)
+            reel = Reel(self.reels[n], args.map)
+            # add the collection to the reel
+            reel.collections.append(self.collection)
             self.num += 1
-            return Reel(self.reels[n])
+            return reel
         else:
             print('\nProcessing complete!')
             raise StopIteration()
@@ -276,13 +282,17 @@ class Reel(pcdm.Item):
 
     ''' class representing an NDNP reel '''
 
-    def __init__(self, number):
+    def __init__(self, number, mapfile):
         pcdm.Item.__init__(self)
         self.id = number
         self.title = 'Reel Number {0}'.format(self.id)
         self.sequence_attr = ('Frame', 'frame')
-        self.basepath = os.path.dirname(batchfile)
-        self.path = os.path.join(self.basepath, elem.text)
+        
+        with open(mapfile, 'r') as f:
+            reader = csv.DictReader(f)
+            self.data = [row['components'] for row in reader]
+
+        print(self.data)
 
         self.graph.add(
             (self.uri, dcterms.title, rdflib.Literal(self.title))

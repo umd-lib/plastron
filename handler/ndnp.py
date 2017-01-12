@@ -172,22 +172,21 @@ class Batch():
 
 
     def __next__(self):
-        for i in self.issues:
-            if not os.path.isfile(i[0]) or not os.path.isfile(i[1]):
-                print("\nMissing file for item {0}, skipping".format(
-                    self.num + 1
-                    ))
-                continue
-            issue = Issue(i)
+        total_length = len(self.issues) + len(self.reels)
+        if self.num < len(self.issues):
+            n = self.num
+            issue = Issue(self.issues[n])
             # add the collection to the issue
             issue.collections.append(self.collection)
+            self.num += 1
             return issue
-        
-        for r in self.reels:
-            return Reel(r)           
-        
-        print('\nProcessing complete!')
-        raise StopIteration()
+        elif self.num >= len(self.issues) and self.num < total_length:
+            n = self.num - len(self.issues)
+            self.num += 1
+            return Reel(self.reels[n])
+        else:
+            print('\nProcessing complete!')
+            raise StopIteration()
 
 
 
@@ -260,6 +259,12 @@ class Issue(pcdm.Item):
         article_root = article_tree.getroot()
         for article_title in article_root.findall(m['article']):
             self.related.append(Article(article_title.text, self))
+
+
+    def get_component_info(self):
+        return ["{0};{1};{2}".format(
+                    page.reel, page.frame, str(page.uri)
+                    ) for page in self.components]
 
 
 
@@ -396,4 +401,6 @@ class Article(pcdm.Item):
         self.graph.namespace_manager = namespace_manager
         self.graph.add( (self.uri, dcterms.title, rdflib.Literal(self.title)) )
         self.graph.add( (self.uri, rdf.type, bibo.Article) )
+
+
 

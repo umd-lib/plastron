@@ -148,7 +148,9 @@ def main():
         test_connection(fcrepo)
 
         # open mapfile, if it exists, and read completed files into list
-        fieldnames = ['number', 'timestamp', 'title', 'path', 'uri']
+        fieldnames = ['number', 'timestamp', 'title', 
+                      'path', 'uri', 'components'
+                      ]
         completed_items = []
         skip_list = []
         if os.path.isfile(args.map):
@@ -210,7 +212,8 @@ def main():
                        'timestamp': item.creation_timestamp,
                        'title': item.title,
                        'path': item.path,
-                       'uri': item.uri
+                       'uri': item.uri,
+                       'components': item.get_component_info()
                        }
                 writer.writerow(row)
 

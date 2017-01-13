@@ -421,4 +421,3 @@ class Proxy(Resource):
         self.graph.add( (self.uri, dcterms.title, rdflib.Literal(self.title)) )
 
 
-

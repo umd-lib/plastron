@@ -158,14 +158,17 @@ class Batch():
                     )
                 )
         
-        self.reels = {}
+        self.reels = []
         for i in root.findall(m['batch']['reels']):
             key = i.get('reelNumber')
-            if key not in self.reels.keys():
-                self.reels[key] = []
+            if key not in self.reels:
+                self.reels.append(
+                    (key, os.path.join(self.basepath, i.text))
+                    )
         
         self.length = len(self.issues) + len(self.reels)
         self.num = 0
+        self.reel_pages = {}
         print("Batch contains {} items (issues and reels).".format(self.length))
 
 
@@ -181,15 +184,23 @@ class Batch():
             # add the collection to the issue
             issue.collections.append(self.collection)
             self.num += 1
+            for page in issue.components:
+                if page.reel in self.reel_pages.keys():
+                    self.reel_pages[page.reel].append(page)
+                else:
+                    self.reel_pages[page.reel] = [page]
             return issue
+            
         elif self.num >= len(self.issues) and self.num < total_length:
             n = self.num - len(self.issues)
-            print(self.reels)
-            reel = Reel(self.reels[n], args.map)
+            number, path = self.reels[n]
+            pages = self.reel_pages[number]
+            reel = Reel(number, pages, path)
             # add the collection to the reel
             reel.collections.append(self.collection)
             self.num += 1
             return reel
+            
         else:
             print('\nProcessing complete!')
             raise StopIteration()
@@ -267,12 +278,6 @@ class Issue(pcdm.Item):
             self.related.append(Article(article_title.text, self))
 
 
-    def get_component_info(self):
-        return ["{0};{1};{2}".format(
-                    page.reel, page.frame, str(page.uri)
-                    ) for page in self.components]
-
-
 
 #============================================================================
 # NDNP REEL OBJECT
@@ -282,17 +287,13 @@ class Reel(pcdm.Item):
 
     ''' class representing an NDNP reel '''
 
-    def __init__(self, number, mapfile):
+    def __init__(self, number, pages, path):
         pcdm.Item.__init__(self)
         self.id = number
         self.title = 'Reel Number {0}'.format(self.id)
         self.sequence_attr = ('Frame', 'frame')
-        
-        with open(mapfile, 'r') as f:
-            reader = csv.DictReader(f)
-            self.data = [row['components'] for row in reader]
-
-        print(self.data)
+        self.path = path
+        self.components = pages
 
         self.graph.add(
             (self.uri, dcterms.title, rdflib.Literal(self.title))

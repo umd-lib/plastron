@@ -371,12 +371,12 @@ class File(pcdm.File):
 
         if self.basename.endswith('.tif'):
             self.width = premisxml.find(m['width']).text
-            self.length = premisxml.find(m['length']).text
+            self.height = premisxml.find(m['length']).text
             self.graph.add(
                 (self.uri, ebucore.width, rdflib.Literal(self.width))
                 )
             self.graph.add(
-                (self.uri, ebucore.length, rdflib.Literal(self.length))
+                (self.uri, ebucore.height, rdflib.Literal(self.height))
                 )
             self.graph.add(
                 (self.uri, rdf.type, pcdm_use.PreservationMasterFile)

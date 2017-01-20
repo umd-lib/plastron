@@ -105,7 +105,8 @@ def main():
 
     # Extra triples to add to each item
     parser.add_argument('-x', '--extra',
-                        help='File containing extra triples to add to each item',
+                        help='''File containing extra triples to add to each 
+                                item''',
                         action='store'
                         )
 

@@ -201,8 +201,12 @@ class Batch():
                 else:
                     self.reel_pages[page.reel] = [page]
             return issue
+        
+        else:
+            print('\nProcessing complete!')
+            raise StopIteration()
             
-        elif self.num >= len(self.issues) and self.num < total_length:
+        '''elif self.num >= len(self.issues) and self.num < total_length:
             n = self.num - len(self.issues)
             number, path = self.reels[n]
             pages = self.reel_pages[number]
@@ -210,11 +214,9 @@ class Batch():
             # add the collection to the reel
             reel.collections.append(self.collection)
             self.num += 1
-            return reel
+            return reel'''
             
-        else:
-            print('\nProcessing complete!')
-            raise StopIteration()
+
 
 
 
@@ -299,9 +301,9 @@ class Reel(pcdm.Item):
 
     ''' class representing an NDNP reel '''
 
-    def __init__(self, number, pages, path):
+    def __init__(self, csvfile):
         pcdm.Item.__init__(self)
-        self.id = number
+        self.id = csvfile
         self.title = 'Reel Number {0}'.format(self.id)
         self.sequence_attr = ('Frame', 'frame')
         self.path = path
@@ -332,11 +334,12 @@ class Page(pcdm.Component):
         m = XPATHMAP['page']
 
         # gather metadata
-        self.number = pagexml.find(m['number']).text
-        self.path   = issue.path + self.number
-        self.reel   = pagexml.find(m['reel']).text
-        self.frame  = pagexml.find(m['frame']).text
-        self.title  = "{0}, page {1}".format(issue.title, self.number)
+        self.number   = pagexml.find(m['number']).text
+        self.path     = issue.path + self.number
+        self.reel     = pagexml.find(m['reel']).text
+        self.frame    = pagexml.find(m['frame']).text
+        self.title    = "{0}, page {1}".format(issue.title, self.number)
+        self.reelpath = 'logs/{0}.csv'.format(self.reel)
 
         # generate a file object for each file in the XML snippet
         for f in filegroup.findall(m['files']):
@@ -348,6 +351,13 @@ class Page(pcdm.Component):
         self.graph.add( (self.uri, ndnp.number, rdflib.Literal(self.number)) )
         self.graph.add( (self.uri, ndnp.sequence, rdflib.Literal(self.frame)) )
         self.graph.add( (self.uri, rdf.type, ndnp.Page) )
+
+    
+    # populate non-atomic aggregation object via overloaded superclass method   
+    def create_object(self, repository):
+        if super(Page, self).create_object(repository):
+            with open(self.reelpath, 'a+') as f:
+                f.write('{0},{1}\n'.format(self.frame, self.uri))
 
 
 

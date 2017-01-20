@@ -87,7 +87,7 @@ class Repository():
 # PCDM RESOURCE (COMMON METHODS FOR ALL OBJECTS)
 #============================================================================
 
-class Resource():
+class Resource(object):
 
     def __init__(self, uri=''):
         self.graph = rdflib.Graph()

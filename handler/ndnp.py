@@ -30,6 +30,9 @@ namespace_manager.bind('dcmitype', dcmitype, override=False)
 dcterms = Namespace('http://purl.org/dc/terms/')
 namespace_manager.bind('dcterms', dcterms, override=False)
 
+ebucore = Namespace('http://www.ebu.ch/metadata/ontologies/ebucore/ebucore#')
+namespace_manager.bind('ebucore', ebucore, override=False)
+
 foaf = Namespace('http://xmlns.com/foaf/0.1/')
 namespace_manager.bind('foaf', foaf, override=False)
 
@@ -86,6 +89,8 @@ XPATHMAP = {
         'files':    (".//{http://www.loc.gov/METS/}fileGrp"
                     ),
         'article':  (".//{http://www.loc.gov/mods/v3}title"
+                    ),
+        'premis':   (".//{http://www.loc.gov/METS/}amdSec"
                     )
         },
 
@@ -109,6 +114,12 @@ XPATHMAP = {
                     ),
         'filepath': (".//{http://www.loc.gov/METS/}FLocat"
                     ),
+        'width':    (".//{http://www.loc.gov/METS/}techMD[@ID='mixmasterFile1']"
+                     "//{http://www.loc.gov/mix/}ImageWidth"
+                     ),
+        'length':   (".//{http://www.loc.gov/METS/}techMD[@ID='mixmasterFile1']"
+                     "//{http://www.loc.gov/mix/}ImageLength"
+                     )
         }
     }
 
@@ -251,6 +262,7 @@ class Issue(pcdm.Item):
             ]
 
         # iterate over each page section matching it to its files
+        premisxml = root.find(m['premis'])
         for n, pagexml in enumerate(pagexml_snippets):
             id = pagexml.get('ID').strip('pageModsBib')
             filexml = next(
@@ -258,7 +270,7 @@ class Issue(pcdm.Item):
                 )
 
             # create a page object for each page and append to list of pages
-            page = Page(pagexml, filexml, self)
+            page = Page(pagexml, filexml, premisxml, self)
 
             self.components.append(page)
 
@@ -310,7 +322,7 @@ class Page(pcdm.Component):
 
     ''' class representing a newspaper page '''
 
-    def __init__(self, pagexml, filegroup, issue):
+    def __init__(self, pagexml, filegroup, premisxml, issue):
         pcdm.Component.__init__(self)
         m = XPATHMAP['page']
 
@@ -323,7 +335,7 @@ class Page(pcdm.Component):
 
         # generate a file object for each file in the XML snippet
         for f in filegroup.findall(m['files']):
-            self.files.append(File(f, issue.dir))
+            self.files.append(File(f, issue.dir, premisxml))
 
         # store metadata in object graph
         self.graph.namespace_manager = namespace_manager
@@ -342,7 +354,7 @@ class File(pcdm.File):
 
     ''' class representing an individual file '''
 
-    def __init__(self, filexml, dir):
+    def __init__(self, filexml, dir, premisxml):
         m = XPATHMAP['file']
         elem = filexml.find(m['filepath'])
         pcdm.File.__init__(self, os.path.join(dir, os.path.basename(
@@ -358,6 +370,14 @@ class File(pcdm.File):
         self.graph.add( (self.uri, dcterms.type, dcmitype.Text) )
 
         if self.basename.endswith('.tif'):
+            self.width = premisxml.find(m['width']).text
+            self.height = premisxml.find(m['length']).text
+            self.graph.add(
+                (self.uri, ebucore.width, rdflib.Literal(self.width))
+                )
+            self.graph.add(
+                (self.uri, ebucore.height, rdflib.Literal(self.height))
+                )
             self.graph.add(
                 (self.uri, rdf.type, pcdm_use.PreservationMasterFile)
                 )

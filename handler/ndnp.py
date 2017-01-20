@@ -62,7 +62,8 @@ namespace_manager.bind('rdf', rdf, override=False)
 
 XPATHMAP = {
     'batch': {
-        'issues':   "./{http://www.loc.gov/ndnp}issue"
+        'issues':   "./{http://www.loc.gov/ndnp}issue",
+        'reels':    "./{http://www.loc.gov/ndnp}reel"
         },
 
     'reel': {
@@ -130,7 +131,7 @@ XPATHMAP = {
 #============================================================================
 
 def load(args):
-    return Batch(args.path, args.limit)
+    return Batch(args)
 
 
 
@@ -142,8 +143,8 @@ class Batch():
 
     '''iterator class representing the set of resources to be loaded'''
 
-    def __init__(self, batchfile, limit):
-        tree = ET.parse(batchfile)
+    def __init__(self, args):
+        tree = ET.parse(args.path)
         root = tree.getroot()
         m = XPATHMAP
 
@@ -156,20 +157,30 @@ class Batch():
         self.collection = dback
         
         # read over the index XML file assembling a list of paths to the issues
-        self.basepath = os.path.dirname(batchfile)
-        self.paths = []
+        self.basepath = os.path.dirname(args.path)
+        
+        self.issues = []
         for i in root.findall(m['batch']['issues']):
             sanitized_path = i.text[:-6] + i.text[-4:]
-            self.paths.append(
+            self.issues.append(
                 (os.path.join(self.basepath, i.text),
                  os.path.join(
                     self.basepath, "Article-Level", sanitized_path)
                     )
                 )
-        self.length = len(self.paths)
+        
+        self.reels = []
+        for i in root.findall(m['batch']['reels']):
+            key = i.get('reelNumber')
+            if key not in self.reels:
+                self.reels.append(
+                    (key, os.path.join(self.basepath, i.text))
+                    )
+        
+        self.length = len(self.issues) + len(self.reels)
         self.num = 0
-        self.reel = Reel(batchfile)
-        print("Batch contains {} issues.".format(self.length))
+        self.reel_pages = {}
+        print("Batch contains {} items (issues and reels).".format(self.length))
 
 
     def __iter__(self):
@@ -177,32 +188,30 @@ class Batch():
 
 
     def __next__(self):
-        if self.num < self.length:
-            p = self.paths[self.num]
-            
-            if not os.path.isfile(p[0]) or not os.path.isfile(p[1]):
-                print("\nMissing file for item {0}, skipping".format(
-                    self.num + 1
-                    ))
-                self.__next__()
-
-            issue = Issue(p)
-
+        total_length = len(self.issues) + len(self.reels)
+        if self.num < len(self.issues):
+            n = self.num
+            issue = Issue(self.issues[n])
             # add the collection to the issue
             issue.collections.append(self.collection)
-
-            # add issue's pages to the reel object
+            self.num += 1
             for page in issue.components:
-                self.reel.components.append(page)
-            
-            self.num += 1
+                if page.reel in self.reel_pages.keys():
+                    self.reel_pages[page.reel].append(page)
+                else:
+                    self.reel_pages[page.reel] = [page]
             return issue
-
-        # after processing all the issues, return the reel as the final object
-        elif self.num == self.length:
+            
+        elif self.num >= len(self.issues) and self.num < total_length:
+            n = self.num - len(self.issues)
+            number, path = self.reels[n]
+            pages = self.reel_pages[number]
+            reel = Reel(number, pages, path)
+            # add the collection to the reel
+            reel.collections.append(self.collection)
             self.num += 1
-            return self.reel
-        
+            return reel
+            
         else:
             print('\nProcessing complete!')
             raise StopIteration()
@@ -290,17 +299,13 @@ class Reel(pcdm.Item):
 
     ''' class representing an NDNP reel '''
 
-    def __init__(self, batchfile):
+    def __init__(self, number, pages, path):
         pcdm.Item.__init__(self)
-        tree = ET.parse(batchfile)
-        root = tree.getroot()
-        m = XPATHMAP['reel']
-        elem = root.find(m['number'])
-        self.id = elem.get('reelNumber')
+        self.id = number
         self.title = 'Reel Number {0}'.format(self.id)
         self.sequence_attr = ('Frame', 'frame')
-        self.basepath = os.path.dirname(batchfile)
-        self.path = os.path.join(self.basepath, elem.text)
+        self.path = path
+        self.components = pages
 
         self.graph.add(
             (self.uri, dcterms.title, rdflib.Literal(self.title))
@@ -395,6 +400,7 @@ class File(pcdm.File):
                 )
 
 
+
 #============================================================================
 # NDNP COLLECTION OBJECT
 #============================================================================
@@ -426,4 +432,6 @@ class Article(pcdm.Item):
         self.graph.namespace_manager = namespace_manager
         self.graph.add( (self.uri, dcterms.title, rdflib.Literal(self.title)) )
         self.graph.add( (self.uri, rdf.type, bibo.Article) )
+
+
 

@@ -242,7 +242,9 @@ class Resource():
                 )
 
     def add_extra_properties(self, triples_file, rdf_format):
-        self.graph.parse(source=triples_file, format=rdf_format, publicID=self.uri)
+        self.graph.parse(
+            source=triples_file, format=rdf_format, publicID=self.uri
+            )
 
     # show the object's graph, serialized as turtle
     def print_graph(self):
@@ -417,6 +419,5 @@ class Proxy(Resource):
         self.title = 'Proxy for {0} in {1}'.format(position, context)
         self.graph.add( (self.uri, rdf.type, ore.Proxy) )
         self.graph.add( (self.uri, dcterms.title, rdflib.Literal(self.title)) )
-
 
 

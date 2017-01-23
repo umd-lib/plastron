@@ -36,6 +36,16 @@ def print_footer():
     print('\nScript complete. Goodbye!\n')
 
 
+def test_connection(fcrepo):
+    # test connection to fcrepo
+    print("Testing connection to {0}... ".format(fcrepo.endpoint),
+            file=sys.stderr, end='')
+    if fcrepo.is_reachable():
+        print("Connection successful.", file=sys.stderr)
+    else:
+        print("Unable to connect.", file=sys.stderr)
+        exit(1)
+
 
 #============================================================================
 # MAIN LOOP
@@ -188,6 +198,10 @@ def main():
                 print('')
                 print("Processing item {0}/{1}...".format(n+1, batch.length))
                 item.print_item_tree()
+                
+                # open transaction
+                fcrepo.open_transaction()
+                
                 print('\nLoading item {0}...'.format(n+1))
                 item.recursive_create(fcrepo, args.nobinaries)
                 print('\nCreating ordering proxies ...')
@@ -205,6 +219,9 @@ def main():
 
                 print('\nUpdating item {0}...'.format(n+1))
                 item.recursive_update(fcrepo, args.nobinaries)
+                
+                # commit transaction
+                fcrepo.commit_transaction()
 
                 # write item details to mapfile
                 row = {'number': n + 1,
@@ -217,15 +234,6 @@ def main():
 
     print_footer()
 
-def test_connection(fcrepo):
-    # test connection to fcrepo
-    print("Testing connection to {0}... ".format(fcrepo.endpoint),
-            file=sys.stderr, end='')
-    if fcrepo.is_reachable():
-        print("Connection successful.", file=sys.stderr)
-    else:
-        print("Unable to connect.", file=sys.stderr)
-        exit(1)
 
 if __name__ == "__main__":
     main()

@@ -55,6 +55,7 @@ class Repository():
         self.endpoint = config['REST_ENDPOINT']
         self.auth = None
         self.client_cert = None
+        self.transaction = None 
 
         if 'CLIENT_CERT' in config and 'CLIENT_KEY' in config:
             self.client_cert = (config['CLIENT_CERT'], config['CLIENT_KEY'])
@@ -85,6 +86,49 @@ class Repository():
     def head(self, url, **kwargs):
         return requests.head(url, cert=self.client_cert, auth=self.auth,
                 verify=self.server_cert, **kwargs)
+    
+    
+    def open_transaction(self):
+        url = os.path.join(repository.endpoint, '/fcr:tx')
+        response = requests.post(url, cert=self.client_cert, auth=self.auth,
+                    verify=self.server_cert, **kwargs)
+        if response.status_code == 201:
+            self.transaction = response.headers['Location']
+            return True
+        else:
+            return False
+
+    
+    def commit_transaction(self):
+        if self.transaction is not None:
+            url = os.path.join(repository.transaction, '/fcr:tx/fcr:commit')
+            response = requests.post(url, cert=self.client_cert, auth=self.auth,
+                        verify=self.server_cert, **kwargs)
+            if response.status_code == 204:
+                self.transaction = None
+                return True
+            else:
+                return False
+    
+    
+    def rollback_transaction(self):
+        if self.transaction is not None:
+            url = os.path.join(repository.transaction, '/fcr:tx/fcr:rollback')
+            response = requests.post(url, cert=self.client_cert, auth=self.auth,
+                        verify=self.server_cert, **kwargs)
+            if response.status_code == 204:
+                self.transaction = None
+                return True
+            else:
+                return False
+
+
+    def _insert_transaction_uri(self, uri):
+        if self.transaction is not None:
+            return os.path.join(self.transaction, uri.lstrip(self.endpoint))
+        else:
+            return uri
+            
 
 
 #============================================================================

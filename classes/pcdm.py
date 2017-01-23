@@ -66,17 +66,21 @@ class Repository():
         else:
             self.server_cert = None
 
+
     def is_reachable(self):
         response = self.head(self.endpoint)
         return response.status_code == 200
+
 
     def post(self, url, **kwargs):
         return requests.post(url, cert=self.client_cert, auth=self.auth,
                 verify=self.server_cert, **kwargs)
 
+
     def patch(self, url, **kwargs):
         return requests.patch(url, cert=self.client_cert, auth=self.auth,
                 verify=self.server_cert, **kwargs)
+
 
     def head(self, url, **kwargs):
         return requests.head(url, cert=self.client_cert, auth=self.auth,
@@ -241,10 +245,13 @@ class Resource(object):
                 (related_object.uri, pcdm.relatedObjectOf, self.uri)
                 )
 
+
+    # add arbitrary additional triples provided in a file
     def add_extra_properties(self, triples_file, rdf_format):
         self.graph.parse(
             source=triples_file, format=rdf_format, publicID=self.uri
             )
+
 
     # show the object's graph, serialized as turtle
     def print_graph(self):

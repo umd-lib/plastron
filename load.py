@@ -73,7 +73,7 @@ def main():
     parser.add_argument('-m', '--map',
                         help='Mapfile to store results of load.',
                         action='store',
-                        default="mapfile.csv"
+                        default="logs/mapfile.csv"
                         )
 
     # Run through object preparation, but do not touch repository

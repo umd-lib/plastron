@@ -38,13 +38,14 @@ def print_footer():
 
 def test_connection(fcrepo):
     # test connection to fcrepo
-    print("Testing connection to {0}... ".format(fcrepo.endpoint),
+    print(fcrepo.fullpath, fcrepo.endpoint, fcrepo.relpath)
+    print("Testing connection to {0}... ".format(fcrepo.fullpath),
             file=sys.stderr, end='')
     if fcrepo.is_reachable():
         print("Connection successful.", file=sys.stderr)
     else:
         print("Unable to connect.", file=sys.stderr)
-        exit(1)
+        sys.exit(1)
 
 
 #============================================================================
@@ -63,7 +64,7 @@ def main():
        according to the most common access control policies in use by the
        repository, so the data handler can access and apply them.'''
 
-    # Path to the repo config (endpoint, credentials, and WebAC paths)
+    # Path to the repo config (endpoint, relpath, credentials, and WebAC paths)
     parser.add_argument('-c', '--config',
                         help='Path to configuration file.',
                         action='store',
@@ -141,7 +142,7 @@ def main():
     # "--ping" tests repository connection and exits
     if args.ping:
         test_connection(fcrepo)
-        exit(0)
+        sys.exit(0)
 
     # Define the specified data_handler function for the data being loaded
     print("Initializing data handler...", end='')
@@ -201,8 +202,11 @@ def main():
                 
                 # open transaction
                 print('\nOpening transaction...', end='')
-                fcrepo.open_transaction()
-                print('success.')
+                if fcrepo.open_transaction():
+                    print('success.')
+                else:
+                    print('failed!')
+                    sys.exit(1)
                 
                 print('\nLoading item {0}...'.format(n+1))
                 item.recursive_create(fcrepo, args.nobinaries)
@@ -224,8 +228,16 @@ def main():
                 
                 # commit transaction
                 print('\nClosing transaction...', end='')
-                fcrepo.commit_transaction()
-                print('success.')
+                if fcrepo.commit_transaction():
+                    print('success.')
+                else:
+                    print('failed!')
+                    if fcrepo.rollback_transaction():
+                        print('Transaction rolled back. Continuing load...')
+                        continue
+                    else:
+                        print('Unable to rollback. Aborting...')
+                        sys.exit(1)
 
                 # write item details to mapfile
                 row = {'number': n + 1,

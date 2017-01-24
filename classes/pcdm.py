@@ -8,6 +8,7 @@ import requests
 import rdflib
 from rdflib import Namespace
 import sys
+from urllib.parse import urljoin
 
 
 
@@ -53,6 +54,10 @@ namespace_manager.bind('rdf', rdf, override=False)
 class Repository():
     def __init__(self, config):
         self.endpoint = config['REST_ENDPOINT']
+        self.relpath = config['RELPATH']
+        self.fullpath = '/'.join(
+            [p.strip('/') for p in (self.endpoint, self.relpath)]
+            )
         self.auth = None
         self.client_cert = None
         self.transaction = None 
@@ -69,7 +74,7 @@ class Repository():
 
 
     def is_reachable(self):
-        response = self.head(self.endpoint)
+        response = self.head(self.fullpath)
         return response.status_code == 200
 
 
@@ -96,8 +101,10 @@ class Repository():
     
     def open_transaction(self, **kwargs):
         url = os.path.join(self.endpoint, 'fcr:tx')
+        print(url)
         response = requests.post(url, cert=self.client_cert, auth=self.auth,
                     verify=self.server_cert, **kwargs)
+        print(response)
         if response.status_code == 201:
             self.transaction = response.headers['Location']
             return True
@@ -107,7 +114,7 @@ class Repository():
     
     def commit_transaction(self, **kwargs):
         if self.transaction is not None:
-            url = os.path.join(self.transaction, '/fcr:tx/fcr:commit')
+            url = os.path.join(self.transaction, 'fcr:tx/fcr:commit')
             response = requests.post(url, cert=self.client_cert, auth=self.auth,
                         verify=self.server_cert, **kwargs)
             if response.status_code == 204:
@@ -119,7 +126,7 @@ class Repository():
     
     def rollback_transaction(self, **kwargs):
         if self.transaction is not None:
-            url = os.path.join(self.transaction, '/fcr:tx/fcr:rollback')
+            url = os.path.join(self.transaction, 'fcr:tx/fcr:rollback')
             response = requests.post(url, cert=self.client_cert, auth=self.auth,
                         verify=self.server_cert, **kwargs)
             if response.status_code == 204:
@@ -131,7 +138,18 @@ class Repository():
 
     def _insert_transaction_uri(self, uri):
         if self.transaction is not None:
-            return os.path.join(self.transaction, uri.lstrip(self.endpoint))
+            return '/'.join([p.strip('/') for p in (
+                            self.transaction, uri.lstrip(self.endpoint))]
+                            )
+        else:
+            return uri
+    
+            
+    def _remove_transaction_uri(self, uri):
+        if self.transaction is not None:
+            return '/'.join([p.strip('/') for p in (
+                            self.endpoint, uri.lstrip(self.transaction))]
+                            )
         else:
             return uri
             
@@ -160,7 +178,9 @@ class Resource(object):
             if response.status_code == 201:
                 print("success.")
                 print(response.status_code, response.text)
-                self.uri = rdflib.URIRef(response.text)
+                self.uri = rdflib.URIRef(
+                    repository._remove_transaction_uri(response.text)
+                    )
                 return True
             else:
                 print("failed!")
@@ -188,6 +208,7 @@ class Resource(object):
             print("success.")
         else:
             print("failed!")
+            print(query)
             print(response.status_code, response.text)
         return response
 
@@ -226,7 +247,9 @@ class Resource(object):
                     )
 
         if hasattr(self, 'collections'):
+            print(self.collections)
             for collection in self.collections:
+                print(collection.uri)
                 if not collection.exists_in_repo(repository):
                     collection.create_object(repository)
                 else:

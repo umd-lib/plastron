@@ -74,22 +74,28 @@ class Repository():
 
 
     def post(self, url, **kwargs):
-        return requests.post(url, cert=self.client_cert, auth=self.auth,
-                verify=self.server_cert, **kwargs)
+        return requests.post(
+            self._insert_transaction_uri(url), cert=self.client_cert,     
+            auth=self.auth, verify=self.server_cert, **kwargs
+            )
 
 
     def patch(self, url, **kwargs):
-        return requests.patch(url, cert=self.client_cert, auth=self.auth,
-                verify=self.server_cert, **kwargs)
+        return requests.patch(
+            self._insert_transaction_uri(url), cert=self.client_cert, 
+            auth=self.auth, verify=self.server_cert, **kwargs
+            )
 
 
     def head(self, url, **kwargs):
-        return requests.head(url, cert=self.client_cert, auth=self.auth,
-                verify=self.server_cert, **kwargs)
+        return requests.head(
+            self._insert_transaction_uri(url), cert=self.client_cert,
+            auth=self.auth, verify=self.server_cert, **kwargs
+            )
     
     
-    def open_transaction(self):
-        url = os.path.join(repository.endpoint, '/fcr:tx')
+    def open_transaction(self, **kwargs):
+        url = os.path.join(self.endpoint, 'fcr:tx')
         response = requests.post(url, cert=self.client_cert, auth=self.auth,
                     verify=self.server_cert, **kwargs)
         if response.status_code == 201:
@@ -99,9 +105,9 @@ class Repository():
             return False
 
     
-    def commit_transaction(self):
+    def commit_transaction(self, **kwargs):
         if self.transaction is not None:
-            url = os.path.join(repository.transaction, '/fcr:tx/fcr:commit')
+            url = os.path.join(self.transaction, '/fcr:tx/fcr:commit')
             response = requests.post(url, cert=self.client_cert, auth=self.auth,
                         verify=self.server_cert, **kwargs)
             if response.status_code == 204:
@@ -111,9 +117,9 @@ class Repository():
                 return False
     
     
-    def rollback_transaction(self):
+    def rollback_transaction(self, **kwargs):
         if self.transaction is not None:
-            url = os.path.join(repository.transaction, '/fcr:tx/fcr:rollback')
+            url = os.path.join(self.transaction, '/fcr:tx/fcr:rollback')
             response = requests.post(url, cert=self.client_cert, auth=self.auth,
                         verify=self.server_cert, **kwargs)
             if response.status_code == 204:

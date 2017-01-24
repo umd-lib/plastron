@@ -200,7 +200,9 @@ def main():
                 item.print_item_tree()
                 
                 # open transaction
+                print('\nOpening transaction...', end='')
                 fcrepo.open_transaction()
+                print('success.')
                 
                 print('\nLoading item {0}...'.format(n+1))
                 item.recursive_create(fcrepo, args.nobinaries)
@@ -221,7 +223,9 @@ def main():
                 item.recursive_update(fcrepo, args.nobinaries)
                 
                 # commit transaction
+                print('\nClosing transaction...', end='')
                 fcrepo.commit_transaction()
+                print('success.')
 
                 # write item details to mapfile
                 row = {'number': n + 1,

@@ -137,22 +137,20 @@ class Repository():
 
 
     def _insert_transaction_uri(self, uri):
-        if self.transaction is not None:
-            return '/'.join([p.strip('/') for p in (
-                            self.transaction, uri.lstrip(self.endpoint))]
-                            )
+        if self.transaction is not None and uri.startswith(self.endpoint):
+            relpath = uri[len(self.endpoint):]
+            return '/'.join([p.strip('/') for p in (self.transaction, relpath)])
         else:
             return uri
-    
-            
+
+
     def _remove_transaction_uri(self, uri):
-        if self.transaction is not None:
-            return '/'.join([p.strip('/') for p in (
-                            self.endpoint, uri.lstrip(self.transaction))]
-                            )
+        if self.transaction is not None and uri.startswith(self.transaction):
+            relpath = uri[len(self.transaction):]
+            return '/'.join([p.strip('/') for p in (self.endpoint, relpath)])
         else:
             return uri
-            
+
 
 
 #============================================================================

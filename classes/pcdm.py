@@ -186,8 +186,10 @@ class Resource(object):
 
 
     # update existing repo object with SPARQL update
-    def update_object(self, repository):
-        print("Patching {0}...".format(str(self.uri)), end='')
+    def update_object(self, repository, patch_uri=None):
+        if not patch_uri:
+            patch_uri = self.uri
+        print("Patching {0}...".format(str(patch_uri)), end='')
         prolog = ''
         #TODO: limit this to just the prefixes that are used in the graph
         for (prefix, uri) in self.graph.namespace_manager.namespaces():
@@ -201,7 +203,7 @@ class Resource(object):
         query = prolog + "INSERT DATA {{{0}}}".format("\n".join(triples))
         data = query.encode('utf-8')
         headers = {'Content-Type': 'application/sparql-update'}
-        response = repository.patch(str(self.uri), data=data, headers=headers)
+        response = repository.patch(str(patch_uri), data=data, headers=headers)
         if response.status_code == 204:
             print("success.")
         else:
@@ -440,7 +442,11 @@ class File(Resource):
         else:
             return False
 
+    def update_object(self, repository):
+        uri = str(self.uri) + '/fcr:metadata'
+        super(File, self).update_object(repository, patch_uri=uri)
 
+    '''
     # update existing binary resource metadata
     def update_object(self, repository):
         patch_uri = str(self.uri) + '/fcr:metadata'
@@ -457,7 +463,7 @@ class File(Resource):
             print("failed!")
             print(response.status_code, response.text)
         return response
-
+    '''
 
     # generate SHA1 checksum on a file
     def sha1(self):

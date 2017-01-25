@@ -86,10 +86,14 @@ class Repository():
 
 
     def patch(self, url, **kwargs):
-        return requests.patch(
-            self._insert_transaction_uri(url), cert=self.client_cert, 
+        target_uri = self._insert_transaction_uri(url)
+        print("Patching {0}...".format(target_uri), end='')
+        response = requests.patch(
+            target_uri, cert=self.client_cert, 
             auth=self.auth, verify=self.server_cert, **kwargs
             )
+        print(response.status_code)
+        return response
 
 
     def head(self, url, **kwargs):
@@ -189,7 +193,6 @@ class Resource(object):
     def update_object(self, repository, patch_uri=None):
         if not patch_uri:
             patch_uri = self.uri
-        print("Patching {0}...".format(str(patch_uri)), end='')
         prolog = ''
         #TODO: limit this to just the prefixes that are used in the graph
         for (prefix, uri) in self.graph.namespace_manager.namespaces():
@@ -441,6 +444,7 @@ class File(Resource):
             return True
         else:
             return False
+
 
     def update_object(self, repository):
         uri = str(self.uri) + '/fcr:metadata'

@@ -176,6 +176,8 @@ class Batch():
             r.get('reelNumber') for r in root.findall(m['batch']['reels'])
             ])
         print('Batch contains {0} reels...'.format(len(self.reels)))
+        if not os.path.isdir('logs'):
+            os.makedirs('logs')
         for n, reel in enumerate(self.reels):
             filename = 'logs/{0}.csv'.format(reel)
             print("  {0}. Creating reel aggregation CSV in '{1}'...".format(n+1,

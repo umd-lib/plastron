@@ -47,6 +47,42 @@ def test_connection(fcrepo):
         sys.exit(1)
 
 
+def load_item(fcrepo, item, args):
+    # open transaction
+    print('\nOpening transaction...', end='')
+    fcrepo.open_transaction()
+
+    # create item and its components
+    try:
+        item.recursive_create(fcrepo, args.nobinaries)
+        print('\nCreating ordering proxies ...')
+        item.create_ordering(fcrepo)
+        print('\nUpdating relationship triples ...')
+        item.update_relationship_triples()
+
+        if args.extra:
+            print('\nAdding additional triples ...')
+            if re.search(r'\.(ttl|n3|nt)$', args.extra):
+                rdf_format = 'n3'
+            elif re.search(r'\.(rdf|xml)$', args.extra):
+                rdf_format = 'xml'
+            item.add_extra_properties(args.extra, rdf_format)
+
+        item.recursive_update(fcrepo, args.nobinaries)
+
+        # commit transaction
+        fcrepo.commit_transaction()
+
+    except pcdm.RESTAPIException as e:
+        # if anything fails during item creation or commiting the transaction
+        # attempt to rollback the current transaction
+        # failures here will be caught by the main loop's exception handler
+        # and should trigger a system exit
+        print("Item creation failed: {0}".format(e))
+        fcrepo.rollback_transaction()
+        print('Transaction rolled back. Continuing load...')
+
+
 #============================================================================
 # MAIN LOOP
 #============================================================================
@@ -115,7 +151,7 @@ def main():
 
     # Extra triples to add to each item
     parser.add_argument('-x', '--extra',
-                        help='''File containing extra triples to add to each 
+                        help='''File containing extra triples to add to each
                                 item''',
                         action='store'
                         )
@@ -192,51 +228,19 @@ def main():
                     break
                 elif item.path in skip_list:
                     continue
-                
+
                 print('')
                 print('=' * 80)
                 print('')
                 print("Processing item {0}/{1}...".format(n+1, batch.length))
                 item.print_item_tree()
-                
-                # open transaction
-                print('\nOpening transaction...', end='')
-                if fcrepo.open_transaction():
-                    print('success.')
-                else:
-                    print('failed!')
+
+                try:
+                    print('\nLoading item {0}...'.format(n+1))
+                    load_item(fcrepo, item, args)
+                except pcdm.RESTAPIException as e:
+                    print("Unable to commit or rollback transaction, aborting")
                     sys.exit(1)
-                
-                print('\nLoading item {0}...'.format(n+1))
-                item.recursive_create(fcrepo, args.nobinaries)
-                print('\nCreating ordering proxies ...')
-                item.create_ordering(fcrepo)
-                print('\nUpdating relationship triples ...')
-                item.update_relationship_triples()
-
-                if args.extra:
-                    print('\nAdding additional triples ...')
-                    if re.search(r'\.(ttl|n3|nt)$', args.extra):
-                        rdf_format = 'n3'
-                    elif re.search(r'\.(rdf|xml)$', args.extra):
-                        rdf_format = 'xml'
-                    item.add_extra_properties(args.extra, rdf_format)
-
-                print('\nUpdating item {0}...'.format(n+1))
-                item.recursive_update(fcrepo, args.nobinaries)
-                
-                # commit transaction
-                print('\nClosing transaction...', end='')
-                if fcrepo.commit_transaction():
-                    print('success.')
-                else:
-                    print('failed!')
-                    if fcrepo.rollback_transaction():
-                        print('Transaction rolled back. Continuing load...')
-                        continue
-                    else:
-                        print('Unable to rollback. Aborting...')
-                        sys.exit(1)
 
                 # write item details to mapfile
                 row = {'number': n + 1,
@@ -248,7 +252,6 @@ def main():
                 writer.writerow(row)
 
     print_footer()
-
 
 if __name__ == "__main__":
     main()

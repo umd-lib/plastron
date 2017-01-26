@@ -59,7 +59,7 @@ class Repository():
             )
         self.auth = None
         self.client_cert = None
-        self.transaction = None 
+        self.transaction = None
 
         if 'CLIENT_CERT' in config and 'CLIENT_KEY' in config:
             self.client_cert = (config['CLIENT_CERT'], config['CLIENT_KEY'])
@@ -81,7 +81,7 @@ class Repository():
         target_uri = self._insert_transaction_uri(url)
         print('Posting to {0}...'.format(target_uri), end='')
         response = requests.post(
-            target_uri, cert=self.client_cert, 
+            target_uri, cert=self.client_cert,
             auth=self.auth, verify=self.server_cert, **kwargs
             )
         print(response.status_code)
@@ -92,7 +92,7 @@ class Repository():
         target_uri = self._insert_transaction_uri(url)
         print('Patching {0}...'.format(target_uri), end='')
         response = requests.patch(
-            target_uri, cert=self.client_cert, 
+            target_uri, cert=self.client_cert,
             auth=self.auth, verify=self.server_cert, **kwargs
             )
         print(response.status_code)
@@ -108,8 +108,8 @@ class Repository():
             )
         print(response.status_code)
         return response
-    
-    
+
+
     def open_transaction(self, **kwargs):
         url = os.path.join(self.endpoint, 'fcr:tx')
         response = requests.post(url, cert=self.client_cert, auth=self.auth,
@@ -118,9 +118,9 @@ class Repository():
             self.transaction = response.headers['Location']
             return True
         else:
-            return False
+            raise RESTAPIException(response)
 
-    
+
     def commit_transaction(self, **kwargs):
         if self.transaction is not None:
             url = os.path.join(self.transaction, 'fcr:tx/fcr:commit')
@@ -130,9 +130,9 @@ class Repository():
                 self.transaction = None
                 return True
             else:
-                return False
-    
-    
+                raise RESTAPIException(response)
+
+
     def rollback_transaction(self, **kwargs):
         if self.transaction is not None:
             url = os.path.join(self.transaction, 'fcr:tx/fcr:rollback')
@@ -142,7 +142,7 @@ class Repository():
                 self.transaction = None
                 return True
             else:
-                return False
+                raise RESTAPIException(response)
 
 
     def _insert_transaction_uri(self, uri):
@@ -168,6 +168,12 @@ class Repository():
 # PCDM RESOURCE (COMMON METHODS FOR ALL OBJECTS)
 #============================================================================
 
+class RESTAPIException(Exception):
+    def __init__(self, response):
+        self.response = response
+    def __str__(self):
+        return '{0} {1}'.format(self.response.status_code, self.response.reason)
+
 class Resource(object):
 
     def __init__(self, uri=''):
@@ -186,7 +192,7 @@ class Resource(object):
             response = repository.post(
                 '/'.join([p.strip('/') for p in (repository.endpoint,
                                                  repository.relpath)])
-                )                                
+                )
             if response.status_code == 201:
                 self.uri = rdflib.URIRef(
                     repository._remove_transaction_uri(response.text)
@@ -195,7 +201,7 @@ class Resource(object):
                 return True
             else:
                 print(response.status_code, response.text)
-                return False
+                raise RESTAPIException(response)
 
 
     # update existing repo object with SPARQL update
@@ -219,6 +225,7 @@ class Resource(object):
         if response.status_code != 204:
             print(query)
             print(response.status_code, response.text)
+            raise RESTAPIException(response)
         return response
 
 
@@ -448,7 +455,7 @@ class File(Resource):
             print(' --> {0}'.format(self.uri))
             return True
         else:
-            return False
+            raise RESTAPIException(response)
 
 
     def update_object(self, repository):

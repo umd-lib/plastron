@@ -8,7 +8,6 @@ import requests
 import rdflib
 from rdflib import Namespace
 import sys
-from urllib.parse import urljoin
 
 
 
@@ -79,15 +78,19 @@ class Repository():
 
 
     def post(self, url, **kwargs):
-        return requests.post(
-            self._insert_transaction_uri(url), cert=self.client_cert,     
+        target_uri = self._insert_transaction_uri(url)
+        print('Posting to {0}...'.format(target_uri), end='')
+        response = requests.post(
+            target_uri, cert=self.client_cert, 
             auth=self.auth, verify=self.server_cert, **kwargs
             )
+        print(response.status_code)
+        return response
 
 
     def patch(self, url, **kwargs):
         target_uri = self._insert_transaction_uri(url)
-        print("Patching {0}...".format(target_uri), end='')
+        print('Patching {0}...'.format(target_uri), end='')
         response = requests.patch(
             target_uri, cert=self.client_cert, 
             auth=self.auth, verify=self.server_cert, **kwargs
@@ -97,18 +100,20 @@ class Repository():
 
 
     def head(self, url, **kwargs):
-        return requests.head(
-            self._insert_transaction_uri(url), cert=self.client_cert,
+        target_uri = self._insert_transaction_uri(url)
+        print('Head request for {0}...'.format(target_uri), end='')
+        response = requests.head(
+            target_uri, cert=self.client_cert,
             auth=self.auth, verify=self.server_cert, **kwargs
             )
+        print(response.status_code)
+        return response
     
     
     def open_transaction(self, **kwargs):
         url = os.path.join(self.endpoint, 'fcr:tx')
-        print(url)
         response = requests.post(url, cert=self.client_cert, auth=self.auth,
                     verify=self.server_cert, **kwargs)
-        print(response)
         if response.status_code == 201:
             self.transaction = response.headers['Location']
             return True
@@ -141,7 +146,9 @@ class Repository():
 
 
     def _insert_transaction_uri(self, uri):
-        if self.transaction is not None and uri.startswith(self.endpoint):
+        if self.transaction is None or uri.startswith(self.transaction):
+            return uri
+        elif uri.startswith(self.endpoint):
             relpath = uri[len(self.endpoint):]
             return '/'.join([p.strip('/') for p in (self.transaction, relpath)])
         else:
@@ -175,17 +182,16 @@ class Resource(object):
         if self.exists_in_repo(repository):
             return False
         else:
-            print("Creating {0}...".format(self.title), end='')
+            print("Creating {0}...".format(self.title))
             response = repository.post(repository.endpoint)
             if response.status_code == 201:
-                print("success.")
-                print(response.status_code, response.text)
                 self.uri = rdflib.URIRef(
                     repository._remove_transaction_uri(response.text)
                     )
+                print(' --> {0}'.format(self.uri))
                 return True
             else:
-                print("failed!")
+                print(response.status_code, response.text)
                 return False
 
 
@@ -207,10 +213,7 @@ class Resource(object):
         data = query.encode('utf-8')
         headers = {'Content-Type': 'application/sparql-update'}
         response = repository.patch(str(patch_uri), data=data, headers=headers)
-        if response.status_code == 204:
-            print("success.")
-        else:
-            print("failed!")
+        if response.status_code != 204:
             print(query)
             print(response.status_code, response.text)
         return response
@@ -250,9 +253,7 @@ class Resource(object):
                     )
 
         if hasattr(self, 'collections'):
-            print(self.collections)
             for collection in self.collections:
-                print(collection.uri)
                 if not collection.exists_in_repo(repository):
                     collection.create_object(repository)
                 else:
@@ -427,7 +428,7 @@ class File(Resource):
 
     # upload a binary resource
     def create_nonrdf(self, repository):
-        print("Loading {0}...".format(self.filename))
+        print("Loading {0}...".format(self.filename), end='')
         with open(self.localpath, 'rb') as binaryfile:
             data = binaryfile.read()
         headers = {'Content-Type': self.mimetype,
@@ -441,33 +442,16 @@ class File(Resource):
                                  )
         if response.status_code == 201:
             self.uri = rdflib.URIRef(response.text)
+            print(' --> {0}'.format(self.uri))
             return True
         else:
             return False
 
 
     def update_object(self, repository):
-        uri = str(self.uri) + '/fcr:metadata'
-        super(File, self).update_object(repository, patch_uri=uri)
+        fcr_metadata = str(self.uri) + '/fcr:metadata'
+        super(File, self).update_object(repository, patch_uri=fcr_metadata)
 
-    '''
-    # update existing binary resource metadata
-    def update_object(self, repository):
-        patch_uri = str(self.uri) + '/fcr:metadata'
-        print("Patching {0}...".format(patch_uri), end='')
-        query = "INSERT DATA {{{0}}}".format(
-            self.graph.serialize(format='nt').decode()
-            )
-        data = query.encode('utf-8')
-        headers = {'Content-Type': 'application/sparql-update'}
-        response = repository.patch(patch_uri, data=data, headers=headers)
-        if response.status_code == 204:
-            print("success.")
-        else:
-            print("failed!")
-            print(response.status_code, response.text)
-        return response
-    '''
 
     # generate SHA1 checksum on a file
     def sha1(self):

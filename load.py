@@ -38,7 +38,6 @@ def print_footer():
 
 def test_connection(fcrepo):
     # test connection to fcrepo
-    print(fcrepo.fullpath, fcrepo.endpoint, fcrepo.relpath)
     print("Testing connection to {0}... ".format(fcrepo.fullpath),
             file=sys.stderr, end='')
     if fcrepo.is_reachable():

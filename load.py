@@ -16,6 +16,7 @@ import yaml
 import re
 import logging
 import logging.config
+from datetime import datetime
 from classes import pcdm
 
 logger = logging.getLogger(__name__)
@@ -185,6 +186,8 @@ def main():
             logging_config['handlers']['console']['level'] = 'DEBUG'
         elif args.quiet:
             logging_config['handlers']['console']['level'] = 'WARNING'
+        logfile = 'logs/load.py.{0}.log'.format(datetime.utcnow().strftime('%Y%m%d%H%M%S'))
+        logging_config['handlers']['file']['filename'] = logfile
         logging.config.dictConfig(logging_config)
 
     # Load config

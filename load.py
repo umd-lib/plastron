@@ -18,10 +18,6 @@ import logging
 import logging.config
 from classes import pcdm
 
-with open('logging.yml', 'r') as configfile:
-    logging_config = yaml.safe_load(configfile)
-    logging.config.dictConfig(logging_config)
-
 logger = logging.getLogger(__name__)
 
 #============================================================================
@@ -95,7 +91,6 @@ def load_item(fcrepo, item, args):
 
 def main():
     '''Parse args and handle options.'''
-    print_header()
 
     parser = argparse.ArgumentParser(
         description='A configurable batch loader for Fedora 4.'
@@ -168,7 +163,29 @@ def main():
                         action='store'
                         )
 
+    parser.add_argument('-v', '--verbose',
+                        help='Increase the verbosity of the status output.',
+                        action='store_true'
+                        )
+
+    parser.add_argument('-q', '--quiet',
+                        help='Decrease the verbosity of the status output.',
+                        action='store_true'
+                        )
+
     args = parser.parse_args()
+
+    if not args.quiet:
+        print_header()
+
+    # configure logging
+    with open('logging.yml', 'r') as configfile:
+        logging_config = yaml.safe_load(configfile)
+        if args.verbose:
+            logging_config['handlers']['console']['level'] = 'DEBUG'
+        elif args.quiet:
+            logging_config['handlers']['console']['level'] = 'WARNING'
+        logging.config.dictConfig(logging_config)
 
     # Load config
     if args.config:
@@ -235,7 +252,8 @@ def main():
                     continue
 
                 logger.info("Processing item {0}/{1}...".format(n+1, batch.length))
-                item.print_item_tree()
+                if args.verbose:
+                    item.print_item_tree()
 
                 try:
                     logger.info('Loading item {0}'.format(n+1))
@@ -253,7 +271,8 @@ def main():
                        }
                 writer.writerow(row)
 
-    print_footer()
+    if not args.quiet:
+        print_footer()
 
 if __name__ == "__main__":
     main()

@@ -183,7 +183,10 @@ class Resource(object):
             return False
         else:
             print("Creating {0}...".format(self.title))
-            response = repository.post(repository.endpoint)
+            response = repository.post(
+                '/'.join([p.strip('/') for p in (repository.endpoint,
+                                                 repository.relpath)])
+                )                                
             if response.status_code == 201:
                 self.uri = rdflib.URIRef(
                     repository._remove_transaction_uri(response.text)

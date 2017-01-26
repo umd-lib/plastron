@@ -7,8 +7,7 @@ import os
 from classes import pcdm
 import rdflib
 from rdflib import Namespace, URIRef
-
-
+import logging
 
 #============================================================================
 # NAMESPACE BINDINGS
@@ -54,8 +53,6 @@ namespace_manager.bind('pcdmuse', pcdm_use, override=False)
 
 rdf = Namespace('http://www.w3.org/1999/02/22-rdf-syntax-ns#')
 namespace_manager.bind('rdf', rdf, override=False)
-
-
 
 #============================================================================
 # METADATA MAPPING
@@ -125,16 +122,12 @@ XPATHMAP = {
         }
     }
 
-
-
 #============================================================================
 # DATA LOADING FUNCTION
 #============================================================================
 
 def load(args):
     return Batch(args)
-
-
 
 #============================================================================
 # NDNP BATCH CLASS
@@ -145,6 +138,7 @@ class Batch():
     '''iterator class representing the set of resources to be loaded'''
 
     def __init__(self, args):
+        self.logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
         tree = ET.parse(args.path)
         root = tree.getroot()
         m = XPATHMAP
@@ -154,13 +148,13 @@ class Batch():
         dback.graph.add(
             (dback.uri, dcterms.title, rdflib.Literal(dback.title))
             )
-            
+
         self.collection = dback
         self.fieldnames = ['aggregation', 'sequence', 'uri']
-        
+
         # read over the index XML file assembling a list of paths to the issues
         self.basepath = os.path.dirname(args.path)
-        
+
         self.issues = []
         for i in root.findall(m['batch']['issues']):
             sanitized_path = i.text[:-6] + i.text[-4:]
@@ -170,30 +164,27 @@ class Batch():
                     self.basepath, "Article-Level", sanitized_path)
                     )
                 )
-        
+
         # set up a CSV file for each reel
         self.reels = set([
             r.get('reelNumber') for r in root.findall(m['batch']['reels'])
             ])
-        print('Batch contains {0} reels...'.format(len(self.reels)))
+        self.logger.info('Batch contains {0} reels'.format(len(self.reels)))
         if not os.path.isdir('logs'):
             os.makedirs('logs')
         for n, reel in enumerate(self.reels):
             filename = 'logs/{0}.csv'.format(reel)
-            print("  {0}. Creating reel aggregation CSV in '{1}'...".format(n+1,
-                                                                     filename))
+            self.logger.info("{0}. Creating reel aggregation CSV in '{1}'".format(n+1, filename))
             with open(filename, 'w') as f:
                 writer = csv.DictWriter(f, fieldnames=self.fieldnames)
                 writer.writeheader()
-            
+
         self.length = len(self.issues)
         self.num = 0
-        print("Batch contains {0} items.".format(self.length))
-
+        self.logger.info("Batch contains {0} items.".format(self.length))
 
     def __iter__(self):
         return self
-
 
     def __next__(self):
         if self.num < self.length:
@@ -202,10 +193,8 @@ class Batch():
             self.num += 1
             return issue
         else:
-            print('\nProcessing complete!')
+            self.logger.info('Processing complete!')
             raise StopIteration()
-
-
 
 #============================================================================
 # NDNP ISSUE OBJECT
@@ -277,8 +266,6 @@ class Issue(pcdm.Item):
         for article_title in article_root.findall(m['article']):
             self.related.append(Article(article_title.text, self))
 
-
-
 #============================================================================
 # NDNP REEL OBJECT
 #============================================================================
@@ -304,8 +291,6 @@ class Reel(pcdm.Item):
         self.graph.add(
             (self.uri, rdf.type, carriers.hd)
             )
-
-
 
 #============================================================================
 # NDNP PAGE OBJECT
@@ -338,7 +323,6 @@ class Page(pcdm.Component):
         self.graph.add( (self.uri, ndnp.sequence, rdflib.Literal(self.frame)) )
         self.graph.add( (self.uri, rdf.type, ndnp.Page) )
 
-    
     # populate non-atomic aggregation object via overloaded superclass method
     def create_object(self, repository):
         if super(Page, self).create_object(repository):
@@ -351,8 +335,6 @@ class Page(pcdm.Component):
                        'uri':          self.uri
                         }
                 writer.writerow(row)
-
-
 
 #============================================================================
 # NDNP FILE OBJECT
@@ -402,8 +384,6 @@ class File(pcdm.File):
                 (self.uri, rdf.type, pcdm_use.ExtractedText)
                 )
 
-
-
 #============================================================================
 # NDNP COLLECTION OBJECT
 #============================================================================
@@ -414,8 +394,6 @@ class Collection(pcdm.Collection):
 
     def __init__(self):
         pcdm.Collection.__init__(self)
-
-
 
 #============================================================================
 # NDNP ARTICLE OBJECT
@@ -435,6 +413,3 @@ class Article(pcdm.Item):
         self.graph.namespace_manager = namespace_manager
         self.graph.add( (self.uri, dcterms.title, rdflib.Literal(self.title)) )
         self.graph.add( (self.uri, rdf.type, bibo.Article) )
-
-
-

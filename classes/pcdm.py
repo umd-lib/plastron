@@ -8,8 +8,7 @@ import requests
 import rdflib
 from rdflib import Namespace
 import sys
-
-
+import logging
 
 #============================================================================
 # NAMESPACE BINDINGS
@@ -44,8 +43,6 @@ namespace_manager.bind('pcdm', pcdm, override=False)
 rdf = Namespace('http://www.w3.org/1999/02/22-rdf-syntax-ns#')
 namespace_manager.bind('rdf', rdf, override=False)
 
-
-
 #============================================================================
 # REPOSITORY (REPRESENTING AN FCREPO INSTANCE)
 #============================================================================
@@ -60,6 +57,7 @@ class Repository():
         self.auth = None
         self.client_cert = None
         self.transaction = None
+        self.logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
 
         if 'CLIENT_CERT' in config and 'CLIENT_KEY' in config:
             self.client_cert = (config['CLIENT_CERT'], config['CLIENT_KEY'])
@@ -71,67 +69,70 @@ class Repository():
         else:
             self.server_cert = None
 
-
     def is_reachable(self):
         response = self.head(self.fullpath)
         return response.status_code == 200
 
-
     def post(self, url, **kwargs):
         target_uri = self._insert_transaction_uri(url)
-        print('Posting to {0}...'.format(target_uri), end='')
+        self.logger.debug("POST {0}".format(target_uri))
         response = requests.post(
             target_uri, cert=self.client_cert,
             auth=self.auth, verify=self.server_cert, **kwargs
             )
-        print(response.status_code)
+        self.logger.debug("%s %s", response.status_code, response.reason)
         return response
-
 
     def patch(self, url, **kwargs):
         target_uri = self._insert_transaction_uri(url)
-        print('Patching {0}...'.format(target_uri), end='')
+        self.logger.debug("PATCH {0}".format(target_uri))
         response = requests.patch(
             target_uri, cert=self.client_cert,
             auth=self.auth, verify=self.server_cert, **kwargs
             )
-        print(response.status_code)
+        self.logger.debug("%s %s", response.status_code, response.reason)
         return response
-
 
     def head(self, url, **kwargs):
         target_uri = self._insert_transaction_uri(url)
-        print('Head request for {0}...'.format(target_uri), end='')
+        self.logger.debug('HEAD {0}'.format(target_uri))
         response = requests.head(
             target_uri, cert=self.client_cert,
             auth=self.auth, verify=self.server_cert, **kwargs
             )
-        print(response.status_code)
+        self.logger.debug("%s %s", response.status_code, response.reason)
         return response
-
 
     def open_transaction(self, **kwargs):
         url = os.path.join(self.endpoint, 'fcr:tx')
+        self.logger.info("Creating transaction")
+        self.logger.debug("POST {0}".format(url))
         response = requests.post(url, cert=self.client_cert, auth=self.auth,
                     verify=self.server_cert, **kwargs)
+        self.logger.debug("%s %s", response.status_code, response.reason)
         if response.status_code == 201:
             self.transaction = response.headers['Location']
+            self.logger.info("Created transaction {0}".format(self.transaction))
             return True
         else:
+            self.logger.error("Failed to create transaction")
             raise RESTAPIException(response)
-
 
     def commit_transaction(self, **kwargs):
         if self.transaction is not None:
             url = os.path.join(self.transaction, 'fcr:tx/fcr:commit')
+            self.logger.info("Commiting transaction {0}".format(self.transaction))
+            self.logger.debug("POST {0}".format(url))
             response = requests.post(url, cert=self.client_cert, auth=self.auth,
                         verify=self.server_cert, **kwargs)
+            self.logger.debug("%s %s", response.status_code, response.reason)
             if response.status_code == 204:
+                self.logger.info("Committed transaction {0}".format(self.transaction))
                 self.transaction = None
                 return True
             else:
+                self.logger.error("Failed to commit transaction {0}".format(self.transaction))
                 raise RESTAPIException(response)
-
 
     def rollback_transaction(self, **kwargs):
         if self.transaction is not None:
@@ -144,7 +145,6 @@ class Repository():
             else:
                 raise RESTAPIException(response)
 
-
     def _insert_transaction_uri(self, uri):
         if self.transaction is None or uri.startswith(self.transaction):
             return uri
@@ -154,15 +154,12 @@ class Repository():
         else:
             return uri
 
-
     def _remove_transaction_uri(self, uri):
         if self.transaction is not None and uri.startswith(self.transaction):
             relpath = uri[len(self.transaction):]
             return '/'.join([p.strip('/') for p in (self.endpoint, relpath)])
         else:
             return uri
-
-
 
 #============================================================================
 # PCDM RESOURCE (COMMON METHODS FOR ALL OBJECTS)
@@ -181,28 +178,28 @@ class Resource(object):
         self.graph.namespace_manager = namespace_manager
         self.uri = rdflib.URIRef(uri)
         self.related = []
-
+        self.logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
 
     # create repository object by POSTing object graph
     def create_object(self, repository):
         if self.exists_in_repo(repository):
             return False
         else:
-            print("Creating {0}...".format(self.title))
+            self.logger.info("Creating {0}...".format(self.title))
             response = repository.post(
                 '/'.join([p.strip('/') for p in (repository.endpoint,
                                                  repository.relpath)])
                 )
             if response.status_code == 201:
+                self.logger.info("Created {0}".format(self.title))
                 self.uri = rdflib.URIRef(
                     repository._remove_transaction_uri(response.text)
                     )
-                print(' --> {0}'.format(self.uri))
+                self.logger.info('URI: {0}'.format(self.uri))
                 return True
             else:
-                print(response.status_code, response.text)
+                self.logger.error("Failed to create {0}".format(self.title))
                 raise RESTAPIException(response)
-
 
     # update existing repo object with SPARQL update
     def update_object(self, repository, patch_uri=None):
@@ -221,13 +218,15 @@ class Resource(object):
         query = prolog + "INSERT DATA {{{0}}}".format("\n".join(triples))
         data = query.encode('utf-8')
         headers = {'Content-Type': 'application/sparql-update'}
+        self.logger.info("Updating {0}".format(self.title))
         response = repository.patch(str(patch_uri), data=data, headers=headers)
-        if response.status_code != 204:
-            print(query)
-            print(response.status_code, response.text)
+        if response.status_code == 204:
+            self.logger.info("Updated {0}".format(self.title))
+            return response
+        else:
+            self.logger.error("Failed to update {0}".format(self.title))
+            self.logger.error(query)
             raise RESTAPIException(response)
-        return response
-
 
     # recursively create an object and components and that don't yet exist
     def recursive_create(self, repository, nobinaries):
@@ -235,43 +234,33 @@ class Resource(object):
             self.create_object(repository)
             self.creation_timestamp = dt.now()
         else:
-            print('Object "{0}" exists. Skipping...'.format(self.title))
+            self.logger.info('Object "{0}" exists. Skipping.'.format(self.title))
 
         if not nobinaries:
             for file in self.files:
                 if not file.exists_in_repo(repository):
                     file.create_nonrdf(repository)
                 else:
-                    print('File "{0}" exists. Skipping...'.format(file.title))
+                    self.logger.info('File "{0}" exists. Skipping.'.format(file.title))
 
         for component in self.components:
             if not component.exists_in_repo(repository):
                 component.recursive_create(repository, nobinaries)
             else:
-                print(
-                    'Component "{0}" exists. Skipping...'.format(
-                        component.title)
-                    )
+                self.logger.info('Component "{0}" exists. Skipping.'.format(component.title))
 
         for related_object in self.related:
             if not related_object.exists_in_repo(repository):
                 related_object.recursive_create(repository, nobinaries)
             else:
-                print(
-                    'Related object "{0}" exists. Skipping...'.format(
-                        related_object.title)
-                    )
+                self.logger.info('Related object "{0}" exists. Skipping.'.format(related_object.title))
 
         if hasattr(self, 'collections'):
             for collection in self.collections:
                 if not collection.exists_in_repo(repository):
                     collection.create_object(repository)
                 else:
-                    print(
-                        'Collection "{0}" exists. Skipping...'.format(
-                            collection.title)
-                        )
-
+                    self.logger.info('Collection "{0}" exists. Skipping.'.format(collection.title))
 
     # recursively update an object and all its components and files
     def recursive_update(self, repository, nobinaries):
@@ -287,7 +276,6 @@ class Resource(object):
             for collection in self.collections:
                 collection.update_object(repository)
 
-
     # check for the existence of a local object in the repository
     def exists_in_repo(self, repository):
         if str(self.uri).startswith(repository.endpoint):
@@ -299,13 +287,11 @@ class Resource(object):
         else:
             return False
 
-
     # update object graph with URI
     def update_subject_uri(self):
         for (s, p, o) in self.graph:
             self.graph.delete( (s, p, o) )
             self.graph.add( (self.uri, p, o) )
-
 
     # update membership triples (can be used after repository object creation
     # to ensure repository URIs are present)
@@ -332,18 +318,15 @@ class Resource(object):
                 (related_object.uri, pcdm.relatedObjectOf, self.uri)
                 )
 
-
     # add arbitrary additional triples provided in a file
     def add_extra_properties(self, triples_file, rdf_format):
         self.graph.parse(
             source=triples_file, format=rdf_format, publicID=self.uri
             )
 
-
     # show the object's graph, serialized as turtle
     def print_graph(self):
         print(self.graph.serialize(format="turtle").decode())
-
 
     # show the item graph and tree of related objects
     def print_item_tree(self):
@@ -353,8 +336,6 @@ class Resource(object):
                 print("  Part {0}: {1}".format(n+1, p.title))
                 for f in p.files:
                     print("   |--{0}: {1}".format(f.title, f.localpath))
-
-
 
 #============================================================================
 # PCDM ITEM-OBJECT
@@ -370,10 +351,8 @@ class Item(Resource):
         self.related = []
         self.graph.add( (self.uri, rdf.type, pcdm.Object) )
 
-
     # iterate over each component and create ordering proxies
     def create_ordering(self, repository):
-
         proxies = []
         for component in self.components:
             position = " ".join([self.sequence_attr[0],
@@ -404,8 +383,6 @@ class Item(Resource):
 
             proxy.update_object(repository)
 
-
-
 #============================================================================
 # PCDM COMPONENT-OBJECT
 #============================================================================
@@ -418,8 +395,6 @@ class Component(Resource):
         self.components = []
         self.collections = []
         self.graph.add( (self.uri, rdf.type, pcdm.Object) )
-
-
 
 #============================================================================
 # PCDM FILE
@@ -435,10 +410,9 @@ class File(Resource):
         self.mimetype = mimetypes.guess_type(self.localpath)[0]
         self.graph.add( (self.uri, rdf.type, pcdm.File) )
 
-
     # upload a binary resource
     def create_nonrdf(self, repository):
-        print("Loading {0}...".format(self.filename), end='')
+        self.logger.info("Loading {0}".format(self.filename))
         with open(self.localpath, 'rb') as binaryfile:
             data = binaryfile.read()
         headers = {'Content-Type': self.mimetype,
@@ -450,16 +424,13 @@ class File(Resource):
         response = repository.post(target_uri, data=data, headers=headers)
         if response.status_code == 201:
             self.uri = rdflib.URIRef(response.text)
-            print(' --> {0}'.format(self.uri))
             return True
         else:
             raise RESTAPIException(response)
 
-
     def update_object(self, repository):
         fcr_metadata = str(self.uri) + '/fcr:metadata'
         super(File, self).update_object(repository, patch_uri=fcr_metadata)
-
 
     # generate SHA1 checksum on a file
     def sha1(self):
@@ -473,8 +444,6 @@ class File(Resource):
                 sha1.update(data)
         return sha1.hexdigest()
 
-
-
 #============================================================================
 # PCDM COLLECTION OBJECT
 #============================================================================
@@ -485,8 +454,6 @@ class Collection(Resource):
         Resource.__init__(self)
         self.files = None
         self.graph.add( (self.uri, rdf.type, pcdm.Collection) )
-
-
 
 #============================================================================
 # PCDM PROXY OBJECT
@@ -499,5 +466,3 @@ class Proxy(Resource):
         self.title = 'Proxy for {0} in {1}'.format(position, context)
         self.graph.add( (self.uri, rdf.type, ore.Proxy) )
         self.graph.add( (self.uri, dcterms.title, rdflib.Literal(self.title)) )
-
-

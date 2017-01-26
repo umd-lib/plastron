@@ -59,7 +59,7 @@ class Repository():
             )
         self.auth = None
         self.client_cert = None
-        self.transaction = None 
+        self.transaction = None
 
         if 'CLIENT_CERT' in config and 'CLIENT_KEY' in config:
             self.client_cert = (config['CLIENT_CERT'], config['CLIENT_KEY'])
@@ -81,7 +81,7 @@ class Repository():
         target_uri = self._insert_transaction_uri(url)
         print('Posting to {0}...'.format(target_uri), end='')
         response = requests.post(
-            target_uri, cert=self.client_cert, 
+            target_uri, cert=self.client_cert,
             auth=self.auth, verify=self.server_cert, **kwargs
             )
         print(response.status_code)
@@ -92,7 +92,7 @@ class Repository():
         target_uri = self._insert_transaction_uri(url)
         print('Patching {0}...'.format(target_uri), end='')
         response = requests.patch(
-            target_uri, cert=self.client_cert, 
+            target_uri, cert=self.client_cert,
             auth=self.auth, verify=self.server_cert, **kwargs
             )
         print(response.status_code)
@@ -108,8 +108,8 @@ class Repository():
             )
         print(response.status_code)
         return response
-    
-    
+
+
     def open_transaction(self, **kwargs):
         url = os.path.join(self.endpoint, 'fcr:tx')
         response = requests.post(url, cert=self.client_cert, auth=self.auth,
@@ -120,7 +120,7 @@ class Repository():
         else:
             return False
 
-    
+
     def commit_transaction(self, **kwargs):
         if self.transaction is not None:
             url = os.path.join(self.transaction, 'fcr:tx/fcr:commit')
@@ -131,8 +131,8 @@ class Repository():
                 return True
             else:
                 return False
-    
-    
+
+
     def rollback_transaction(self, **kwargs):
         if self.transaction is not None:
             url = os.path.join(self.transaction, 'fcr:tx/fcr:rollback')
@@ -186,7 +186,7 @@ class Resource(object):
             response = repository.post(
                 '/'.join([p.strip('/') for p in (repository.endpoint,
                                                  repository.relpath)])
-                )                                
+                )
             if response.status_code == 201:
                 self.uri = rdflib.URIRef(
                     repository._remove_transaction_uri(response.text)
@@ -439,10 +439,8 @@ class File(Resource):
                    'Content-Disposition':
                         'attachment; filename="{0}"'.format(self.filename)
                     }
-        response = repository.post(repository.endpoint,
-                                 data=data,
-                                 headers=headers
-                                 )
+        target_uri = '/'.join([p.strip('/') for p in (repository.endpoint, repository.relpath)])
+        response = repository.post(target_uri, data=data, headers=headers)
         if response.status_code == 201:
             self.uri = rdflib.URIRef(response.text)
             print(' --> {0}'.format(self.uri))

@@ -36,6 +36,16 @@ def print_footer():
     print('\nScript complete. Goodbye!\n')
 
 
+def test_connection(fcrepo):
+    # test connection to fcrepo
+    print("Testing connection to {0}... ".format(fcrepo.fullpath),
+            file=sys.stderr, end='')
+    if fcrepo.is_reachable():
+        print("Connection successful.", file=sys.stderr)
+    else:
+        print("Unable to connect.", file=sys.stderr)
+        sys.exit(1)
+
 
 #============================================================================
 # MAIN LOOP
@@ -53,7 +63,7 @@ def main():
        according to the most common access control policies in use by the
        repository, so the data handler can access and apply them.'''
 
-    # Path to the repo config (endpoint, credentials, and WebAC paths)
+    # Path to the repo config (endpoint, relpath, credentials, and WebAC paths)
     parser.add_argument('-c', '--config',
                         help='Path to configuration file.',
                         action='store',
@@ -73,7 +83,7 @@ def main():
     parser.add_argument('-m', '--map',
                         help='Mapfile to store results of load.',
                         action='store',
-                        default="mapfile.csv"
+                        default="logs/mapfile.csv"
                         )
 
     # Run through object preparation, but do not touch repository
@@ -105,7 +115,8 @@ def main():
 
     # Extra triples to add to each item
     parser.add_argument('-x', '--extra',
-                        help='File containing extra triples to add to each item',
+                        help='''File containing extra triples to add to each 
+                                item''',
                         action='store'
                         )
 
@@ -130,7 +141,7 @@ def main():
     # "--ping" tests repository connection and exits
     if args.ping:
         test_connection(fcrepo)
-        exit(0)
+        sys.exit(0)
 
     # Define the specified data_handler function for the data being loaded
     print("Initializing data handler...", end='')
@@ -187,6 +198,15 @@ def main():
                 print('')
                 print("Processing item {0}/{1}...".format(n+1, batch.length))
                 item.print_item_tree()
+                
+                # open transaction
+                print('\nOpening transaction...', end='')
+                if fcrepo.open_transaction():
+                    print('success.')
+                else:
+                    print('failed!')
+                    sys.exit(1)
+                
                 print('\nLoading item {0}...'.format(n+1))
                 item.recursive_create(fcrepo, args.nobinaries)
                 print('\nCreating ordering proxies ...')
@@ -204,6 +224,19 @@ def main():
 
                 print('\nUpdating item {0}...'.format(n+1))
                 item.recursive_update(fcrepo, args.nobinaries)
+                
+                # commit transaction
+                print('\nClosing transaction...', end='')
+                if fcrepo.commit_transaction():
+                    print('success.')
+                else:
+                    print('failed!')
+                    if fcrepo.rollback_transaction():
+                        print('Transaction rolled back. Continuing load...')
+                        continue
+                    else:
+                        print('Unable to rollback. Aborting...')
+                        sys.exit(1)
 
                 # write item details to mapfile
                 row = {'number': n + 1,
@@ -216,15 +249,6 @@ def main():
 
     print_footer()
 
-def test_connection(fcrepo):
-    # test connection to fcrepo
-    print("Testing connection to {0}... ".format(fcrepo.endpoint),
-            file=sys.stderr, end='')
-    if fcrepo.is_reachable():
-        print("Connection successful.", file=sys.stderr)
-    else:
-        print("Unable to connect.", file=sys.stderr)
-        exit(1)
 
 if __name__ == "__main__":
     main()

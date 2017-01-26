@@ -53,8 +53,13 @@ namespace_manager.bind('rdf', rdf, override=False)
 class Repository():
     def __init__(self, config):
         self.endpoint = config['REST_ENDPOINT']
+        self.relpath = config['RELPATH']
+        self.fullpath = '/'.join(
+            [p.strip('/') for p in (self.endpoint, self.relpath)]
+            )
         self.auth = None
         self.client_cert = None
+        self.transaction = None 
 
         if 'CLIENT_CERT' in config and 'CLIENT_KEY' in config:
             self.client_cert = (config['CLIENT_CERT'], config['CLIENT_KEY'])
@@ -66,28 +71,104 @@ class Repository():
         else:
             self.server_cert = None
 
+
     def is_reachable(self):
-        response = self.head(self.endpoint)
+        response = self.head(self.fullpath)
         return response.status_code == 200
 
+
     def post(self, url, **kwargs):
-        return requests.post(url, cert=self.client_cert, auth=self.auth,
-                verify=self.server_cert, **kwargs)
+        target_uri = self._insert_transaction_uri(url)
+        print('Posting to {0}...'.format(target_uri), end='')
+        response = requests.post(
+            target_uri, cert=self.client_cert, 
+            auth=self.auth, verify=self.server_cert, **kwargs
+            )
+        print(response.status_code)
+        return response
+
 
     def patch(self, url, **kwargs):
-        return requests.patch(url, cert=self.client_cert, auth=self.auth,
-                verify=self.server_cert, **kwargs)
+        target_uri = self._insert_transaction_uri(url)
+        print('Patching {0}...'.format(target_uri), end='')
+        response = requests.patch(
+            target_uri, cert=self.client_cert, 
+            auth=self.auth, verify=self.server_cert, **kwargs
+            )
+        print(response.status_code)
+        return response
+
 
     def head(self, url, **kwargs):
-        return requests.head(url, cert=self.client_cert, auth=self.auth,
-                verify=self.server_cert, **kwargs)
+        target_uri = self._insert_transaction_uri(url)
+        print('Head request for {0}...'.format(target_uri), end='')
+        response = requests.head(
+            target_uri, cert=self.client_cert,
+            auth=self.auth, verify=self.server_cert, **kwargs
+            )
+        print(response.status_code)
+        return response
+    
+    
+    def open_transaction(self, **kwargs):
+        url = os.path.join(self.endpoint, 'fcr:tx')
+        response = requests.post(url, cert=self.client_cert, auth=self.auth,
+                    verify=self.server_cert, **kwargs)
+        if response.status_code == 201:
+            self.transaction = response.headers['Location']
+            return True
+        else:
+            return False
+
+    
+    def commit_transaction(self, **kwargs):
+        if self.transaction is not None:
+            url = os.path.join(self.transaction, 'fcr:tx/fcr:commit')
+            response = requests.post(url, cert=self.client_cert, auth=self.auth,
+                        verify=self.server_cert, **kwargs)
+            if response.status_code == 204:
+                self.transaction = None
+                return True
+            else:
+                return False
+    
+    
+    def rollback_transaction(self, **kwargs):
+        if self.transaction is not None:
+            url = os.path.join(self.transaction, 'fcr:tx/fcr:rollback')
+            response = requests.post(url, cert=self.client_cert, auth=self.auth,
+                        verify=self.server_cert, **kwargs)
+            if response.status_code == 204:
+                self.transaction = None
+                return True
+            else:
+                return False
+
+
+    def _insert_transaction_uri(self, uri):
+        if self.transaction is None or uri.startswith(self.transaction):
+            return uri
+        elif uri.startswith(self.endpoint):
+            relpath = uri[len(self.endpoint):]
+            return '/'.join([p.strip('/') for p in (self.transaction, relpath)])
+        else:
+            return uri
+
+
+    def _remove_transaction_uri(self, uri):
+        if self.transaction is not None and uri.startswith(self.transaction):
+            relpath = uri[len(self.transaction):]
+            return '/'.join([p.strip('/') for p in (self.endpoint, relpath)])
+        else:
+            return uri
+
 
 
 #============================================================================
 # PCDM RESOURCE (COMMON METHODS FOR ALL OBJECTS)
 #============================================================================
 
-class Resource():
+class Resource(object):
 
     def __init__(self, uri=''):
         self.graph = rdflib.Graph()
@@ -101,21 +182,26 @@ class Resource():
         if self.exists_in_repo(repository):
             return False
         else:
-            print("Creating {0}...".format(self.title), end='')
-            response = repository.post(repository.endpoint)
+            print("Creating {0}...".format(self.title))
+            response = repository.post(
+                '/'.join([p.strip('/') for p in (repository.endpoint,
+                                                 repository.relpath)])
+                )                                
             if response.status_code == 201:
-                print("success.")
-                print(response.status_code, response.text)
-                self.uri = rdflib.URIRef(response.text)
+                self.uri = rdflib.URIRef(
+                    repository._remove_transaction_uri(response.text)
+                    )
+                print(' --> {0}'.format(self.uri))
                 return True
             else:
-                print("failed!")
+                print(response.status_code, response.text)
                 return False
 
 
     # update existing repo object with SPARQL update
-    def update_object(self, repository):
-        print("Patching {0}...".format(str(self.uri)), end='')
+    def update_object(self, repository, patch_uri=None):
+        if not patch_uri:
+            patch_uri = self.uri
         prolog = ''
         #TODO: limit this to just the prefixes that are used in the graph
         for (prefix, uri) in self.graph.namespace_manager.namespaces():
@@ -129,11 +215,9 @@ class Resource():
         query = prolog + "INSERT DATA {{{0}}}".format("\n".join(triples))
         data = query.encode('utf-8')
         headers = {'Content-Type': 'application/sparql-update'}
-        response = repository.patch(str(self.uri), data=data, headers=headers)
-        if response.status_code == 204:
-            print("success.")
-        else:
-            print("failed!")
+        response = repository.patch(str(patch_uri), data=data, headers=headers)
+        if response.status_code != 204:
+            print(query)
             print(response.status_code, response.text)
         return response
 
@@ -241,10 +325,13 @@ class Resource():
                 (related_object.uri, pcdm.relatedObjectOf, self.uri)
                 )
 
+
+    # add arbitrary additional triples provided in a file
     def add_extra_properties(self, triples_file, rdf_format):
         self.graph.parse(
             source=triples_file, format=rdf_format, publicID=self.uri
             )
+
 
     # show the object's graph, serialized as turtle
     def print_graph(self):
@@ -344,7 +431,7 @@ class File(Resource):
 
     # upload a binary resource
     def create_nonrdf(self, repository):
-        print("Loading {0}...".format(self.filename))
+        print("Loading {0}...".format(self.filename), end='')
         with open(self.localpath, 'rb') as binaryfile:
             data = binaryfile.read()
         headers = {'Content-Type': self.mimetype,
@@ -358,27 +445,15 @@ class File(Resource):
                                  )
         if response.status_code == 201:
             self.uri = rdflib.URIRef(response.text)
+            print(' --> {0}'.format(self.uri))
             return True
         else:
             return False
 
 
-    # update existing binary resource metadata
     def update_object(self, repository):
-        patch_uri = str(self.uri) + '/fcr:metadata'
-        print("Patching {0}...".format(patch_uri), end='')
-        query = "INSERT DATA {{{0}}}".format(
-            self.graph.serialize(format='nt').decode()
-            )
-        data = query.encode('utf-8')
-        headers = {'Content-Type': 'application/sparql-update'}
-        response = repository.patch(patch_uri, data=data, headers=headers)
-        if response.status_code == 204:
-            print("success.")
-        else:
-            print("failed!")
-            print(response.status_code, response.text)
-        return response
+        fcr_metadata = str(self.uri) + '/fcr:metadata'
+        super(File, self).update_object(repository, patch_uri=fcr_metadata)
 
 
     # generate SHA1 checksum on a file

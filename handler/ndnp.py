@@ -1,6 +1,7 @@
 ''' Classes for interpreting and loading metadata and files stored
     according to the NDNP specification. '''
 
+import csv
 import lxml.etree as ET
 import os
 from classes import pcdm
@@ -155,6 +156,7 @@ class Batch():
             )
             
         self.collection = dback
+        self.fieldnames = ['aggregation', 'sequence', 'uri']
         
         # read over the index XML file assembling a list of paths to the issues
         self.basepath = os.path.dirname(args.path)
@@ -169,18 +171,24 @@ class Batch():
                     )
                 )
         
-        self.reels = []
-        for i in root.findall(m['batch']['reels']):
-            key = i.get('reelNumber')
-            if key not in self.reels:
-                self.reels.append(
-                    (key, os.path.join(self.basepath, i.text))
-                    )
-        
-        self.length = len(self.issues) + len(self.reels)
+        # set up a CSV file for each reel
+        self.reels = set([
+            r.get('reelNumber') for r in root.findall(m['batch']['reels'])
+            ])
+        print('Batch contains {0} reels...'.format(len(self.reels)))
+        if not os.path.isdir('logs'):
+            os.makedirs('logs')
+        for n, reel in enumerate(self.reels):
+            filename = 'logs/{0}.csv'.format(reel)
+            print("  {0}. Creating reel aggregation CSV in '{1}'...".format(n+1,
+                                                                     filename))
+            with open(filename, 'w') as f:
+                writer = csv.DictWriter(f, fieldnames=self.fieldnames)
+                writer.writeheader()
+            
+        self.length = len(self.issues)
         self.num = 0
-        self.reel_pages = {}
-        print("Batch contains {} items (issues and reels).".format(self.length))
+        print("Batch contains {0} items.".format(self.length))
 
 
     def __iter__(self):
@@ -188,30 +196,11 @@ class Batch():
 
 
     def __next__(self):
-        total_length = len(self.issues) + len(self.reels)
-        if self.num < len(self.issues):
-            n = self.num
-            issue = Issue(self.issues[n])
-            # add the collection to the issue
+        if self.num < self.length:
+            issue = Issue(self.issues[self.num])
             issue.collections.append(self.collection)
             self.num += 1
-            for page in issue.components:
-                if page.reel in self.reel_pages.keys():
-                    self.reel_pages[page.reel].append(page)
-                else:
-                    self.reel_pages[page.reel] = [page]
             return issue
-            
-        elif self.num >= len(self.issues) and self.num < total_length:
-            n = self.num - len(self.issues)
-            number, path = self.reels[n]
-            pages = self.reel_pages[number]
-            reel = Reel(number, pages, path)
-            # add the collection to the reel
-            reel.collections.append(self.collection)
-            self.num += 1
-            return reel
-            
         else:
             print('\nProcessing complete!')
             raise StopIteration()
@@ -280,7 +269,6 @@ class Issue(pcdm.Item):
 
             # create a page object for each page and append to list of pages
             page = Page(pagexml, filexml, premisxml, self)
-
             self.components.append(page)
 
         # iterate over the article XML and create objects for issue's articles
@@ -299,9 +287,9 @@ class Reel(pcdm.Item):
 
     ''' class representing an NDNP reel '''
 
-    def __init__(self, number, pages, path):
+    def __init__(self, csvfile):
         pcdm.Item.__init__(self)
-        self.id = number
+        self.id = csvfile
         self.title = 'Reel Number {0}'.format(self.id)
         self.sequence_attr = ('Frame', 'frame')
         self.path = path
@@ -332,11 +320,12 @@ class Page(pcdm.Component):
         m = XPATHMAP['page']
 
         # gather metadata
-        self.number = pagexml.find(m['number']).text
-        self.path   = issue.path + self.number
-        self.reel   = pagexml.find(m['reel']).text
-        self.frame  = pagexml.find(m['frame']).text
-        self.title  = "{0}, page {1}".format(issue.title, self.number)
+        self.number   = pagexml.find(m['number']).text
+        self.path     = issue.path + self.number
+        self.reel     = pagexml.find(m['reel']).text
+        self.frame    = pagexml.find(m['frame']).text
+        self.title    = "{0}, page {1}".format(issue.title, self.number)
+        self.reelpath = 'logs/{0}.csv'.format(self.reel)
 
         # generate a file object for each file in the XML snippet
         for f in filegroup.findall(m['files']):
@@ -348,6 +337,20 @@ class Page(pcdm.Component):
         self.graph.add( (self.uri, ndnp.number, rdflib.Literal(self.number)) )
         self.graph.add( (self.uri, ndnp.sequence, rdflib.Literal(self.frame)) )
         self.graph.add( (self.uri, rdf.type, ndnp.Page) )
+
+    
+    # populate non-atomic aggregation object via overloaded superclass method
+    def create_object(self, repository):
+        if super(Page, self).create_object(repository):
+            with open(self.reelpath, 'r') as f:
+                fieldnames = f.readline().strip('\n').split(',')
+            with open(self.reelpath, 'a+') as f:
+                writer = csv.DictWriter(f, fieldnames=fieldnames)
+                row = {'aggregation':  self.reel,
+                       'sequence':     self.frame,
+                       'uri':          self.uri
+                        }
+                writer.writerow(row)
 
 
 

@@ -14,10 +14,12 @@ import requests
 import sys
 import yaml
 import re
-
+import logging
+import logging.config
+from datetime import datetime
 from classes import pcdm
 
-
+logger = logging.getLogger(__name__)
 
 #============================================================================
 # HELPER FUNCTIONS
@@ -30,47 +32,49 @@ def print_header():
     spacer = '|' + ' '*(len(title)-2) + '|'
     print('\n'.join(['', bar, spacer, title, spacer, bar, '']))
 
-
 def print_footer():
     '''Report success or failure and resources created.'''
     print('\nScript complete. Goodbye!\n')
 
-
 def test_connection(fcrepo):
     # test connection to fcrepo
-    print("Testing connection to {0}... ".format(fcrepo.fullpath),
-            file=sys.stderr, end='')
+    logger.debug("fcrepo.endpoint = %s", fcrepo.fullpath)
+    logger.debug("fcrepo.relpath = %s", fcrepo.fullpath)
+    logger.debug("fcrepo.fullpath = %s", fcrepo.fullpath)
+    logger.info("Testing connection to {0}".format(fcrepo.fullpath))
     if fcrepo.is_reachable():
-        print("Connection successful.", file=sys.stderr)
+        logger.info("Connection successful.")
     else:
-        print("Unable to connect.", file=sys.stderr)
+        logger.warn("Unable to connect.")
         sys.exit(1)
-
 
 def load_item(fcrepo, item, args):
     # open transaction
-    print('\nOpening transaction...', end='')
+    logger.info('Opening transaction')
     fcrepo.open_transaction()
 
     # create item and its components
     try:
+        logger.info('Creating item')
         item.recursive_create(fcrepo, args.nobinaries)
-        print('\nCreating ordering proxies ...')
+        logger.info('Creating ordering proxies')
         item.create_ordering(fcrepo)
-        print('\nUpdating relationship triples ...')
+        logger.info('Updating relationship triples')
         item.update_relationship_triples()
 
         if args.extra:
-            print('\nAdding additional triples ...')
+            logger.info('Adding additional triples')
             if re.search(r'\.(ttl|n3|nt)$', args.extra):
                 rdf_format = 'n3'
             elif re.search(r'\.(rdf|xml)$', args.extra):
                 rdf_format = 'xml'
             item.add_extra_properties(args.extra, rdf_format)
 
+        logger.info('Updating item and components')
         item.recursive_update(fcrepo, args.nobinaries)
 
         # commit transaction
+        logger.info('Committing transaction')
         fcrepo.commit_transaction()
 
     except pcdm.RESTAPIException as e:
@@ -78,10 +82,9 @@ def load_item(fcrepo, item, args):
         # attempt to rollback the current transaction
         # failures here will be caught by the main loop's exception handler
         # and should trigger a system exit
-        print("Item creation failed: {0}".format(e))
+        logger.error("Item creation failed: {0}".format(e))
         fcrepo.rollback_transaction()
-        print('Transaction rolled back. Continuing load...')
-
+        logger.warn('Transaction rolled back. Continuing load.')
 
 #============================================================================
 # MAIN LOOP
@@ -89,7 +92,6 @@ def load_item(fcrepo, item, args):
 
 def main():
     '''Parse args and handle options.'''
-    print_header()
 
     parser = argparse.ArgumentParser(
         description='A configurable batch loader for Fedora 4.'
@@ -162,17 +164,40 @@ def main():
                         action='store'
                         )
 
+    parser.add_argument('-v', '--verbose',
+                        help='Increase the verbosity of the status output.',
+                        action='store_true'
+                        )
+
+    parser.add_argument('-q', '--quiet',
+                        help='Decrease the verbosity of the status output.',
+                        action='store_true'
+                        )
+
     args = parser.parse_args()
 
+    if not args.quiet:
+        print_header()
+
+    # configure logging
+    with open('logging.yml', 'r') as configfile:
+        logging_config = yaml.safe_load(configfile)
+        if args.verbose:
+            logging_config['handlers']['console']['level'] = 'DEBUG'
+        elif args.quiet:
+            logging_config['handlers']['console']['level'] = 'WARNING'
+        logfile = 'logs/load.py.{0}.log'.format(datetime.utcnow().strftime('%Y%m%d%H%M%S'))
+        logging_config['handlers']['file']['filename'] = logfile
+        logging.config.dictConfig(logging_config)
+
     # Load config
-    print("Configuring repo connection...", end='')
     if args.config:
         with open(args.config, 'r') as configfile:
             config = yaml.safe_load(configfile)
             fcrepo = pcdm.Repository(config)
-            print(' loading {0} => Done!'.format(args.config))
+            logger.info('Loaded configuration from {0}'.format(args.config))
     else:
-        print(' no configuration specified.')
+        logger.warn('No configuration file specified.')
 
     # "--ping" tests repository connection and exits
     if args.ping:
@@ -180,12 +205,12 @@ def main():
         sys.exit(0)
 
     # Define the specified data_handler function for the data being loaded
-    print("Initializing data handler...", end='')
+    logger.info("Initializing data handler")
     if args.handler:
         handler = import_module('handler.' + args.handler)
-        print(' loading "{0}" handler => Done!'.format(args.handler))
+        logger.info('Loaded "{0}" handler'.format(args.handler))
     else:
-        print(' no data handler specified.')
+        logger.warn('No data handler specified.')
 
     # The handler is always invoked by calling the load function defined in
     # the specified handler on a specified local path (file or directory).
@@ -203,7 +228,7 @@ def main():
                 reader = csv.DictReader(infile)
                 # check the validity of the map file data
                 if not reader.fieldnames == fieldnames:
-                    print('ERROR: Non-standard map file specified!')
+                    logger.error('Non-standard map file specified!')
                     sys.exit(1)
                 else:
                     # read the data from the existing file
@@ -215,7 +240,7 @@ def main():
             writer = csv.DictWriter(mapfile, fieldnames=fieldnames)
             writer.writeheader()
             # write out completed items
-            print('Writing data for {0} existing items to mapfile.'.format(
+            logger.info('Writing data for {0} existing items to mapfile.'.format(
                     len(completed_items))
                     )
             for row in completed_items:
@@ -224,22 +249,20 @@ def main():
             # create all batch objects in repository
             for n, item in enumerate(batch):
                 if args.limit is not None and n >= args.limit:
-                    print("Stopping after {0} item(s)".format(args.limit))
+                    logger.info("Stopping after {0} item(s)".format(args.limit))
                     break
                 elif item.path in skip_list:
                     continue
 
-                print('')
-                print('=' * 80)
-                print('')
-                print("Processing item {0}/{1}...".format(n+1, batch.length))
-                item.print_item_tree()
+                logger.info("Processing item {0}/{1}...".format(n+1, batch.length))
+                if args.verbose:
+                    item.print_item_tree()
 
                 try:
-                    print('\nLoading item {0}...'.format(n+1))
+                    logger.info('Loading item {0}'.format(n+1))
                     load_item(fcrepo, item, args)
                 except pcdm.RESTAPIException as e:
-                    print("Unable to commit or rollback transaction, aborting")
+                    logger.error("Unable to commit or rollback transaction, aborting")
                     sys.exit(1)
 
                 # write item details to mapfile
@@ -251,7 +274,8 @@ def main():
                        }
                 writer.writerow(row)
 
-    print_footer()
+    if not args.quiet:
+        print_footer()
 
 if __name__ == "__main__":
     main()

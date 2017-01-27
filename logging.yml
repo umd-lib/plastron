@@ -1,0 +1,33 @@
+version: 1
+formatters:
+  full:
+    format: '%(levelname)s|%(asctime)s|%(name)s|%(message)s'
+  messageonly:
+    format: '%(message)s'
+handlers:
+  console:
+    class: logging.StreamHandler
+    level: INFO
+    formatter: messageonly
+    stream: ext://sys.stdout
+  file:
+    class: logging.FileHandler
+    level: DEBUG
+    formatter: full
+    filename: 'logs/load.py.log'
+loggers:
+  __main__:
+    level: DEBUG
+    handlers: [console,file]
+    propagate: no
+  classes.pcdm:
+    level: DEBUG
+    handlers: [console,file]
+    propagate: no
+  classes.ndnp:
+    level: DEBUG
+    handlers: [console,file]
+    propagate: no
+root:
+  level: DEBUG
+  handlers: [console,file]

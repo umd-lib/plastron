@@ -118,7 +118,7 @@ class Repository():
             self.transaction = response.headers['Location']
             return True
         else:
-            return False
+            raise RESTAPIException(response)
 
 
     def commit_transaction(self, **kwargs):
@@ -130,7 +130,7 @@ class Repository():
                 self.transaction = None
                 return True
             else:
-                return False
+                raise RESTAPIException(response)
 
 
     def rollback_transaction(self, **kwargs):
@@ -142,7 +142,7 @@ class Repository():
                 self.transaction = None
                 return True
             else:
-                return False
+                raise RESTAPIException(response)
 
 
     def _insert_transaction_uri(self, uri):
@@ -167,6 +167,12 @@ class Repository():
 #============================================================================
 # PCDM RESOURCE (COMMON METHODS FOR ALL OBJECTS)
 #============================================================================
+
+class RESTAPIException(Exception):
+    def __init__(self, response):
+        self.response = response
+    def __str__(self):
+        return '{0} {1}'.format(self.response.status_code, self.response.reason)
 
 class Resource(object):
 
@@ -195,7 +201,7 @@ class Resource(object):
                 return True
             else:
                 print(response.status_code, response.text)
-                return False
+                raise RESTAPIException(response)
 
 
     # update existing repo object with SPARQL update
@@ -219,6 +225,7 @@ class Resource(object):
         if response.status_code != 204:
             print(query)
             print(response.status_code, response.text)
+            raise RESTAPIException(response)
         return response
 
 
@@ -446,7 +453,7 @@ class File(Resource):
             print(' --> {0}'.format(self.uri))
             return True
         else:
-            return False
+            raise RESTAPIException(response)
 
 
     def update_object(self, repository):

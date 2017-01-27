@@ -446,10 +446,8 @@ class File(Resource):
                    'Content-Disposition':
                         'attachment; filename="{0}"'.format(self.filename)
                     }
-        response = repository.post(repository.endpoint,
-                                 data=data,
-                                 headers=headers
-                                 )
+        target_uri = '/'.join([p.strip('/') for p in (repository.endpoint, repository.relpath)])
+        response = repository.post(target_uri, data=data, headers=headers)
         if response.status_code == 201:
             self.uri = rdflib.URIRef(response.text)
             print(' --> {0}'.format(self.uri))

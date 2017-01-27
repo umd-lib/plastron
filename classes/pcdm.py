@@ -405,18 +405,18 @@ class File(Resource):
     def __init__(self, localpath):
         Resource.__init__(self)
         self.localpath = localpath
-        self.checksum = self.sha1()
-        self.filename = os.path.basename(self.localpath)
-        self.mimetype = mimetypes.guess_type(self.localpath)[0]
-        self.graph.add( (self.uri, rdf.type, pcdm.File) )
+        self.graph.add((self.uri, rdf.type, pcdm.File))
 
     # upload a binary resource
     def create_nonrdf(self, repository):
+        checksum = self.sha1()
+        mimetype = mimetypes.guess_type(self.localpath)[0]
+        self.filename = os.path.basename(self.localpath)
         self.logger.info("Loading {0}".format(self.filename))
         with open(self.localpath, 'rb') as binaryfile:
             data = binaryfile.read()
-        headers = {'Content-Type': self.mimetype,
-                   'Digest': 'sha1={0}'.format(self.checksum),
+        headers = {'Content-Type': mimetype,
+                   'Digest': 'sha1={0}'.format(checksum),
                    'Content-Disposition':
                         'attachment; filename="{0}"'.format(self.filename)
                     }

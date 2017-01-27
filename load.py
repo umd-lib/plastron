@@ -76,8 +76,9 @@ def load_item(fcrepo, item, args):
         # commit transaction
         logger.info('Committing transaction')
         fcrepo.commit_transaction()
+        return True
 
-    except pcdm.RESTAPIException as e:
+    except (pcdm.RESTAPIException, FileNotFoundError) as e:
         # if anything fails during item creation or commiting the transaction
         # attempt to rollback the current transaction
         # failures here will be caught by the main loop's exception handler
@@ -260,19 +261,20 @@ def main():
 
                 try:
                     logger.info('Loading item {0}'.format(n+1))
-                    load_item(fcrepo, item, args)
+                    is_loaded = load_item(fcrepo, item, args)
                 except pcdm.RESTAPIException as e:
                     logger.error("Unable to commit or rollback transaction, aborting")
                     sys.exit(1)
 
-                # write item details to mapfile
-                row = {'number': n + 1,
-                       'timestamp': item.creation_timestamp,
-                       'title': item.title,
-                       'path': item.path,
-                       'uri': item.uri
-                       }
-                writer.writerow(row)
+                if is_loaded:
+                    # write item details to mapfile
+                    row = {'number': n + 1,
+                           'timestamp': item.creation_timestamp,
+                           'title': item.title,
+                           'path': item.path,
+                           'uri': item.uri
+                           }
+                    writer.writerow(row)
 
     if not args.quiet:
         print_footer()

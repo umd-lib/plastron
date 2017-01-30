@@ -68,6 +68,7 @@ target/
 logs/*
 
 # non-committable application files
-config.yml
+config/*
 data/*
+!config/templates/*
 

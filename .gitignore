@@ -71,4 +71,5 @@ logs/*
 config/*
 data/*
 !config/templates/*
+!config/logging.yml
 

@@ -1,0 +1,4 @@
+REST_ENDPOINT: http://fcrepodev.lib.umd.edu:8080/fcrepo/rest
+RELPATH: /pcdm
+CLIENT_CERT: /Users/westgard/sslkeys/fcrepodev-batchloader.pem
+CLIENT_KEY: /Users/westgard/sslkeys/fcrepodev-batchloader.key

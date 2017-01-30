@@ -1,13 +1,15 @@
 ''' Classes for interpreting and loading metadata and files stored
     according to the NDNP specification. '''
 
+from classes import pcdm
 import csv
+import logging
 import lxml.etree as ET
 import os
-from classes import pcdm
 import rdflib
 from rdflib import Namespace, URIRef
-import logging
+import requests
+import sys
 
 #============================================================================
 # NAMESPACE BINDINGS
@@ -126,8 +128,8 @@ XPATHMAP = {
 # DATA LOADING FUNCTION
 #============================================================================
 
-def load(args):
-    return Batch(args)
+def load(batch_config):
+    return Batch(batch_config)
 
 #============================================================================
 # NDNP BATCH CLASS
@@ -137,24 +139,37 @@ class Batch():
 
     '''iterator class representing the set of resources to be loaded'''
 
-    def __init__(self, args):
-        self.logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
-        tree = ET.parse(args.path)
+    def __init__(self, config):
+        self.logger = logging.getLogger(
+            __name__ + '.' + self.__class__.__name__
+            )
+        self.batchfile = config.get('LOCAL_PATH')
+        self.collection = Collection()
+        self.collection.uri = rdflib.URIRef(config.get('COLLECTION'))
+        
+        # check that the supplied collection exists and get title
+        response = requests.head(self.collection.uri)
+        if response.status_code == 200:
+            self.collection.title = '[unspecified]'
+            coll_graph = rdflib.graph.Graph().parse(self.collection.uri)
+            for (subj, pred, obj) in coll_graph:
+                if str(pred) == "http://purl.org/dc/elements/1.1/title":
+                    self.collection.title = obj
+        else:
+            self.logger.error(
+                "Supplied collection URI ({0}) could not be reached.".format(
+                    self.collection.uri)
+                )
+            sys.exit(1)            
+
+        self.fieldnames = ['aggregation', 'sequence', 'uri']
+        
+        tree = ET.parse(self.batchfile)
         root = tree.getroot()
         m = XPATHMAP
 
-        dback = Collection()
-        dback.title = "The Diamondback Newspaper Collection"
-        dback.graph.add(
-            (dback.uri, dcterms.title, rdflib.Literal(dback.title))
-            )
-
-        self.collection = dback
-        self.fieldnames = ['aggregation', 'sequence', 'uri']
-
         # read over the index XML file assembling a list of paths to the issues
-        self.basepath = os.path.dirname(args.path)
-
+        self.basepath = os.path.dirname(self.batchfile)
         self.issues = []
         for i in root.findall(m['batch']['issues']):
             sanitized_path = i.text[:-6] + i.text[-4:]

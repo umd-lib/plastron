@@ -138,7 +138,9 @@ class Batch():
     '''iterator class representing the set of resources to be loaded'''
 
     def __init__(self, args):
-        self.logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
+        self.logger = logging.getLogger(
+            __name__ + '.' + self.__class__.__name__
+            )
         tree = ET.parse(args.path)
         root = tree.getroot()
         m = XPATHMAP
@@ -165,19 +167,29 @@ class Batch():
                     )
                 )
 
-        # set up a CSV file for each reel
-        self.reels = set([
-            r.get('reelNumber') for r in root.findall(m['batch']['reels'])
-            ])
+        # set up a CSV file for each reel, skipping existing CSVs
+        self.reels = set(
+            [r.get('reelNumber') for r in root.findall(m['batch']['reels'])]
+            )
         self.logger.info('Batch contains {0} reels'.format(len(self.reels)))
-        if not os.path.isdir('logs'):
-            os.makedirs('logs')
+        path_to_reels = 'logs/reels'
+        if not os.path.isdir(path_to_reels):
+            os.makedirs(path_to_reels)
         for n, reel in enumerate(self.reels):
-            filename = 'logs/{0}.csv'.format(reel)
-            self.logger.info("{0}. Creating reel aggregation CSV in '{1}'".format(n+1, filename))
-            with open(filename, 'w') as f:
-                writer = csv.DictWriter(f, fieldnames=self.fieldnames)
-                writer.writeheader()
+            reel_csv = '{0}/{1}.csv'.format(path_to_reels, reel)
+            if not os.path.isfile(reel_csv):
+                self.logger.info(
+                    "{0}. Creating reel aggregation CSV in '{1}'".format(
+                        n+1, reel_csv)
+                    )
+                with open(reel_csv, 'w') as f:
+                    writer = csv.DictWriter(f, fieldnames=self.fieldnames)
+                    writer.writeheader()
+            else:
+                self.logger.info(
+                    "{0}. Reel aggregation file '{1}' exists; skipping".format(
+                        n+1, reel_csv)
+                    )
 
         self.length = len(self.issues)
         self.num = 0
@@ -310,7 +322,7 @@ class Page(pcdm.Component):
         self.reel     = pagexml.find(m['reel']).text
         self.frame    = pagexml.find(m['frame']).text
         self.title    = "{0}, page {1}".format(issue.title, self.number)
-        self.reelpath = 'logs/{0}.csv'.format(self.reel)
+        self.reelpath = 'logs/reels/{0}.csv'.format(self.reel)
 
         # generate a file object for each file in the XML snippet
         for f in filegroup.findall(m['files']):
@@ -328,7 +340,7 @@ class Page(pcdm.Component):
         if super(Page, self).create_object(repository):
             with open(self.reelpath, 'r') as f:
                 fieldnames = f.readline().strip('\n').split(',')
-            with open(self.reelpath, 'a+') as f:
+            with open(self.reelpath, 'a') as f:
                 writer = csv.DictWriter(f, fieldnames=fieldnames)
                 row = {'aggregation':  self.reel,
                        'sequence':     self.frame,

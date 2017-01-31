@@ -103,6 +103,16 @@ class Repository():
         self.logger.debug("%s %s", response.status_code, response.reason)
         return response
 
+    def get(self, url, **kwargs):
+        target_uri = self._insert_transaction_uri(url)
+        self.logger.debug('GET {0}'.format(target_uri))
+        response = requests.get(
+            target_uri, cert=self.client_cert,
+            auth=self.auth, verify=self.server_cert, **kwargs
+            )
+        self.logger.debug("%s %s", response.status_code, response.reason)
+        return response
+
     def open_transaction(self, **kwargs):
         url = os.path.join(self.endpoint, 'fcr:tx')
         self.logger.info("Creating transaction")

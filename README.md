@@ -13,15 +13,21 @@ pip install -r requirements.txt
 ## Running
 
 ```
-# get help
-./load.py --help
+usage: load.py [-h] -r REPO -b BATCH [-d] [-n] [-l LIMIT] [-p] [-v] [-q]
 
-# dry-run (run through process but do not touch repository)
-./load.py -d -c config.yml -H ndnp /path/to/batch.xml
+A configurable batch loader for Fedora 4.
 
-# no binaries (create and update only rdfsources)
-./load.py -n -c config.yml -H ndnp /path/to/batch.xml
-
-# do the load
-./load.py -c config.yml -H ndnp /path/to/batch.xml
+optional arguments:
+  -h, --help            show this help message and exit
+  -r REPO, --repo REPO  Path to repository configuration file.
+  -b BATCH, --batch BATCH
+                        Path to batch configuration file.
+  -d, --dryrun          Iterate over the batch without POSTing.
+  -n, --nobinaries      Iterate without uploading binaries.
+  -l LIMIT, --limit LIMIT
+                        Limit the load to a specified number of top-level
+                        objects.
+  -p, --ping            Check the connection to the repository and exit.
+  -v, --verbose         Increase the verbosity of the status output.
+  -q, --quiet           Decrease the verbosity of the status output.
 ```

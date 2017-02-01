@@ -128,43 +128,48 @@ XPATHMAP = {
 # DATA LOADING FUNCTION
 #============================================================================
 
-def load(batch_config):
-    return Batch(batch_config)
+def load(repo, batch_config):
+    return Batch(repo, batch_config)
 
 #============================================================================
 # NDNP BATCH CLASS
 #============================================================================
 
+class ConfigException(Exception):
+    def __init__(self, message):
+        self.message = message
+    def __str__(self):
+        return self.message
+
 class Batch():
 
     '''iterator class representing the set of resources to be loaded'''
 
-    def __init__(self, config):
+    def __init__(self, repo, config):
         self.logger = logging.getLogger(
             __name__ + '.' + self.__class__.__name__
 
             )
         self.batchfile = config.get('LOCAL_PATH')
+        collection_uri = config.get('COLLECTION')
+        if collection_uri is None:
+            raise ConfigException('Missing required key COLLECTION in batch config')
         self.collection = Collection()
-        self.collection.uri = rdflib.URIRef(config.get('COLLECTION'))
-        
+        self.collection.uri = rdflib.URIRef(collection_uri)
+
         # check that the supplied collection exists and get title
-        response = requests.head(self.collection.uri)
+        response = repo.get(self.collection.uri, headers={'Accept': 'application/rdf+xml'})
         if response.status_code == 200:
             self.collection.title = '[unspecified]'
-            coll_graph = rdflib.graph.Graph().parse(self.collection.uri)
+            coll_graph = rdflib.graph.Graph().parse(data=response.text)
             for (subj, pred, obj) in coll_graph:
                 if str(pred) == "http://purl.org/dc/elements/1.1/title":
                     self.collection.title = obj
         else:
-            self.logger.error(
-                "Supplied collection URI ({0}) could not be reached.".format(
-                    self.collection.uri)
-                )
-            sys.exit(1)            
+            raise ConfigException("Collection URI {0} could not be reached.".format(self.collection.uri))
 
         self.fieldnames = ['aggregation', 'sequence', 'uri']
-        
+
         tree = ET.parse(self.batchfile)
         root = tree.getroot()
         m = XPATHMAP

@@ -171,12 +171,12 @@ def main():
     with open(args.repo, 'r') as repoconfig:
         fcrepo = pcdm.Repository(yaml.safe_load(repoconfig))
         logger.info('Loaded repo configuration from {0}'.format(args.repo))
-    
+
     # "--ping" tests repository connection and exits
     if args.ping:
         test_connection(fcrepo)
         sys.exit(0)
-        
+
     # Load required batch config file and create batch object
     with open(args.batch, 'r') as batchconfig:
         batch_options = yaml.safe_load(batchconfig)
@@ -186,10 +186,16 @@ def main():
         # Define the data_handler function for the data being loaded
         logger.info("Initializing data handler")
         module_name = batch_options.get('HANDLER')
-        handler = import_module('handler.' + module_name)                 
+        handler = import_module('handler.' + module_name)
         logger.info('Loaded "{0}" handler'.format(module_name))
+
         # Handler is invoked by calling the load function on the batch config
-        batch = handler.load(batch_options)
+        try:
+            batch = handler.load(fcrepo, batch_options)
+        except handler.ConfigException as e:
+            logger.error(e.message)
+            logger.error("Failed to load batch configuration from {0}".format(args.batch))
+            sys.exit(1)
 
     if not args.dryrun:
         test_connection(fcrepo)

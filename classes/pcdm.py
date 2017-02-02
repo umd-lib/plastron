@@ -57,7 +57,9 @@ class Repository():
         self.auth = None
         self.client_cert = None
         self.transaction = None
-        self.logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
+        self.logger = logging.getLogger(
+            __name__ + '.' + self.__class__.__name__
+            )
 
         if 'CLIENT_CERT' in config and 'CLIENT_KEY' in config:
             self.client_cert = (config['CLIENT_CERT'], config['CLIENT_KEY'])
@@ -131,17 +133,23 @@ class Repository():
     def commit_transaction(self, **kwargs):
         if self.transaction is not None:
             url = os.path.join(self.transaction, 'fcr:tx/fcr:commit')
-            self.logger.info("Commiting transaction {0}".format(self.transaction))
+            self.logger.info(
+                "Commiting transaction {0}".format(self.transaction)
+                )
             self.logger.debug("POST {0}".format(url))
             response = requests.post(url, cert=self.client_cert, auth=self.auth,
                         verify=self.server_cert, **kwargs)
             self.logger.debug("%s %s", response.status_code, response.reason)
             if response.status_code == 204:
-                self.logger.info("Committed transaction {0}".format(self.transaction))
+                self.logger.info(
+                    "Committed transaction {0}".format(self.transaction)
+                    )
                 self.transaction = None
                 return True
             else:
-                self.logger.error("Failed to commit transaction {0}".format(self.transaction))
+                self.logger.error(
+                    "Failed to commit transaction {0}".format(self.transaction)
+                    )
                 raise RESTAPIException(response)
 
     def rollback_transaction(self, **kwargs):
@@ -188,7 +196,9 @@ class Resource(object):
         self.graph.namespace_manager = namespace_manager
         self.uri = rdflib.URIRef(uri)
         self.related = []
-        self.logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
+        self.logger = logging.getLogger(
+            __name__ + '.' + self.__class__.__name__
+            )
 
     # create repository object by POSTing object graph
     def create_object(self, repository):
@@ -244,33 +254,47 @@ class Resource(object):
             self.create_object(repository)
             self.creation_timestamp = dt.now()
         else:
-            self.logger.info('Object "{0}" exists. Skipping.'.format(self.title))
+            self.logger.info(
+                'Object "{0}" exists. Skipping.'.format(self.title)
+                )
 
         if not nobinaries:
             for file in self.files:
                 if not file.exists_in_repo(repository):
                     file.create_nonrdf(repository)
                 else:
-                    self.logger.info('File "{0}" exists. Skipping.'.format(file.title))
+                    self.logger.info(
+                        'File "{0}" exists. Skipping.'.format(file.title)
+                        )
 
         for component in self.components:
             if not component.exists_in_repo(repository):
                 component.recursive_create(repository, nobinaries)
             else:
-                self.logger.info('Component "{0}" exists. Skipping.'.format(component.title))
+                self.logger.info(
+                    'Component "{0}" exists. Skipping.'.format(component.title)
+                    )
 
         for related_object in self.related:
             if not related_object.exists_in_repo(repository):
                 related_object.recursive_create(repository, nobinaries)
             else:
-                self.logger.info('Related object "{0}" exists. Skipping.'.format(related_object.title))
+                self.logger.info(
+                    'Related object "{0}" exists. Skipping.'.format(
+                        related_object.title
+                        )
+                    )
 
         if hasattr(self, 'collections'):
             for collection in self.collections:
                 if not collection.exists_in_repo(repository):
                     collection.create_object(repository)
                 else:
-                    self.logger.info('Collection "{0}" exists. Skipping.'.format(collection.title))
+                    self.logger.info(
+                        'Collection "{0}" exists. Skipping.'.format(
+                            collection.title
+                            )
+                        )
 
     # recursively update an object and all its components and files
     def recursive_update(self, repository, nobinaries):
@@ -430,7 +454,9 @@ class File(Resource):
                    'Content-Disposition':
                         'attachment; filename="{0}"'.format(self.filename)
                     }
-        target_uri = '/'.join([p.strip('/') for p in (repository.endpoint, repository.relpath)])
+        target_uri = '/'.join(
+            [p.strip('/') for p in (repository.endpoint, repository.relpath)]
+            )
         response = repository.post(target_uri, data=data, headers=headers)
         if response.status_code == 201:
             self.uri = rdflib.URIRef(response.text)

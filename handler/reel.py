@@ -5,7 +5,7 @@ import logging
 import os
 from classes import pcdm
 import rdflib
-from rdflib import Namespace, URIRef
+from rdflib import Namespace
 
 #============================================================================
 # NAMESPACE BINDINGS
@@ -56,8 +56,14 @@ namespace_manager.bind('rdf', rdf, override=False)
 # DATA LOADING FUNCTION
 #============================================================================
 
-def load(config):
-    return Batch(config)
+def load(repo, batch_config):
+    return Batch(repo, batch_config)
+
+class ConfigException(Exception):
+    def __init__(self, message):
+        self.message = message
+    def __str__(self):
+        return self.message
 
 #============================================================================
 # CSV BATCH CLASS
@@ -67,13 +73,16 @@ class Batch():
 
     '''iterator class representing the set of resources to be loaded'''
 
-    def __init__(self, config):
+    def __init__(self, repo, batch_config):
         self.logger = logging.getLogger(
             __name__ + '.' + self.__class__.__name__
             )
 
-        self.collection = config.get('COLLECTION')
-        self.path = config.get('LOCAL_PATH')
+        collection = pcdm.Collection()
+        collection.uri = rdflib.URIRef(batch_config.get('COLLECTION'))
+        collection.title = str(collection.uri)
+        self.collections = [collection]
+        self.path = batch_config.get('LOCAL_PATH')
         self.files = [os.path.join(self.path, f) for f in os.listdir(self.path)]
         self.length = len(self.files)
         self.num = 0
@@ -84,7 +93,7 @@ class Batch():
     def __next__(self):
         if self.num < self.length:
             reel = Reel(self.files[self.num])
-            reel.collection = self.collection
+            reel.collections = self.collections
             self.num += 1
             return reel
         else:
@@ -121,7 +130,7 @@ class Reel(pcdm.Item):
         self.graph.add(
             (self.uri, rdf.type, carriers.hd)
             )
-        
+
 #============================================================================
 # NDNP FRAME OBJECT
 #============================================================================
@@ -134,6 +143,6 @@ class Frame(pcdm.Component):
         pcdm.Component.__init__(self)
 
         self.frame = sequence
-        self.uri = URIRef(uri)
+        self.uri = rdflib.URIRef(uri)
         self.title = "{0}, frame {1}".format(reel.title, self.frame)
-        
+

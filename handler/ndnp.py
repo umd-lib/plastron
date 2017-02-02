@@ -303,33 +303,7 @@ class Issue(pcdm.Item):
         article_tree = ET.parse(article_path)
         article_root = article_tree.getroot()
         for article_title in article_root.findall(m['article']):
-            self.related.append(Article(article_title.text, self))
-
-#============================================================================
-# NDNP REEL OBJECT
-#============================================================================
-
-class Reel(pcdm.Item):
-
-    ''' class representing an NDNP reel '''
-
-    def __init__(self, csvfile):
-        pcdm.Item.__init__(self)
-        self.id = csvfile
-        self.title = 'Reel Number {0}'.format(self.id)
-        self.sequence_attr = ('Frame', 'frame')
-        self.path = path
-        self.components = pages
-
-        self.graph.add(
-            (self.uri, dcterms.title, rdflib.Literal(self.title))
-            )
-        self.graph.add(
-            (self.uri, dc.identifier, rdflib.Literal(self.id))
-            )
-        self.graph.add(
-            (self.uri, rdf.type, carriers.hd)
-            )
+            self.components.append(Article(article_title.text, self))
 
 #============================================================================
 # NDNP PAGE OBJECT
@@ -350,6 +324,7 @@ class Page(pcdm.Component):
         self.frame    = pagexml.find(m['frame']).text
         self.title    = "{0}, page {1}".format(issue.title, self.number)
         self.reelpath = 'logs/reels/{0}.csv'.format(self.reel)
+        self.ordered  = True
 
         # generate a file object for each file in the XML snippet
         for f in filegroup.findall(m['files']):
@@ -438,15 +413,16 @@ class Collection(pcdm.Collection):
 # NDNP ARTICLE OBJECT
 #============================================================================
 
-class Article(pcdm.Item):
+class Article(pcdm.Component):
 
     ''' class representing an article in a newspaper issue '''
 
     def __init__(self, title, issue):
-        pcdm.Item.__init__(self)
+        pcdm.Component.__init__(self)
 
         # gather metadata
         self.title = title
+        self.ordered = False
 
         # store metadata in object graph
         self.graph.namespace_manager = namespace_manager

@@ -388,17 +388,20 @@ class Item(Resource):
     # iterate over each component and create ordering proxies
     def create_ordering(self, repository):
         proxies = []
-        for component in self.components:
+        ordered_components = [c for c in self.components if c.ordered is True]
+        for component in ordered_components:
             position = " ".join([self.sequence_attr[0],
                                 getattr(component, self.sequence_attr[1])]
                                 )
+            print(position)
             proxies.append(Proxy(position, self.title))
 
+        print(proxies)
         for proxy in proxies:
             proxy.create_object(repository)
             proxy.graph.namespace_manager = self.graph.namespace_manager
 
-        for (position, component) in enumerate(self.components):
+        for (position, component) in enumerate(ordered_components):
             proxy = proxies[position]
             proxy.graph.add( (proxy.uri, ore.proxyFor, component.uri) )
             proxy.graph.add( (proxy.uri, ore.proxyIn, self.uri) )
@@ -409,7 +412,7 @@ class Item(Resource):
                 prev = proxies[position - 1]
                 proxy.graph.add( (proxy.uri, iana.prev, prev.uri) )
 
-            if position == len(self.components) - 1:
+            if position == len(ordered_components) - 1:
                 self.graph.add( (self.uri, iana.last, proxy.uri) )
             else:
                 next = proxies[position + 1]
@@ -428,6 +431,7 @@ class Component(Resource):
         self.files = []
         self.components = []
         self.collections = []
+        self.ordered = False
         self.graph.add( (self.uri, rdf.type, pcdm.Object) )
 
 #============================================================================

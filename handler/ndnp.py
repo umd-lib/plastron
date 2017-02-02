@@ -153,12 +153,16 @@ class Batch():
         self.batchfile = config.get('LOCAL_PATH')
         collection_uri = config.get('COLLECTION')
         if collection_uri is None:
-            raise ConfigException('Missing required key COLLECTION in batch config')
+            raise ConfigException(
+                'Missing required key COLLECTION in batch config'
+                )
         self.collection = Collection()
         self.collection.uri = rdflib.URIRef(collection_uri)
 
         # check that the supplied collection exists and get title
-        response = repo.get(self.collection.uri, headers={'Accept': 'application/rdf+xml'})
+        response = repo.get(
+            self.collection.uri, headers={'Accept': 'application/rdf+xml'}
+            )
         if response.status_code == 200:
             self.collection.title = '[unspecified]'
             coll_graph = rdflib.graph.Graph().parse(data=response.text)
@@ -166,7 +170,11 @@ class Batch():
                 if str(pred) == "http://purl.org/dc/elements/1.1/title":
                     self.collection.title = obj
         else:
-            raise ConfigException("Collection URI {0} could not be reached.".format(self.collection.uri))
+            raise ConfigException(
+                "Collection URI {0} could not be reached.".format(
+                    self.collection.uri
+                    )
+                )
 
         self.fieldnames = ['aggregation', 'sequence', 'uri']
 

@@ -178,8 +178,8 @@ def main():
         sys.exit(0)
 
     # Load required batch config file and create batch object
-    with open(args.batch, 'r') as batchconfig:
-        batch_options = yaml.safe_load(batchconfig)
+    with open(args.batch, 'r') as batch_config:
+        batch_options = yaml.safe_load(batch_config)
         logger.info(
             'Loaded batch configuration from {0}'.format(args.batch)
             )
@@ -194,7 +194,9 @@ def main():
             batch = handler.load(fcrepo, batch_options)
         except handler.ConfigException as e:
             logger.error(e.message)
-            logger.error("Failed to load batch configuration from {0}".format(args.batch))
+            logger.error(
+                "Failed to load batch configuration from {0}".format(args.batch)
+                )
             sys.exit(1)
 
     if not args.dryrun:

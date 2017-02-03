@@ -393,10 +393,8 @@ class Item(Resource):
             position = " ".join([self.sequence_attr[0],
                                 getattr(component, self.sequence_attr[1])]
                                 )
-            print(position)
             proxies.append(Proxy(position, self.title))
 
-        print(proxies)
         for proxy in proxies:
             proxy.create_object(repository)
             proxy.graph.namespace_manager = self.graph.namespace_manager

@@ -96,9 +96,7 @@ class Batch():
                     self.collection.uri
                     )
                 )
-
-        
-        self.collections = [collection]
+        self.collections = [self.collection]
         self.path = batch_config.get('LOCAL_PATH')
         self.files = [os.path.join(self.path, f) for f in os.listdir(self.path)]
         self.length = len(self.files)
@@ -162,4 +160,5 @@ class Frame(pcdm.Component):
         self.frame = sequence
         self.uri = rdflib.URIRef(uri)
         self.title = "{0}, frame {1}".format(reel.title, self.frame)
+        self.ordered = True
 

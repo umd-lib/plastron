@@ -112,7 +112,7 @@ class Reel(pcdm.Item):
         pcdm.Item.__init__(self)
         self.id = os.path.splitext(os.path.basename(csvfile))[0]
         self.title = 'Reel Number {0}'.format(self.id)
-        self.sequence_attr = ('Frame', 'frame')
+        self.sequence_attr = ('Frame', 'sequence')
         self.path = csvfile
         
         with open(self.path, 'r') as f:
@@ -125,7 +125,7 @@ class Reel(pcdm.Item):
             (self.uri, dcterms.title, rdflib.Literal(self.title))
             )
         self.graph.add(
-            (self.uri, dc.identifier, rdflib.Literal(self.id))
+            (self.uri, dcterms.identifier, rdflib.Literal(self.id))
             )
         self.graph.add(
             (self.uri, rdf.type, carriers.hd)
@@ -142,7 +142,7 @@ class Frame(pcdm.Component):
     def __init__(self, reel, sequence, uri):
         pcdm.Component.__init__(self)
 
-        self.frame = sequence
+        self.sequence = sequence
         self.uri = rdflib.URIRef(uri)
-        self.title = "{0}, frame {1}".format(reel.title, self.frame)
+        self.title = "{0}, frame {1}".format(reel.title, self.sequence)
 

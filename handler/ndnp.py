@@ -164,8 +164,8 @@ class Batch():
             self.collection.uri, headers={'Accept': 'application/rdf+xml'}
             )
         if response.status_code == 200:
-            self.collection.title = '[unspecified]'
             coll_graph = rdflib.graph.Graph().parse(data=response.text)
+            self.collection.title = str(self.collection.uri)
             for (subj, pred, obj) in coll_graph:
                 if str(pred) == "http://purl.org/dc/elements/1.1/title":
                     self.collection.title = obj

@@ -337,7 +337,7 @@ class Page(pcdm.Component):
         self.graph.add( (self.uri, ndnp.sequence, rdflib.Literal(self.frame)) )
         self.graph.add( (self.uri, rdf.type, ndnp.Page) )
 
-    # populate non-atomic aggregation object via overloaded superclass method
+    '''# populate non-atomic aggregation object via overloaded superclass method
     def create_object(self, repository):
         if super(Page, self).create_object(repository):
             with open(self.reelpath, 'r') as f:
@@ -348,7 +348,7 @@ class Page(pcdm.Component):
                        'sequence':     self.frame,
                        'uri':          self.uri
                         }
-                writer.writerow(row)
+                writer.writerow(row)'''
 
 #============================================================================
 # NDNP FILE OBJECT

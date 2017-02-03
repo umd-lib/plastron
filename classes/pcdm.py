@@ -365,8 +365,11 @@ class Resource(object):
     # show the item graph and tree of related objects
     def print_item_tree(self):
         print(self.title)
+        ordered_components = [c for c in self.components if c.ordered is True]
         if self.components:
-            for n, p in enumerate(self.components):
+            for n, p in enumerate(
+                
+                ):
                 print("  Part {0}: {1}".format(n+1, p.title))
                 for f in p.files:
                     print("   |--{0}: {1}".format(f.title, f.localpath))

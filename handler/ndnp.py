@@ -56,6 +56,7 @@ namespace_manager.bind('pcdmuse', pcdm_use, override=False)
 rdf = Namespace('http://www.w3.org/1999/02/22-rdf-syntax-ns#')
 namespace_manager.bind('rdf', rdf, override=False)
 
+
 #============================================================================
 # METADATA MAPPING
 #============================================================================
@@ -305,6 +306,24 @@ class Issue(pcdm.Item):
         for article_title in article_root.findall(m['article']):
             self.components.append(Article(article_title.text, self))
 
+    # actions to take upon successful creation of object in repository
+    def post_creation_hook(self):
+        super(pcdm.Item, self).post_creation_hook()
+        pages = [c for c in self.components if c.ordered == True]
+        print(pages)
+        for page in pages:
+            row = {'aggregation': page.reel, 
+                   'sequence': page.frame, 
+                   'uri': page.uri
+                    }
+            csv_path = 'logs/reels/{0}.csv'.format(page.reel)
+            with open(csv_path, 'r') as f:
+                fieldnames = f.readline().strip('\n').split(',')
+            with open(csv_path, 'a') as f:
+                writer = csv.DictWriter(f, fieldnames=fieldnames)
+                writer.writerow(row)
+        self.logger.info('Completed post-creation actions')
+
 #============================================================================
 # NDNP PAGE OBJECT
 #============================================================================
@@ -318,13 +337,12 @@ class Page(pcdm.Component):
         m = XPATHMAP['page']
 
         # gather metadata
-        self.number   = pagexml.find(m['number']).text
-        self.path     = issue.path + self.number
-        self.reel     = pagexml.find(m['reel']).text
-        self.frame    = pagexml.find(m['frame']).text
-        self.title    = "{0}, page {1}".format(issue.title, self.number)
-        self.reelpath = 'logs/reels/{0}.csv'.format(self.reel)
-        self.ordered  = True
+        self.number    = pagexml.find(m['number']).text
+        self.path      = issue.path + self.number
+        self.reel      = pagexml.find(m['reel']).text
+        self.frame     = pagexml.find(m['frame']).text
+        self.title     = "{0}, page {1}".format(issue.title, self.number)
+        self.ordered   = True
 
         # generate a file object for each file in the XML snippet
         for f in filegroup.findall(m['files']):
@@ -336,19 +354,6 @@ class Page(pcdm.Component):
         self.graph.add( (self.uri, ndnp.number, rdflib.Literal(self.number)) )
         self.graph.add( (self.uri, ndnp.sequence, rdflib.Literal(self.frame)) )
         self.graph.add( (self.uri, rdf.type, ndnp.Page) )
-
-    '''# populate non-atomic aggregation object via overloaded superclass method
-    def create_object(self, repository):
-        if super(Page, self).create_object(repository):
-            with open(self.reelpath, 'r') as f:
-                fieldnames = f.readline().strip('\n').split(',')
-            with open(self.reelpath, 'a') as f:
-                writer = csv.DictWriter(f, fieldnames=fieldnames)
-                row = {'aggregation':  self.reel,
-                       'sequence':     self.frame,
-                       'uri':          self.uri
-                        }
-                writer.writerow(row)'''
 
 #============================================================================
 # NDNP FILE OBJECT

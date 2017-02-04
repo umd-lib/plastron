@@ -134,7 +134,7 @@ class Repository():
         if self.transaction is not None:
             url = os.path.join(self.transaction, 'fcr:tx/fcr:commit')
             self.logger.info(
-                "Commiting transaction {0}".format(self.transaction)
+                "Committing transaction {0}".format(self.transaction)
                 )
             self.logger.debug("POST {0}".format(url))
             response = requests.post(url, cert=self.client_cert, auth=self.auth,
@@ -361,6 +361,10 @@ class Resource(object):
     # show the object's graph, serialized as turtle
     def print_graph(self):
         print(self.graph.serialize(format="turtle").decode())
+
+    # called after creation of object in repo
+    def post_creation_hook(self):
+        pass
 
     # show the item graph and tree of related objects
     def print_item_tree(self):

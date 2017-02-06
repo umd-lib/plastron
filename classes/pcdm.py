@@ -369,14 +369,21 @@ class Resource(object):
     # show the item graph and tree of related objects
     def print_item_tree(self):
         print(self.title)
-        ordered_components = [c for c in self.components if c.ordered is True]
-        if self.components:
-            for n, p in enumerate(
-                
-                ):
+        ordered = [c for c in self.components if c.ordered is True]
+        unordered = [c for c in self.components if c.ordered is False]
+        if ordered:
+            print(" ORDERED COMPONENTS")
+            for n, p in enumerate(ordered):
                 print("  Part {0}: {1}".format(n+1, p.title))
                 for f in p.files:
                     print("   |--{0}: {1}".format(f.title, f.localpath))
+        if unordered:
+            print(" UNORDERED COMPONENTS")
+            for n, p in enumerate(unordered):
+                print("  - {1}".format(n+1, p.title))
+                for f in p.files:
+                    print("   |--{0}: {1}".format(f.title, f.localpath))
+
 
 #============================================================================
 # PCDM ITEM-OBJECT

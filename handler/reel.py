@@ -77,11 +77,26 @@ class Batch():
         self.logger = logging.getLogger(
             __name__ + '.' + self.__class__.__name__
             )
+        self.collection = pcdm.Collection()
+        self.collection.uri = rdflib.URIRef(batch_config.get('COLLECTION'))
 
-        collection = pcdm.Collection()
-        collection.uri = rdflib.URIRef(batch_config.get('COLLECTION'))
-        collection.title = str(collection.uri)
-        self.collections = [collection]
+        # check that the supplied collection exists and get title
+        response = repo.get(
+            self.collection.uri, headers={'Accept': 'application/rdf+xml'}
+            )
+        if response.status_code == 200:
+            coll_graph = rdflib.graph.Graph().parse(data=response.text)
+            self.collection.title = str(self.collection.uri)
+            for (subj, pred, obj) in coll_graph:
+                if str(pred) == "http://purl.org/dc/elements/1.1/title":
+                    self.collection.title = obj
+        else:
+            raise ConfigException(
+                "Collection URI {0} could not be reached.".format(
+                    self.collection.uri
+                    )
+                )
+        self.collections = [self.collection]
         self.path = batch_config.get('LOCAL_PATH')
         self.files = [os.path.join(self.path, f) for f in os.listdir(self.path)]
         self.length = len(self.files)
@@ -145,4 +160,5 @@ class Frame(pcdm.Component):
         self.frame = sequence
         self.uri = rdflib.URIRef(uri)
         self.title = "{0}, frame {1}".format(reel.title, self.frame)
+        self.ordered = True
 

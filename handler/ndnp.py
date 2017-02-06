@@ -153,20 +153,28 @@ class Batch():
         self.batchfile = config.get('LOCAL_PATH')
         collection_uri = config.get('COLLECTION')
         if collection_uri is None:
-            raise ConfigException('Missing required key COLLECTION in batch config')
+            raise ConfigException(
+                'Missing required key COLLECTION in batch config'
+                )
         self.collection = Collection()
         self.collection.uri = rdflib.URIRef(collection_uri)
 
         # check that the supplied collection exists and get title
-        response = repo.get(self.collection.uri, headers={'Accept': 'application/rdf+xml'})
+        response = repo.get(
+            self.collection.uri, headers={'Accept': 'application/rdf+xml'}
+            )
         if response.status_code == 200:
-            self.collection.title = '[unspecified]'
             coll_graph = rdflib.graph.Graph().parse(data=response.text)
+            self.collection.title = str(self.collection.uri)
             for (subj, pred, obj) in coll_graph:
                 if str(pred) == "http://purl.org/dc/elements/1.1/title":
                     self.collection.title = obj
         else:
-            raise ConfigException("Collection URI {0} could not be reached.".format(self.collection.uri))
+            raise ConfigException(
+                "Collection URI {0} could not be reached.".format(
+                    self.collection.uri
+                    )
+                )
 
         self.fieldnames = ['aggregation', 'sequence', 'uri']
 
@@ -295,33 +303,7 @@ class Issue(pcdm.Item):
         article_tree = ET.parse(article_path)
         article_root = article_tree.getroot()
         for article_title in article_root.findall(m['article']):
-            self.related.append(Article(article_title.text, self))
-
-#============================================================================
-# NDNP REEL OBJECT
-#============================================================================
-
-class Reel(pcdm.Item):
-
-    ''' class representing an NDNP reel '''
-
-    def __init__(self, csvfile):
-        pcdm.Item.__init__(self)
-        self.id = csvfile
-        self.title = 'Reel Number {0}'.format(self.id)
-        self.sequence_attr = ('Frame', 'frame')
-        self.path = path
-        self.components = pages
-
-        self.graph.add(
-            (self.uri, dcterms.title, rdflib.Literal(self.title))
-            )
-        self.graph.add(
-            (self.uri, dc.identifier, rdflib.Literal(self.id))
-            )
-        self.graph.add(
-            (self.uri, rdf.type, carriers.hd)
-            )
+            self.components.append(Article(article_title.text, self))
 
 #============================================================================
 # NDNP PAGE OBJECT
@@ -342,6 +324,7 @@ class Page(pcdm.Component):
         self.frame    = pagexml.find(m['frame']).text
         self.title    = "{0}, page {1}".format(issue.title, self.number)
         self.reelpath = 'logs/reels/{0}.csv'.format(self.reel)
+        self.ordered  = True
 
         # generate a file object for each file in the XML snippet
         for f in filegroup.findall(m['files']):
@@ -430,15 +413,16 @@ class Collection(pcdm.Collection):
 # NDNP ARTICLE OBJECT
 #============================================================================
 
-class Article(pcdm.Item):
+class Article(pcdm.Component):
 
     ''' class representing an article in a newspaper issue '''
 
     def __init__(self, title, issue):
-        pcdm.Item.__init__(self)
+        pcdm.Component.__init__(self)
 
         # gather metadata
         self.title = title
+        self.ordered = False
 
         # store metadata in object graph
         self.graph.namespace_manager = namespace_manager

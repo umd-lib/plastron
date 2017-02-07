@@ -76,6 +76,8 @@ def load_item(fcrepo, item, args, extra=None):
         # commit transaction
         logger.info('Committing transaction')
         fcrepo.commit_transaction()
+        logger.info('Performing post-creation actions')
+        item.post_creation_hook()
         return True
 
     except (pcdm.RESTAPIException, FileNotFoundError) as e:

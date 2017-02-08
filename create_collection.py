@@ -34,8 +34,6 @@ def create_collection(fcrepo, name):
         return True
 
     except (pcdm.RESTAPIException) as e:
-        # if anything fails during item creation or commiting the transaction
-        # attempt to rollback the current transaction
         # failures here will be caught by the main loop's exception handler
         # and should trigger a system exit
         logger.error("Error in collection creation: {0}".format(e))
@@ -71,7 +69,7 @@ def main():
     # configure logging
     with open('config/logging.yml', 'r') as configfile:
         logging_config = yaml.safe_load(configfile)
-        logfile = 'logs/load.py.{0}.log'.format(
+        logfile = 'logs/create_collection.py.{0}.log'.format(
             datetime.utcnow().strftime('%Y%m%d%H%M%S')
             )
         logging_config['handlers']['file']['filename'] = logfile

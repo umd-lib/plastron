@@ -49,3 +49,8 @@ Optional arguments:
 
 ### Configuration Templates
 Templates for creating the configuration files can be found at [config/templates](./config/templates)
+
+## License
+
+See the [LICENSE](LICENSE.md) file for license rights and limitations (Apache 2.0).
+

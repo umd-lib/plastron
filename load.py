@@ -279,13 +279,12 @@ def main():
                             ),
                        'uri': getattr(item, 'uri', 'N/A')
                        }
-                       
+
                 # write item details to relevant summary CSV    
                 if is_loaded:
                     map_writer.writerow(row)
                 else:
                     skip_writer.writerow(row)
-                    
 
     if not args.quiet:
         print_footer()

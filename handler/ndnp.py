@@ -133,7 +133,7 @@ def load(repo, batch_config):
     return Batch(repo, batch_config)
 
 #============================================================================
-# NDNP BATCH CLASS
+# EXCEPTION CLASSES
 #============================================================================
 
 class ConfigException(Exception):
@@ -142,6 +142,15 @@ class ConfigException(Exception):
     def __str__(self):
         return self.message
 
+class DataReadException(Exception):
+    def __init__(self, file):
+        self.message = "Error interpreting the data in {0}".format(file)
+    def __str__(self):
+        return self.message
+              #============================================================================
+# NDNP BATCH CLASS
+#============================================================================
+
 class Batch():
 
     '''iterator class representing the set of resources to be loaded'''
@@ -149,7 +158,6 @@ class Batch():
     def __init__(self, repo, config):
         self.logger = logging.getLogger(
             __name__ + '.' + self.__class__.__name__
-
             )
         self.batchfile = config.get('LOCAL_PATH')
         collection_uri = config.get('COLLECTION')
@@ -228,11 +236,13 @@ class Batch():
 
     def __next__(self):
         if self.num < self.length:
-            issue = Issue(self.issues[self.num])
+            data = self.issues[self.num]
+            issue = Issue(data)
             issue.collections.append(self.collection)
             self.num += 1
             return issue
         else:
+            print(self.num, self.length)
             self.logger.info('Processing complete!')
             raise StopIteration()
 
@@ -245,15 +255,21 @@ class Issue(pcdm.Item):
     ''' class representing all components of a newspaper issue '''
 
     def __init__(self, paths):
+        print('\n' + '*' * 80)
         (issue_path, article_path) = paths
+        print(issue_path)
         pcdm.Item.__init__(self)
-        tree = ET.parse(issue_path)
-        root = tree.getroot()
-        m = XPATHMAP['issue']
 
         # gather metadata
         self.dir            = os.path.dirname(issue_path)
         self.path           = issue_path
+        self.article_path   = article_path
+        
+    def read_data(self):
+        tree = ET.parse(self.path)
+        root = tree.getroot()
+        m = XPATHMAP['issue']
+    
         self.title          = root.xpath('./@LABEL')[0]
         self.volume         = root.find(m['volume']).text
         self.issue          = root.find(m['issue']).text
@@ -283,7 +299,10 @@ class Issue(pcdm.Item):
             )
 
         # gather all the page and file xml snippets
-        filexml_snippets = [f for f in root.findall(m['files'])]
+        filexml_snippets = {
+            elem.get('ID'): elem for elem in root.findall(m['files'])
+            }
+        
         pagexml_snippets = [p for p in root.findall(m['pages']) if \
             p.get('ID').startswith('pageModsBib')
             ]
@@ -292,25 +311,25 @@ class Issue(pcdm.Item):
         premisxml = root.find(m['premis'])
         for n, pagexml in enumerate(pagexml_snippets):
             id = pagexml.get('ID').strip('pageModsBib')
-            filexml = next(
-                f for f in filexml_snippets if f.get('ID').endswith(id)
-                )
+            try:
+                filexml = filexml_snippets['pageFileGrp' + id]
+            except KeyError:
+                raise DataReadException(self.path)
 
             # create a page object for each page and append to list of pages
             page = Page(pagexml, filexml, premisxml, self)
             self.components.append(page)
 
-        # iterate over the article XML and create objects for issue's articles
-        article_tree = ET.parse(article_path)
+        # iterate over the article XML and create objects for articles
+        article_tree = ET.parse(self.article_path)
         article_root = article_tree.getroot()
         for article_title in article_root.findall(m['article']):
-            self.components.append(Article(article_title.text, self))
+            self.components.append(Article(article_title.text, self))    
 
     # actions to take upon successful creation of object in repository
     def post_creation_hook(self):
         super(pcdm.Item, self).post_creation_hook()
         pages = [c for c in self.components if c.ordered == True]
-        print(pages)
         for page in pages:
             row = {'aggregation': page.reel, 
                    'sequence': page.frame, 

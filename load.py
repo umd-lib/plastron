@@ -49,6 +49,10 @@ def test_connection(fcrepo):
         sys.exit(1)
 
 def load_item(fcrepo, item, args, extra=None):
+    # read data for item
+    logger.info('Reading item data')
+    item.read_data()
+    
     # open transaction
     logger.info('Opening transaction')
     fcrepo.open_transaction()
@@ -222,19 +226,24 @@ def main():
                     skip_list = [row['path'] for row in completed_items]
 
         # open a new version of the map file
-        with open(mapfile, 'w+') as outfile:
-            writer = csv.DictWriter(outfile, fieldnames=fieldnames)
-            writer.writeheader()
+        with open(mapfile, 'w+', 1) as map, open(
+            'logs/skipped.csv', 'w+', 1) as skip:
+            map_writer = csv.DictWriter(map, fieldnames=fieldnames)
+            skip_writer = csv.DictWriter(skip, fieldnames=fieldnames)
+            map_writer.writeheader()
+            skip_writer.writeheader()
+            
             # write out completed items
             logger.info(
                 'Writing data for {0} existing items to mapfile.'.format(
                     len(completed_items))
-                    )
+                )
             for row in completed_items:
-                writer.writerow(row)
+                map_writer.writerow(row)
 
             # create all batch objects in repository
             for n, item in enumerate(batch):
+                is_loaded = False
                 if args.limit is not None and n >= args.limit:
                     logger.info("Stopping after {0} item(s)".format(args.limit))
                     break
@@ -257,16 +266,25 @@ def main():
                         "Unable to commit or rollback transaction, aborting"
                         )
                     sys.exit(1)
+                except handler.DataReadException as e:
+                    logger.error(
+                        "Skipping item {0}: {1}".format(n, e.message)
+                        )
 
+                row = {'number': n + 1,
+                       'title': item.title,
+                       'path': item.path,
+                       'timestamp': getattr(
+                            item, 'creation_timestamp', str(datetime.utcnow())
+                            ),
+                       'uri': getattr(item, 'uri', 'N/A')
+                       }
+
+                # write item details to relevant summary CSV    
                 if is_loaded:
-                    # write item details to mapfile
-                    row = {'number': n + 1,
-                           'timestamp': item.creation_timestamp,
-                           'title': item.title,
-                           'path': item.path,
-                           'uri': item.uri
-                           }
-                    writer.writerow(row)
+                    map_writer.writerow(row)
+                else:
+                    skip_writer.writerow(row)
 
     if not args.quiet:
         print_footer()

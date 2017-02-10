@@ -271,20 +271,19 @@ def main():
                         "Skipping item {0}: {1}".format(n, e.message)
                         )
 
-                # write item details to mapfile    
-                if is_loaded:
-                    row = {'number': n + 1,
-                       'timestamp': item.creation_timestamp,
+                row = {'number': n + 1,
                        'title': item.title,
                        'path': item.path,
-                       'uri': item.uri
+                       'timestamp': getattr(
+                            item, 'creation_timestamp', str(datetime.utcnow())
+                            ),
+                       'uri': getattr(item, 'uri', 'N/A')
                        }
+                       
+                # write item details to relevant summary CSV    
+                if is_loaded:
                     map_writer.writerow(row)
                 else:
-                    row = {'number': n + 1,
-                       'title': item.title,
-                       'path': item.path
-                       }
                     skip_writer.writerow(row)
                     
 

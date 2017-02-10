@@ -158,7 +158,6 @@ class Batch():
     def __init__(self, repo, config):
         self.logger = logging.getLogger(
             __name__ + '.' + self.__class__.__name__
-
             )
         self.batchfile = config.get('LOCAL_PATH')
         collection_uri = config.get('COLLECTION')
@@ -303,7 +302,6 @@ class Issue(pcdm.Item):
         filexml_snippets = {
             elem.get('ID'): elem for elem in root.findall(m['files'])
             }
-        print(filexml_snippets.items())
         
         pagexml_snippets = [p for p in root.findall(m['pages']) if \
             p.get('ID').startswith('pageModsBib')

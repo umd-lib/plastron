@@ -342,7 +342,6 @@ class Resource(object):
 
         for collection in self.collections:
             self.graph.add( (self.uri, pcdm.memberOf, collection.uri) )
-            collection.graph.add( (collection.uri, pcdm.hasMember, self.uri) )
 
         for related_object in self.related:
             self.graph.add(

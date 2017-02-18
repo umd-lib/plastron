@@ -85,6 +85,16 @@ class Repository():
         self.logger.debug("%s %s", response.status_code, response.reason)
         return response
 
+    def put(self, url, **kwargs):
+        target_uri = self._insert_transaction_uri(url)
+        self.logger.debug("PUT {0}".format(target_uri))
+        response = requests.put(
+            target_uri, cert=self.client_cert,
+            auth=self.auth, verify=self.server_cert, **kwargs
+            )
+        self.logger.debug("%s %s", response.status_code, response.reason)
+        return response
+
     def patch(self, url, **kwargs):
         target_uri = self._insert_transaction_uri(url)
         self.logger.debug("PATCH {0}".format(target_uri))
@@ -215,7 +225,10 @@ class Resource(object):
                 self.uri = rdflib.URIRef(
                     repository._remove_transaction_uri(response.text)
                     )
-                self.logger.info('URI: {0}'.format(self.uri))
+                self.uuid = str(self.uri).rsplit('/', 1)[-1]
+                self.logger.info(
+                    'URI: {0} / UUID: {1}'.format(self.uri, self.uuid)
+                    )
                 return True
             else:
                 self.logger.error("Failed to create {0}".format(self.title))
@@ -406,7 +419,9 @@ class Item(Resource):
             position = " ".join([self.sequence_attr[0],
                                 getattr(component, self.sequence_attr[1])]
                                 )
-            proxies.append(Proxy(position, self.title))
+            proxies.append(
+                Proxy(position, self.title, component.uri, self.uuid)
+                )
 
         for proxy in proxies:
             proxy.create_object(repository)
@@ -512,8 +527,34 @@ class Collection(Resource):
 
 class Proxy(Resource):
 
-    def __init__(self, position, context):
+    def __init__(self, position, context, parent_uri, item_uuid):
         Resource.__init__(self)
         self.title = 'Proxy for {0} in {1}'.format(position, context)
+        self.parent_uri = parent_uri
+        self.item_uuid = item_uuid
         self.graph.add( (self.uri, rdf.type, ore.Proxy) )
         self.graph.add( (self.uri, dcterms.title, rdflib.Literal(self.title)) )
+
+    # create proxy object by PUTting object graph
+    def create_object(self, repository):
+        if self.exists_in_repo(repository):
+            return False
+        else:
+            self.logger.info("Creating {0}...".format(self.title))
+            response = repository.put(
+                '/'.join([p.strip('/') for p in (self.parent_uri,
+                                                 self.item_uuid)])
+                )
+            if response.status_code == 201:
+                self.logger.info("Created {0}".format(self.title))
+                self.uri = rdflib.URIRef(
+                    repository._remove_transaction_uri(response.text)
+                    )
+                self.uuid = str(self.uri).rsplit('/', 1)[-1]
+                self.logger.info(
+                    'URI: {0} / UUID: {1}'.format(self.uri, self.uuid)
+                    )
+                return True
+            else:
+                self.logger.error("Failed to create {0}".format(self.title))
+                raise RESTAPIException(response)

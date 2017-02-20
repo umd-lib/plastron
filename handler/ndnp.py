@@ -187,7 +187,11 @@ class Batch():
 
         self.fieldnames = ['aggregation', 'sequence', 'uri']
 
-        tree = ET.parse(self.batchfile)
+        try:
+            tree = ET.parse(self.batchfile)
+        except ET.XMLSyntaxError as e:
+            raise DataReadException("Unable to parse {0} as XML".format(self.batchfile))
+
         root = tree.getroot()
         m = XPATHMAP
 
@@ -264,12 +268,16 @@ class Issue(pcdm.Item):
         self.dir            = os.path.dirname(issue_path)
         self.path           = issue_path
         self.article_path   = article_path
-        
+
     def read_data(self):
-        tree = ET.parse(self.path)
+        try:
+            tree = ET.parse(self.path)
+        except ET.XMLSyntaxError as e:
+            raise DataReadException("Unable to parse {0} as XML".format(self.path))
+
         root = tree.getroot()
         m = XPATHMAP['issue']
-    
+
         self.title          = root.xpath('./@LABEL')[0]
         self.volume         = root.find(m['volume']).text
         self.issue          = root.find(m['issue']).text
@@ -302,7 +310,7 @@ class Issue(pcdm.Item):
         filexml_snippets = {
             elem.get('ID'): elem for elem in root.findall(m['files'])
             }
-        
+
         pagexml_snippets = [p for p in root.findall(m['pages']) if \
             p.get('ID').startswith('pageModsBib')
             ]
@@ -321,18 +329,22 @@ class Issue(pcdm.Item):
             self.components.append(page)
 
         # iterate over the article XML and create objects for articles
-        article_tree = ET.parse(self.article_path)
+        try:
+            article_tree = ET.parse(self.article_path)
+        except ET.XMLSyntaxError as e:
+            raise DataReadException("Unable to parse {0} as XML".format(self.article_path))
+
         article_root = article_tree.getroot()
         for article_title in article_root.findall(m['article']):
-            self.components.append(Article(article_title.text, self))    
+            self.components.append(Article(article_title.text, self))
 
     # actions to take upon successful creation of object in repository
     def post_creation_hook(self):
         super(pcdm.Item, self).post_creation_hook()
         pages = [c for c in self.components if c.ordered == True]
         for page in pages:
-            row = {'aggregation': page.reel, 
-                   'sequence': page.frame, 
+            row = {'aggregation': page.reel,
+                   'sequence': page.frame,
                    'uri': page.uri
                     }
             csv_path = 'logs/reels/{0}.csv'.format(page.reel)

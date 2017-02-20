@@ -143,8 +143,8 @@ class ConfigException(Exception):
         return self.message
 
 class DataReadException(Exception):
-    def __init__(self, file):
-        self.message = "Error interpreting the data in {0}".format(file)
+    def __init__(self, message):
+        self.message = message
     def __str__(self):
         return self.message
               #============================================================================
@@ -322,7 +322,7 @@ class Issue(pcdm.Item):
             try:
                 filexml = filexml_snippets['pageFileGrp' + id]
             except KeyError:
-                raise DataReadException(self.path)
+                raise DataReadException("Missing element with id pageFileGrp{0} in {1}".format(id, self.path))
 
             # create a page object for each page and append to list of pages
             page = Page(pagexml, filexml, premisxml, self)

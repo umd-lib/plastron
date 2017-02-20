@@ -52,7 +52,7 @@ def load_item(fcrepo, item, args, extra=None):
     # read data for item
     logger.info('Reading item data')
     item.read_data()
-    
+
     # open transaction
     logger.info('Opening transaction')
     fcrepo.open_transaction()
@@ -232,7 +232,7 @@ def main():
             skip_writer = csv.DictWriter(skip, fieldnames=fieldnames)
             map_writer.writeheader()
             skip_writer.writeheader()
-            
+
             # write out completed items
             logger.info(
                 'Writing data for {0} existing items to mapfile.'.format(
@@ -268,7 +268,7 @@ def main():
                     sys.exit(1)
                 except handler.DataReadException as e:
                     logger.error(
-                        "Skipping item {0}: {1}".format(n, e.message)
+                        "Skipping item {0}: {1}".format(n + 1, e.message)
                         )
 
                 row = {'number': n + 1,
@@ -280,7 +280,7 @@ def main():
                        'uri': getattr(item, 'uri', 'N/A')
                        }
 
-                # write item details to relevant summary CSV    
+                # write item details to relevant summary CSV
                 if is_loaded:
                     map_writer.writerow(row)
                 else:

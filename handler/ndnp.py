@@ -189,6 +189,8 @@ class Batch():
 
         try:
             tree = ET.parse(self.batchfile)
+        except OSError as e:
+            raise DataReadException("Unable to read {0}".format(self.batchfile))
         except ET.XMLSyntaxError as e:
             raise DataReadException("Unable to parse {0} as XML".format(self.batchfile))
 
@@ -272,6 +274,8 @@ class Issue(pcdm.Item):
     def read_data(self):
         try:
             tree = ET.parse(self.path)
+        except OSError as e:
+            raise DataReadException("Unable to read {0}".format(self.path))
         except ET.XMLSyntaxError as e:
             raise DataReadException("Unable to parse {0} as XML".format(self.path))
 
@@ -331,6 +335,8 @@ class Issue(pcdm.Item):
         # iterate over the article XML and create objects for articles
         try:
             article_tree = ET.parse(self.article_path)
+        except OSError as e:
+            raise DataReadException("Unable to read {0}".format(self.article_path))
         except ET.XMLSyntaxError as e:
             raise DataReadException("Unable to parse {0} as XML".format(self.article_path))
 

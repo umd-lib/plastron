@@ -298,17 +298,6 @@ class Resource(object):
                         )
                     )
 
-        if hasattr(self, 'collections'):
-            for collection in self.collections:
-                if not collection.exists_in_repo(repository):
-                    collection.create_object(repository)
-                else:
-                    self.logger.info(
-                        'Collection "{0}" exists. Skipping.'.format(
-                            collection.title
-                            )
-                        )
-
     # recursively update an object and all its components and files
     def recursive_update(self, repository, nobinaries):
         self.update_object(repository)
@@ -319,9 +308,6 @@ class Resource(object):
             component.recursive_update(repository, nobinaries)
         for related_object in self.related:
             related_object.recursive_update(repository, nobinaries)
-        if hasattr(self, 'collections'):
-            for collection in self.collections:
-                collection.update_object(repository)
 
     # check for the existence of a local object in the repository
     def exists_in_repo(self, repository):

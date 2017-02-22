@@ -35,6 +35,9 @@ namespace_manager.bind('dcterms', dcterms, override=False)
 ebucore = Namespace('http://www.ebu.ch/metadata/ontologies/ebucore/ebucore#')
 namespace_manager.bind('ebucore', ebucore, override=False)
 
+fabio = Namespace('http://purl.org/spar/fabio/')
+namespace_manager.bind('fabio', fabio, override=False)
+
 foaf = Namespace('http://xmlns.com/foaf/0.1/')
 namespace_manager.bind('foaf', foaf, override=False)
 
@@ -310,6 +313,12 @@ class Issue(pcdm.Item):
             (self.uri, rdf.type, bibo.Issue)
             )
 
+        # add the issue and article-level XML files as related objects
+        self.related.append(IssueMetadata(
+            self.path, title='{0}, issue METS metadata'.format(self.title)))
+        self.related.append(IssueMetadata(
+            self.article_path, title='{0}, article METS metadata'.format(self.title)))
+
         # gather all the page and file xml snippets
         filexml_snippets = {
             elem.get('ID'): elem for elem in root.findall(m['files'])
@@ -361,6 +370,33 @@ class Issue(pcdm.Item):
                 writer.writerow(row)
         self.logger.info('Completed post-creation actions')
 
+class IssueMetadata(pcdm.Component):
+    '''additional metadata about an issue'''
+
+    def __init__(self, file_path, title=None):
+        super(IssueMetadata, self).__init__()
+
+        file = MetadataFile(file_path)
+        self.files.append(file)
+        if title is not None:
+            self.title = title
+        else:
+            self.title = file.title
+
+        # store metadata in object graph
+        self.graph.namespace_manager = namespace_manager
+        self.graph.add((self.uri, rdf.type, fabio.Metadata))
+        self.graph.add((self.uri, dcterms.title, rdflib.Literal(self.title)))
+
+class MetadataFile(pcdm.File):
+    '''a binary file containing metadata in non-RDF formats (METS, MODS, etc.)'''
+
+    def __init__(self, localpath, title=None):
+        super(MetadataFile, self).__init__(localpath, title)
+
+        self.graph.namespace_manager = namespace_manager
+        self.graph.add( (self.uri, rdf.type, fabio.MetadataDocument) )
+
 #============================================================================
 # NDNP PAGE OBJECT
 #============================================================================
@@ -401,14 +437,12 @@ class File(pcdm.File):
     ''' class representing an individual file '''
 
     def __init__(self, filexml, dir, premisxml):
+        self.use = filexml.get('USE')
         m = XPATHMAP['file']
         elem = filexml.find(m['filepath'])
-        pcdm.File.__init__(self, os.path.join(dir, os.path.basename(
-                            elem.get('{http://www.w3.org/1999/xlink}href')
-                            )))
-        self.basename = os.path.basename(self.localpath)
-        self.use  = filexml.get('USE')
-        self.title = "{0} ({1})".format(self.basename, self.use)
+        localpath = os.path.join(dir, os.path.basename(elem.get('{http://www.w3.org/1999/xlink}href')))
+        self.basename = os.path.basename(localpath)
+        super(File, self).__init__(localpath, title="{0} ({1})".format(self.basename, self.use))
 
         # store metadata in object graph
         self.graph.namespace_manager = namespace_manager

@@ -349,6 +349,7 @@ class Resource(object):
             related_object.graph.add(
                 (related_object.uri, pcdm.relatedObjectOf, self.uri)
                 )
+            related_object.update_relationship_triples()
 
     # add arbitrary additional triples provided in a file
     def add_extra_properties(self, triples_file, rdf_format):
@@ -452,10 +453,15 @@ class Component(Resource):
 
 class File(Resource):
 
-    def __init__(self, localpath):
+    def __init__(self, localpath, title=None):
         Resource.__init__(self)
         self.localpath = localpath
+        if title is not None:
+            self.title = title
+        else:
+            self.title = os.path.basename(self.localpath)
         self.graph.add((self.uri, rdf.type, pcdm.File))
+        self.graph.add((self.uri, dcterms.title, rdflib.Literal(self.title)))
 
     # upload a binary resource
     def create_nonrdf(self, repository):

@@ -25,7 +25,6 @@ def create_collection(fcrepo, name):
     try:
         collection = pcdm.Collection()
         collection.title = name
-        collection.graph.add( (collection.uri, pcdm.dcterms.title, rdflib.Literal(name)) )
         collection.create_object(fcrepo)
         collection.update_object(fcrepo)
         # commit transaction

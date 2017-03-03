@@ -202,13 +202,35 @@ class RESTAPIException(Exception):
 class Resource(object):
 
     def __init__(self, uri=''):
-        self.graph = rdflib.Graph()
-        self.graph.namespace_manager = namespace_manager
         self.uri = rdflib.URIRef(uri)
+        self.components = []
+        self.files = []
+        self.collections = []
         self.related = []
+        self.extra = rdflib.Graph()
         self.logger = logging.getLogger(
             __name__ + '.' + self.__class__.__name__
             )
+
+    def graph(self):
+        graph = rdflib.Graph()
+        graph.namespace_manager = namespace_manager
+
+        for component in self.components:
+            graph.add((self.uri, pcdm.hasMember, component.uri))
+
+        for file in self.files:
+            graph.add((self.uri, pcdm.hasFile, file.uri))
+
+        for collection in self.collections:
+            graph.add((self.uri, pcdm.memberOf, collection.uri))
+
+        for related_object in self.related:
+            graph.add((self.uri, pcdm.hasRelatedObject, related_object.uri))
+
+        graph = graph + self.extra
+
+        return graph
 
     # create repository object by POSTing object graph
     def create_object(self, repository):
@@ -236,17 +258,18 @@ class Resource(object):
 
     # update existing repo object with SPARQL update
     def update_object(self, repository, patch_uri=None):
+        graph = self.graph()
         if not patch_uri:
             patch_uri = self.uri
         prolog = ''
         #TODO: limit this to just the prefixes that are used in the graph
-        for (prefix, uri) in self.graph.namespace_manager.namespaces():
+        for (prefix, uri) in graph.namespace_manager.namespaces():
             prolog += "PREFIX {0}: {1}\n".format(prefix, uri.n3())
 
         triples = [ "<> {0} {1}.".format(
-            self.graph.namespace_manager.normalizeUri(p),
-            o.n3(self.graph.namespace_manager)
-            ) for (s, p, o) in self.graph ]
+            graph.namespace_manager.normalizeUri(p),
+            o.n3(graph.namespace_manager)
+            ) for (s, p, o) in graph ]
 
         query = prolog + "INSERT DATA {{{0}}}".format("\n".join(triples))
         data = query.encode('utf-8')
@@ -326,34 +349,9 @@ class Resource(object):
             self.graph.delete( (s, p, o) )
             self.graph.add( (self.uri, p, o) )
 
-    # update membership triples (can be used after repository object creation
-    # to ensure repository URIs are present)
-    def update_relationship_triples(self):
-        for component in self.components:
-            self.graph.add( (self.uri, pcdm.hasMember, component.uri) )
-            component.graph.add( (component.uri, pcdm.memberOf, self.uri) )
-            component.update_relationship_triples()
-
-        for file in self.files:
-            # sys.stderr.write(str(self.uri))
-            self.graph.add( (self.uri, pcdm.hasFile, file.uri) )
-            file.graph.add( (file.uri, pcdm.fileOf, self.uri) )
-
-        for collection in self.collections:
-            self.graph.add( (self.uri, pcdm.memberOf, collection.uri) )
-
-        for related_object in self.related:
-            self.graph.add(
-                (self.uri, pcdm.hasRelatedObject, related_object.uri)
-                )
-            related_object.graph.add(
-                (related_object.uri, pcdm.relatedObjectOf, self.uri)
-                )
-            related_object.update_relationship_triples()
-
     # add arbitrary additional triples provided in a file
     def add_extra_properties(self, triples_file, rdf_format):
-        self.graph.parse(
+        self.extra.parse(
             source=triples_file, format=rdf_format, publicID=self.uri
             )
 
@@ -391,12 +389,16 @@ class Resource(object):
 class Item(Resource):
 
     def __init__(self):
-        Resource.__init__(self)
-        self.files = []
-        self.components = []
-        self.collections = []
-        self.related = []
-        self.graph.add( (self.uri, rdf.type, pcdm.Object) )
+        super(Item, self).__init__()
+
+    def graph(self):
+        graph = super(Item, self).graph()
+        graph.add((self.uri, rdf.type, pcdm.Object))
+        if self.first is not None:
+            graph.add((self.uri, iana.first, self.first.uri))
+        if self.last is not None:
+            graph.add((self.uri, iana.last, self.last.uri))
+        return graph
 
     # iterate over each component and create ordering proxies
     def create_ordering(self, repository):
@@ -406,30 +408,23 @@ class Item(Resource):
             position = " ".join([self.sequence_attr[0],
                                 getattr(component, self.sequence_attr[1])]
                                 )
-            proxies.append(
-                Proxy(position, self.title, component.uri, self.uuid)
-                )
+            proxies.append(Proxy(position, proxy_for=component, proxy_in=self))
 
         for proxy in proxies:
             proxy.create_object(repository)
-            proxy.graph.namespace_manager = self.graph.namespace_manager
 
         for (position, component) in enumerate(ordered_components):
             proxy = proxies[position]
-            proxy.graph.add( (proxy.uri, ore.proxyFor, component.uri) )
-            proxy.graph.add( (proxy.uri, ore.proxyIn, self.uri) )
 
             if position == 0:
-                self.graph.add( (self.uri, iana.first, proxy.uri) )
+                self.first = proxy
             else:
-                prev = proxies[position - 1]
-                proxy.graph.add( (proxy.uri, iana.prev, prev.uri) )
+                proxy.prev = proxies[position - 1]
 
             if position == len(ordered_components) - 1:
-                self.graph.add( (self.uri, iana.last, proxy.uri) )
+                self.last = proxy
             else:
-                next = proxies[position + 1]
-                proxy.graph.add( (proxy.uri, iana.next, next.uri) )
+                proxy.next = proxies[position + 1]
 
             proxy.update_object(repository)
 
@@ -440,12 +435,19 @@ class Item(Resource):
 class Component(Resource):
 
     def __init__(self):
-        Resource.__init__(self)
-        self.files = []
-        self.components = []
-        self.collections = []
+        super(Component, self).__init__()
+        self.parent = None
+        self.related_obj_of = None
         self.ordered = False
-        self.graph.add( (self.uri, rdf.type, pcdm.Object) )
+
+    def graph(self):
+        graph = super(Component, self).graph()
+        graph.add((self.uri, rdf.type, pcdm.Object))
+        if self.parent is not None:
+            graph.add((self.uri, pcdm.memberOf, self.parent.uri))
+        if self.related_obj_of is not None:
+            graph.add((self.uri, pcdm.relatedObjectOf, self.related_obj_of.uri))
+        return graph
 
 #============================================================================
 # PCDM FILE
@@ -453,15 +455,21 @@ class Component(Resource):
 
 class File(Resource):
 
-    def __init__(self, localpath, title=None):
-        Resource.__init__(self)
+    def __init__(self, parent, localpath, title=None):
+        super(File, self).__init__()
+        self.parent = parent
         self.localpath = localpath
         if title is not None:
             self.title = title
         else:
             self.title = os.path.basename(self.localpath)
-        self.graph.add((self.uri, rdf.type, pcdm.File))
-        self.graph.add((self.uri, dcterms.title, rdflib.Literal(self.title)))
+
+    def graph(self):
+        graph = super(File, self).graph()
+        graph.add((self.uri, rdf.type, pcdm.File))
+        graph.add((self.uri, dcterms.title, rdflib.Literal(self.title)))
+        graph.add((self.uri, pcdm.fileOf, self.parent.uri))
+        return graph
 
     # upload a binary resource
     def create_nonrdf(self, repository):
@@ -510,8 +518,14 @@ class Collection(Resource):
 
     def __init__(self):
         Resource.__init__(self)
-        self.files = None
-        self.graph.add( (self.uri, rdf.type, pcdm.Collection) )
+        self.title = None
+
+    def graph(self):
+        graph = super(Collection, self).graph()
+        graph.add((self.uri, rdf.type, pcdm.Collection))
+        if self.title is not None:
+            graph.add((self.uri, dcterms.title, rdflib.Literal(self.title)))
+        return graph
 
 #============================================================================
 # PCDM PROXY OBJECT
@@ -519,13 +533,25 @@ class Collection(Resource):
 
 class Proxy(Resource):
 
-    def __init__(self, position, context, parent_uri, item_uuid):
+    def __init__(self, position, proxy_for, proxy_in):
         Resource.__init__(self)
-        self.title = 'Proxy for {0} in {1}'.format(position, context)
-        self.parent_uri = parent_uri
-        self.item_uuid = item_uuid
-        self.graph.add( (self.uri, rdf.type, ore.Proxy) )
-        self.graph.add( (self.uri, dcterms.title, rdflib.Literal(self.title)) )
+        self.title = 'Proxy for {0} in {1}'.format(position, proxy_in.title)
+        self.prev = None
+        self.next = None
+        self.proxy_for = proxy_for
+        self.proxy_in = proxy_in
+
+    def graph(self):
+        graph = super(Proxy, self).graph()
+        graph.add((self.uri, rdf.type, ore.Proxy))
+        graph.add((self.uri, dcterms.title, rdflib.Literal(self.title)))
+        graph.add((self.uri, ore.proxyFor, self.proxy_for.uri))
+        graph.add((self.uri, ore.proxyIn, self.proxy_in.uri))
+        if self.prev is not None:
+            graph.add((self.uri, iana.prev, self.prev.uri))
+        if self.next is not None:
+            graph.add((self.uri, iana.next, self.next.uri))
+        return graph
 
     # create proxy object by PUTting object graph
     def create_object(self, repository):
@@ -534,8 +560,8 @@ class Proxy(Resource):
         else:
             self.logger.info("Creating {0}...".format(self.title))
             response = repository.put(
-                '/'.join([p.strip('/') for p in (self.parent_uri,
-                                                 self.item_uuid)])
+                '/'.join([p.strip('/') for p in (self.proxy_for.uri,
+                                                 self.proxy_in.uuid)])
                 )
             if response.status_code == 201:
                 self.logger.info("Created {0}".format(self.title))

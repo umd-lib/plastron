@@ -280,17 +280,22 @@ class Issue(pcdm.Item):
         except OSError as e:
             raise DataReadException("Unable to read {0}".format(self.path))
         except ET.XMLSyntaxError as e:
-            raise DataReadException("Unable to parse {0} as XML".format(self.path))
+            raise DataReadException(
+                "Unable to parse {0} as XML".format(self.path)
+                )
 
         root = tree.getroot()
         m = XPATHMAP['issue']
-
-        self.title          = root.xpath('./@LABEL')[0]
-        self.volume         = root.find(m['volume']).text
-        self.issue          = root.find(m['issue']).text
-        self.edition        = root.find(m['edition']).text
-        self.date           = root.find(m['date']).text
-        self.sequence_attr  = ('Page', 'number')
+        
+        try:
+            self.title          = root.xpath('./@LABEL')[0]
+            self.volume         = root.find(m['volume']).text
+            self.issue          = root.find(m['issue']).text
+            self.edition        = root.find(m['edition']).text
+            self.date           = root.find(m['date']).text
+            self.sequence_attr  = ('Page', 'number')
+        except AttributeError as e:
+            raise DataReadException("Missing metadata in {0}".format(self.path))
 
         # store metadata as an RDF graph
         self.graph.namespace_manager = namespace_manager

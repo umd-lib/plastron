@@ -60,7 +60,7 @@ def load_item(fcrepo, item, args, extra=None):
     # create item and its components
     try:
         logger.info('Creating item')
-        item.recursive_create(fcrepo, args.nobinaries)
+        item.recursive_create(fcrepo)
         logger.info('Creating ordering proxies')
         item.create_ordering(fcrepo)
 
@@ -73,7 +73,7 @@ def load_item(fcrepo, item, args, extra=None):
             item.add_extra_properties(extra, rdf_format)
 
         logger.info('Updating item and components')
-        item.recursive_update(fcrepo, args.nobinaries)
+        item.recursive_update(fcrepo)
 
         # commit transaction
         logger.info('Committing transaction')
@@ -191,6 +191,8 @@ def main():
 
     # create repository object
     fcrepo = pcdm.Repository(repo_options)
+    if args.nobinaries:
+        fcrepo.load_binaries = False
 
     # "--ping" tests repository connection and exits
     if args.ping:

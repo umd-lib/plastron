@@ -249,7 +249,7 @@ class Batch():
         if self.num < self.length:
             data = self.issues[self.num]
             issue = Issue(data)
-            issue.collections.append(self.collection)
+            issue.add_collection(self.collection)
             self.num += 1
             return issue
         else:
@@ -300,12 +300,10 @@ class Issue(pcdm.Item):
             raise DataReadException("Missing metadata in {0}".format(self.path))
 
         # add the issue and article-level XML files as related objects
-        self.related.append(IssueMetadata(
+        self.add_related(IssueMetadata(
             self.path, title='{0}, issue METS metadata'.format(self.title)))
-        self.related.append(IssueMetadata(
+        self.add_related(IssueMetadata(
             self.article_path, title='{0}, article METS metadata'.format(self.title)))
-        for r in self.related:
-            r.related_obj_of = self
 
         # gather all the page and file xml snippets
         filexml_snippets = {
@@ -327,7 +325,7 @@ class Issue(pcdm.Item):
 
             # create a page object for each page and append to list of pages
             page = Page(pagexml, filexml, premisxml, self)
-            self.components.append(page)
+            self.add_component(page)
 
         # iterate over the article XML and create objects for articles
         try:
@@ -344,7 +342,7 @@ class Issue(pcdm.Item):
             for area in article.findall(m['areas']):
                 pagenum = int(area.get('FILEID').replace('ocrFile', ''))
                 article_pagenums.add(pagenum)
-            self.components.append(Article(article_title, self, pages=sorted(list(article_pagenums))))
+            self.add_component(Article(article_title, self, pages=sorted(list(article_pagenums))))
 
     def graph(self):
         graph = super(Issue, self).graph()
@@ -360,9 +358,8 @@ class Issue(pcdm.Item):
 
     # actions to take upon successful creation of object in repository
     def post_creation_hook(self):
-        super(pcdm.Item, self).post_creation_hook()
-        pages = [c for c in self.components if c.ordered == True]
-        for page in pages:
+        super(Issue, self).post_creation_hook()
+        for page in self.ordered_components():
             row = {'aggregation': page.reel,
                    'sequence': page.frame,
                    'uri': page.uri
@@ -381,8 +378,8 @@ class IssueMetadata(pcdm.Component):
     def __init__(self, file_path, title=None):
         super(IssueMetadata, self).__init__()
 
-        file = MetadataFile(self, file_path)
-        self.files.append(file)
+        file = MetadataFile(file_path)
+        self.add_file(file)
         if title is not None:
             self.title = title
         else:
@@ -398,8 +395,8 @@ class IssueMetadata(pcdm.Component):
 class MetadataFile(pcdm.File):
     '''a binary file containing metadata in non-RDF formats (METS, MODS, etc.)'''
 
-    def __init__(self, parent, localpath, title=None):
-        super(MetadataFile, self).__init__(parent, localpath, title)
+    def __init__(self, localpath, title=None):
+        super(MetadataFile, self).__init__(localpath, title)
 
     def graph(self):
         graph = super(MetadataFile, self).graph()
@@ -430,7 +427,8 @@ class Page(pcdm.Component):
 
         # generate a file object for each file in the XML snippet
         for f in filegroup.findall(m['files']):
-            self.files.append(File(self, f, issue.dir, premisxml))
+            file = File(f, issue.dir, premisxml)
+            self.add_file(file)
 
     def graph(self):
         graph = super(Page, self).graph()
@@ -450,13 +448,13 @@ class File(pcdm.File):
 
     ''' class representing an individual file '''
 
-    def __init__(self, page, filexml, dir, premisxml):
+    def __init__(self, filexml, dir, premisxml):
         self.use = filexml.get('USE')
         m = XPATHMAP['file']
         elem = filexml.find(m['filepath'])
         localpath = os.path.join(dir, os.path.basename(elem.get('{http://www.w3.org/1999/xlink}href')))
         self.basename = os.path.basename(localpath)
-        super(File, self).__init__(page, localpath, title="{0} ({1})".format(self.basename, self.use))
+        super(File, self).__init__(localpath, title="{0} ({1})".format(self.basename, self.use))
 
         if self.basename.endswith('.tif'):
             self.width = premisxml.find(m['width']).text

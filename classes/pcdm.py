@@ -125,6 +125,17 @@ class Repository():
         self.logger.debug("%s %s", response.status_code, response.reason)
         return response
 
+    def recursive_get(self, url, traverse=[], **kwargs):
+        uris = {url}
+        response = self.get(url, headers={'Accept': 'text/turtle'}, **kwargs)
+        if response.status_code == 200:
+            graph = rdflib.Graph()
+            graph.parse(data=response.text, format='n3', publicID=url)
+            for (s, p, o) in graph:
+                if p in traverse:
+                    uris.update(self.recursive_get(str(o), traverse=traverse, **kwargs))
+        return uris
+
     def open_transaction(self, **kwargs):
         url = os.path.join(self.endpoint, 'fcr:tx')
         self.logger.info("Creating transaction")

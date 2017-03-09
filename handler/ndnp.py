@@ -93,7 +93,9 @@ XPATHMAP = {
                     ),
         'files':    (".//{http://www.loc.gov/METS/}fileGrp"
                     ),
-        'article':  (".//{http://www.loc.gov/mods/v3}title"
+        'article':  (".//{http://www.loc.gov/METS/}div[@TYPE='article']"
+                    ),
+        'areas':    (".//{http://www.loc.gov/METS/}area"
                     ),
         'premis':   (".//{http://www.loc.gov/METS/}amdSec"
                     )
@@ -267,7 +269,7 @@ class Issue(pcdm.Item):
         print('\n' + '*' * 80)
         (issue_path, article_path) = paths
         print(issue_path)
-        pcdm.Item.__init__(self)
+        super(Issue, self).__init__()
 
         # gather metadata
         self.dir            = os.path.dirname(issue_path)
@@ -286,7 +288,7 @@ class Issue(pcdm.Item):
 
         root = tree.getroot()
         m = XPATHMAP['issue']
-        
+
         try:
             self.title          = root.xpath('./@LABEL')[0]
             self.volume         = root.find(m['volume']).text
@@ -297,32 +299,13 @@ class Issue(pcdm.Item):
         except AttributeError as e:
             raise DataReadException("Missing metadata in {0}".format(self.path))
 
-        # store metadata as an RDF graph
-        self.graph.namespace_manager = namespace_manager
-        self.graph.add(
-            (self.uri, dcterms.title, rdflib.Literal(self.title))
-            )
-        self.graph.add(
-            (self.uri, bibo.volume, rdflib.Literal(self.volume))
-            )
-        self.graph.add(
-            (self.uri, bibo.issue, rdflib.Literal(self.issue))
-            )
-        self.graph.add(
-            (self.uri, bibo.edition, rdflib.Literal(self.edition))
-            )
-        self.graph.add(
-            (self.uri, dc.date, rdflib.Literal(self.date))
-            )
-        self.graph.add(
-            (self.uri, rdf.type, bibo.Issue)
-            )
-
         # add the issue and article-level XML files as related objects
         self.related.append(IssueMetadata(
             self.path, title='{0}, issue METS metadata'.format(self.title)))
         self.related.append(IssueMetadata(
             self.article_path, title='{0}, article METS metadata'.format(self.title)))
+        for r in self.related:
+            r.related_obj_of = self
 
         # gather all the page and file xml snippets
         filexml_snippets = {
@@ -355,8 +338,25 @@ class Issue(pcdm.Item):
             raise DataReadException("Unable to parse {0} as XML".format(self.article_path))
 
         article_root = article_tree.getroot()
-        for article_title in article_root.findall(m['article']):
-            self.components.append(Article(article_title.text, self))
+        for article in article_root.findall(m['article']):
+            article_title = article.get('LABEL')
+            article_pagenums = set()
+            for area in article.findall(m['areas']):
+                pagenum = int(area.get('FILEID').replace('ocrFile', ''))
+                article_pagenums.add(pagenum)
+            self.components.append(Article(article_title, self, pages=sorted(list(article_pagenums))))
+
+    def graph(self):
+        graph = super(Issue, self).graph()
+        # store metadata as an RDF graph
+        graph.namespace_manager = namespace_manager
+        graph.add((self.uri, dcterms.title, rdflib.Literal(self.title)))
+        graph.add((self.uri, bibo.volume, rdflib.Literal(self.volume)))
+        graph.add((self.uri, bibo.issue, rdflib.Literal(self.issue)))
+        graph.add((self.uri, bibo.edition, rdflib.Literal(self.edition)))
+        graph.add((self.uri, dc.date, rdflib.Literal(self.date)))
+        graph.add((self.uri, rdf.type, bibo.Issue))
+        return graph
 
     # actions to take upon successful creation of object in repository
     def post_creation_hook(self):
@@ -381,26 +381,31 @@ class IssueMetadata(pcdm.Component):
     def __init__(self, file_path, title=None):
         super(IssueMetadata, self).__init__()
 
-        file = MetadataFile(file_path)
+        file = MetadataFile(self, file_path)
         self.files.append(file)
         if title is not None:
             self.title = title
         else:
             self.title = file.title
 
-        # store metadata in object graph
-        self.graph.namespace_manager = namespace_manager
-        self.graph.add((self.uri, rdf.type, fabio.Metadata))
-        self.graph.add((self.uri, dcterms.title, rdflib.Literal(self.title)))
+    def graph(self):
+        graph = super(IssueMetadata, self).graph()
+        graph.namespace_manager = namespace_manager
+        graph.add((self.uri, rdf.type, fabio.Metadata))
+        graph.add((self.uri, dcterms.title, rdflib.Literal(self.title)))
+        return graph
 
 class MetadataFile(pcdm.File):
     '''a binary file containing metadata in non-RDF formats (METS, MODS, etc.)'''
 
-    def __init__(self, localpath, title=None):
-        super(MetadataFile, self).__init__(localpath, title)
+    def __init__(self, parent, localpath, title=None):
+        super(MetadataFile, self).__init__(parent, localpath, title)
 
-        self.graph.namespace_manager = namespace_manager
-        self.graph.add( (self.uri, rdf.type, fabio.MetadataDocument) )
+    def graph(self):
+        graph = super(MetadataFile, self).graph()
+        graph.namespace_manager = namespace_manager
+        graph.add((self.uri, rdf.type, fabio.MetadataDocument))
+        return graph
 
 #============================================================================
 # NDNP PAGE OBJECT
@@ -411,7 +416,7 @@ class Page(pcdm.Component):
     ''' class representing a newspaper page '''
 
     def __init__(self, pagexml, filegroup, premisxml, issue):
-        pcdm.Component.__init__(self)
+        super(Page, self).__init__()
         m = XPATHMAP['page']
 
         # gather metadata
@@ -421,17 +426,21 @@ class Page(pcdm.Component):
         self.frame     = pagexml.find(m['frame']).text
         self.title     = "{0}, page {1}".format(issue.title, self.number)
         self.ordered   = True
+        self.issue     = issue
 
         # generate a file object for each file in the XML snippet
         for f in filegroup.findall(m['files']):
-            self.files.append(File(f, issue.dir, premisxml))
+            self.files.append(File(self, f, issue.dir, premisxml))
 
-        # store metadata in object graph
-        self.graph.namespace_manager = namespace_manager
-        self.graph.add( (self.uri, dcterms.title, rdflib.Literal(self.title)) )
-        self.graph.add( (self.uri, ndnp.number, rdflib.Literal(self.number)) )
-        self.graph.add( (self.uri, ndnp.sequence, rdflib.Literal(self.frame)) )
-        self.graph.add( (self.uri, rdf.type, ndnp.Page) )
+    def graph(self):
+        graph = super(Page, self).graph()
+        graph.namespace_manager = namespace_manager
+        graph.add((self.uri, dcterms.title, rdflib.Literal(self.title)))
+        graph.add((self.uri, ndnp.number, rdflib.Literal(self.number)))
+        graph.add((self.uri, ndnp.sequence, rdflib.Literal(self.frame)))
+        graph.add((self.uri, pcdm_ns.memberOf, self.issue.uri))
+        graph.add((self.uri, rdf.type, ndnp.Page))
+        return graph
 
 #============================================================================
 # NDNP FILE OBJECT
@@ -441,43 +450,42 @@ class File(pcdm.File):
 
     ''' class representing an individual file '''
 
-    def __init__(self, filexml, dir, premisxml):
+    def __init__(self, page, filexml, dir, premisxml):
         self.use = filexml.get('USE')
         m = XPATHMAP['file']
         elem = filexml.find(m['filepath'])
         localpath = os.path.join(dir, os.path.basename(elem.get('{http://www.w3.org/1999/xlink}href')))
         self.basename = os.path.basename(localpath)
-        super(File, self).__init__(localpath, title="{0} ({1})".format(self.basename, self.use))
-
-        # store metadata in object graph
-        self.graph.namespace_manager = namespace_manager
-        self.graph.add( (self.uri, dcterms.title, rdflib.Literal(self.title)) )
-        self.graph.add( (self.uri, dcterms.type, dcmitype.Text) )
+        super(File, self).__init__(page, localpath, title="{0} ({1})".format(self.basename, self.use))
 
         if self.basename.endswith('.tif'):
             self.width = premisxml.find(m['width']).text
             self.height = premisxml.find(m['length']).text
-            self.graph.add(
-                (self.uri, ebucore.width, rdflib.Literal(self.width))
-                )
-            self.graph.add(
-                (self.uri, ebucore.height, rdflib.Literal(self.height))
-                )
-            self.graph.add(
-                (self.uri, rdf.type, pcdm_use.PreservationMasterFile)
-                )
+        else:
+            self.width = None
+            self.height = None
+
+    def graph(self):
+        graph = super(File, self).graph()
+        graph.namespace_manager = namespace_manager
+        graph.add((self.uri, dcterms.title, rdflib.Literal(self.title)))
+        graph.add((self.uri, dcterms.type, dcmitype.Text))
+
+        if self.width is not None:
+            graph.add((self.uri, ebucore.width, rdflib.Literal(self.width)))
+        if self.height is not None:
+            graph.add((self.uri, ebucore.height, rdflib.Literal(self.height)))
+
+        if self.basename.endswith('.tif'):
+            graph.add((self.uri, rdf.type, pcdm_use.PreservationMasterFile))
         elif self.basename.endswith('.jp2'):
-            self.graph.add(
-                (self.uri, rdf.type, pcdm_use.IntermediateFile)
-                )
+            graph.add((self.uri, rdf.type, pcdm_use.IntermediateFile))
         elif self.basename.endswith('.pdf'):
-            self.graph.add(
-                (self.uri, rdf.type, pcdm_use.ServiceFile)
-                )
+            graph.add((self.uri, rdf.type, pcdm_use.ServiceFile))
         elif self.basename.endswith('.xml'):
-            self.graph.add(
-                (self.uri, rdf.type, pcdm_use.ExtractedText)
-                )
+            graph.add((self.uri, rdf.type, pcdm_use.ExtractedText))
+
+        return graph
 
 #============================================================================
 # NDNP COLLECTION OBJECT
@@ -488,7 +496,7 @@ class Collection(pcdm.Collection):
     ''' class representing a collection of newspaper resources '''
 
     def __init__(self):
-        pcdm.Collection.__init__(self)
+        super(Collection, self).__init__()
 
 #============================================================================
 # NDNP ARTICLE OBJECT
@@ -498,14 +506,25 @@ class Article(pcdm.Component):
 
     ''' class representing an article in a newspaper issue '''
 
-    def __init__(self, title, issue):
-        pcdm.Component.__init__(self)
+    def __init__(self, title, issue, pages=None):
+        super(Article, self).__init__()
 
         # gather metadata
         self.title = title
+        self.issue = issue
         self.ordered = False
+        if pages is not None:
+            self.start_page = pages[0]
+            self.end_page = pages[-1]
 
-        # store metadata in object graph
-        self.graph.namespace_manager = namespace_manager
-        self.graph.add( (self.uri, dcterms.title, rdflib.Literal(self.title)) )
-        self.graph.add( (self.uri, rdf.type, bibo.Article) )
+    def graph(self):
+        graph = super(Article, self).graph()
+        graph.namespace_manager = namespace_manager
+        graph.add((self.uri, dcterms.title, rdflib.Literal(self.title)))
+        graph.add((self.uri, pcdm_ns.memberOf, self.issue.uri))
+        graph.add((self.uri, rdf.type, bibo.Article))
+        if self.start_page is not None:
+            graph.add((self.uri, bibo.pageStart, rdflib.Literal(self.start_page)))
+        if self.end_page is not None:
+            graph.add((self.uri, bibo.pageEnd, rdflib.Literal(self.end_page)))
+        return graph

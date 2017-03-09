@@ -63,8 +63,6 @@ def load_item(fcrepo, item, args, extra=None):
         item.recursive_create(fcrepo, args.nobinaries)
         logger.info('Creating ordering proxies')
         item.create_ordering(fcrepo)
-        logger.info('Updating relationship triples')
-        item.update_relationship_triples()
 
         if extra:
             logger.info('Adding additional triples')

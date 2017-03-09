@@ -49,7 +49,6 @@ def delete_item(fcrepo, args):
     # create item and its components
     try:
         for uri in args.uris:
-            logger.info('Deleting resource {0}'.format(uri))
             fcrepo.delete(uri)
             logger.info('Deleted resource {0}'.format(uri))
 
@@ -62,7 +61,7 @@ def delete_item(fcrepo, args):
         # if anything fails during deletion of a set of uris, attempt to
         # rollback the transaction. Failures here will be caught by the main         
         # loop's exception handler and should trigger a system exit
-        logger.error("Item creation failed: {0}".format(e))
+        logger.error("Item deletion failed: {0}".format(e))
         fcrepo.rollback_transaction()
         logger.warn('Transaction rolled back.')
 

@@ -124,6 +124,16 @@ class Repository():
             )
         self.logger.debug("%s %s", response.status_code, response.reason)
         return response
+    
+    def delete(self, url, **kwargs):
+        target_uri = self._insert_transaction_uri(url)
+        self.logger.debug('DELETE {0}'.format(target_uri))
+        response = requests.delete(
+            target_uri, cert=self.client_cert,
+            auth=self.auth, verify=self.server_cert, **kwargs
+            )
+        self.logger.debug("%s %s", response.status_code, response.reason)
+        return response
 
     def recursive_get(self, url, traverse=[], **kwargs):
         uris = {url}

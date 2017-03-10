@@ -4,6 +4,7 @@
 from __future__ import print_function
 
 import argparse
+import rdflib
 from datetime import datetime
 import logging
 import logging.config
@@ -46,11 +47,19 @@ def delete_item(fcrepo, args):
     logger.info('Opening transaction')
     fcrepo.open_transaction()
 
-    # create item and its components
+    # delete item
+    # (and its components, if a list of predicates to traverse was given)
     try:
         for uri in args.uris:
-            fcrepo.delete(uri)
-            logger.info('Deleted resource {0}'.format(uri))
+            if args.recursive is not None:
+                logger.info('Constructing list of URIs to delete')
+                uris_to_delete = fcrepo.recursive_get(uri, traverse=args.predicates)
+            else:
+                uris_to_delete = [uri]
+
+            for target_uri in uris_to_delete:
+                fcrepo.delete(target_uri)
+                logger.info('Deleted resource {0}'.format(target_uri))
 
         # commit transaction
         logger.info('Committing transaction')
@@ -59,7 +68,7 @@ def delete_item(fcrepo, args):
 
     except pcdm.RESTAPIException as e:
         # if anything fails during deletion of a set of uris, attempt to
-        # rollback the transaction. Failures here will be caught by the main         
+        # rollback the transaction. Failures here will be caught by the main
         # loop's exception handler and should trigger a system exit
         logger.error("Item deletion failed: {0}".format(e))
         fcrepo.rollback_transaction()
@@ -90,14 +99,19 @@ def main():
                         action='store_true'
                         )
 
+    parser.add_argument('-R', '--recursive',
+                        help='Delete additional objects found by traversing the given predicate(s)',
+                        action='store'
+                        )
+
     parser.add_argument('uris', nargs='+',
                         help='One or more repository URIs to be deleted.'
                         )
 
     args = parser.parse_args()
-    
+
     print_header()
-    
+
     # configure logging
     with open('config/logging.yml', 'r') as configfile:
         logging_config = yaml.safe_load(configfile)
@@ -116,7 +130,17 @@ def main():
     if args.ping:
         test_connection(fcrepo)
         sys.exit(0)
-    
+
+    if args.recursive is not None:
+        logger.info('Recursive delete enabled')
+        args.predicates = [
+            rdflib.util.from_n3(p, nsm=pcdm.namespace_manager)
+            for p in args.recursive.split(',')
+            ]
+        logger.info('Deletion will traverse the following predicates: {0}'.format(
+            ', '.join([ p.n3() for p in args.predicates ]))
+            )
+
     test_connection(fcrepo)
     try:
         delete_item(fcrepo, args)
@@ -125,7 +149,7 @@ def main():
             "Unable to commit or rollback transaction, aborting"
             )
         sys.exit(1)
-    
+
     print_footer()
 
 if __name__ == "__main__":

@@ -124,7 +124,7 @@ class Repository():
             )
         self.logger.debug("%s %s", response.status_code, response.reason)
         return response
-    
+
     def delete(self, url, **kwargs):
         target_uri = self._insert_transaction_uri(url)
         self.logger.debug('DELETE {0}'.format(target_uri))
@@ -136,7 +136,7 @@ class Repository():
         return response
 
     def recursive_get(self, url, traverse=[], **kwargs):
-        uris = {url}
+        uris = {self._remove_transaction_uri(url)}
         response = self.get(url, headers={'Accept': 'text/turtle'}, **kwargs)
         if response.status_code == 200:
             graph = rdflib.Graph()

@@ -1,5 +1,7 @@
 HANDLER:
 COLLECTION: 
 LOCAL_PATH: 
-MAPFILE: logs/mapfile.csv
+LOG_LOCATION: 
+LOG_CONFIG: config/logging.yml
+MAPFILE: mapfile.csv
 EXTRA: 

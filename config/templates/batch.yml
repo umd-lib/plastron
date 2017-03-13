@@ -3,5 +3,5 @@ COLLECTION:
 LOCAL_PATH: 
 LOG_LOCATION: 
 LOG_CONFIG: config/logging.yml
-MAPFILE: logs/mapfile.csv
+MAPFILE: mapfile.csv
 EXTRA: 

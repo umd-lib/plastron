@@ -42,7 +42,14 @@ def test_connection(fcrepo):
         logger.warn("Unable to connect.")
         sys.exit(1)
 
-def delete_item(fcrepo, args):
+def get_uris_to_delete(fcrepo, uri, args):
+    if args.recursive is not None:
+        logger.info('Constructing list of URIs to delete')
+        return list(fcrepo.recursive_get(uri, traverse=args.predicates))
+    else:
+        return [uri]
+
+def delete_item(fcrepo, uri, args):
     # open transaction
     logger.info('Opening transaction')
     fcrepo.open_transaction()
@@ -50,16 +57,9 @@ def delete_item(fcrepo, args):
     # delete item
     # (and its components, if a list of predicates to traverse was given)
     try:
-        for uri in args.uris:
-            if args.recursive is not None:
-                logger.info('Constructing list of URIs to delete')
-                uris_to_delete = fcrepo.recursive_get(uri, traverse=args.predicates)
-            else:
-                uris_to_delete = [uri]
-
-            for target_uri in uris_to_delete:
-                fcrepo.delete(target_uri)
-                logger.info('Deleted resource {0}'.format(target_uri))
+        for target_uri in get_uris_to_delete(fcrepo, uri, args):
+            fcrepo.delete(target_uri)
+            logger.info('Deleted resource {0}'.format(target_uri))
 
         # commit transaction
         logger.info('Committing transaction')
@@ -104,6 +104,11 @@ def main():
                         action='store'
                         )
 
+    parser.add_argument('-d', '--dryrun',
+                        help='Simulate a delete without modifying the repository',
+                        action='store_true'
+                        )
+
     parser.add_argument('uris', nargs='+',
                         help='One or more repository URIs to be deleted.'
                         )
@@ -142,8 +147,16 @@ def main():
             )
 
     test_connection(fcrepo)
+    if args.dryrun:
+        logger.info('Dry run enabled, no actual deletions will take place')
+
     try:
-        delete_item(fcrepo, args)
+        for uri in args.uris:
+            if args.dryrun:
+                for target_uri in get_uris_to_delete(fcrepo, uri, args):
+                    logger.info("Would delete {0}".format(target_uri))
+            else:
+                delete_item(fcrepo, uri, args)
     except pcdm.RESTAPIException as e:
         logger.error(
             "Unable to commit or rollback transaction, aborting"

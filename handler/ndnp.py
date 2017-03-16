@@ -253,7 +253,6 @@ class Batch():
             self.num += 1
             return issue
         else:
-            print(self.num, self.length)
             self.logger.info('Processing complete!')
             raise StopIteration()
 

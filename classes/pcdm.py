@@ -227,6 +227,7 @@ class Resource(object):
         self.uri = rdflib.URIRef(uri)
         self.linked_objects = []
         self.extra = rdflib.Graph()
+        self.created = False
         self.updated = False
         self.logger = logging.getLogger(
             __name__ + '.' + self.__class__.__name__
@@ -278,27 +279,31 @@ class Resource(object):
 
     # create repository object by POSTing object graph
     def create_object(self, repository):
-        if self.exists_in_repo(repository):
+        if self.created:
             return False
-        else:
-            self.logger.info("Creating {0}...".format(self.title))
-            response = repository.post(
-                '/'.join([p.strip('/') for p in (repository.endpoint,
-                                                 repository.relpath)])
+        elif self.exists_in_repo(repository):
+            self.created = True
+            return False
+
+        self.logger.info("Creating {0}...".format(self.title))
+        response = repository.post(
+            '/'.join([p.strip('/') for p in (repository.endpoint,
+                                             repository.relpath)])
+            )
+        if response.status_code == 201:
+            self.created = True
+            self.logger.info("Created {0}".format(self.title))
+            self.uri = rdflib.URIRef(
+                repository._remove_transaction_uri(response.text)
                 )
-            if response.status_code == 201:
-                self.logger.info("Created {0}".format(self.title))
-                self.uri = rdflib.URIRef(
-                    repository._remove_transaction_uri(response.text)
-                    )
-                self.uuid = str(self.uri).rsplit('/', 1)[-1]
-                self.logger.info(
-                    'URI: {0} / UUID: {1}'.format(self.uri, self.uuid)
-                    )
-                return True
-            else:
-                self.logger.error("Failed to create {0}".format(self.title))
-                raise RESTAPIException(response)
+            self.uuid = str(self.uri).rsplit('/', 1)[-1]
+            self.logger.info(
+                'URI: {0} / UUID: {1}'.format(self.uri, self.uuid)
+                )
+            return True
+        else:
+            self.logger.error("Failed to create {0}".format(self.title))
+            raise RESTAPIException(response)
 
     # update existing repo object with SPARQL update
     def update_object(self, repository, patch_uri=None):
@@ -331,17 +336,17 @@ class Resource(object):
 
     # recursively create an object and components and that don't yet exist
     def recursive_create(self, repository):
-        if not self.exists_in_repo(repository):
-            self.create_object(repository)
+        if self.create_object(repository):
             self.creation_timestamp = dt.now()
         else:
-            self.logger.info('Object "{0}" exists. Skipping.'.format(self.title))
+            self.logger.debug('Object "{0}" exists. Skipping.'.format(self.title))
 
         for (rel, obj) in self.linked_objects:
-            if not obj.exists_in_repo(repository):
-                obj.recursive_create(repository)
+            if obj.created or obj.exists_in_repo(repository):
+                obj.created = True
+                self.logger.debug('Object "{0}" exists. Skipping.'.format(self.title))
             else:
-                self.logger.info('Object "{0}" exists. Skipping.'.format(obj.title))
+                obj.recursive_create(repository)
 
     # recursively update an object and all its components and files
     def recursive_update(self, repository):
@@ -482,6 +487,11 @@ class File(Resource):
         if not repository.load_binaries:
             self.logger.info('Skipping loading for binary {0}'.format(self.filename))
             return True
+        elif self.created:
+            return False
+        elif self.exists_in_repo(repository):
+            self.created = True
+            return False
 
         checksum = self.sha1()
         mimetype = mimetypes.guess_type(self.localpath)[0]
@@ -500,6 +510,7 @@ class File(Resource):
         response = repository.post(target_uri, data=data, headers=headers)
         if response.status_code == 201:
             self.uri = rdflib.URIRef(response.text)
+            self.created = True
             return True
         else:
             raise RESTAPIException(response)

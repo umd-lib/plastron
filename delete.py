@@ -45,9 +45,9 @@ def test_connection(fcrepo):
 def get_uris_to_delete(fcrepo, uri, args):
     if args.recursive is not None:
         logger.info('Constructing list of URIs to delete')
-        return list(fcrepo.recursive_get(uri, traverse=args.predicates))
+        return fcrepo.recursive_get(uri, traverse=args.predicates)
     else:
-        return [uri]
+        return fcrepo.recursive_get(uri, traverse=[])
 
 def delete_item(fcrepo, uri, args):
     # open transaction
@@ -57,9 +57,10 @@ def delete_item(fcrepo, uri, args):
     # delete item
     # (and its components, if a list of predicates to traverse was given)
     try:
-        for target_uri in get_uris_to_delete(fcrepo, uri, args):
+        for (target_uri, graph) in get_uris_to_delete(fcrepo, uri, args):
+            title = '; '.join([ t for t in graph.objects(predicate=pcdm.dcterms.title) ])
             fcrepo.delete(target_uri)
-            logger.info('Deleted resource {0}'.format(target_uri))
+            logger.info('Deleted resource {0} ({1})'.format(target_uri, title))
 
         # commit transaction
         logger.info('Committing transaction')
@@ -151,12 +152,13 @@ def main():
         logger.info('Dry run enabled, no actual deletions will take place')
 
     try:
-        for uri in args.uris:
+        for item_uri in args.uris:
             if args.dryrun:
-                for target_uri in get_uris_to_delete(fcrepo, uri, args):
-                    logger.info("Would delete {0}".format(target_uri))
+                for (uri, graph) in get_uris_to_delete(fcrepo, item_uri, args):
+                    title = '; '.join([ t for t in graph.objects(predicate=pcdm.dcterms.title) ])
+                    logger.info("Would delete {0} ({1})".format(uri, title))
             else:
-                delete_item(fcrepo, uri, args)
+                delete_item(fcrepo, item_uri, args)
     except pcdm.RESTAPIException as e:
         logger.error(
             "Unable to commit or rollback transaction, aborting"

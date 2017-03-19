@@ -137,15 +137,21 @@ class Repository():
         return response
 
     def recursive_get(self, url, traverse=[], **kwargs):
-        uris = {self._remove_transaction_uri(url)}
-        response = self.get(url, headers={'Accept': 'text/turtle'}, **kwargs)
+        head_response = self.head(url, **kwargs)
+        if 'describedby' in head_response.links:
+            target = head_response.links['describedby']['url']
+        else:
+            target = url
+        response = self.get(target, headers={'Accept': 'text/turtle'}, **kwargs)
         if response.status_code == 200:
             graph = rdflib.Graph()
             graph.parse(data=response.text, format='n3', publicID=url)
+            yield (self._remove_transaction_uri(url), graph)
             for (s, p, o) in graph:
                 if p in traverse:
-                    uris.update(self.recursive_get(str(o), traverse=traverse, **kwargs))
-        return uris
+                    for (uri, graph) in self.recursive_get(
+                        str(o), traverse=traverse, **kwargs):
+                        yield (uri, graph)
 
     def open_transaction(self, **kwargs):
         url = os.path.join(self.endpoint, 'fcr:tx')

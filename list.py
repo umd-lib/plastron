@@ -8,6 +8,7 @@ import logging
 import logging.config
 from datetime import datetime
 from classes import pcdm
+import rdflib
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +31,7 @@ def main():
     # configure logging
     with open('config/logging.yml', 'r') as configfile:
         logging_config = yaml.safe_load(configfile)
-        logfile = 'logs/read.py.{0}.log'.format(
+        logfile = 'logs/list.py.{0}.log'.format(
             datetime.utcnow().strftime('%Y%m%d%H%M%S')
             )
         logging_config['handlers']['file']['filename'] = logfile
@@ -44,8 +45,9 @@ def main():
 
     predicates = [pcdm.pcdm.hasMember, pcdm.pcdm.hasFile, pcdm.pcdm.hasRelatedObject]
     for item_uri in sys.stdin:
-        for uri in fcrepo.recursive_get(item_uri.rstrip('\n'), traverse=predicates):
-            print(uri)
+        for (uri, graph) in fcrepo.recursive_get(item_uri.rstrip('\n'), traverse=predicates):
+            title = '; '.join([ t for t in graph.objects(predicate=pcdm.dcterms.title) ])
+            print("{0} ({1})".format(uri, title))
 
 if __name__ == "__main__":
     main()

@@ -31,7 +31,7 @@ def main():
     # configure logging
     with open('config/logging.yml', 'r') as configfile:
         logging_config = yaml.safe_load(configfile)
-        logfile = 'logs/read.py.{0}.log'.format(
+        logfile = 'logs/list.py.{0}.log'.format(
             datetime.utcnow().strftime('%Y%m%d%H%M%S')
             )
         logging_config['handlers']['file']['filename'] = logfile

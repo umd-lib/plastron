@@ -136,9 +136,10 @@ class Repository():
         return response
 
     def recursive_get(self, url, traverse=[], **kwargs):
-        try:
-            target = self.head(url, **kwargs).links['describedby']['url']
-        except KeyError:
+        head_response = self.head(url, **kwargs)
+        if 'describedby' in head_response.links:
+            target = head_response.links['describedby']['url']
+        else:
             target = url
         response = self.get(target, headers={'Accept': 'text/turtle'}, **kwargs)
         if response.status_code == 200:

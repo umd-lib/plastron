@@ -19,17 +19,19 @@ A configurable batch loader for Fedora 4.
 
 optional arguments:
   -h, --help            show this help message and exit
-  -r REPO, --repo REPO  Path to repository configuration file.
-  -b BATCH, --batch BATCH
-                        Path to batch configuration file.
-  -d, --dryrun          Iterate over the batch without POSTing.
-  -n, --nobinaries      Iterate without uploading binaries.
+  -d, --dryrun          iterate over the batch without POSTing
+  -n, --nobinaries      iterate without uploading binaries
   -l LIMIT, --limit LIMIT
-                        Limit the load to a specified number of top-level
-                        objects.
-  -p, --ping            Check the connection to the repository and exit.
-  -v, --verbose         Increase the verbosity of the status output.
-  -q, --quiet           Decrease the verbosity of the status output.
+                        limit the load to a specified number of top-level
+                        objects
+  -p, --ping            check the repo connection and exit
+  -v, --verbose         increase the verbosity of the status output
+  -q, --quiet           decrease the verbosity of the status output
+
+required arguments:
+  -r REPO, --repo REPO  path to repository configuration file
+  -b BATCH, --batch BATCH
+                        path to batch configuration file
 ```
 
 ## Create Collection

@@ -101,37 +101,38 @@ def main():
     parser = argparse.ArgumentParser(
         description='A configurable batch loader for Fedora 4.'
         )
+    required = parser.add_argument_group('required arguments')
 
     # Path to the repo config (endpoint, relpath, credentials, and WebAC paths)
-    parser.add_argument('-r', '--repo',
-                        help='Path to repository configuration file.',
+    required.add_argument('-r', '--repo',
+                        help='path to repository configuration file',
                         action='store',
                         required=True
                         )
 
     # Data handler module to use
-    parser.add_argument('-b', '--batch',
-                        help='Path to batch configuration file.',
+    required.add_argument('-b', '--batch',
+                        help='path to batch configuration file',
                         action='store',
                         required=True
                         )
 
     # Run through object preparation, but do not touch repository
     parser.add_argument('-d', '--dryrun',
-                        help='Iterate over the batch without POSTing.',
+                        help='iterate over the batch without POSTing',
                         action='store_true'
                         )
 
     # Load without binaries; useful for testing when file loading is too slow
     parser.add_argument('-n', '--nobinaries',
-                        help='Iterate without uploading binaries.',
+                        help='iterate without uploading binaries',
                         action='store_true'
                         )
 
     # Limit the load to a specified number of top-level objects
     parser.add_argument('-l', '--limit',
-                        help='''Limit the load to a specified number of
-                                top-level objects.''',
+                        help='''limit the load to a specified number of
+                                top-level objects''',
                         action='store',
                         type=int,
                         default=None
@@ -139,17 +140,17 @@ def main():
 
     # Just ping the repository to see if the endpoint exists
     parser.add_argument('-p', '--ping',
-                        help='Check the connection to the repository and exit.',
+                        help='check the repo connection and exit',
                         action='store_true'
                         )
 
     parser.add_argument('-v', '--verbose',
-                        help='Increase the verbosity of the status output.',
+                        help='increase the verbosity of the status output',
                         action='store_true'
                         )
 
     parser.add_argument('-q', '--quiet',
-                        help='Decrease the verbosity of the status output.',
+                        help='decrease the verbosity of the status output',
                         action='store_true'
                         )
 

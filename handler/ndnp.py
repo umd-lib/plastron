@@ -1,7 +1,7 @@
 ''' Classes for interpreting and loading metadata and files stored
     according to the NDNP specification. '''
 
-from classes import pcdm
+from classes import pcdm, ocr
 import csv
 import logging
 import lxml.etree as ET
@@ -58,6 +58,12 @@ namespace_manager.bind('pcdmuse', pcdm_use, override=False)
 
 rdf = Namespace('http://www.w3.org/1999/02/22-rdf-syntax-ns#')
 namespace_manager.bind('rdf', rdf, override=False)
+
+oa = Namespace('http://www.w3.org/ns/oa#')
+namespace_manager.bind('oa', oa, override=False)
+
+sc = Namespace('http://www.shared-canvas.org/ns/')
+namespace_manager.bind('sc', sc, override=False)
 
 
 #============================================================================
@@ -305,16 +311,19 @@ class Issue(pcdm.Item):
             ]
 
         # iterate over each page section matching it to its files
+        pages = {}
         premisxml = root.find(m['premis'])
         for n, pagexml in enumerate(pagexml_snippets):
-            id = pagexml.get('ID').strip('pageModsBib')
             # attempt to match files
+            pagenum = int(pagexml.get('ID').strip('pageModsBib'))
             try:
-                filexml = filexml_snippets['pageFileGrp' + id]
+                filexml = filexml_snippets['pageFileGrp{0}'.format(pagenum)]
             except KeyError:
                 filexml = None
+
             # create a page object for each page and append to list of pages
             page = Page(pagexml, filexml, premisxml, self)
+            pages[str(pagenum)] = page
             self.add_component(page)
 
         # iterate over the article XML and create objects for articles
@@ -335,6 +344,22 @@ class Issue(pcdm.Item):
             article_pagenums = set()
             for area in article.findall(m['areas']):
                 pagenum = int(area.get('FILEID').replace('ocrFile', ''))
+                page = pages[str(pagenum)]
+                annotation = pcdm.Annotation()
+                target = pcdm.SpecificResource(page)
+                textblock = page.ocr.textblock(area.get('BEGIN'))
+                body = pcdm.TextualBody(textblock.text(), 'text/plain')
+                xywh = ','.join([ str(i) for i in textblock.xywh(page.ocr.scale) ])
+                selector = pcdm.FragmentSelector(
+                    "xywh={0}".format(xywh),
+                    rdflib.URIRef('http://www.w3.org/TR/media-frags/')
+                    )
+                annotation.add_body(body)
+                annotation.add_target(target)
+                annotation.motivation = sc.painting
+                target.add_selector(selector)
+                annotation.fragments = [body, target, selector]
+                self.annotations.append(annotation)
                 article_pagenums.add(pagenum)
             self.add_component(Article(article_title, self, pages=sorted(list(article_pagenums))))
 
@@ -425,12 +450,26 @@ class Page(pcdm.Component):
         self.title     = "{0}, page {1}".format(issue.title, self.number)
         self.ordered   = True
         self.issue     = issue
+        self.annotations = []
 
         # optionally generate a file object for each file in the XML snippet
         if filegroup is not None:
             for f in filegroup.findall(m['files']):
                 file = File(f, issue.dir, premisxml)
                 self.add_file(file)
+
+            if file.use == 'ocr':
+                # load ALTO XML into page object, for article text extraction
+                try:
+                    tree = ET.parse(file.localpath)
+                except OSError as e:
+                    raise DataReadException("Unable to read {0}".format(file.localpath))
+                except ET.XMLSyntaxError as e:
+                    raise DataReadException("Unable to parse {0} as XML".format(file.localpath))
+
+                # TODO: read in resolution from issue METS data
+                image_resolution = (400, 400)
+                self.ocr = ocr.ALTOResource(tree, image_resolution)
 
     def graph(self):
         graph = super(Page, self).graph()

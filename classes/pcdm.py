@@ -9,6 +9,7 @@ import rdflib
 from rdflib import Namespace
 import sys
 import logging
+from uuid import uuid4
 
 #============================================================================
 # NAMESPACE BINDINGS
@@ -232,6 +233,7 @@ class Resource(object):
     def __init__(self, uri=''):
         self.uri = rdflib.URIRef(uri)
         self.linked_objects = []
+        self.fragments = []
         self.extra = rdflib.Graph()
         self.created = False
         self.updated = False
@@ -279,6 +281,9 @@ class Resource(object):
         for (rel, obj) in self.linked_objects:
             graph.add((self.uri, rel, obj.uri))
 
+        for obj in self.fragments:
+            graph = graph + obj.graph()
+
         graph = graph + self.extra
 
         return graph
@@ -306,10 +311,17 @@ class Resource(object):
             self.logger.info(
                 'URI: {0} / UUID: {1}'.format(self.uri, self.uuid)
                 )
+            self.create_fragments()
             return True
         else:
             self.logger.error("Failed to create {0}".format(self.title))
             raise RESTAPIException(response)
+
+    def create_fragments(self):
+        for obj in self.fragments:
+            obj.uuid = uuid4()
+            obj.uri = rdflib.URIRef('{0}#{1}'.format(self.uri, obj.uuid))
+            obj.created = True
 
     # update existing repo object with SPARQL update
     def update_object(self, repository, patch_uri=None):
@@ -321,10 +333,18 @@ class Resource(object):
         for (prefix, uri) in graph.namespace_manager.namespaces():
             prolog += "PREFIX {0}: {1}\n".format(prefix, uri.n3())
 
-        triples = [ "<> {0} {1}.".format(
+        triples = []
+        for (s, p, o) in graph:
+            subject = s.n3(graph.namespace_manager)
+            if '#' in subject:
+                subject = '<' + subject[subject.index('#'):]
+            else:
+                subject = '<>'
+            triples.append("{0} {1} {2}.".format(
+                subject,
             graph.namespace_manager.normalizeUri(p),
             o.n3(graph.namespace_manager)
-            ) for (s, p, o) in graph ]
+                ))
 
         query = prolog + "INSERT DATA {{{0}}}".format("\n".join(triples))
         data = query.encode('utf-8')

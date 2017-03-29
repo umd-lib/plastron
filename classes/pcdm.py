@@ -288,8 +288,8 @@ class Resource(object):
 
         return graph
 
-    # create repository object by POSTing object graph
-    def create_object(self, repository):
+    # create repository object by POST or PUT
+    def create_object(self, repository, uri=None):
         if self.created:
             return False
         elif self.exists_in_repo(repository):
@@ -297,10 +297,14 @@ class Resource(object):
             return False
 
         self.logger.info("Creating {0}...".format(self.title))
+        if uri is not None:
+            response = repository.put(uri)
+        else:
         response = repository.post(
             '/'.join([p.strip('/') for p in (repository.endpoint,
                                              repository.relpath)])
             )
+
         if response.status_code == 201:
             self.created = True
             self.logger.info("Created {0}".format(self.title))
@@ -604,25 +608,6 @@ class Proxy(Resource):
         return graph
 
     # create proxy object by PUTting object graph
-    def create_object(self, repository):
-        if self.exists_in_repo(repository):
-            return False
-        else:
-            self.logger.info("Creating {0}...".format(self.title))
-            response = repository.put(
-                '/'.join([p.strip('/') for p in (self.proxy_for.uri,
-                                                 self.proxy_in.uuid)])
-                )
-            if response.status_code == 201:
-                self.logger.info("Created {0}".format(self.title))
-                self.uri = rdflib.URIRef(
-                    repository._remove_transaction_uri(response.text)
-                    )
-                self.uuid = str(self.uri).rsplit('/', 1)[-1]
-                self.logger.info(
-                    'URI: {0} / UUID: {1}'.format(self.uri, self.uuid)
-                    )
-                return True
-            else:
-                self.logger.error("Failed to create {0}".format(self.title))
-                raise RESTAPIException(response)
+    def create_object(self, repository, **kwargs):
+        uri='/'.join([p.strip('/') for p in (self.proxy_for.uri, self.proxy_in.uuid)])
+        super(Proxy, self).create_object(repository, uri=uri, **kwargs)

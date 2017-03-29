@@ -52,6 +52,7 @@ class Repository():
     def __init__(self, config):
         self.endpoint = config['REST_ENDPOINT']
         self.relpath = config['RELPATH']
+        self._path_stack = [ self.relpath ]
         self.fullpath = '/'.join(
             [p.strip('/') for p in (self.endpoint, self.relpath)]
             )
@@ -72,6 +73,18 @@ class Repository():
             self.server_cert = config['SERVER_CERT']
         else:
             self.server_cert = None
+
+    def at_path(self, relpath):
+        self._path_stack.append(self.relpath)
+        self.relpath = relpath
+        return self
+
+    def __enter__(self):
+        pass
+
+    def __exit__(self, type, value, traceback):
+        self.relpath = self._path_stack.pop()
+
 
     def is_reachable(self):
         response = self.head(self.fullpath)

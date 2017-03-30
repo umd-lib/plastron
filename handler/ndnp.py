@@ -345,21 +345,8 @@ class Issue(pcdm.Item):
             for area in article.findall(m['areas']):
                 pagenum = int(area.get('FILEID').replace('ocrFile', ''))
                 page = pages[str(pagenum)]
-                annotation = pcdm.Annotation()
-                target = pcdm.SpecificResource(page)
                 textblock = page.ocr.textblock(area.get('BEGIN'))
-                body = pcdm.TextualBody(textblock.text(), 'text/plain')
-                xywh = ','.join([ str(i) for i in textblock.xywh(page.ocr.scale) ])
-                selector = pcdm.FragmentSelector(
-                    "xywh={0}".format(xywh),
-                    rdflib.URIRef('http://www.w3.org/TR/media-frags/')
-                    )
-                annotation.add_body(body)
-                annotation.add_target(target)
-                annotation.motivation = sc.painting
-                target.add_selector(selector)
-                annotation.fragments = [body, target, selector]
-                self.annotations.append(annotation)
+                self.annotations.append(TextblockOnPage(textblock, page))
                 article_pagenums.add(pagenum)
             self.add_component(Article(article_title, self, pages=sorted(list(article_pagenums))))
 
@@ -397,6 +384,22 @@ class Issue(pcdm.Item):
                     writer = csv.DictWriter(f, fieldnames=fieldnames)
                     writer.writerow(row)
         self.logger.info('Completed post-creation actions')
+
+class TextblockOnPage(pcdm.Annotation):
+    def __init__(self, textblock, page):
+        super(TextblockOnPage, self).__init__()
+        body = pcdm.TextualBody(textblock.text(), 'text/plain')
+        target = pcdm.SpecificResource(page)
+        xywh = ','.join([ str(i) for i in textblock.xywh(page.ocr.scale) ])
+        selector = pcdm.FragmentSelector(
+            "xywh={0}".format(xywh),
+            rdflib.URIRef('http://www.w3.org/TR/media-frags/')
+            )
+        self.add_body(body)
+        self.add_target(target)
+        self.motivation = sc.painting
+        target.add_selector(selector)
+        self.fragments = [body, target, selector]
 
 class IssueMetadata(pcdm.Component):
     '''additional metadata about an issue'''

@@ -714,3 +714,15 @@ class FragmentSelector(Resource):
         if self.conforms_to is not None:
             graph.add((self.uri, dcterms.conformsTo, self.conforms_to))
         return graph
+
+class XPathSelector(Resource):
+    def __init__(self, value):
+        super(XPathSelector, self).__init__()
+        self.value = value
+        self.title = self.value
+
+    def graph(self):
+        graph = super(XPathSelector, self).graph()
+        graph.add((self.uri, rdf.value, rdflib.Literal(self.value)))
+        graph.add((self.uri, rdf.type, oa.XPathSelector))
+        return graph

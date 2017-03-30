@@ -65,6 +65,9 @@ namespace_manager.bind('oa', oa, override=False)
 sc = Namespace('http://www.shared-canvas.org/ns/')
 namespace_manager.bind('sc', sc, override=False)
 
+prov = Namespace('http://www.w3.org/ns/prov#')
+namespace_manager.bind('prov', prov, override=False)
+
 
 #============================================================================
 # METADATA MAPPING
@@ -395,11 +398,15 @@ class TextblockOnPage(pcdm.Annotation):
             "xywh={0}".format(xywh),
             rdflib.URIRef('http://www.w3.org/TR/media-frags/')
             )
+        xpath_selector = pcdm.XPathSelector("//*[@ID='{0}']".format(textblock.id))
+        ocr_resource = pcdm.SpecificResource(page.ocr_file)
+        ocr_resource.add_selector(xpath_selector)
+        body.linked_objects.append((prov.wasDerivedFrom, ocr_resource))
         self.add_body(body)
         self.add_target(target)
         self.motivation = sc.painting
         target.add_selector(selector)
-        self.fragments = [body, target, selector]
+        self.fragments = [body, target, selector, ocr_resource, xpath_selector]
 
 class IssueMetadata(pcdm.Component):
     '''additional metadata about an issue'''
@@ -472,6 +479,7 @@ class Page(pcdm.Component):
 
                 # TODO: read in resolution from issue METS data
                 image_resolution = (400, 400)
+                self.ocr_file = file
                 self.ocr = ocr.ALTOResource(tree, image_resolution)
 
     def graph(self):

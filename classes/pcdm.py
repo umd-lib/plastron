@@ -9,6 +9,7 @@ import rdflib
 from rdflib import Namespace
 import sys
 import logging
+from uuid import uuid4
 
 #============================================================================
 # NAMESPACE BINDINGS
@@ -51,6 +52,7 @@ class Repository():
     def __init__(self, config):
         self.endpoint = config['REST_ENDPOINT']
         self.relpath = config['RELPATH']
+        self._path_stack = [ self.relpath ]
         self.fullpath = '/'.join(
             [p.strip('/') for p in (self.endpoint, self.relpath)]
             )
@@ -71,6 +73,18 @@ class Repository():
             self.server_cert = config['SERVER_CERT']
         else:
             self.server_cert = None
+
+    def at_path(self, relpath):
+        self._path_stack.append(self.relpath)
+        self.relpath = relpath
+        return self
+
+    def __enter__(self):
+        pass
+
+    def __exit__(self, type, value, traceback):
+        self.relpath = self._path_stack.pop()
+
 
     def is_reachable(self):
         response = self.head(self.fullpath)
@@ -232,6 +246,7 @@ class Resource(object):
     def __init__(self, uri=''):
         self.uri = rdflib.URIRef(uri)
         self.linked_objects = []
+        self.fragments = []
         self.extra = rdflib.Graph()
         self.created = False
         self.updated = False
@@ -279,12 +294,15 @@ class Resource(object):
         for (rel, obj) in self.linked_objects:
             graph.add((self.uri, rel, obj.uri))
 
+        for obj in self.fragments:
+            graph = graph + obj.graph()
+
         graph = graph + self.extra
 
         return graph
 
-    # create repository object by POSTing object graph
-    def create_object(self, repository):
+    # create repository object by POST or PUT
+    def create_object(self, repository, uri=None):
         if self.created:
             return False
         elif self.exists_in_repo(repository):
@@ -292,10 +310,14 @@ class Resource(object):
             return False
 
         self.logger.info("Creating {0}...".format(self.title))
+        if uri is not None:
+            response = repository.put(uri)
+        else:
         response = repository.post(
             '/'.join([p.strip('/') for p in (repository.endpoint,
                                              repository.relpath)])
             )
+
         if response.status_code == 201:
             self.created = True
             self.logger.info("Created {0}".format(self.title))
@@ -306,10 +328,17 @@ class Resource(object):
             self.logger.info(
                 'URI: {0} / UUID: {1}'.format(self.uri, self.uuid)
                 )
+            self.create_fragments()
             return True
         else:
             self.logger.error("Failed to create {0}".format(self.title))
             raise RESTAPIException(response)
+
+    def create_fragments(self):
+        for obj in self.fragments:
+            obj.uuid = uuid4()
+            obj.uri = rdflib.URIRef('{0}#{1}'.format(self.uri, obj.uuid))
+            obj.created = True
 
     # update existing repo object with SPARQL update
     def update_object(self, repository, patch_uri=None):
@@ -321,10 +350,18 @@ class Resource(object):
         for (prefix, uri) in graph.namespace_manager.namespaces():
             prolog += "PREFIX {0}: {1}\n".format(prefix, uri.n3())
 
-        triples = [ "<> {0} {1}.".format(
+        triples = []
+        for (s, p, o) in graph:
+            subject = s.n3(graph.namespace_manager)
+            if '#' in subject:
+                subject = '<' + subject[subject.index('#'):]
+            else:
+                subject = '<>'
+            triples.append("{0} {1} {2}.".format(
+                subject,
             graph.namespace_manager.normalizeUri(p),
             o.n3(graph.namespace_manager)
-            ) for (s, p, o) in graph ]
+                ))
 
         query = prolog + "INSERT DATA {{{0}}}".format("\n".join(triples))
         data = query.encode('utf-8')
@@ -584,25 +621,6 @@ class Proxy(Resource):
         return graph
 
     # create proxy object by PUTting object graph
-    def create_object(self, repository):
-        if self.exists_in_repo(repository):
-            return False
-        else:
-            self.logger.info("Creating {0}...".format(self.title))
-            response = repository.put(
-                '/'.join([p.strip('/') for p in (self.proxy_for.uri,
-                                                 self.proxy_in.uuid)])
-                )
-            if response.status_code == 201:
-                self.logger.info("Created {0}".format(self.title))
-                self.uri = rdflib.URIRef(
-                    repository._remove_transaction_uri(response.text)
-                    )
-                self.uuid = str(self.uri).rsplit('/', 1)[-1]
-                self.logger.info(
-                    'URI: {0} / UUID: {1}'.format(self.uri, self.uuid)
-                    )
-                return True
-            else:
-                self.logger.error("Failed to create {0}".format(self.title))
-                raise RESTAPIException(response)
+    def create_object(self, repository, **kwargs):
+        uri='/'.join([p.strip('/') for p in (self.proxy_for.uri, self.proxy_in.uuid)])
+        super(Proxy, self).create_object(repository, uri=uri, **kwargs)

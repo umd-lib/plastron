@@ -313,10 +313,10 @@ class Resource(object):
         if uri is not None:
             response = repository.put(uri)
         else:
-        response = repository.post(
-            '/'.join([p.strip('/') for p in (repository.endpoint,
-                                             repository.relpath)])
-            )
+            response = repository.post(
+                '/'.join([p.strip('/') for p in (repository.endpoint,
+                                                 repository.relpath)])
+                )
 
         if response.status_code == 201:
             self.created = True

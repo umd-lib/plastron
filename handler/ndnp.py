@@ -345,13 +345,16 @@ class Issue(pcdm.Item):
         for article in article_root.findall(m['article']):
             article_title = article.get('LABEL')
             article_pagenums = set()
+            textblocks = []
             for area in article.findall(m['areas']):
                 pagenum = int(area.get('FILEID').replace('ocrFile', ''))
                 page = pages[str(pagenum)]
-                textblock = page.ocr.textblock(area.get('BEGIN'))
-                self.annotations.append(TextblockOnPage(textblock, page))
+                textblocks.append(page.ocr.textblock(area.get('BEGIN')))
                 article_pagenums.add(pagenum)
-            self.add_component(Article(article_title, self, pages=sorted(list(article_pagenums))))
+            article = Article(article_title, self, pages=sorted(list(article_pagenums)))
+            self.add_component(article)
+            for textblock in textblocks:
+                self.annotations.append(TextblockOnPage(textblock, page, article=article))
 
     def graph(self):
         graph = super(Issue, self).graph()
@@ -389,9 +392,11 @@ class Issue(pcdm.Item):
         self.logger.info('Completed post-creation actions')
 
 class TextblockOnPage(pcdm.Annotation):
-    def __init__(self, textblock, page):
+    def __init__(self, textblock, page, article=None):
         super(TextblockOnPage, self).__init__()
         body = pcdm.TextualBody(textblock.text(), 'text/plain')
+        if article is not None:
+            body.linked_objects.append((dcterms.isPartOf, article))
         target = pcdm.SpecificResource(page)
         xywh = ','.join([ str(i) for i in textblock.xywh(page.ocr.scale) ])
         selector = pcdm.FragmentSelector(

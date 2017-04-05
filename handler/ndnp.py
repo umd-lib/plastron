@@ -289,21 +289,29 @@ class Issue(pcdm.Item):
         root = tree.getroot()
         m = XPATHMAP['issue']
 
+        # get required metadata elements
         try:
-            self.title          = root.xpath('./@LABEL')[0]
-            self.volume         = root.find(m['volume']).text
-            self.issue          = root.find(m['issue']).text
-            self.edition        = root.find(m['edition']).text
-            self.date           = root.find(m['date']).text
-            self.sequence_attr  = ('Page', 'number')
+            self.title = root.xpath('./@LABEL')[0]
+            self.date = root.find(m['date']).text
+            self.sequence_attr = ('Page', 'number')
         except AttributeError as e:
             raise DataReadException("Missing metadata in {0}".format(self.path))
 
+        # optional metadata elements
+        if root.find(m['volume']):
+            self.volume = root.find(m['volume']).text
+        if root.find(m['issue']):
+            self.issue = root.find(m['issue']).text
+        if root.find(m['edition']):
+            self.edition = root.find(m['edition']).text
+
         # add the issue and article-level XML files as related objects
-        self.add_related(IssueMetadata(
-            self.path, title='{0}, issue METS metadata'.format(self.title)))
-        self.add_related(IssueMetadata(
-            self.article_path, title='{0}, article METS metadata'.format(self.title)))
+        self.add_related(IssueMetadata(self.path,
+            title='{0}, issue METS metadata'.format(self.title)
+            ))
+        self.add_related(IssueMetadata(self.article_path, 
+            title='{0}, article METS metadata'.format(self.title)
+            ))
 
         # gather all the page and file xml snippets
         filexml_snippets = {
@@ -322,13 +330,10 @@ class Issue(pcdm.Item):
             try:
                 filexml = filexml_snippets['pageFileGrp' + id]
             except KeyError:
-                self.logger.info('Files not found for page {0}'.format(id))
-                filexml = None
-                
-                '''raise DataReadException(
+                raise DataReadException(
                     "Missing element with id pageFileGrp{0} in {1}".format(
                         id, self.path)
-                    )'''
+                    )
 
             # create a page object for each page and append to list of pages
             page = Page(pagexml, filexml, premisxml, self)
@@ -356,11 +361,15 @@ class Issue(pcdm.Item):
         # store metadata as an RDF graph
         graph.namespace_manager = namespace_manager
         graph.add((self.uri, dcterms.title, rdflib.Literal(self.title)))
-        graph.add((self.uri, bibo.volume, rdflib.Literal(self.volume)))
-        graph.add((self.uri, bibo.issue, rdflib.Literal(self.issue)))
-        graph.add((self.uri, bibo.edition, rdflib.Literal(self.edition)))
         graph.add((self.uri, dc.date, rdflib.Literal(self.date)))
         graph.add((self.uri, rdf.type, bibo.Issue))
+        # add optional metadata elements if present
+        if self.volume:
+            graph.add((self.uri, bibo.volume, rdflib.Literal(self.volume)))
+        if self.issue:
+            graph.add((self.uri, bibo.issue, rdflib.Literal(self.issue)))
+        if self.edition:
+            graph.add((self.uri, bibo.edition, rdflib.Literal(self.edition)))
         return graph
 
     # actions to take upon successful creation of object in repository
@@ -460,7 +469,9 @@ class File(pcdm.File):
         self.use = filexml.get('USE')
         m = XPATHMAP['file']
         elem = filexml.find(m['filepath'])
-        localpath = os.path.join(dir, os.path.basename(elem.get('{http://www.w3.org/1999/xlink}href')))
+        localpath = os.path.join(dir, os.path.basename(
+            elem.get('{http://www.w3.org/1999/xlink}href')
+            ))
         self.basename = os.path.basename(localpath)
         super(File, self).__init__(localpath, title="{0} ({1})".format(self.basename, self.use))
 

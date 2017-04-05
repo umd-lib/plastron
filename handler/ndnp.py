@@ -152,7 +152,8 @@ class DataReadException(Exception):
         self.message = message
     def __str__(self):
         return self.message
-              #============================================================================
+
+#============================================================================
 # NDNP BATCH CLASS
 #============================================================================
 
@@ -317,10 +318,17 @@ class Issue(pcdm.Item):
         premisxml = root.find(m['premis'])
         for n, pagexml in enumerate(pagexml_snippets):
             id = pagexml.get('ID').strip('pageModsBib')
+            # attempt to match files
             try:
                 filexml = filexml_snippets['pageFileGrp' + id]
             except KeyError:
-                raise DataReadException("Missing element with id pageFileGrp{0} in {1}".format(id, self.path))
+                self.logger.info('Files not found for page {0}'.format(id))
+                filexml = None
+                
+                '''raise DataReadException(
+                    "Missing element with id pageFileGrp{0} in {1}".format(
+                        id, self.path)
+                    )'''
 
             # create a page object for each page and append to list of pages
             page = Page(pagexml, filexml, premisxml, self)
@@ -424,10 +432,11 @@ class Page(pcdm.Component):
         self.ordered   = True
         self.issue     = issue
 
-        # generate a file object for each file in the XML snippet
-        for f in filegroup.findall(m['files']):
-            file = File(f, issue.dir, premisxml)
-            self.add_file(file)
+        # optionally generate a file object for each file in the XML snippet
+        if filegroup is not None:
+            for f in filegroup.findall(m['files']):
+                file = File(f, issue.dir, premisxml)
+                self.add_file(file)
 
     def graph(self):
         graph = super(Page, self).graph()

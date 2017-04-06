@@ -317,7 +317,6 @@ class Issue(pcdm.Item):
         filexml_snippets = {
             elem.get('ID'): elem for elem in root.findall(m['files'])
             }
-
         pagexml_snippets = [p for p in root.findall(m['pages']) if \
             p.get('ID').startswith('pageModsBib')
             ]
@@ -329,6 +328,7 @@ class Issue(pcdm.Item):
             # attempt to match files
             try:
                 filexml = filexml_snippets['pageFileGrp' + id]
+                print(filexml.text)
             except KeyError:
                 raise DataReadException(
                     "Missing element with id pageFileGrp{0} in {1}".format(
@@ -343,9 +343,13 @@ class Issue(pcdm.Item):
         try:
             article_tree = ET.parse(self.article_path)
         except OSError as e:
-            raise DataReadException("Unable to read {0}".format(self.article_path))
+            raise DataReadException(
+                "Unable to read {0}".format(self.article_path)
+                )
         except ET.XMLSyntaxError as e:
-            raise DataReadException("Unable to parse {0} as XML".format(self.article_path))
+            raise DataReadException(
+                "Unable to parse {0} as XML".format(self.article_path)
+                )
 
         article_root = article_tree.getroot()
         for article in article_root.findall(m['article']):
@@ -358,17 +362,17 @@ class Issue(pcdm.Item):
 
     def graph(self):
         graph = super(Issue, self).graph()
-        # store metadata as an RDF graph
+        # store required metadata as an RDF graph
         graph.namespace_manager = namespace_manager
         graph.add((self.uri, dcterms.title, rdflib.Literal(self.title)))
         graph.add((self.uri, dc.date, rdflib.Literal(self.date)))
         graph.add((self.uri, rdf.type, bibo.Issue))
         # add optional metadata elements if present
-        if self.volume:
+        if hasattr(self, 'volume'):
             graph.add((self.uri, bibo.volume, rdflib.Literal(self.volume)))
-        if self.issue:
+        if hasattr(self, 'issue'):
             graph.add((self.uri, bibo.issue, rdflib.Literal(self.issue)))
-        if self.edition:
+        if hasattr(self, 'edition'):
             graph.add((self.uri, bibo.edition, rdflib.Literal(self.edition)))
         return graph
 

@@ -220,7 +220,7 @@ class Batch():
             [r.get('reelNumber') for r in root.findall(m['batch']['reels'])]
             )
         self.logger.info('Batch contains {0} reels'.format(len(self.reels)))
-        path_to_reels = 'logs/reels'
+        path_to_reels = os.path.join(config.get('LOG_LOCATION'), 'reels')
         if not os.path.isdir(path_to_reels):
             os.makedirs(path_to_reels)
         for n, reel in enumerate(self.reels):
@@ -328,13 +328,8 @@ class Issue(pcdm.Item):
             # attempt to match files
             try:
                 filexml = filexml_snippets['pageFileGrp' + id]
-                print(filexml.text)
             except KeyError:
-                raise DataReadException(
-                    "Missing element with id pageFileGrp{0} in {1}".format(
-                        id, self.path)
-                    )
-
+                filexml = None
             # create a page object for each page and append to list of pages
             page = Page(pagexml, filexml, premisxml, self)
             self.add_component(page)
@@ -380,16 +375,17 @@ class Issue(pcdm.Item):
     def post_creation_hook(self):
         super(Issue, self).post_creation_hook()
         for page in self.ordered_components():
-            row = {'aggregation': page.reel,
-                   'sequence': page.frame,
-                   'uri': page.uri
-                    }
-            csv_path = 'logs/reels/{0}.csv'.format(page.reel)
-            with open(csv_path, 'r') as f:
-                fieldnames = f.readline().strip('\n').split(',')
-            with open(csv_path, 'a') as f:
-                writer = csv.DictWriter(f, fieldnames=fieldnames)
-                writer.writerow(row)
+            if hasattr(page, 'frame'):
+                row = {'aggregation': page.reel,
+                       'sequence': page.frame,
+                       'uri': page.uri
+                        }
+                csv_path = 'logs/reels/{0}.csv'.format(page.reel)
+                with open(csv_path, 'r') as f:
+                    fieldnames = f.readline().strip('\n').split(',')
+                with open(csv_path, 'a') as f:
+                    writer = csv.DictWriter(f, fieldnames=fieldnames)
+                    writer.writerow(row)
         self.logger.info('Completed post-creation actions')
 
 class IssueMetadata(pcdm.Component):
@@ -440,7 +436,8 @@ class Page(pcdm.Component):
         self.number    = pagexml.find(m['number']).text
         self.path      = issue.path + self.number
         self.reel      = pagexml.find(m['reel']).text
-        self.frame     = pagexml.find(m['frame']).text
+        if pagexml.find(m['frame']):
+            self.frame = pagexml.find(m['frame']).text
         self.title     = "{0}, page {1}".format(issue.title, self.number)
         self.ordered   = True
         self.issue     = issue
@@ -455,10 +452,13 @@ class Page(pcdm.Component):
         graph = super(Page, self).graph()
         graph.namespace_manager = namespace_manager
         graph.add((self.uri, dcterms.title, rdflib.Literal(self.title)))
-        graph.add((self.uri, ndnp.number, rdflib.Literal(self.number)))
-        graph.add((self.uri, ndnp.sequence, rdflib.Literal(self.frame)))
         graph.add((self.uri, pcdm_ns.memberOf, self.issue.uri))
         graph.add((self.uri, rdf.type, ndnp.Page))
+        # add optional metadata elements if present
+        if hasattr(self, 'number'):
+            graph.add((self.uri, ndnp.number, rdflib.Literal(self.number)))
+        if hasattr(self, 'frame'):
+            graph.add((self.uri, ndnp.sequence, rdflib.Literal(self.frame)))
         return graph
 
 #============================================================================
@@ -477,7 +477,9 @@ class File(pcdm.File):
             elem.get('{http://www.w3.org/1999/xlink}href')
             ))
         self.basename = os.path.basename(localpath)
-        super(File, self).__init__(localpath, title="{0} ({1})".format(self.basename, self.use))
+        super(File, self).__init__(
+            localpath, title="{0} ({1})".format(self.basename, self.use)
+            )
 
         if self.basename.endswith('.tif'):
             self.width = premisxml.find(m['width']).text

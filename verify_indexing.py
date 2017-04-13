@@ -14,6 +14,7 @@
 import argparse
 import csv
 import json
+import os
 import requests
 import sys
 from urllib.parse import urlparse
@@ -51,12 +52,11 @@ with open(args.repo, 'r') as repo_config:
     print('Loaded repo configuration from {0}'.format(args.repo))
 
 # Read uris for items loaded to fcrepo from mapfile
-with open(batch['MAPFILE'], 'r') as mapfile:
+mapfile_path = os.path.join(batch['LOG_LOCATION'], batch['MAPFILE'])
+with open(mapfile_path, 'r') as mapfile:
     reader = csv.DictReader(mapfile)
     fcrepo_uris = set([row['uri'] for row in reader])
-    print('Loaded {0} uris from {1}'.format(len(fcrepo_uris), 
-                                            batch['MAPFILE']
-                                            ))
+    print('Loaded {0} uris from {1}'.format(len(fcrepo_uris), mapfile_path))
 
 # read repo config info and construct query to appropriate solr server
 host = urlparse(repo['REST_ENDPOINT']).netloc

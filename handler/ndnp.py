@@ -152,7 +152,8 @@ class DataReadException(Exception):
         self.message = message
     def __str__(self):
         return self.message
-              #============================================================================
+
+#============================================================================
 # NDNP BATCH CLASS
 #============================================================================
 
@@ -219,11 +220,11 @@ class Batch():
             [r.get('reelNumber') for r in root.findall(m['batch']['reels'])]
             )
         self.logger.info('Batch contains {0} reels'.format(len(self.reels)))
-        path_to_reels = 'logs/reels'
-        if not os.path.isdir(path_to_reels):
-            os.makedirs(path_to_reels)
+        self.path_to_reels = os.path.join(config.get('LOG_LOCATION'), 'reels')
+        if not os.path.isdir(self.path_to_reels):
+            os.makedirs(self.path_to_reels)
         for n, reel in enumerate(self.reels):
-            reel_csv = '{0}/{1}.csv'.format(path_to_reels, reel)
+            reel_csv = '{0}/{1}.csv'.format(self.path_to_reels, reel)
             if not os.path.isfile(reel_csv):
                 self.logger.info(
                     "{0}. Creating reel aggregation CSV in '{1}'".format(
@@ -248,7 +249,7 @@ class Batch():
     def __next__(self):
         if self.num < self.length:
             data = self.issues[self.num]
-            issue = Issue(data)
+            issue = Issue(self, data)
             issue.add_collection(self.collection)
             self.num += 1
             return issue
@@ -264,7 +265,7 @@ class Issue(pcdm.Item):
 
     ''' class representing all components of a newspaper issue '''
 
-    def __init__(self, paths):
+    def __init__(self, batch, paths):
         print('\n' + '*' * 80)
         (issue_path, article_path) = paths
         print(issue_path)
@@ -274,6 +275,7 @@ class Issue(pcdm.Item):
         self.dir            = os.path.dirname(issue_path)
         self.path           = issue_path
         self.article_path   = article_path
+        self.reel_csv_loc   = batch.path_to_reels
 
     def read_data(self):
         try:
@@ -288,27 +290,34 @@ class Issue(pcdm.Item):
         root = tree.getroot()
         m = XPATHMAP['issue']
 
+        # get required metadata elements
         try:
-            self.title          = root.xpath('./@LABEL')[0]
-            self.volume         = root.find(m['volume']).text
-            self.issue          = root.find(m['issue']).text
-            self.edition        = root.find(m['edition']).text
-            self.date           = root.find(m['date']).text
-            self.sequence_attr  = ('Page', 'number')
+            self.title = root.xpath('./@LABEL')[0]
+            self.date = root.find(m['date']).text
+            self.sequence_attr = ('Page', 'number')
         except AttributeError as e:
             raise DataReadException("Missing metadata in {0}".format(self.path))
 
+        # optional metadata elements
+        if root.find(m['volume']) is not None:
+            self.volume = root.find(m['volume']).text
+        if root.find(m['issue']) is not None:
+            self.issue = root.find(m['issue']).text
+        if root.find(m['edition']) is not None:
+            self.edition = root.find(m['edition']).text
+
         # add the issue and article-level XML files as related objects
-        self.add_related(IssueMetadata(
-            self.path, title='{0}, issue METS metadata'.format(self.title)))
-        self.add_related(IssueMetadata(
-            self.article_path, title='{0}, article METS metadata'.format(self.title)))
+        self.add_related(IssueMetadata(self.path,
+            title='{0}, issue METS metadata'.format(self.title)
+            ))
+        self.add_related(IssueMetadata(self.article_path, 
+            title='{0}, article METS metadata'.format(self.title)
+            ))
 
         # gather all the page and file xml snippets
         filexml_snippets = {
             elem.get('ID'): elem for elem in root.findall(m['files'])
             }
-
         pagexml_snippets = [p for p in root.findall(m['pages']) if \
             p.get('ID').startswith('pageModsBib')
             ]
@@ -317,11 +326,11 @@ class Issue(pcdm.Item):
         premisxml = root.find(m['premis'])
         for n, pagexml in enumerate(pagexml_snippets):
             id = pagexml.get('ID').strip('pageModsBib')
+            # attempt to match files
             try:
                 filexml = filexml_snippets['pageFileGrp' + id]
             except KeyError:
-                raise DataReadException("Missing element with id pageFileGrp{0} in {1}".format(id, self.path))
-
+                filexml = None
             # create a page object for each page and append to list of pages
             page = Page(pagexml, filexml, premisxml, self)
             self.add_component(page)
@@ -330,9 +339,13 @@ class Issue(pcdm.Item):
         try:
             article_tree = ET.parse(self.article_path)
         except OSError as e:
-            raise DataReadException("Unable to read {0}".format(self.article_path))
+            raise DataReadException(
+                "Unable to read {0}".format(self.article_path)
+                )
         except ET.XMLSyntaxError as e:
-            raise DataReadException("Unable to parse {0} as XML".format(self.article_path))
+            raise DataReadException(
+                "Unable to parse {0} as XML".format(self.article_path)
+                )
 
         article_root = article_tree.getroot()
         for article in article_root.findall(m['article']):
@@ -345,30 +358,37 @@ class Issue(pcdm.Item):
 
     def graph(self):
         graph = super(Issue, self).graph()
-        # store metadata as an RDF graph
+        # store required metadata as an RDF graph
         graph.namespace_manager = namespace_manager
         graph.add((self.uri, dcterms.title, rdflib.Literal(self.title)))
-        graph.add((self.uri, bibo.volume, rdflib.Literal(self.volume)))
-        graph.add((self.uri, bibo.issue, rdflib.Literal(self.issue)))
-        graph.add((self.uri, bibo.edition, rdflib.Literal(self.edition)))
         graph.add((self.uri, dc.date, rdflib.Literal(self.date)))
         graph.add((self.uri, rdf.type, bibo.Issue))
+        # add optional metadata elements if present
+        if hasattr(self, 'volume'):
+            graph.add((self.uri, bibo.volume, rdflib.Literal(self.volume)))
+        if hasattr(self, 'issue'):
+            graph.add((self.uri, bibo.issue, rdflib.Literal(self.issue)))
+        if hasattr(self, 'edition'):
+            graph.add((self.uri, bibo.edition, rdflib.Literal(self.edition)))
         return graph
 
     # actions to take upon successful creation of object in repository
     def post_creation_hook(self):
         super(Issue, self).post_creation_hook()
         for page in self.ordered_components():
-            row = {'aggregation': page.reel,
-                   'sequence': page.frame,
-                   'uri': page.uri
-                    }
-            csv_path = 'logs/reels/{0}.csv'.format(page.reel)
-            with open(csv_path, 'r') as f:
-                fieldnames = f.readline().strip('\n').split(',')
-            with open(csv_path, 'a') as f:
-                writer = csv.DictWriter(f, fieldnames=fieldnames)
-                writer.writerow(row)
+            if hasattr(page, 'frame'):
+                row = {'aggregation': page.reel,
+                       'sequence': page.frame,
+                       'uri': page.uri
+                        }
+                csv_path = os.path.join(
+                    self.reel_csv_loc, '{0}.csv'.format(page.reel)
+                    )
+                with open(csv_path, 'r') as f:
+                    fieldnames = f.readline().strip('\n').split(',')
+                with open(csv_path, 'a') as f:
+                    writer = csv.DictWriter(f, fieldnames=fieldnames)
+                    writer.writerow(row)
         self.logger.info('Completed post-creation actions')
 
 class IssueMetadata(pcdm.Component):
@@ -376,7 +396,6 @@ class IssueMetadata(pcdm.Component):
 
     def __init__(self, file_path, title=None):
         super(IssueMetadata, self).__init__()
-
         file = MetadataFile(file_path)
         self.add_file(file)
         if title is not None:
@@ -419,24 +438,29 @@ class Page(pcdm.Component):
         self.number    = pagexml.find(m['number']).text
         self.path      = issue.path + self.number
         self.reel      = pagexml.find(m['reel']).text
-        self.frame     = pagexml.find(m['frame']).text
+        if pagexml.find(m['frame']) is not None:
+            self.frame = pagexml.find(m['frame']).text
         self.title     = "{0}, page {1}".format(issue.title, self.number)
         self.ordered   = True
         self.issue     = issue
 
-        # generate a file object for each file in the XML snippet
-        for f in filegroup.findall(m['files']):
-            file = File(f, issue.dir, premisxml)
-            self.add_file(file)
+        # optionally generate a file object for each file in the XML snippet
+        if filegroup is not None:
+            for f in filegroup.findall(m['files']):
+                file = File(f, issue.dir, premisxml)
+                self.add_file(file)
 
     def graph(self):
         graph = super(Page, self).graph()
         graph.namespace_manager = namespace_manager
         graph.add((self.uri, dcterms.title, rdflib.Literal(self.title)))
-        graph.add((self.uri, ndnp.number, rdflib.Literal(self.number)))
-        graph.add((self.uri, ndnp.sequence, rdflib.Literal(self.frame)))
         graph.add((self.uri, pcdm_ns.memberOf, self.issue.uri))
         graph.add((self.uri, rdf.type, ndnp.Page))
+        # add optional metadata elements if present
+        if hasattr(self, 'number'):
+            graph.add((self.uri, ndnp.number, rdflib.Literal(self.number)))
+        if hasattr(self, 'frame'):
+            graph.add((self.uri, ndnp.sequence, rdflib.Literal(self.frame)))
         return graph
 
 #============================================================================
@@ -451,9 +475,13 @@ class File(pcdm.File):
         self.use = filexml.get('USE')
         m = XPATHMAP['file']
         elem = filexml.find(m['filepath'])
-        localpath = os.path.join(dir, os.path.basename(elem.get('{http://www.w3.org/1999/xlink}href')))
+        localpath = os.path.join(dir, os.path.basename(
+            elem.get('{http://www.w3.org/1999/xlink}href')
+            ))
         self.basename = os.path.basename(localpath)
-        super(File, self).__init__(localpath, title="{0} ({1})".format(self.basename, self.use))
+        super(File, self).__init__(
+            localpath, title="{0} ({1})".format(self.basename, self.use)
+            )
 
         if self.basename.endswith('.tif'):
             self.width = premisxml.find(m['width']).text

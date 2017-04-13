@@ -66,6 +66,7 @@ target/
 
 # log files
 logs/*
+logs.*
 
 # non-committable application files
 config/*

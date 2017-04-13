@@ -286,11 +286,11 @@ def main():
                     )
 
             row = {'number': n + 1,
-                   'title': item.title,
                    'path': item.path,
                    'timestamp': getattr(
                         item, 'creation_timestamp', str(datetime.utcnow())
                         ),
+                   'title': getattr(item, 'title', 'N/A')
                    'uri': getattr(item, 'uri', 'N/A')
                    }
 

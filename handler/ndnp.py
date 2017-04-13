@@ -220,11 +220,11 @@ class Batch():
             [r.get('reelNumber') for r in root.findall(m['batch']['reels'])]
             )
         self.logger.info('Batch contains {0} reels'.format(len(self.reels)))
-        path_to_reels = os.path.join(config.get('LOG_LOCATION'), 'reels')
-        if not os.path.isdir(path_to_reels):
-            os.makedirs(path_to_reels)
+        self.path_to_reels = os.path.join(config.get('LOG_LOCATION'), 'reels')
+        if not os.path.isdir(self.path_to_reels):
+            os.makedirs(self.path_to_reels)
         for n, reel in enumerate(self.reels):
-            reel_csv = '{0}/{1}.csv'.format(path_to_reels, reel)
+            reel_csv = '{0}/{1}.csv'.format(self.path_to_reels, reel)
             if not os.path.isfile(reel_csv):
                 self.logger.info(
                     "{0}. Creating reel aggregation CSV in '{1}'".format(
@@ -249,7 +249,7 @@ class Batch():
     def __next__(self):
         if self.num < self.length:
             data = self.issues[self.num]
-            issue = Issue(data)
+            issue = Issue(self, data)
             issue.add_collection(self.collection)
             self.num += 1
             return issue
@@ -265,7 +265,7 @@ class Issue(pcdm.Item):
 
     ''' class representing all components of a newspaper issue '''
 
-    def __init__(self, paths):
+    def __init__(self, batch, paths):
         print('\n' + '*' * 80)
         (issue_path, article_path) = paths
         print(issue_path)
@@ -275,6 +275,7 @@ class Issue(pcdm.Item):
         self.dir            = os.path.dirname(issue_path)
         self.path           = issue_path
         self.article_path   = article_path
+        self.reel_csv_loc   = batch.path_to_reels
 
     def read_data(self):
         try:
@@ -298,11 +299,11 @@ class Issue(pcdm.Item):
             raise DataReadException("Missing metadata in {0}".format(self.path))
 
         # optional metadata elements
-        if root.find(m['volume']):
+        if root.find(m['volume']) is not None:
             self.volume = root.find(m['volume']).text
-        if root.find(m['issue']):
+        if root.find(m['issue']) is not None:
             self.issue = root.find(m['issue']).text
-        if root.find(m['edition']):
+        if root.find(m['edition']) is not None:
             self.edition = root.find(m['edition']).text
 
         # add the issue and article-level XML files as related objects
@@ -380,12 +381,16 @@ class Issue(pcdm.Item):
                        'sequence': page.frame,
                        'uri': page.uri
                         }
-                csv_path = 'logs/reels/{0}.csv'.format(page.reel)
+                csv_path = os.path.join(
+                    self.reel_csv_loc, '{0}.csv'.format(page.reel)
+                    )
                 with open(csv_path, 'r') as f:
                     fieldnames = f.readline().strip('\n').split(',')
                 with open(csv_path, 'a') as f:
                     writer = csv.DictWriter(f, fieldnames=fieldnames)
                     writer.writerow(row)
+            else:
+                print(page.__dict__)
         self.logger.info('Completed post-creation actions')
 
 class IssueMetadata(pcdm.Component):
@@ -393,7 +398,6 @@ class IssueMetadata(pcdm.Component):
 
     def __init__(self, file_path, title=None):
         super(IssueMetadata, self).__init__()
-
         file = MetadataFile(file_path)
         self.add_file(file)
         if title is not None:
@@ -436,7 +440,7 @@ class Page(pcdm.Component):
         self.number    = pagexml.find(m['number']).text
         self.path      = issue.path + self.number
         self.reel      = pagexml.find(m['reel']).text
-        if pagexml.find(m['frame']):
+        if pagexml.find(m['frame']) is not None:
             self.frame = pagexml.find(m['frame']).text
         self.title     = "{0}, page {1}".format(issue.title, self.number)
         self.ordered   = True

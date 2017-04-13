@@ -389,8 +389,6 @@ class Issue(pcdm.Item):
                 with open(csv_path, 'a') as f:
                     writer = csv.DictWriter(f, fieldnames=fieldnames)
                     writer.writerow(row)
-            else:
-                print(page.__dict__)
         self.logger.info('Completed post-creation actions')
 
 class IssueMetadata(pcdm.Component):

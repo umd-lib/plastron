@@ -290,7 +290,7 @@ def main():
                    'timestamp': getattr(
                         item, 'creation_timestamp', str(datetime.utcnow())
                         ),
-                   'title': getattr(item, 'title', 'N/A')
+                   'title': getattr(item, 'title', 'N/A'),
                    'uri': getattr(item, 'uri', 'N/A')
                    }
 

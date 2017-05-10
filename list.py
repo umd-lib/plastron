@@ -26,6 +26,12 @@ def main():
                         required=True
                         )
 
+    # long mode to print more than just the URIs (name modeled after ls -l)
+    parser.add_argument('-l', '--long',
+                        help='Display additional information besides the URI',
+                        action='store_true'
+                        )
+
     args = parser.parse_args()
 
     # configure logging
@@ -47,7 +53,10 @@ def main():
     for item_uri in sys.stdin:
         for (uri, graph) in fcrepo.recursive_get(item_uri.rstrip('\n'), traverse=predicates):
             title = '; '.join([ t for t in graph.objects(predicate=pcdm.dcterms.title) ])
-            print("{0} ({1})".format(uri, title))
+            if args.long:
+                print("{0} ({1})".format(uri, title))
+            else:
+                print(uri)
 
 if __name__ == "__main__":
     main()

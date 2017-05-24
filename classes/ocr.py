@@ -49,16 +49,43 @@ class TextBlock(Region):
         for node in self.element.xpath('alto:TextLine', namespaces=ns):
             yield TextLine(node)
 
-    def text(self):
-        return "\n".join([ line.text() for line in self.lines() ])
+    def text(self, scale=None):
+        return "\n".join([ line.text(scale) for line in self.lines() ])
 
 class TextLine(Region):
-    def text(self):
-        text = ''
+    def inlines(self):
         for node in self.element.xpath('alto:String|alto:SP|alto:HYP', namespaces=ns):
             tag = etree.QName(node.tag)
-            if tag.localname == 'SP':
-                text += ' '
-            else:
-                text += node.get('CONTENT')
-        return text
+            if tag.localname == 'String':
+                yield String(node)
+            elif tag.localname == 'SP':
+                yield Space(node)
+            elif tag.localname == 'HYP':
+                yield Hyphen(node)
+
+    def text(self, scale=None):
+        return ''.join([ inline.text(scale) for inline in self.inlines() ])
+
+class String(Region):
+    def text(self, scale=None):
+        text = self.element.get('CONTENT')
+        if scale is None:
+            return text
+        xywh = ','.join([ str(i) for i in self.xywh(scale) ])
+        return '{0}|{1}'.format(text, xywh)
+
+class Space(object):
+    def __init__(self, element):
+        self.element = element
+        super(Space, self).__init__()
+
+    def text(self, scale=None):
+        return ' '
+
+class Hyphen(object):
+    def __init__(self, element):
+        self.element = element
+        super(Hyphen, self).__init__()
+
+    def text(self, scale=None):
+        return '\N{SOFT HYPHEN}'

@@ -394,7 +394,7 @@ class Issue(pcdm.Item):
 class TextblockOnPage(pcdm.Annotation):
     def __init__(self, textblock, page, article=None):
         super(TextblockOnPage, self).__init__()
-        body = pcdm.TextualBody(textblock.text(), 'text/plain')
+        body = pcdm.TextualBody(textblock.text(scale=page.ocr.scale), 'text/plain')
         if article is not None:
             body.linked_objects.append((dcterms.isPartOf, article))
         target = pcdm.SpecificResource(page)

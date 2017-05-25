@@ -171,25 +171,7 @@ class Batch():
             raise ConfigException(
                 'Missing required key COLLECTION in batch config'
                 )
-        self.collection = Collection()
-        self.collection.uri = rdflib.URIRef(collection_uri)
-
-        # check that the supplied collection exists and get title
-        response = repo.get(
-            self.collection.uri, headers={'Accept': 'application/rdf+xml'}
-            )
-        if response.status_code == 200:
-            coll_graph = rdflib.graph.Graph().parse(data=response.text)
-            self.collection.title = str(self.collection.uri)
-            for (subj, pred, obj) in coll_graph:
-                if str(pred) == "http://purl.org/dc/elements/1.1/title":
-                    self.collection.title = obj
-        else:
-            raise ConfigException(
-                "Collection URI {0} could not be reached.".format(
-                    self.collection.uri
-                    )
-                )
+        self.collection = Collection.from_repo_uri(repo, collection_uri)
 
         self.fieldnames = ['aggregation', 'sequence', 'uri']
 
@@ -310,7 +292,7 @@ class Issue(pcdm.Item):
         self.add_related(IssueMetadata(self.path,
             title='{0}, issue METS metadata'.format(self.title)
             ))
-        self.add_related(IssueMetadata(self.article_path, 
+        self.add_related(IssueMetadata(self.article_path,
             title='{0}, article METS metadata'.format(self.title)
             ))
 
@@ -522,6 +504,30 @@ class Collection(pcdm.Collection):
 
     def __init__(self):
         super(Collection, self).__init__()
+
+    @classmethod
+    def from_repo_uri(klass, repository, uri):
+        response = repository.get(uri, headers={'Accept': 'application/rdf+xml'})
+        if response.status_code == 200:
+            graph = rdflib.graph.Graph().parse(data=response.text)
+            collection = klass()
+            collection.uri = rdflib.URIRef(uri)
+            # mark as created and updated so that the create_object and update_object
+            # methods doesn't try try to modify it
+            collection.created = True
+            collection.updated = True
+
+            # default title is the URI
+            collection.title = str(collection.uri)
+            for o in graph.objects(subject=collection.uri, predicate=dcterms.title):
+                collection.title = str(o)
+        else:
+            raise ConfigException(
+                "Collection URI {0} could not be reached.".format(collection.uri)
+                )
+
+        return collection
+
 
 #============================================================================
 # NDNP ARTICLE OBJECT

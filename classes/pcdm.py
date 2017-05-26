@@ -44,6 +44,15 @@ namespace_manager.bind('pcdm', pcdm, override=False)
 rdf = Namespace('http://www.w3.org/1999/02/22-rdf-syntax-ns#')
 namespace_manager.bind('rdf', rdf, override=False)
 
+oa = Namespace('http://www.w3.org/ns/oa#')
+namespace_manager.bind('oa', oa, override=False)
+
+sc = Namespace('http://www.shared-canvas.org/ns/')
+namespace_manager.bind('sc', sc, override=False)
+
+ldp = Namespace('http://www.w3.org/ns/ldp#')
+namespace_manager.bind('ldp', ldp, override=False)
+
 #============================================================================
 # REPOSITORY (REPRESENTING AN FCREPO INSTANCE)
 #============================================================================

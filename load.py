@@ -63,6 +63,8 @@ def load_item(fcrepo, item, args, extra=None):
         item.recursive_create(fcrepo)
         logger.info('Creating ordering proxies')
         item.create_ordering(fcrepo)
+        logger.info('Creating annotations')
+        item.create_annotations(fcrepo)
 
         if extra:
             logger.info('Adding additional triples')

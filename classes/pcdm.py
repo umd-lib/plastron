@@ -256,6 +256,7 @@ class Resource(object):
         self.uri = rdflib.URIRef(uri)
         self.linked_objects = []
         self.fragments = []
+        self.annotations = None
         self.extra = rdflib.Graph()
         self.created = False
         self.updated = False
@@ -368,8 +369,8 @@ class Resource(object):
                 subject = '<>'
             triples.append("{0} {1} {2}.".format(
                 subject,
-            graph.namespace_manager.normalizeUri(p),
-            o.n3(graph.namespace_manager)
+                graph.namespace_manager.normalizeUri(p),
+                o.n3(graph.namespace_manager)
                 ))
 
         query = prolog + "INSERT DATA {{{0}}}".format("\n".join(triples))
@@ -406,6 +407,9 @@ class Resource(object):
             self.update_object(repository)
             for (rel, obj) in self.linked_objects:
                 obj.recursive_update(repository)
+            if self.annotations is not None:
+                for annotation in self.annotations:
+                    annotation.recursive_update(repository)
 
     # check for the existence of a local object in the repository
     def exists_in_repo(self, repository):
@@ -461,6 +465,7 @@ class Item(Resource):
         super(Item, self).__init__()
         self.first = None
         self.last = None
+        self.annotations = []
 
     def graph(self):
         graph = super(Item, self).graph()
@@ -498,6 +503,11 @@ class Item(Resource):
                 proxy.next = proxies[position + 1]
 
             proxy.update_object(repository)
+
+    def create_annotations(self, repository):
+        with repository.at_path('annotations'):
+            for annotation in self.annotations:
+                annotation.recursive_create(repository)
 
 #============================================================================
 # PCDM COMPONENT-OBJECT
@@ -633,3 +643,86 @@ class Proxy(Resource):
     def create_object(self, repository, **kwargs):
         uri='/'.join([p.strip('/') for p in (self.proxy_for.uri, self.proxy_in.uuid)])
         super(Proxy, self).create_object(repository, uri=uri, **kwargs)
+
+# Annotation resources
+
+class Annotation(Resource):
+    def __init__(self):
+        super(Annotation, self).__init__()
+        self.motivation = None
+
+    def add_body(self, body):
+        self.linked_objects.append((oa.hasBody, body))
+        self.title = body.title
+        body.annotation = self
+
+    def add_target(self, target):
+        self.linked_objects.append((oa.hasTarget, target))
+        target.annotation = self
+
+    def graph(self):
+        graph = super(Annotation, self).graph()
+        graph.add((self.uri, rdf.type, oa.Annotation))
+        if self.motivation is not None:
+            graph.add((self.uri, oa.motivatedBy, self.motivation))
+        return graph
+
+class TextualBody(Resource):
+    def __init__(self, value, content_type):
+        super(TextualBody, self).__init__()
+        self.value = value
+        self.content_type = content_type
+        if len(self.value) <= 25:
+            self.title = self.value
+        else:
+            self.title = self.value[:24] + '…'
+
+    def graph(self):
+        graph = super(TextualBody, self).graph()
+        graph.add((self.uri, rdf.value, rdflib.Literal(self.value)))
+        graph.add((self.uri, dcterms['format'], rdflib.Literal(self.content_type)))
+        graph.add((self.uri, rdf.type, oa.TextualBody))
+        return graph
+
+class SpecificResource(Resource):
+    def __init__(self, source):
+        super(SpecificResource, self).__init__()
+        self.source = source
+
+    def add_selector(self, selector):
+        self.title = selector.title
+        self.linked_objects.append((oa.hasSelector, selector))
+        selector.annotation = self
+
+    def graph(self):
+        graph = super(SpecificResource, self).graph()
+        graph.add((self.uri, oa.hasSource, self.source.uri))
+        graph.add((self.uri, rdf.type, oa.SpecificResource))
+        return graph
+
+class FragmentSelector(Resource):
+    def __init__(self, value, conforms_to=None):
+        super(FragmentSelector, self).__init__()
+        self.value = value
+        self.conforms_to = conforms_to
+        self.title = self.value
+
+    def graph(self):
+        graph = super(FragmentSelector, self).graph()
+        graph.add((self.uri, rdf.value, rdflib.Literal(self.value)))
+        graph.add((self.uri, rdf.type, oa.FragmentSelector))
+        if self.conforms_to is not None:
+            graph.add((self.uri, dcterms.conformsTo, self.conforms_to))
+        return graph
+
+class XPathSelector(Resource):
+    def __init__(self, value):
+        super(XPathSelector, self).__init__()
+        self.value = value
+        self.title = self.value
+
+    def graph(self):
+        graph = super(XPathSelector, self).graph()
+        graph.add((self.uri, rdf.value, rdflib.Literal(self.value)))
+        graph.add((self.uri, rdf.type, oa.XPathSelector))
+        return graph

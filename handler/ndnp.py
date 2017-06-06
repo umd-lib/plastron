@@ -329,6 +329,10 @@ class Issue(pcdm.Item):
             pages[str(pagenum)] = page
             self.add_component(page)
 
+            # extract text blocks from ALTO XML for this page
+            for textblock in page.ocr.textblocks():
+                self.annotations.append(TextblockOnPage(textblock, page))
+
         # iterate over the article XML and create objects for articles
         try:
             article_tree = ET.parse(self.article_path)
@@ -345,16 +349,12 @@ class Issue(pcdm.Item):
         for article in article_root.findall(m['article']):
             article_title = article.get('LABEL')
             article_pagenums = set()
-            textblocks = []
             for area in article.findall(m['areas']):
                 pagenum = int(area.get('FILEID').replace('ocrFile', ''))
                 page = pages[str(pagenum)]
-                textblocks.append(page.ocr.textblock(area.get('BEGIN')))
                 article_pagenums.add(pagenum)
             article = Article(article_title, self, pages=sorted(list(article_pagenums)))
             self.add_component(article)
-            for textblock in textblocks:
-                self.annotations.append(TextblockOnPage(textblock, page, article=article))
 
     def graph(self):
         graph = super(Issue, self).graph()
@@ -403,7 +403,7 @@ class TextblockOnPage(pcdm.Annotation):
             "xywh={0}".format(xywh),
             rdflib.URIRef('http://www.w3.org/TR/media-frags/')
             )
-        xpath_selector = pcdm.XPathSelector("//*[@ID='{0}']".format(textblock.id))
+        xpath_selector = pcdm.XPathSelector('//*[@ID="{0}"]'.format(textblock.id))
         ocr_resource = pcdm.SpecificResource(page.ocr_file)
         ocr_resource.add_selector(xpath_selector)
         body.linked_objects.append((prov.wasDerivedFrom, ocr_resource))
@@ -473,8 +473,8 @@ class Page(pcdm.Component):
                 file = File(f, issue.dir, premisxml)
                 self.add_file(file)
 
-            if file.use == 'ocr':
-                # load ALTO XML into page object, for article text extraction
+            for file in self.files_for('ocr'):
+                # load ALTO XML into page object, for text extraction
                 try:
                     tree = ET.parse(file.localpath)
                 except OSError as e:
@@ -499,6 +499,9 @@ class Page(pcdm.Component):
         if hasattr(self, 'frame'):
             graph.add((self.uri, ndnp.sequence, rdflib.Literal(self.frame)))
         return graph
+
+    def files_for(self, use):
+        return [ f for f in self.files() if f.use == use ]
 
 #============================================================================
 # NDNP FILE OBJECT

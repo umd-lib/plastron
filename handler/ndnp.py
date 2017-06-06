@@ -406,7 +406,7 @@ class TextblockOnPage(pcdm.Annotation):
         xpath_selector = pcdm.XPathSelector('//*[@ID="{0}"]'.format(textblock.id))
         ocr_resource = pcdm.SpecificResource(page.ocr_file)
         ocr_resource.add_selector(xpath_selector)
-        body.linked_objects.append((prov.wasDerivedFrom, ocr_resource))
+        self.linked_objects.append((prov.wasDerivedFrom, ocr_resource))
         self.add_body(body)
         self.add_target(target)
         self.motivation = sc.painting

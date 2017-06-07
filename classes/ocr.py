@@ -18,6 +18,10 @@ class ALTOResource(object):
         else:
             raise Exception("Unknown MeasurementUnit " + unit)
 
+    def textblocks(self):
+        for node in self.xmldoc.xpath("//alto:TextBlock", namespaces=ns):
+            yield TextBlock(node)
+
     def textblock(self, id):
         return TextBlock(self.xmldoc.xpath("//alto:TextBlock[@ID=$id]", id=id, namespaces=ns)[0])
 

@@ -63,8 +63,9 @@ def load_item(fcrepo, item, args, extra=None):
         item.recursive_create(fcrepo)
         logger.info('Creating ordering proxies')
         item.create_ordering(fcrepo)
-        logger.info('Creating annotations')
-        item.create_annotations(fcrepo)
+        if not args.noannotations:
+            logger.info('Creating annotations')
+            item.create_annotations(fcrepo)
 
         if extra:
             logger.info('Adding additional triples')
@@ -76,6 +77,9 @@ def load_item(fcrepo, item, args, extra=None):
 
         logger.info('Updating item and components')
         item.recursive_update(fcrepo)
+        if not args.noannotations:
+            logger.info('Updating annotations')
+            item.update_annotations(fcrepo)
 
         # commit transaction
         logger.info('Committing transaction')
@@ -153,6 +157,11 @@ def main():
 
     parser.add_argument('-q', '--quiet',
                         help='decrease the verbosity of the status output',
+                        action='store_true'
+                        )
+
+    parser.add_argument('--noannotations',
+                        help='iterate without loading annotations (e.g. OCR)',
                         action='store_true'
                         )
 

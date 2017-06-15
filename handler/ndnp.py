@@ -7,9 +7,10 @@ import logging
 import lxml.etree as ET
 import os
 import rdflib
-from rdflib import Namespace, URIRef
+from rdflib import Namespace, URIRef, RDF
 import requests
 import sys
+import mimetypes
 
 #============================================================================
 # NAMESPACE BINDINGS
@@ -79,10 +80,6 @@ XPATHMAP = {
         'reels':    "./{http://www.loc.gov/ndnp}reel"
         },
 
-    'reel': {
-        'number':   "./{http://www.loc.gov/ndnp}reel"
-        },
-
     'issue': {
         'volume':   (".//{http://www.loc.gov/mods/v3}detail[@type='volume']/"
                     "{http://www.loc.gov/mods/v3}number"
@@ -93,51 +90,20 @@ XPATHMAP = {
         'edition':  (".//{http://www.loc.gov/mods/v3}detail[@type='edition']/"
                     "{http://www.loc.gov/mods/v3}number"
                     ),
-        'date':     (".//{http://www.loc.gov/mods/v3}dateIssued"
-                    ),
-        'lccn':     (".//{http://www.loc.gov/mods/v3}"
-                    "identifier[@type='lccn']"
-                    ),
-        'pages':    (".//{http://www.loc.gov/METS/}dmdSec"
-                    ),
-        'files':    (".//{http://www.loc.gov/METS/}fileGrp"
-                    ),
         'article':  (".//{http://www.loc.gov/METS/}div[@TYPE='article']"
                     ),
         'areas':    (".//{http://www.loc.gov/METS/}area"
                     ),
-        'premis':   (".//{http://www.loc.gov/METS/}amdSec"
-                    )
-        },
-
-    'page': {
-        'number':   (".//{http://www.loc.gov/mods/v3}start"
-                    ),
-        'reel':     (".//{http://www.loc.gov/mods/v3}"
-                    "identifier[@type='reel number']"
-                    ),
-        'location': (".//{http://www.loc.gov/mods/v3}physicalLocation"
-                    ),
-        'frame':    (".//{http://www.loc.gov/mods/v3}"
-                    "identifier[@type='reel sequence number']"
-                    ),
-        'files':    (".//{http://www.loc.gov/METS/}file"
-                    ),
-        },
-
-    'file': {
-        'number':   (".//{http://www.loc.gov/mods/v3}start"
-                    ),
-        'filepath': (".//{http://www.loc.gov/METS/}FLocat"
-                    ),
-        'width':    (".//{http://www.loc.gov/METS/}techMD[@ID='mixmasterFile1']"
-                     "//{http://www.loc.gov/mix/}ImageWidth"
-                     ),
-        'length':   (".//{http://www.loc.gov/METS/}techMD[@ID='mixmasterFile1']"
-                     "//{http://www.loc.gov/mix/}ImageLength"
-                     )
         }
     }
+
+xmlns = {
+    'METS': 'http://www.loc.gov/METS/',
+    'mix': 'http://www.loc.gov/mix/',
+    'MODS': 'http://www.loc.gov/mods/v3',
+    'premis': 'http://www.loc.gov/standards/premis',
+    'xlink': 'http://www.w3.org/1999/xlink',
+}
 
 #============================================================================
 # DATA LOADING FUNCTION
@@ -278,13 +244,14 @@ class Issue(pcdm.Item):
                 "Unable to parse {0} as XML".format(self.path)
                 )
 
+        issue_mets = METSResource(tree)
         root = tree.getroot()
         m = XPATHMAP['issue']
 
         # get required metadata elements
         try:
-            self.title = root.xpath('./@LABEL')[0]
-            self.date = root.find(m['date']).text
+            self.title = root.get('LABEL')
+            self.date = root.find('.//MODS:dateIssued', xmlns).text
             self.sequence_attr = ('Page', 'number')
         except AttributeError as e:
             raise DataReadException("Missing metadata in {0}".format(self.path))
@@ -298,40 +265,24 @@ class Issue(pcdm.Item):
             self.edition = root.find(m['edition']).text
 
         # add the issue and article-level XML files as related objects
-        self.add_related(IssueMetadata(self.path,
+        self.add_related(IssueMetadata(MetadataFile.from_localpath(
+            localpath=self.path,
             title='{0}, issue METS metadata'.format(self.title)
-            ))
-        self.add_related(IssueMetadata(self.article_path,
+            )))
+        self.add_related(IssueMetadata(MetadataFile.from_localpath(
+            localpath=self.article_path,
             title='{0}, article METS metadata'.format(self.title)
-            ))
+            )))
 
-        # gather all the page and file xml snippets
-        filexml_snippets = {
-            elem.get('ID'): elem for elem in root.findall(m['files'])
-            }
-        pagexml_snippets = [p for p in root.findall(m['pages']) if \
-            p.get('ID').startswith('pageModsBib')
-            ]
-
-        # iterate over each page section matching it to its files
+        # create a page object for each page and append to list of pages
         pages = {}
-        premisxml = root.find(m['premis'])
-        for n, pagexml in enumerate(pagexml_snippets):
-            # attempt to match files
-            pagenum = int(pagexml.get('ID').strip('pageModsBib'))
-            try:
-                filexml = filexml_snippets['pageFileGrp{0}'.format(pagenum)]
-            except KeyError:
-                filexml = None
-
-            # create a page object for each page and append to list of pages
-            page = Page(pagexml, filexml, premisxml, self)
-            pages[str(pagenum)] = page
+        for div in issue_mets.xpath('METS:structMap//METS:div[@TYPE="np:page"]'):
+            page = Page.from_mets(issue_mets, div, self)
+            pages[str(page.number)] = page
             self.add_component(page)
 
-            # extract text blocks from ALTO XML for this page
-            for textblock in page.ocr.textblocks():
-                self.annotations.append(TextblockOnPage(textblock, page))
+            # add OCR text blocks as annotations
+            self.annotations.extend(page.textblocks())
 
         # iterate over the article XML and create objects for articles
         try:
@@ -391,6 +342,21 @@ class Issue(pcdm.Item):
                     writer.writerow(row)
         self.logger.info('Completed post-creation actions')
 
+class METSResource(object):
+    def __init__(self, xmldoc):
+        self.root = xmldoc.getroot()
+        self.xpath = ET.XPathElementEvaluator(self.root, namespaces=xmlns,
+                smart_strings = False)
+
+    def dmdsec(self, id):
+        return self.xpath('METS:dmdSec[@ID=$id]', id=id)[0]
+
+    def file(self, id):
+        return self.xpath('METS:fileSec//METS:file[@ID=$id]', id=id)[0]
+
+    def techmd(self, id):
+        return self.xpath('METS:amdSec/METS:techMD[@ID=$id]', id=id)[0]
+
 class TextblockOnPage(pcdm.Annotation):
     def __init__(self, textblock, page, article=None):
         super(TextblockOnPage, self).__init__()
@@ -416,9 +382,8 @@ class TextblockOnPage(pcdm.Annotation):
 class IssueMetadata(pcdm.Component):
     '''additional metadata about an issue'''
 
-    def __init__(self, file_path, title=None):
+    def __init__(self, file, title=None):
         super(IssueMetadata, self).__init__()
-        file = MetadataFile(file_path)
         self.add_file(file)
         if title is not None:
             self.title = title
@@ -435,9 +400,6 @@ class IssueMetadata(pcdm.Component):
 class MetadataFile(pcdm.File):
     '''a binary file containing metadata in non-RDF formats (METS, MODS, etc.)'''
 
-    def __init__(self, localpath, title=None):
-        super(MetadataFile, self).__init__(localpath, title)
-
     def graph(self):
         graph = super(MetadataFile, self).graph()
         graph.namespace_manager = namespace_manager
@@ -452,40 +414,99 @@ class Page(pcdm.Component):
 
     ''' class representing a newspaper page '''
 
-    def __init__(self, pagexml, filegroup, premisxml, issue):
-        super(Page, self).__init__()
-        m = XPATHMAP['page']
+    @classmethod
+    def from_mets(cls, issue_mets, div, issue):
+        dmdsec = issue_mets.dmdsec(div.get('DMDID'))
+        number = dmdsec.find('.//MODS:start', xmlns).text
+        reel = dmdsec.find('.//MODS:identifier[@type="reel number"]', xmlns).text
+        frame = dmdsec.find('.//MODS:identifier[@type="reel sequence number"]', xmlns)
+        if frame is not None:
+            frame = frame.text
+        title = "{0}, page {1}".format(issue.title, number)
 
-        # gather metadata
-        self.number    = pagexml.find(m['number']).text
-        self.path      = issue.path + self.number
-        self.reel      = pagexml.find(m['reel']).text
-        if pagexml.find(m['frame']) is not None:
-            self.frame = pagexml.find(m['frame']).text
-        self.title     = "{0}, page {1}".format(issue.title, self.number)
-        self.ordered   = True
-        self.issue     = issue
-        self.annotations = []
+        # create Page object
+        page = cls(issue, reel, number, title, frame)
 
         # optionally generate a file object for each file in the XML snippet
-        if filegroup is not None:
-            for f in filegroup.findall(m['files']):
-                file = File(f, issue.dir, premisxml)
-                self.add_file(file)
+        for fptr in div.findall('METS:fptr', xmlns):
+            fileid = fptr.get('FILEID')
+            filexml = issue_mets.file(fileid)
 
-            for file in self.files_for('ocr'):
-                # load ALTO XML into page object, for text extraction
-                try:
-                    tree = ET.parse(file.localpath)
-                except OSError as e:
-                    raise DataReadException("Unable to read {0}".format(file.localpath))
-                except ET.XMLSyntaxError as e:
-                    raise DataReadException("Unable to parse {0} as XML".format(file.localpath))
+            # get technical metadata by type
+            techmd = {}
+            for admid in filexml.get('ADMID').split():
+                t = issue_mets.techmd(admid)
+                for mdwrap in t.findall('METS:mdWrap', xmlns):
+                    mdtype = mdwrap.get('MDTYPE')
+                    if mdtype == 'OTHER':
+                        mdtype = mdwrap.get('OTHERMDTYPE')
+                techmd[mdtype] = t
 
-                # TODO: read in resolution from issue METS data
-                image_resolution = (400, 400)
-                self.ocr_file = file
-                self.ocr = ocr.ALTOResource(tree, image_resolution)
+            file = File.from_mets(filexml, issue.dir, techmd)
+            page.add_file(file)
+
+        page.parse_ocr()
+
+        return page
+
+    @classmethod
+    def from_repository(cls, repo, page_uri, graph=None):
+        # insert transaction URI into the page_uri, since the returned
+        # graph will have the transaction URI in all of its URIs
+        page_uri = rdflib.URIRef(repo._insert_transaction_uri(page_uri))
+
+        if graph is None:
+            page_graph = repo.get_graph(page_uri)
+        else:
+            page_graph = graph
+
+        title = page_graph.value(subject=page_uri, predicate=dcterms.title)
+        number = page_graph.value(subject=page_uri, predicate=ndnp.number)
+        frame = page_graph.value(subject=page_uri, predicate=ndnp.frame)
+
+        #TODO: real value for issue and reel
+        page = cls(issue=None, reel=None, number=number, title=title, frame=frame)
+        page.uri = page_uri
+        page.created = True
+        page.updated = True
+
+        for file_uri in page_graph.objects(subject=page_uri, predicate=pcdm_ns.hasFile):
+            file = File.from_repository(repo, file_uri)
+            page.add_file(file)
+
+        page.parse_ocr()
+
+        return page
+
+
+    def __init__(self, issue, reel, number, title=None, frame=None):
+        super(Page, self).__init__()
+        self.issue = issue
+        self.reel = reel
+        self.number = number
+        self.title = title
+        self.frame = frame
+        self.ordered = True
+
+    def parse_ocr(self):
+        ocr_file = next(self.files_for('ocr'))
+        # load ALTO XML into page object, for text extraction
+        try:
+            tree = ET.parse(ocr_file.stream)
+        except OSError as e:
+            raise DataReadException("Unable to read {0}".format(ocr_file.filename))
+        except ET.XMLSyntaxError as e:
+            raise DataReadException("Unable to parse {0} as XML".format(ocr_file.filename))
+
+        # read in resolution from issue METS data
+        master = next(self.files_for('master'))
+        self.ocr_file = ocr_file
+        self.ocr = ocr.ALTOResource(tree, master.resolution)
+
+    def textblocks(self):
+        # extract text blocks from ALTO XML for this page
+        for textblock in self.ocr.textblocks():
+            yield TextblockOnPage(textblock, self)
 
     def graph(self):
         graph = super(Page, self).graph()
@@ -501,7 +522,9 @@ class Page(pcdm.Component):
         return graph
 
     def files_for(self, use):
-        return [ f for f in self.files() if f.use == use ]
+        for f in self.files():
+            if f.use == use:
+                yield f
 
 #============================================================================
 # NDNP FILE OBJECT
@@ -511,24 +534,73 @@ class File(pcdm.File):
 
     ''' class representing an individual file '''
 
-    def __init__(self, filexml, dir, premisxml):
-        self.use = filexml.get('USE')
-        m = XPATHMAP['file']
-        elem = filexml.find(m['filepath'])
-        localpath = os.path.join(dir, os.path.basename(
-            elem.get('{http://www.w3.org/1999/xlink}href')
-            ))
-        self.basename = os.path.basename(localpath)
-        super(File, self).__init__(
-            localpath, title="{0} ({1})".format(self.basename, self.use)
-            )
+    @classmethod
+    def from_mets(self, filexml, base_dir, techmd):
+        use = filexml.get('USE')
+        file_locator = filexml.find('METS:FLocat', xmlns)
+        href = file_locator.get('{http://www.w3.org/1999/xlink}href')
+        localpath = os.path.join(base_dir, os.path.basename(href))
+        basename = os.path.basename(localpath)
+        mimetype = techmd['PREMIS'].find('.//premis:formatName', xmlns).text
+        file = File(filename=basename, stream=open(localpath, 'rb'),
+                mimetype=mimetype, title="{0} ({1})".format(basename, use))
+        file.use = use
+        file.basename = basename
 
-        if self.basename.endswith('.tif'):
-            self.width = premisxml.find(m['width']).text
-            self.height = premisxml.find(m['length']).text
+        if mimetype == 'image/tiff':
+            file.width = techmd['NISOIMG'].find('.//mix:ImageWidth', xmlns).text
+            file.height = techmd['NISOIMG'].find('.//mix:ImageLength', xmlns).text
+            file.resolution = (
+                int(techmd['NISOIMG'].find('.//mix:XSamplingFrequency', xmlns).text),
+                int(techmd['NISOIMG'].find('.//mix:YSamplingFrequency', xmlns).text)
+                )
         else:
-            self.width = None
-            self.height = None
+            file.width = None
+            file.height = None
+            file.resolution = None
+
+        return file
+
+    @classmethod
+    def from_repository(cls, repo, file_uri):
+        head_res = repo.head(file_uri)
+        if 'describedby' in head_res.links:
+            rdf_uri = head_res.links['describedby']['url']
+            file_res = repo.get(rdf_uri, headers={'Accept': 'text/turtle'})
+            file_graph = rdflib.Graph()
+            file_graph.parse(data=file_res.text, format='turtle')
+            binary_res = repo.get(file_uri, stream=True)
+
+            title = file_graph.value(subject=file_uri, predicate=dcterms.title)
+            mimetype = file_graph.value(subject=file_uri,
+                    predicate=ebucore.hasMimeType)
+            filename = file_graph.value(subject=file_uri,
+                    predicate=ebucore.filename)
+
+            file = File(filename=filename,stream=binary_res.raw,mimetype=mimetype,title=title)
+            file.uri = file_uri
+            file.created = True
+            file.updated = True
+
+            types = list(file_graph.objects(subject=file_uri, predicate=RDF.type))
+            if pcdm_use.PreservationMasterFile in types:
+                file.use = 'master'
+            elif pcdm_use.IntermediateFile in types:
+                file.use = 'service'
+            elif pcdm_use.ServiceFile in types:
+                file.use = 'derivative'
+            elif pcdm_use.ExtractedText in types:
+                file.use = 'ocr'
+
+            if file.use == 'master':
+                file.width = file_graph.value(subject=file_uri, predicate=ebucore.width)
+                file.height = file_graph.value(subject=file_uri, predicate=ebucore.height)
+                #TODO: how to not hardocde this?
+                file.resolution = (400,400)
+
+            return file
+        else:
+            raise Exception("No metadata for resource")
 
     def graph(self):
         graph = super(File, self).graph()

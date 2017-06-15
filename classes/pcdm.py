@@ -85,6 +85,10 @@ class Repository():
     def delete(self, url, **kwargs):
         return self.request('DELETE', url, **kwargs)
 
+    def exists(self, url, **kwargs):
+        response = self.head(url, **kwargs)
+        return response.status_code == 200
+
     def recursive_get(self, url, traverse=[], **kwargs):
         head_response = self.head(url, **kwargs)
         if 'describedby' in head_response.links:

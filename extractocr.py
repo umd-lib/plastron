@@ -6,25 +6,13 @@ import yaml
 import logging
 import logging.config
 from datetime import datetime
-from classes import pcdm,ocr
+from classes import pcdm,ocr,util
 from handler import ndnp
 import rdflib
 from rdflib import RDF
 from lxml import etree as ET
 
 logger = logging.getLogger(__name__)
-
-# stub page object
-class Page(object):
-    def __init__(self, uri, ocr_resource, ocr_file):
-        self.uri = uri
-        self.ocr = ocr_resource
-        self.ocr_file = ocr_file
-
-# sub file object
-class File(object):
-    def __init__(self, uri):
-        self.uri = uri
 
 def main():
     '''Parse args and handle options.'''
@@ -60,11 +48,23 @@ def main():
         fcrepo = pcdm.Repository(yaml.safe_load(repoconfig))
         logger.info('Loaded repo configuration from {0}'.format(args.repo))
 
+    # read the log of completed items
+    try:
+        completed = util.CompletedLog('logs/annotated.csv', ['uri', 'timestamp'], 'uri')
+    except Exception as e:
+        logger.error('Non-standard map file specified: {0}'.format(e))
+        sys.exit(1)
+
+    logger.info('Found {0} completed items'.format(len(completed)))
+
     with fcrepo.at_path('/annotations'):
-        for issue_uri in args.uris:
+        for uri in args.uris:
+            if uri in completed:
+                continue
+
             fcrepo.open_transaction()
-            issue_graph = fcrepo.get_graph(issue_uri)
-            issue_uri = rdflib.URIRef(fcrepo._insert_transaction_uri(issue_uri))
+            issue_graph = fcrepo.get_graph(uri)
+            issue_uri = rdflib.URIRef(fcrepo._insert_transaction_uri(uri))
             for member_uri in issue_graph.objects(subject=issue_uri, predicate=pcdm.pcdm.hasMember):
                 member_graph = fcrepo.get_graph(member_uri)
                 if (member_uri, RDF.type, ndnp.ndnp.Page) in member_graph:
@@ -74,7 +74,10 @@ def main():
                         annotation.create_object(fcrepo)
                         annotation.update_object(fcrepo)
             fcrepo.commit_transaction()
-
+            completed.writerow({
+                'uri': uri,
+                'timestamp': str(datetime.utcnow())
+                })
 
 if __name__ == "__main__":
     main()

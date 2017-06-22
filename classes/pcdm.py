@@ -543,27 +543,29 @@ class Component(Resource):
 
 class File(Resource):
     @classmethod
-    def from_localpath(cls, localpath, title=None):
+    def from_localpath(cls, localpath, mimetype=None, title=None):
+        if mimetype is None:
+            mimetype = mimetypes.guess_type(localpath)[0]
+
+        def open_stream():
+            return open(localpath, 'rb')
+
         return cls(
-            stream=open(localpath, 'rb'),
             filename=os.path.basename(localpath),
-            mimetype=mimetypes.guess_type(localpath)[0],
-            title=title
+            mimetype=mimetype,
+            title=title,
+            open_stream=open_stream
             )
 
-    def __init__(self, stream, filename, mimetype, title=None):
+    def __init__(self, filename, mimetype, title=None, open_stream=None):
         super(File, self).__init__()
-        self.stream = stream
         self.filename = filename
         self.mimetype = mimetype
+        self.open_stream = open_stream
         if title is not None:
             self.title = title
         else:
             self.title = self.filename
-
-    def __del__(self):
-        # close the stream when this object is destroyed
-        self.stream.close()
 
     def graph(self):
         graph = super(File, self).graph()
@@ -584,8 +586,8 @@ class File(Resource):
 
         checksum = self.sha1()
         self.logger.info("Loading {0}".format(self.filename))
-        self.stream.seek(0)
-        data = self.stream.read()
+        with self.open_stream() as stream:
+            data = stream.read()
         headers = {'Content-Type': self.mimetype,
                    'Digest': 'sha1={0}'.format(checksum),
                    'Content-Disposition':
@@ -613,12 +615,12 @@ class File(Resource):
     def sha1(self):
         BUF_SIZE = 65536
         sha1 = hashlib.sha1()
-        self.stream.seek(0)
-        while True:
-            data = self.stream.read(BUF_SIZE)
-            if not data:
-                break
-            sha1.update(data)
+        with self.open_stream() as stream:
+            while True:
+                data = stream.read(BUF_SIZE)
+                if not data:
+                    break
+                sha1.update(data)
         return sha1.hexdigest()
 
 #============================================================================

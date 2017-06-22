@@ -492,7 +492,8 @@ class Page(pcdm.Component):
         ocr_file = next(self.files_for('ocr'))
         # load ALTO XML into page object, for text extraction
         try:
-            tree = ET.parse(ocr_file.stream)
+            with ocr_file.open_stream() as stream:
+                tree = ET.parse(stream)
         except OSError as e:
             raise DataReadException("Unable to read {0}".format(ocr_file.filename))
         except ET.XMLSyntaxError as e:
@@ -535,15 +536,18 @@ class File(pcdm.File):
     ''' class representing an individual file '''
 
     @classmethod
-    def from_mets(self, filexml, base_dir, techmd):
+    def from_mets(cls, filexml, base_dir, techmd):
         use = filexml.get('USE')
         file_locator = filexml.find('METS:FLocat', xmlns)
         href = file_locator.get('{http://www.w3.org/1999/xlink}href')
         localpath = os.path.join(base_dir, os.path.basename(href))
         basename = os.path.basename(localpath)
         mimetype = techmd['PREMIS'].find('.//premis:formatName', xmlns).text
-        file = File(filename=basename, stream=open(localpath, 'rb'),
-                mimetype=mimetype, title="{0} ({1})".format(basename, use))
+        file = cls.from_localpath(
+            localpath,
+            mimetype=mimetype,
+            title="{0} ({1})".format(basename, use)
+            )
         file.use = use
         file.basename = basename
 
@@ -569,7 +573,6 @@ class File(pcdm.File):
             file_res = repo.get(rdf_uri, headers={'Accept': 'text/turtle'})
             file_graph = rdflib.Graph()
             file_graph.parse(data=file_res.text, format='turtle')
-            binary_res = repo.get(file_uri, stream=True)
 
             title = file_graph.value(subject=file_uri, predicate=dcterms.title)
             mimetype = file_graph.value(subject=file_uri,
@@ -577,7 +580,15 @@ class File(pcdm.File):
             filename = file_graph.value(subject=file_uri,
                     predicate=ebucore.filename)
 
-            file = File(filename=filename,stream=binary_res.raw,mimetype=mimetype,title=title)
+            def open_stream():
+                return repo.get(file_uri, stream=True).raw
+
+            file = cls(
+                filename=filename,
+                mimetype=mimetype,
+                title=title,
+                open_stream=open_stream
+                )
             file.uri = file_uri
             file.created = True
             file.updated = True

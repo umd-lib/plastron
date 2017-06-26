@@ -63,16 +63,11 @@ def main():
                 continue
 
             fcrepo.open_transaction()
-            issue_graph = fcrepo.get_graph(uri)
-            issue_uri = rdflib.URIRef(fcrepo._insert_transaction_uri(uri))
-            for member_uri in issue_graph.objects(subject=issue_uri, predicate=pcdm.pcdm.hasMember):
-                member_graph = fcrepo.get_graph(member_uri)
-                if (member_uri, RDF.type, ndnp.ndnp.Page) in member_graph:
-                    page = ndnp.Page.from_repository(fcrepo, member_uri, graph=member_graph)
-                    logger.info("Creating annotations for page {0}".format(page.title))
-                    for annotation in page.textblocks():
-                        annotation.create_object(fcrepo)
-                        annotation.update_object(fcrepo)
+            page = ndnp.Page.from_repository(fcrepo, uri)
+            logger.info("Creating annotations for page {0}".format(page.title))
+            for annotation in page.textblocks():
+                annotation.create_object(fcrepo)
+                annotation.update_object(fcrepo)
             fcrepo.commit_transaction()
             completed.writerow({
                 'uri': uri,

@@ -570,9 +570,7 @@ class File(pcdm.File):
         head_res = repo.head(file_uri)
         if 'describedby' in head_res.links:
             rdf_uri = head_res.links['describedby']['url']
-            file_res = repo.get(rdf_uri, headers={'Accept': 'text/turtle'})
-            file_graph = rdflib.Graph()
-            file_graph.parse(data=file_res.text, format='turtle')
+            file_graph = repo.get_graph(rdf_uri)
 
             title = file_graph.value(subject=file_uri, predicate=dcterms.title)
             mimetype = file_graph.value(subject=file_uri,

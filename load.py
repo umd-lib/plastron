@@ -180,14 +180,14 @@ def main():
     with open(log_conf_file, 'r') as logging_config:
         logging_options = yaml.safe_load(logging_config)
 
+    now = datetime.utcnow().strftime('%Y%m%d%H%M%S')
+
     # Configure logging
     if args.verbose:
         logging_options['handlers']['console']['level'] = 'DEBUG'
     elif args.quiet:
         logging_options['handlers']['console']['level'] = 'WARNING'
-    log_filename = 'load.py.{0}.log'.format(
-        datetime.utcnow().strftime('%Y%m%d%H%M%S')
-        )
+    log_filename = 'load.py.{0}.log'.format(now)
     logfile = os.path.join(log_location, log_filename)
     logging_options['handlers']['file']['filename'] = logfile
     logging.config.dictConfig(logging_options)
@@ -234,17 +234,15 @@ def main():
         mapfile = os.path.join(log_location, batch_options.get('MAPFILE'))
         fieldnames = ['number', 'timestamp', 'title', 'path', 'uri']
         try:
-            completed = util.CompletedLog(mapfile, fieldnames, 'path')
+            completed = util.ItemLog(mapfile, fieldnames, 'path')
         except Exception as e:
             logger.error('Non-standard map file specified: {0}'.format(e))
             sys.exit(1)
 
         logger.info('Found {0} completed items'.format(len(completed)))
 
-        skipfile = os.path.join(log_location, 'skipped.csv')
-        sfile = open(skipfile, 'w+', 1)
-        skip_writer = csv.DictWriter(sfile, fieldnames=fieldnames)
-        skip_writer.writeheader()
+        skipfile = os.path.join(log_location, 'skipped.load.{0}.csv'.format(now))
+        skipped = util.ItemLog(skipfile, fieldnames, 'path')
 
         # create all batch objects in repository
         for n, item in enumerate(batch):
@@ -289,9 +287,7 @@ def main():
             if is_loaded:
                 completed.writerow(row)
             else:
-                skip_writer.writerow(row)
-
-        sfile.close()
+                skipped.writerow(row)
 
     if not args.quiet:
         print_footer()

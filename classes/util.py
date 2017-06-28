@@ -1,17 +1,15 @@
 import os
 import csv
 
-class CompletedLog():
+class ItemLog():
     def __init__(self, filename, fieldnames, keyfield):
         self.filename = filename
         self.fieldnames = fieldnames
         self.keyfield = keyfield
-        self.skip_list = set()
+        self.item_keys = set()
         self.fh = None
         self.writer = None
 
-        # open filename, if it exists, and read completed files into list
-        completed_items = []
         if not os.path.isfile(self.filename):
             with open(self.filename, 'w', 1) as fh:
                 writer = csv.DictWriter(fh, fieldnames=self.fieldnames)
@@ -26,7 +24,7 @@ class CompletedLog():
 
                 # read the data from the existing file
                 for row in reader:
-                    self.skip_list.add(row[self.keyfield])
+                    self.item_keys.add(row[self.keyfield])
 
     def get_writer(self):
         if self.fh is None:
@@ -37,13 +35,13 @@ class CompletedLog():
 
     def writerow(self, row):
         self.get_writer().writerow(row)
-        self.skip_list.add(row[self.keyfield])
+        self.item_keys.add(row[self.keyfield])
 
     def __contains__(self, other):
-        return other in self.skip_list
+        return other in self.item_keys
 
     def __len__(self):
-        return len(self.skip_list)
+        return len(self.item_keys)
 
     def __del__(self):
         if self.fh is not None:

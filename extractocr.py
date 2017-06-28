@@ -11,8 +11,6 @@ from handler import ndnp
 import rdflib
 from rdflib import RDF
 from lxml import etree as ET
-import os
-import csv
 
 logger = logging.getLogger(__name__)
 
@@ -34,7 +32,7 @@ def extract(fcrepo, uri):
         # attempt to rollback the current transaction
         # failures here will be caught by the main loop's exception handler
         # and should trigger a system exit
-        logger.error("Item creation failed: {0}".format(e))
+        logger.error("OCR extraction failed: {0}".format(e))
         fcrepo.rollback_transaction()
         logger.warn('Transaction rolled back. Continuing load.')
 
@@ -58,12 +56,12 @@ def main():
 
     args = parser.parse_args()
 
+    now = datetime.utcnow().strftime('%Y%m%d%H%M%S')
+
     # configure logging
     with open('config/logging.yml', 'r') as configfile:
         logging_config = yaml.safe_load(configfile)
-        logfile = 'logs/extractocr.py.{0}.log'.format(
-            datetime.utcnow().strftime('%Y%m%d%H%M%S')
-            )
+        logfile = 'logs/extractocr.py.{0}.log'.format(now)
         logging_config['handlers']['file']['filename'] = logfile
         logging.config.dictConfig(logging_config)
 
@@ -74,17 +72,15 @@ def main():
 
     # read the log of completed items
     try:
-        completed = util.CompletedLog('logs/annotated.csv', ['uri', 'timestamp'], 'uri')
+        completed = util.ItemLog('logs/annotated.csv', ['uri', 'timestamp'], 'uri')
     except Exception as e:
         logger.error('Non-standard map file specified: {0}'.format(e))
         sys.exit(1)
 
     logger.info('Found {0} completed items'.format(len(completed)))
 
-    skipfile = os.path.join('logs/skipped.csv')
-    sfile = open(skipfile, 'w+', 1)
-    skip_writer = csv.DictWriter(sfile, fieldnames=['uri', 'timestamp'])
-    skip_writer.writeheader()
+    skipfile = 'logs/skipped.extractocr.{0}.csv'.format(now)
+    skipped = util.ItemLog(skipfile, ['uri', 'timestamp'], 'uri')
 
     with fcrepo.at_path('/annotations'):
         for uri in args.uris:
@@ -108,7 +104,7 @@ def main():
             if is_extracted:
                 completed.writerow(row)
             else:
-                skip_writer.writerow(row)
+                skipped.writerow(row)
 
 if __name__ == "__main__":
     main()

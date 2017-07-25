@@ -50,10 +50,6 @@ def main():
                         required=True
                         )
 
-    parser.add_argument('uris', nargs='+',
-                        help='One or more repository URIs to extract text from.'
-                        )
-
     args = parser.parse_args()
 
     now = datetime.utcnow().strftime('%Y%m%d%H%M%S')
@@ -83,7 +79,8 @@ def main():
     skipped = util.ItemLog(skipfile, ['uri', 'timestamp'], 'uri')
 
     with fcrepo.at_path('/annotations'):
-        for uri in args.uris:
+        for line in sys.stdin:
+            uri = line.rstrip('\n')
             if uri in completed:
                 continue
 

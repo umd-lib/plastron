@@ -489,7 +489,15 @@ class Page(pcdm.Component):
         self.ordered = True
 
     def parse_ocr(self):
-        ocr_file = next(self.files_for('ocr'))
+        # try to get an OCR file
+        # if there isn't one, just skip it
+        try:
+            ocr_file = next(self.files_for('ocr'))
+        except StopIteration as e:
+            self.ocr = None
+            self.ocr_file = None
+            return
+
         # load ALTO XML into page object, for text extraction
         try:
             with ocr_file.open_stream() as stream:
@@ -505,6 +513,8 @@ class Page(pcdm.Component):
         self.ocr = ocr.ALTOResource(tree, master.resolution)
 
     def textblocks(self):
+        if self.ocr is None:
+            raise StopIteration()
         # extract text blocks from ALTO XML for this page
         for textblock in self.ocr.textblocks():
             yield TextblockOnPage(textblock, self)

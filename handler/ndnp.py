@@ -275,10 +275,8 @@ class Issue(pcdm.Item):
             )))
 
         # create a page object for each page and append to list of pages
-        pages = {}
         for div in issue_mets.xpath('METS:structMap//METS:div[@TYPE="np:page"]'):
             page = Page.from_mets(issue_mets, div, self)
-            pages[str(page.number)] = page
             self.add_component(page)
 
             # add OCR text blocks as annotations
@@ -302,7 +300,6 @@ class Issue(pcdm.Item):
             article_pagenums = set()
             for area in article.findall(m['areas']):
                 pagenum = int(area.get('FILEID').replace('ocrFile', ''))
-                page = pages[str(pagenum)]
                 article_pagenums.add(pagenum)
             article = Article(article_title, self, pages=sorted(list(article_pagenums)))
             self.add_component(article)

@@ -49,7 +49,13 @@ def get_uris_to_delete(fcrepo, uri, args):
     else:
         return fcrepo.recursive_get(uri, traverse=[])
 
-def delete_item(fcrepo, uri, args):
+def delete_items(fcrepo, uri_list, args):
+    if args.dryrun:
+        for (uri, graph) in get_uris_to_delete(fcrepo, item_uri, args):
+            title = '; '.join([ t for t in graph.objects(predicate=pcdm.dcterms.title) ])
+            logger.info("Would delete {0} ({1})".format(uri, title))
+        return True
+
     # open transaction
     logger.info('Opening transaction')
     fcrepo.open_transaction()
@@ -57,10 +63,11 @@ def delete_item(fcrepo, uri, args):
     # delete item
     # (and its components, if a list of predicates to traverse was given)
     try:
-        for (target_uri, graph) in get_uris_to_delete(fcrepo, uri, args):
-            title = '; '.join([ t for t in graph.objects(predicate=pcdm.dcterms.title) ])
-            fcrepo.delete(target_uri)
-            logger.info('Deleted resource {0} ({1})'.format(target_uri, title))
+        for uri in uri_list:
+            for (target_uri, graph) in get_uris_to_delete(fcrepo, uri, args):
+                title = '; '.join([ t for t in graph.objects(predicate=pcdm.dcterms.title) ])
+                fcrepo.delete(target_uri)
+                logger.info('Deleted resource {0} ({1})'.format(target_uri, title))
 
         # commit transaction
         logger.info('Committing transaction')
@@ -110,8 +117,13 @@ def main():
                         action='store_true'
                         )
 
-    parser.add_argument('uris', nargs='+',
-                        help='One or more repository URIs to be deleted.'
+    parser.add_argument('-f', '--file',
+                        help='File containing a list of URIs to delete',
+                        action='store'
+                        )
+
+    parser.add_argument('uris', nargs='*',
+                        help='Zero or more repository URIs to be deleted.'
                         )
 
     args = parser.parse_args()
@@ -152,13 +164,13 @@ def main():
         logger.info('Dry run enabled, no actual deletions will take place')
 
     try:
-        for item_uri in args.uris:
-            if args.dryrun:
-                for (uri, graph) in get_uris_to_delete(fcrepo, item_uri, args):
-                    title = '; '.join([ t for t in graph.objects(predicate=pcdm.dcterms.title) ])
-                    logger.info("Would delete {0} ({1})".format(uri, title))
-            else:
-                delete_item(fcrepo, item_uri, args)
+        if args.file is not None:
+            with open(args.file, 'r') as uri_list:
+                delete_items(fcrepo, uri_list, args)
+        elif args.uris is not None:
+            for item_uri in args.uris:
+                delete_items(fcrepo, [item_uri], args)
+
     except pcdm.RESTAPIException as e:
         logger.error(
             "Unable to commit or rollback transaction, aborting"

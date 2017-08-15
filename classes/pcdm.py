@@ -53,6 +53,9 @@ namespace_manager.bind('sc', sc, override=False)
 ldp = Namespace('http://www.w3.org/ns/ldp#')
 namespace_manager.bind('ldp', ldp, override=False)
 
+prov = Namespace('http://www.w3.org/ns/prov#')
+namespace_manager.bind('prov', prov, override=False)
+
 #============================================================================
 # REPOSITORY (REPRESENTING AN FCREPO INSTANCE)
 #============================================================================
@@ -175,6 +178,15 @@ class Repository():
                     for (uri, graph) in self.recursive_get(
                         str(o), traverse=traverse, **kwargs):
                         yield (uri, graph)
+
+    def get_graph(self, url):
+        response = self.get(url, headers={'Accept': 'text/turtle'}, stream=True)
+        if response.status_code != 200:
+            self.logger.error("Unable to get text/turtle representation of {0}".format(url))
+            raise RESTAPIException(response)
+        graph = rdflib.Graph()
+        graph.parse(source=response.raw, format='turtle')
+        return graph
 
     def open_transaction(self, **kwargs):
         url = os.path.join(self.endpoint, 'fcr:tx')
@@ -407,9 +419,6 @@ class Resource(object):
             self.update_object(repository)
             for (rel, obj) in self.linked_objects:
                 obj.recursive_update(repository)
-            if self.annotations is not None:
-                for annotation in self.annotations:
-                    annotation.recursive_update(repository)
 
     # check for the existence of a local object in the repository
     def exists_in_repo(self, repository):
@@ -509,6 +518,10 @@ class Item(Resource):
             for annotation in self.annotations:
                 annotation.recursive_create(repository)
 
+    def update_annotations(self, repository):
+        for annotation in self.annotations:
+            annotation.recursive_update(repository)
+
 #============================================================================
 # PCDM COMPONENT-OBJECT
 #============================================================================
@@ -529,14 +542,30 @@ class Component(Resource):
 #============================================================================
 
 class File(Resource):
+    @classmethod
+    def from_localpath(cls, localpath, mimetype=None, title=None):
+        if mimetype is None:
+            mimetype = mimetypes.guess_type(localpath)[0]
 
-    def __init__(self, localpath, title=None):
+        def open_stream():
+            return open(localpath, 'rb')
+
+        return cls(
+            filename=os.path.basename(localpath),
+            mimetype=mimetype,
+            title=title,
+            open_stream=open_stream
+            )
+
+    def __init__(self, filename, mimetype, title=None, open_stream=None):
         super(File, self).__init__()
-        self.localpath = localpath
+        self.filename = filename
+        self.mimetype = mimetype
+        self.open_stream = open_stream
         if title is not None:
             self.title = title
         else:
-            self.title = os.path.basename(self.localpath)
+            self.title = self.filename
 
     def graph(self):
         graph = super(File, self).graph()
@@ -556,12 +585,10 @@ class File(Resource):
             return False
 
         checksum = self.sha1()
-        mimetype = mimetypes.guess_type(self.localpath)[0]
-        self.filename = os.path.basename(self.localpath)
         self.logger.info("Loading {0}".format(self.filename))
-        with open(self.localpath, 'rb') as binaryfile:
-            data = binaryfile.read()
-        headers = {'Content-Type': mimetype,
+        with self.open_stream() as stream:
+            data = stream.read()
+        headers = {'Content-Type': self.mimetype,
                    'Digest': 'sha1={0}'.format(checksum),
                    'Content-Disposition':
                         'attachment; filename="{0}"'.format(self.filename)
@@ -588,9 +615,9 @@ class File(Resource):
     def sha1(self):
         BUF_SIZE = 65536
         sha1 = hashlib.sha1()
-        with open(self.localpath, 'rb') as f:
+        with self.open_stream() as stream:
             while True:
-                data = f.read(BUF_SIZE)
+                data = stream.read(BUF_SIZE)
                 if not data:
                     break
                 sha1.update(data)

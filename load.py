@@ -17,7 +17,7 @@ import re
 import logging
 import logging.config
 from datetime import datetime
-from classes import pcdm
+from classes import pcdm,util
 
 logger = logging.getLogger(__name__)
 
@@ -63,8 +63,9 @@ def load_item(fcrepo, item, args, extra=None):
         item.recursive_create(fcrepo)
         logger.info('Creating ordering proxies')
         item.create_ordering(fcrepo)
-        logger.info('Creating annotations')
-        item.create_annotations(fcrepo)
+        if not args.noannotations:
+            logger.info('Creating annotations')
+            item.create_annotations(fcrepo)
 
         if extra:
             logger.info('Adding additional triples')
@@ -76,6 +77,9 @@ def load_item(fcrepo, item, args, extra=None):
 
         logger.info('Updating item and components')
         item.recursive_update(fcrepo)
+        if not args.noannotations:
+            logger.info('Updating annotations')
+            item.update_annotations(fcrepo)
 
         # commit transaction
         logger.info('Committing transaction')
@@ -156,6 +160,11 @@ def main():
                         action='store_true'
                         )
 
+    parser.add_argument('--noannotations',
+                        help='iterate without loading annotations (e.g. OCR)',
+                        action='store_true'
+                        )
+
     args = parser.parse_args()
 
     if not args.quiet:
@@ -171,14 +180,14 @@ def main():
     with open(log_conf_file, 'r') as logging_config:
         logging_options = yaml.safe_load(logging_config)
 
+    now = datetime.utcnow().strftime('%Y%m%d%H%M%S')
+
     # Configure logging
     if args.verbose:
         logging_options['handlers']['console']['level'] = 'DEBUG'
     elif args.quiet:
         logging_options['handlers']['console']['level'] = 'WARNING'
-    log_filename = 'load.py.{0}.log'.format(
-        datetime.utcnow().strftime('%Y%m%d%H%M%S')
-        )
+    log_filename = 'load.py.{0}.log'.format(now)
     logfile = os.path.join(log_location, log_filename)
     logging_options['handlers']['file']['filename'] = logfile
     logging.config.dictConfig(logging_options)
@@ -221,41 +230,19 @@ def main():
     if not args.dryrun:
         test_connection(fcrepo)
 
-        # open mapfile, if it exists, and read completed files into list
-        fieldnames = ['number', 'timestamp', 'title', 'path', 'uri']
-        completed_items = []
-        skip_list = []
+        # read the log of completed items
         mapfile = os.path.join(log_location, batch_options.get('MAPFILE'))
-        if os.path.isfile(mapfile):
-            with open(mapfile, 'r') as infile:
-                reader = csv.DictReader(infile)
-                # check the validity of the map file data
-                if not reader.fieldnames == fieldnames:
-                    logger.error('Non-standard map file specified!')
-                    sys.exit(1)
-                else:
-                    # read the data from the existing file
-                    completed_items = [row for row in reader]
-                    skip_list = [row['path'] for row in completed_items]
+        fieldnames = ['number', 'timestamp', 'title', 'path', 'uri']
+        try:
+            completed = util.ItemLog(mapfile, fieldnames, 'path')
+        except Exception as e:
+            logger.error('Non-standard map file specified: {0}'.format(e))
+            sys.exit(1)
 
-        # open a new map file and skip file
-        mfile = open(mapfile, 'w+', 1)
-        map_writer = csv.DictWriter(mfile, fieldnames=fieldnames)
-        map_writer.writeheader()
+        logger.info('Found {0} completed items'.format(len(completed)))
 
-        skipfile = os.path.join(log_location, 'skipped.csv')
-        sfile = open(skipfile, 'w+', 1)
-        skip_writer = csv.DictWriter(sfile, fieldnames=fieldnames)
-        skip_writer.writeheader()
-
-        # write out completed items
-        if completed_items:
-            logger.info(
-                'Writing data for {0} existing items to mapfile.'.format(
-                    len(completed_items))
-                )
-            for row in completed_items:
-                map_writer.writerow(row)
+        skipfile = os.path.join(log_location, 'skipped.load.{0}.csv'.format(now))
+        skipped = util.ItemLog(skipfile, fieldnames, 'path')
 
         # create all batch objects in repository
         for n, item in enumerate(batch):
@@ -263,7 +250,7 @@ def main():
             if args.limit is not None and n >= args.limit:
                 logger.info("Stopping after {0} item(s)".format(args.limit))
                 break
-            elif item.path in skip_list:
+            elif item.path in completed:
                 continue
 
             logger.info(
@@ -298,12 +285,9 @@ def main():
 
             # write item details to relevant summary CSV
             if is_loaded:
-                map_writer.writerow(row)
+                completed.writerow(row)
             else:
-                skip_writer.writerow(row)
-
-        mfile.close()
-        sfile.close()
+                skipped.writerow(row)
 
     if not args.quiet:
         print_footer()

@@ -25,13 +25,12 @@ def create_collection(fcrepo, name):
     try:
         collection = pcdm.Collection()
         collection.title = name
-        collection.graph.add( (collection.uri, pcdm.dcterms.title, rdflib.Literal(name)) )
         collection.create_object(fcrepo)
         collection.update_object(fcrepo)
         # commit transaction
         logger.info('Committing transaction')
         fcrepo.commit_transaction()
-        return True
+        return collection
 
     except (pcdm.RESTAPIException) as e:
         # failures here will be caught by the main loop's exception handler
@@ -63,6 +62,13 @@ def main():
                         required=True
                         )
 
+    # Path to a batch config file
+    # If given, will write the collection URI to it
+    parser.add_argument('-b', '--batch',
+                        help='Path to batch configuration file.',
+                        action='store'
+                        )
+
     args = parser.parse_args()
 
 
@@ -80,7 +86,14 @@ def main():
         fcrepo = pcdm.Repository(yaml.safe_load(repoconfig))
         logger.info('Loaded repo configuration from {0}'.format(args.repo))
 
-    create_collection(fcrepo, args.name)
+    collection = create_collection(fcrepo, args.name)
+
+    if args.batch is not None:
+        with open(args.batch, 'r') as batchconfig:
+            batch = yaml.safe_load(batchconfig)
+            batch['COLLECTION'] = str(collection.uri)
+        with open(args.batch, 'w') as batchconfig:
+            yaml.dump(batch, batchconfig, default_flow_style=False)
 
 if __name__ == "__main__":
     main()

@@ -17,7 +17,7 @@ import re
 import logging
 import logging.config
 from datetime import datetime
-from classes import pcdm
+from classes import pcdm,util
 
 logger = logging.getLogger(__name__)
 
@@ -60,11 +60,12 @@ def load_item(fcrepo, item, args, extra=None):
     # create item and its components
     try:
         logger.info('Creating item')
-        item.recursive_create(fcrepo, args.nobinaries)
+        item.recursive_create(fcrepo)
         logger.info('Creating ordering proxies')
         item.create_ordering(fcrepo)
-        logger.info('Updating relationship triples')
-        item.update_relationship_triples()
+        if not args.noannotations:
+            logger.info('Creating annotations')
+            item.create_annotations(fcrepo)
 
         if extra:
             logger.info('Adding additional triples')
@@ -75,7 +76,10 @@ def load_item(fcrepo, item, args, extra=None):
             item.add_extra_properties(extra, rdf_format)
 
         logger.info('Updating item and components')
-        item.recursive_update(fcrepo, args.nobinaries)
+        item.recursive_update(fcrepo)
+        if not args.noannotations:
+            logger.info('Updating annotations')
+            item.update_annotations(fcrepo)
 
         # commit transaction
         logger.info('Committing transaction')
@@ -103,37 +107,38 @@ def main():
     parser = argparse.ArgumentParser(
         description='A configurable batch loader for Fedora 4.'
         )
+    required = parser.add_argument_group('required arguments')
 
     # Path to the repo config (endpoint, relpath, credentials, and WebAC paths)
-    parser.add_argument('-r', '--repo',
-                        help='Path to repository configuration file.',
+    required.add_argument('-r', '--repo',
+                        help='path to repository configuration file',
                         action='store',
                         required=True
                         )
 
     # Data handler module to use
-    parser.add_argument('-b', '--batch',
-                        help='Path to batch configuration file.',
+    required.add_argument('-b', '--batch',
+                        help='path to batch configuration file',
                         action='store',
                         required=True
                         )
 
     # Run through object preparation, but do not touch repository
     parser.add_argument('-d', '--dryrun',
-                        help='Iterate over the batch without POSTing.',
+                        help='iterate over the batch without POSTing',
                         action='store_true'
                         )
 
     # Load without binaries; useful for testing when file loading is too slow
     parser.add_argument('-n', '--nobinaries',
-                        help='Iterate without uploading binaries.',
+                        help='iterate without uploading binaries',
                         action='store_true'
                         )
 
     # Limit the load to a specified number of top-level objects
     parser.add_argument('-l', '--limit',
-                        help='''Limit the load to a specified number of
-                                top-level objects.''',
+                        help='''limit the load to a specified number of
+                                top-level objects''',
                         action='store',
                         type=int,
                         default=None
@@ -141,17 +146,22 @@ def main():
 
     # Just ping the repository to see if the endpoint exists
     parser.add_argument('-p', '--ping',
-                        help='Check the connection to the repository and exit.',
+                        help='check the repo connection and exit',
                         action='store_true'
                         )
 
     parser.add_argument('-v', '--verbose',
-                        help='Increase the verbosity of the status output.',
+                        help='increase the verbosity of the status output',
                         action='store_true'
                         )
 
     parser.add_argument('-q', '--quiet',
-                        help='Decrease the verbosity of the status output.',
+                        help='decrease the verbosity of the status output',
+                        action='store_true'
+                        )
+
+    parser.add_argument('--noannotations',
+                        help='iterate without loading annotations (e.g. OCR)',
                         action='store_true'
                         )
 
@@ -160,131 +170,124 @@ def main():
     if not args.quiet:
         print_header()
 
-    # configure logging
-    with open('config/logging.yml', 'r') as configfile:
-        logging_config = yaml.safe_load(configfile)
-        if args.verbose:
-            logging_config['handlers']['console']['level'] = 'DEBUG'
-        elif args.quiet:
-            logging_config['handlers']['console']['level'] = 'WARNING'
-        logfile = 'logs/load.py.{0}.log'.format(
-            datetime.utcnow().strftime('%Y%m%d%H%M%S')
-            )
-        logging_config['handlers']['file']['filename'] = logfile
-        logging.config.dictConfig(logging_config)
+    # Load batch configuration
+    with open(args.batch, 'r') as batch_config:
+        batch_options = yaml.safe_load(batch_config)
+        log_location = batch_options.get('LOG_LOCATION')
+        log_conf_file = batch_options.get('LOG_CONFIG')
 
-    # Load required repository config file and create repository object
-    with open(args.repo, 'r') as repoconfig:
-        fcrepo = pcdm.Repository(yaml.safe_load(repoconfig))
-        logger.info('Loaded repo configuration from {0}'.format(args.repo))
+    # Load logging configuration
+    with open(log_conf_file, 'r') as logging_config:
+        logging_options = yaml.safe_load(logging_config)
+
+    now = datetime.utcnow().strftime('%Y%m%d%H%M%S')
+
+    # Configure logging
+    if args.verbose:
+        logging_options['handlers']['console']['level'] = 'DEBUG'
+    elif args.quiet:
+        logging_options['handlers']['console']['level'] = 'WARNING'
+    log_filename = 'load.py.{0}.log'.format(now)
+    logfile = os.path.join(log_location, log_filename)
+    logging_options['handlers']['file']['filename'] = logfile
+    logging.config.dictConfig(logging_options)
+
+    # Load repository configuration
+    with open(args.repo, 'r') as repo_config:
+        repo_options = yaml.safe_load(repo_config)
+
+    # log configuration files loaded
+    logger.info('Loaded batch configuration from {0}'.format(args.batch))
+    logger.info('Loaded repo configuration from {0}'.format(args.repo))
+    logger.info('Loaded logging configuration from {0}'.format(log_conf_file))
+
+    # create repository object
+    fcrepo = pcdm.Repository(repo_options)
+    if args.nobinaries:
+        fcrepo.load_binaries = False
 
     # "--ping" tests repository connection and exits
     if args.ping:
         test_connection(fcrepo)
         sys.exit(0)
 
-    # Load required batch config file and create batch object
-    with open(args.batch, 'r') as batch_config:
-        batch_options = yaml.safe_load(batch_config)
-        logger.info(
-            'Loaded batch configuration from {0}'.format(args.batch)
-            )
-        # Define the data_handler function for the data being loaded
-        logger.info("Initializing data handler")
-        module_name = batch_options.get('HANDLER')
-        handler = import_module('handler.' + module_name)
-        logger.info('Loaded "{0}" handler'.format(module_name))
+    # Define the data_handler function for the data being loaded
+    logger.info("Initializing data handler")
+    module_name = batch_options.get('HANDLER')
+    handler = import_module('handler.' + module_name)
+    logger.info('Loaded "{0}" handler'.format(module_name))
 
-        # Handler is invoked by calling the load function on the batch config
-        try:
-            batch = handler.load(fcrepo, batch_options)
-        except handler.ConfigException as e:
-            logger.error(e.message)
-            logger.error(
-                "Failed to load batch configuration from {0}".format(args.batch)
-                )
-            sys.exit(1)
+    # Invoke the data handler by calling the load function on the batch config
+    try:
+        batch = handler.load(fcrepo, batch_options)
+    except handler.ConfigException as e:
+        logger.error(e.message)
+        logger.error(
+            "Failed to load batch configuration from {0}".format(args.batch)
+            )
+        sys.exit(1)
 
     if not args.dryrun:
         test_connection(fcrepo)
 
-        # open mapfile, if it exists, and read completed files into list
+        # read the log of completed items
+        mapfile = os.path.join(log_location, batch_options.get('MAPFILE'))
         fieldnames = ['number', 'timestamp', 'title', 'path', 'uri']
-        completed_items = []
-        skip_list = []
-        mapfile = batch_options.get('MAPFILE')
-        if os.path.isfile(mapfile):
-            with open(mapfile, 'r') as infile:
-                reader = csv.DictReader(infile)
-                # check the validity of the map file data
-                if not reader.fieldnames == fieldnames:
-                    logger.error('Non-standard map file specified!')
-                    sys.exit(1)
-                else:
-                    # read the data from the existing file
-                    completed_items = [row for row in reader]
-                    skip_list = [row['path'] for row in completed_items]
+        try:
+            completed = util.ItemLog(mapfile, fieldnames, 'path')
+        except Exception as e:
+            logger.error('Non-standard map file specified: {0}'.format(e))
+            sys.exit(1)
 
-        # open a new version of the map file
-        with open(mapfile, 'w+', 1) as map, open(
-            'logs/skipped.csv', 'w+', 1) as skip:
-            map_writer = csv.DictWriter(map, fieldnames=fieldnames)
-            skip_writer = csv.DictWriter(skip, fieldnames=fieldnames)
-            map_writer.writeheader()
-            skip_writer.writeheader()
+        logger.info('Found {0} completed items'.format(len(completed)))
 
-            # write out completed items
+        skipfile = os.path.join(log_location, 'skipped.load.{0}.csv'.format(now))
+        skipped = util.ItemLog(skipfile, fieldnames, 'path')
+
+        # create all batch objects in repository
+        for n, item in enumerate(batch):
+            is_loaded = False
+            if args.limit is not None and n >= args.limit:
+                logger.info("Stopping after {0} item(s)".format(args.limit))
+                break
+            elif item.path in completed:
+                continue
+
             logger.info(
-                'Writing data for {0} existing items to mapfile.'.format(
-                    len(completed_items))
+                "Processing item {0}/{1}...".format(n+1, batch.length)
                 )
-            for row in completed_items:
-                map_writer.writerow(row)
+            if args.verbose:
+                item.print_item_tree()
 
-            # create all batch objects in repository
-            for n, item in enumerate(batch):
-                is_loaded = False
-                if args.limit is not None and n >= args.limit:
-                    logger.info("Stopping after {0} item(s)".format(args.limit))
-                    break
-                elif item.path in skip_list:
-                    continue
-
-                logger.info(
-                    "Processing item {0}/{1}...".format(n+1, batch.length)
+            try:
+                logger.info('Loading item {0}'.format(n+1))
+                is_loaded = load_item(
+                    fcrepo, item, args, extra=batch_options.get('EXTRA')
                     )
-                if args.verbose:
-                    item.print_item_tree()
+            except pcdm.RESTAPIException as e:
+                logger.error(
+                    "Unable to commit or rollback transaction, aborting"
+                    )
+                sys.exit(1)
+            except handler.DataReadException as e:
+                logger.error(
+                    "Skipping item {0}: {1}".format(n + 1, e.message)
+                    )
 
-                try:
-                    logger.info('Loading item {0}'.format(n+1))
-                    is_loaded = load_item(
-                        fcrepo, item, args, extra=batch_options.get('EXTRA')
-                        )
-                except pcdm.RESTAPIException as e:
-                    logger.error(
-                        "Unable to commit or rollback transaction, aborting"
-                        )
-                    sys.exit(1)
-                except handler.DataReadException as e:
-                    logger.error(
-                        "Skipping item {0}: {1}".format(n + 1, e.message)
-                        )
+            row = {'number': n + 1,
+                   'path': item.path,
+                   'timestamp': getattr(
+                        item, 'creation_timestamp', str(datetime.utcnow())
+                        ),
+                   'title': getattr(item, 'title', 'N/A'),
+                   'uri': getattr(item, 'uri', 'N/A')
+                   }
 
-                row = {'number': n + 1,
-                       'title': item.title,
-                       'path': item.path,
-                       'timestamp': getattr(
-                            item, 'creation_timestamp', str(datetime.utcnow())
-                            ),
-                       'uri': getattr(item, 'uri', 'N/A')
-                       }
-
-                # write item details to relevant summary CSV
-                if is_loaded:
-                    map_writer.writerow(row)
-                else:
-                    skip_writer.writerow(row)
+            # write item details to relevant summary CSV
+            if is_loaded:
+                completed.writerow(row)
+            else:
+                skipped.writerow(row)
 
     if not args.quiet:
         print_footer()

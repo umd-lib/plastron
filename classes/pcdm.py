@@ -9,6 +9,7 @@ import rdflib
 from rdflib import Namespace
 import sys
 import logging
+from uuid import uuid4
 
 #============================================================================
 # NAMESPACE BINDINGS
@@ -43,6 +44,18 @@ namespace_manager.bind('pcdm', pcdm, override=False)
 rdf = Namespace('http://www.w3.org/1999/02/22-rdf-syntax-ns#')
 namespace_manager.bind('rdf', rdf, override=False)
 
+oa = Namespace('http://www.w3.org/ns/oa#')
+namespace_manager.bind('oa', oa, override=False)
+
+sc = Namespace('http://www.shared-canvas.org/ns/')
+namespace_manager.bind('sc', sc, override=False)
+
+ldp = Namespace('http://www.w3.org/ns/ldp#')
+namespace_manager.bind('ldp', ldp, override=False)
+
+prov = Namespace('http://www.w3.org/ns/prov#')
+namespace_manager.bind('prov', prov, override=False)
+
 #============================================================================
 # REPOSITORY (REPRESENTING AN FCREPO INSTANCE)
 #============================================================================
@@ -51,12 +64,14 @@ class Repository():
     def __init__(self, config):
         self.endpoint = config['REST_ENDPOINT']
         self.relpath = config['RELPATH']
+        self._path_stack = [ self.relpath ]
         self.fullpath = '/'.join(
             [p.strip('/') for p in (self.endpoint, self.relpath)]
             )
         self.auth = None
         self.client_cert = None
         self.transaction = None
+        self.load_binaries = True
         self.logger = logging.getLogger(
             __name__ + '.' + self.__class__.__name__
             )
@@ -70,6 +85,18 @@ class Repository():
             self.server_cert = config['SERVER_CERT']
         else:
             self.server_cert = None
+
+    def at_path(self, relpath):
+        self._path_stack.append(self.relpath)
+        self.relpath = relpath
+        return self
+
+    def __enter__(self):
+        pass
+
+    def __exit__(self, type, value, traceback):
+        self.relpath = self._path_stack.pop()
+
 
     def is_reachable(self):
         response = self.head(self.fullpath)
@@ -124,6 +151,42 @@ class Repository():
             )
         self.logger.debug("%s %s", response.status_code, response.reason)
         return response
+
+    def delete(self, url, **kwargs):
+        target_uri = self._insert_transaction_uri(url)
+        self.logger.debug('DELETE {0}'.format(target_uri))
+        response = requests.delete(
+            target_uri, cert=self.client_cert,
+            auth=self.auth, verify=self.server_cert, **kwargs
+            )
+        self.logger.debug("%s %s", response.status_code, response.reason)
+        return response
+
+    def recursive_get(self, url, traverse=[], **kwargs):
+        head_response = self.head(url, **kwargs)
+        if 'describedby' in head_response.links:
+            target = head_response.links['describedby']['url']
+        else:
+            target = url
+        response = self.get(target, headers={'Accept': 'text/turtle'}, **kwargs)
+        if response.status_code == 200:
+            graph = rdflib.Graph()
+            graph.parse(data=response.text, format='n3', publicID=url)
+            yield (self._remove_transaction_uri(url), graph)
+            for (s, p, o) in graph:
+                if p in traverse:
+                    for (uri, graph) in self.recursive_get(
+                        str(o), traverse=traverse, **kwargs):
+                        yield (uri, graph)
+
+    def get_graph(self, url):
+        response = self.get(url, headers={'Accept': 'text/turtle'}, stream=True)
+        if response.status_code != 200:
+            self.logger.error("Unable to get text/turtle representation of {0}".format(url))
+            raise RESTAPIException(response)
+        graph = rdflib.Graph()
+        graph.parse(source=response.raw, format='turtle')
+        return graph
 
     def open_transaction(self, **kwargs):
         url = os.path.join(self.endpoint, 'fcr:tx')
@@ -202,51 +265,125 @@ class RESTAPIException(Exception):
 class Resource(object):
 
     def __init__(self, uri=''):
-        self.graph = rdflib.Graph()
-        self.graph.namespace_manager = namespace_manager
         self.uri = rdflib.URIRef(uri)
-        self.related = []
+        self.linked_objects = []
+        self.fragments = []
+        self.annotations = None
+        self.extra = rdflib.Graph()
+        self.created = False
+        self.updated = False
         self.logger = logging.getLogger(
             __name__ + '.' + self.__class__.__name__
             )
 
-    # create repository object by POSTing object graph
-    def create_object(self, repository):
-        if self.exists_in_repo(repository):
+    def components(self):
+        return [ obj for (rel, obj) in self.linked_objects if rel == pcdm.hasMember ]
+
+    def ordered_components(self):
+        return [ obj for obj in self.components() if obj.ordered ]
+
+    def unordered_components(self):
+        return [ obj for obj in self.components() if not obj.ordered ]
+
+    def files(self):
+        return [ obj for (rel, obj) in self.linked_objects if rel == pcdm.hasFile ]
+
+    def collections(self):
+        return [ obj for (rel, obj) in self.linked_objects if rel == pcdm.memberOf ]
+
+    def related(self):
+        return [ obj for (rel, obj) in self.linked_objects if rel == pcdm.hasRelatedObject ]
+
+    def add_component(self, obj):
+        self.linked_objects.append((pcdm.hasMember, obj))
+        obj.linked_objects.append((pcdm.memberOf, self))
+
+    def add_file(self, obj):
+        self.linked_objects.append((pcdm.hasFile, obj))
+        obj.linked_objects.append((pcdm.fileOf, self))
+
+    def add_collection(self, obj):
+        self.linked_objects.append((pcdm.memberOf, obj))
+
+    def add_related(self, obj):
+        self.linked_objects.append((pcdm.hasRelatedObject, obj))
+        obj.linked_objects.append((pcdm.relatedObjectOf, self))
+
+    def graph(self):
+        graph = rdflib.Graph()
+        graph.namespace_manager = namespace_manager
+
+        for (rel, obj) in self.linked_objects:
+            graph.add((self.uri, rel, obj.uri))
+
+        for obj in self.fragments:
+            graph = graph + obj.graph()
+
+        graph = graph + self.extra
+
+        return graph
+
+    # create repository object by POST or PUT
+    def create_object(self, repository, uri=None):
+        if self.created:
             return False
+        elif self.exists_in_repo(repository):
+            self.created = True
+            return False
+
+        self.logger.info("Creating {0}...".format(self.title))
+        if uri is not None:
+            response = repository.put(uri)
         else:
-            self.logger.info("Creating {0}...".format(self.title))
             response = repository.post(
                 '/'.join([p.strip('/') for p in (repository.endpoint,
                                                  repository.relpath)])
                 )
-            if response.status_code == 201:
-                self.logger.info("Created {0}".format(self.title))
-                self.uri = rdflib.URIRef(
-                    repository._remove_transaction_uri(response.text)
-                    )
-                self.uuid = str(self.uri).rsplit('/', 1)[-1]
-                self.logger.info(
-                    'URI: {0} / UUID: {1}'.format(self.uri, self.uuid)
-                    )
-                return True
-            else:
-                self.logger.error("Failed to create {0}".format(self.title))
-                raise RESTAPIException(response)
+
+        if response.status_code == 201:
+            self.created = True
+            self.logger.info("Created {0}".format(self.title))
+            self.uri = rdflib.URIRef(
+                repository._remove_transaction_uri(response.text)
+                )
+            self.uuid = str(self.uri).rsplit('/', 1)[-1]
+            self.logger.info(
+                'URI: {0} / UUID: {1}'.format(self.uri, self.uuid)
+                )
+            self.create_fragments()
+            return True
+        else:
+            self.logger.error("Failed to create {0}".format(self.title))
+            raise RESTAPIException(response)
+
+    def create_fragments(self):
+        for obj in self.fragments:
+            obj.uuid = uuid4()
+            obj.uri = rdflib.URIRef('{0}#{1}'.format(self.uri, obj.uuid))
+            obj.created = True
 
     # update existing repo object with SPARQL update
     def update_object(self, repository, patch_uri=None):
+        graph = self.graph()
         if not patch_uri:
             patch_uri = self.uri
         prolog = ''
         #TODO: limit this to just the prefixes that are used in the graph
-        for (prefix, uri) in self.graph.namespace_manager.namespaces():
+        for (prefix, uri) in graph.namespace_manager.namespaces():
             prolog += "PREFIX {0}: {1}\n".format(prefix, uri.n3())
 
-        triples = [ "<> {0} {1}.".format(
-            self.graph.namespace_manager.normalizeUri(p),
-            o.n3(self.graph.namespace_manager)
-            ) for (s, p, o) in self.graph ]
+        triples = []
+        for (s, p, o) in graph:
+            subject = s.n3(graph.namespace_manager)
+            if '#' in subject:
+                subject = '<' + subject[subject.index('#'):]
+            else:
+                subject = '<>'
+            triples.append("{0} {1} {2}.".format(
+                subject,
+                graph.namespace_manager.normalizeUri(p),
+                o.n3(graph.namespace_manager)
+                ))
 
         query = prolog + "INSERT DATA {{{0}}}".format("\n".join(triples))
         data = query.encode('utf-8')
@@ -255,6 +392,7 @@ class Resource(object):
         response = repository.patch(str(patch_uri), data=data, headers=headers)
         if response.status_code == 204:
             self.logger.info("Updated {0}".format(self.title))
+            self.updated = True
             return response
         else:
             self.logger.error("Failed to update {0}".format(self.title))
@@ -262,52 +400,25 @@ class Resource(object):
             raise RESTAPIException(response)
 
     # recursively create an object and components and that don't yet exist
-    def recursive_create(self, repository, nobinaries):
-        if not self.exists_in_repo(repository):
-            self.create_object(repository)
+    def recursive_create(self, repository):
+        if self.create_object(repository):
             self.creation_timestamp = dt.now()
         else:
-            self.logger.info(
-                'Object "{0}" exists. Skipping.'.format(self.title)
-                )
+            self.logger.debug('Object "{0}" exists. Skipping.'.format(self.title))
 
-        if not nobinaries:
-            for file in self.files:
-                if not file.exists_in_repo(repository):
-                    file.create_nonrdf(repository)
-                else:
-                    self.logger.info(
-                        'File "{0}" exists. Skipping.'.format(file.title)
-                        )
-
-        for component in self.components:
-            if not component.exists_in_repo(repository):
-                component.recursive_create(repository, nobinaries)
+        for (rel, obj) in self.linked_objects:
+            if obj.created or obj.exists_in_repo(repository):
+                obj.created = True
+                self.logger.debug('Object "{0}" exists. Skipping.'.format(self.title))
             else:
-                self.logger.info(
-                    'Component "{0}" exists. Skipping.'.format(component.title)
-                    )
-
-        for related_object in self.related:
-            if not related_object.exists_in_repo(repository):
-                related_object.recursive_create(repository, nobinaries)
-            else:
-                self.logger.info(
-                    'Related object "{0}" exists. Skipping.'.format(
-                        related_object.title
-                        )
-                    )
+                obj.recursive_create(repository)
 
     # recursively update an object and all its components and files
-    def recursive_update(self, repository, nobinaries):
-        self.update_object(repository)
-        if not nobinaries:
-            for file in self.files:
-                file.update_object(repository)
-        for component in self.components:
-            component.recursive_update(repository, nobinaries)
-        for related_object in self.related:
-            related_object.recursive_update(repository, nobinaries)
+    def recursive_update(self, repository):
+        if not self.updated:
+            self.update_object(repository)
+            for (rel, obj) in self.linked_objects:
+                obj.recursive_update(repository)
 
     # check for the existence of a local object in the repository
     def exists_in_repo(self, repository):
@@ -320,46 +431,15 @@ class Resource(object):
         else:
             return False
 
-    # update object graph with URI
-    def update_subject_uri(self):
-        for (s, p, o) in self.graph:
-            self.graph.delete( (s, p, o) )
-            self.graph.add( (self.uri, p, o) )
-
-    # update membership triples (can be used after repository object creation
-    # to ensure repository URIs are present)
-    def update_relationship_triples(self):
-        for component in self.components:
-            self.graph.add( (self.uri, pcdm.hasMember, component.uri) )
-            component.graph.add( (component.uri, pcdm.memberOf, self.uri) )
-            component.update_relationship_triples()
-
-        for file in self.files:
-            # sys.stderr.write(str(self.uri))
-            self.graph.add( (self.uri, pcdm.hasFile, file.uri) )
-            file.graph.add( (file.uri, pcdm.fileOf, self.uri) )
-
-        for collection in self.collections:
-            self.graph.add( (self.uri, pcdm.memberOf, collection.uri) )
-
-        for related_object in self.related:
-            self.graph.add(
-                (self.uri, pcdm.hasRelatedObject, related_object.uri)
-                )
-            related_object.graph.add(
-                (related_object.uri, pcdm.relatedObjectOf, self.uri)
-                )
-            related_object.update_relationship_triples()
-
     # add arbitrary additional triples provided in a file
     def add_extra_properties(self, triples_file, rdf_format):
-        self.graph.parse(
+        self.extra.parse(
             source=triples_file, format=rdf_format, publicID=self.uri
             )
 
     # show the object's graph, serialized as turtle
     def print_graph(self):
-        print(self.graph.serialize(format="turtle").decode())
+        print(self.graph().serialize(format="turtle").decode())
 
     # called after creation of object in repo
     def post_creation_hook(self):
@@ -368,8 +448,8 @@ class Resource(object):
     # show the item graph and tree of related objects
     def print_item_tree(self):
         print(self.title)
-        ordered = [c for c in self.components if c.ordered is True]
-        unordered = [c for c in self.components if c.ordered is False]
+        ordered = self.ordered_components()
+        unordered = self.unordered_components()
         if ordered:
             print(" ORDERED COMPONENTS")
             for n, p in enumerate(ordered):
@@ -391,47 +471,56 @@ class Resource(object):
 class Item(Resource):
 
     def __init__(self):
-        Resource.__init__(self)
-        self.files = []
-        self.components = []
-        self.collections = []
-        self.related = []
-        self.graph.add( (self.uri, rdf.type, pcdm.Object) )
+        super(Item, self).__init__()
+        self.first = None
+        self.last = None
+        self.annotations = []
+
+    def graph(self):
+        graph = super(Item, self).graph()
+        graph.add((self.uri, rdf.type, pcdm.Object))
+        if self.first is not None:
+            graph.add((self.uri, iana.first, self.first.uri))
+        if self.last is not None:
+            graph.add((self.uri, iana.last, self.last.uri))
+        return graph
 
     # iterate over each component and create ordering proxies
     def create_ordering(self, repository):
         proxies = []
-        ordered_components = [c for c in self.components if c.ordered is True]
+        ordered_components = self.ordered_components()
         for component in ordered_components:
             position = " ".join([self.sequence_attr[0],
                                 getattr(component, self.sequence_attr[1])]
                                 )
-            proxies.append(
-                Proxy(position, self.title, component.uri, self.uuid)
-                )
+            proxies.append(Proxy(position, proxy_for=component, proxy_in=self))
 
         for proxy in proxies:
             proxy.create_object(repository)
-            proxy.graph.namespace_manager = self.graph.namespace_manager
 
         for (position, component) in enumerate(ordered_components):
             proxy = proxies[position]
-            proxy.graph.add( (proxy.uri, ore.proxyFor, component.uri) )
-            proxy.graph.add( (proxy.uri, ore.proxyIn, self.uri) )
 
             if position == 0:
-                self.graph.add( (self.uri, iana.first, proxy.uri) )
+                self.first = proxy
             else:
-                prev = proxies[position - 1]
-                proxy.graph.add( (proxy.uri, iana.prev, prev.uri) )
+                proxy.prev = proxies[position - 1]
 
             if position == len(ordered_components) - 1:
-                self.graph.add( (self.uri, iana.last, proxy.uri) )
+                self.last = proxy
             else:
-                next = proxies[position + 1]
-                proxy.graph.add( (proxy.uri, iana.next, next.uri) )
+                proxy.next = proxies[position + 1]
 
             proxy.update_object(repository)
+
+    def create_annotations(self, repository):
+        with repository.at_path('annotations'):
+            for annotation in self.annotations:
+                annotation.recursive_create(repository)
+
+    def update_annotations(self, repository):
+        for annotation in self.annotations:
+            annotation.recursive_update(repository)
 
 #============================================================================
 # PCDM COMPONENT-OBJECT
@@ -440,38 +529,66 @@ class Item(Resource):
 class Component(Resource):
 
     def __init__(self):
-        Resource.__init__(self)
-        self.files = []
-        self.components = []
-        self.collections = []
+        super(Component, self).__init__()
         self.ordered = False
-        self.graph.add( (self.uri, rdf.type, pcdm.Object) )
+
+    def graph(self):
+        graph = super(Component, self).graph()
+        graph.add((self.uri, rdf.type, pcdm.Object))
+        return graph
 
 #============================================================================
 # PCDM FILE
 #============================================================================
 
 class File(Resource):
+    @classmethod
+    def from_localpath(cls, localpath, mimetype=None, title=None):
+        if mimetype is None:
+            mimetype = mimetypes.guess_type(localpath)[0]
 
-    def __init__(self, localpath, title=None):
-        Resource.__init__(self)
-        self.localpath = localpath
+        def open_stream():
+            return open(localpath, 'rb')
+
+        return cls(
+            filename=os.path.basename(localpath),
+            mimetype=mimetype,
+            title=title,
+            open_stream=open_stream
+            )
+
+    def __init__(self, filename, mimetype, title=None, open_stream=None):
+        super(File, self).__init__()
+        self.filename = filename
+        self.mimetype = mimetype
+        self.open_stream = open_stream
         if title is not None:
             self.title = title
         else:
-            self.title = os.path.basename(self.localpath)
-        self.graph.add((self.uri, rdf.type, pcdm.File))
-        self.graph.add((self.uri, dcterms.title, rdflib.Literal(self.title)))
+            self.title = self.filename
+
+    def graph(self):
+        graph = super(File, self).graph()
+        graph.add((self.uri, rdf.type, pcdm.File))
+        graph.add((self.uri, dcterms.title, rdflib.Literal(self.title)))
+        return graph
 
     # upload a binary resource
-    def create_nonrdf(self, repository):
+    def create_object(self, repository):
+        if not repository.load_binaries:
+            self.logger.info('Skipping loading for binary {0}'.format(self.filename))
+            return True
+        elif self.created:
+            return False
+        elif self.exists_in_repo(repository):
+            self.created = True
+            return False
+
         checksum = self.sha1()
-        mimetype = mimetypes.guess_type(self.localpath)[0]
-        self.filename = os.path.basename(self.localpath)
         self.logger.info("Loading {0}".format(self.filename))
-        with open(self.localpath, 'rb') as binaryfile:
-            data = binaryfile.read()
-        headers = {'Content-Type': mimetype,
+        with self.open_stream() as stream:
+            data = stream.read()
+        headers = {'Content-Type': self.mimetype,
                    'Digest': 'sha1={0}'.format(checksum),
                    'Content-Disposition':
                         'attachment; filename="{0}"'.format(self.filename)
@@ -482,11 +599,15 @@ class File(Resource):
         response = repository.post(target_uri, data=data, headers=headers)
         if response.status_code == 201:
             self.uri = rdflib.URIRef(response.text)
+            self.created = True
             return True
         else:
             raise RESTAPIException(response)
 
     def update_object(self, repository):
+        if not repository.load_binaries:
+            self.logger.info('Skipping update for binary {0}'.format(self.filename))
+            return True
         fcr_metadata = str(self.uri) + '/fcr:metadata'
         super(File, self).update_object(repository, patch_uri=fcr_metadata)
 
@@ -494,9 +615,9 @@ class File(Resource):
     def sha1(self):
         BUF_SIZE = 65536
         sha1 = hashlib.sha1()
-        with open(self.localpath, 'rb') as f:
+        with self.open_stream() as stream:
             while True:
-                data = f.read(BUF_SIZE)
+                data = stream.read(BUF_SIZE)
                 if not data:
                     break
                 sha1.update(data)
@@ -510,8 +631,14 @@ class Collection(Resource):
 
     def __init__(self):
         Resource.__init__(self)
-        self.files = None
-        self.graph.add( (self.uri, rdf.type, pcdm.Collection) )
+        self.title = None
+
+    def graph(self):
+        graph = super(Collection, self).graph()
+        graph.add((self.uri, rdf.type, pcdm.Collection))
+        if self.title is not None:
+            graph.add((self.uri, dcterms.title, rdflib.Literal(self.title)))
+        return graph
 
 #============================================================================
 # PCDM PROXY OBJECT
@@ -519,34 +646,110 @@ class Collection(Resource):
 
 class Proxy(Resource):
 
-    def __init__(self, position, context, parent_uri, item_uuid):
+    def __init__(self, position, proxy_for, proxy_in):
         Resource.__init__(self)
-        self.title = 'Proxy for {0} in {1}'.format(position, context)
-        self.parent_uri = parent_uri
-        self.item_uuid = item_uuid
-        self.graph.add( (self.uri, rdf.type, ore.Proxy) )
-        self.graph.add( (self.uri, dcterms.title, rdflib.Literal(self.title)) )
+        self.title = 'Proxy for {0} in {1}'.format(position, proxy_in.title)
+        self.prev = None
+        self.next = None
+        self.proxy_for = proxy_for
+        self.proxy_in = proxy_in
+
+    def graph(self):
+        graph = super(Proxy, self).graph()
+        graph.add((self.uri, rdf.type, ore.Proxy))
+        graph.add((self.uri, dcterms.title, rdflib.Literal(self.title)))
+        graph.add((self.uri, ore.proxyFor, self.proxy_for.uri))
+        graph.add((self.uri, ore.proxyIn, self.proxy_in.uri))
+        if self.prev is not None:
+            graph.add((self.uri, iana.prev, self.prev.uri))
+        if self.next is not None:
+            graph.add((self.uri, iana.next, self.next.uri))
+        return graph
 
     # create proxy object by PUTting object graph
-    def create_object(self, repository):
-        if self.exists_in_repo(repository):
-            return False
+    def create_object(self, repository, **kwargs):
+        uri='/'.join([p.strip('/') for p in (self.proxy_for.uri, self.proxy_in.uuid)])
+        super(Proxy, self).create_object(repository, uri=uri, **kwargs)
+
+# Annotation resources
+
+class Annotation(Resource):
+    def __init__(self):
+        super(Annotation, self).__init__()
+        self.motivation = None
+
+    def add_body(self, body):
+        self.linked_objects.append((oa.hasBody, body))
+        self.title = body.title
+        body.annotation = self
+
+    def add_target(self, target):
+        self.linked_objects.append((oa.hasTarget, target))
+        target.annotation = self
+
+    def graph(self):
+        graph = super(Annotation, self).graph()
+        graph.add((self.uri, rdf.type, oa.Annotation))
+        if self.motivation is not None:
+            graph.add((self.uri, oa.motivatedBy, self.motivation))
+        return graph
+
+class TextualBody(Resource):
+    def __init__(self, value, content_type):
+        super(TextualBody, self).__init__()
+        self.value = value
+        self.content_type = content_type
+        if len(self.value) <= 25:
+            self.title = self.value
         else:
-            self.logger.info("Creating {0}...".format(self.title))
-            response = repository.put(
-                '/'.join([p.strip('/') for p in (self.parent_uri,
-                                                 self.item_uuid)])
-                )
-            if response.status_code == 201:
-                self.logger.info("Created {0}".format(self.title))
-                self.uri = rdflib.URIRef(
-                    repository._remove_transaction_uri(response.text)
-                    )
-                self.uuid = str(self.uri).rsplit('/', 1)[-1]
-                self.logger.info(
-                    'URI: {0} / UUID: {1}'.format(self.uri, self.uuid)
-                    )
-                return True
-            else:
-                self.logger.error("Failed to create {0}".format(self.title))
-                raise RESTAPIException(response)
+            self.title = self.value[:24] + '…'
+
+    def graph(self):
+        graph = super(TextualBody, self).graph()
+        graph.add((self.uri, rdf.value, rdflib.Literal(self.value)))
+        graph.add((self.uri, dcterms['format'], rdflib.Literal(self.content_type)))
+        graph.add((self.uri, rdf.type, oa.TextualBody))
+        return graph
+
+class SpecificResource(Resource):
+    def __init__(self, source):
+        super(SpecificResource, self).__init__()
+        self.source = source
+
+    def add_selector(self, selector):
+        self.title = selector.title
+        self.linked_objects.append((oa.hasSelector, selector))
+        selector.annotation = self
+
+    def graph(self):
+        graph = super(SpecificResource, self).graph()
+        graph.add((self.uri, oa.hasSource, self.source.uri))
+        graph.add((self.uri, rdf.type, oa.SpecificResource))
+        return graph
+
+class FragmentSelector(Resource):
+    def __init__(self, value, conforms_to=None):
+        super(FragmentSelector, self).__init__()
+        self.value = value
+        self.conforms_to = conforms_to
+        self.title = self.value
+
+    def graph(self):
+        graph = super(FragmentSelector, self).graph()
+        graph.add((self.uri, rdf.value, rdflib.Literal(self.value)))
+        graph.add((self.uri, rdf.type, oa.FragmentSelector))
+        if self.conforms_to is not None:
+            graph.add((self.uri, dcterms.conformsTo, self.conforms_to))
+        return graph
+
+class XPathSelector(Resource):
+    def __init__(self, value):
+        super(XPathSelector, self).__init__()
+        self.value = value
+        self.title = self.value
+
+    def graph(self):
+        graph = super(XPathSelector, self).graph()
+        graph.add((self.uri, rdf.value, rdflib.Literal(self.value)))
+        graph.add((self.uri, rdf.type, oa.XPathSelector))
+        return graph

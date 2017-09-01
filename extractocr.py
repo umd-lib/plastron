@@ -50,6 +50,11 @@ def main():
                         required=True
                         )
 
+    parser.add_argument('--ignore', '-i',
+                        help='file listing items to ignore',
+                        action='store'
+                        )
+
     args = parser.parse_args()
 
     now = datetime.utcnow().strftime('%Y%m%d%H%M%S')
@@ -66,22 +71,36 @@ def main():
         fcrepo = pcdm.Repository(yaml.safe_load(repoconfig))
         logger.info('Loaded repo configuration from {0}'.format(args.repo))
 
+    fieldnames = ['uri', 'timestamp']
+
     # read the log of completed items
     try:
-        completed = util.ItemLog('logs/annotated.csv', ['uri', 'timestamp'], 'uri')
+        completed = util.ItemLog('logs/annotated.csv', fieldnames, 'uri')
     except Exception as e:
         logger.error('Non-standard map file specified: {0}'.format(e))
         sys.exit(1)
 
     logger.info('Found {0} completed items'.format(len(completed)))
 
+    if args.ignore is not None:
+        try:
+            ignored = util.ItemLog(args.ignore, fieldnames, 'uri')
+        except Exception as e:
+            logger.error('Non-standard ignore file specified: {0}'.format(e))
+            sys.exit(1)
+    else:
+        ignored = []
+
     skipfile = 'logs/skipped.extractocr.{0}.csv'.format(now)
-    skipped = util.ItemLog(skipfile, ['uri', 'timestamp'], 'uri')
+    skipped = util.ItemLog(skipfile, fieldnames, 'uri')
 
     with fcrepo.at_path('/annotations'):
         for line in sys.stdin:
             uri = line.rstrip('\n')
             if uri in completed:
+                continue
+            elif uri in ignored:
+                logger.debug('Ignoring {0}'.format(uri))
                 continue
 
             is_extracted = False

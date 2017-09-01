@@ -165,6 +165,11 @@ def main():
                         action='store_true'
                         )
 
+    parser.add_argument('--ignore', '-i',
+                        help='file listing items to ignore',
+                        action='store'
+                        )
+
     args = parser.parse_args()
 
     if not args.quiet:
@@ -241,6 +246,15 @@ def main():
 
         logger.info('Found {0} completed items'.format(len(completed)))
 
+        if args.ignore is not None:
+            try:
+                ignored = util.ItemLog(args.ignore, fieldnames, 'path')
+            except Exception as e:
+                logger.error('Non-standard ignore file specified: {0}'.format(e))
+                sys.exit(1)
+        else:
+            ignored = []
+
         skipfile = os.path.join(log_location, 'skipped.load.{0}.csv'.format(now))
         skipped = util.ItemLog(skipfile, fieldnames, 'path')
 
@@ -251,6 +265,9 @@ def main():
                 logger.info("Stopping after {0} item(s)".format(args.limit))
                 break
             elif item.path in completed:
+                continue
+            elif item.path in ignored:
+                logger.debug('Ignoring {0}'.format(item.path))
                 continue
 
             logger.info(

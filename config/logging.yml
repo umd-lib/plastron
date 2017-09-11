@@ -1,7 +1,7 @@
 version: 1
 formatters:
   full:
-    format: '%(levelname)s|%(asctime)s|%(name)s|%(message)s'
+    format: '%(levelname)s|%(asctime)s|%(threadName)s|%(name)s|%(message)s'
   messageonly:
     format: '%(message)s'
 handlers:

@@ -59,6 +59,9 @@ def load_item(fcrepo, item, args, extra=None):
 
     # create item and its components
     try:
+        keep_alive = pcdm.TransactionKeepAlive(fcrepo, 90)
+        keep_alive.start()
+
         logger.info('Creating item')
         item.recursive_create(fcrepo)
         logger.info('Creating ordering proxies')
@@ -81,6 +84,8 @@ def load_item(fcrepo, item, args, extra=None):
             logger.info('Updating annotations')
             item.update_annotations(fcrepo)
 
+        keep_alive.stop()
+
         # commit transaction
         logger.info('Committing transaction')
         fcrepo.commit_transaction()
@@ -96,6 +101,12 @@ def load_item(fcrepo, item, args, extra=None):
         logger.error("Item creation failed: {0}".format(e))
         fcrepo.rollback_transaction()
         logger.warn('Transaction rolled back. Continuing load.')
+
+    except KeyboardInterrupt as e:
+        # set the stop flag on the keep-alive ping
+        keep_alive.stop()
+        logger.error("Load interrupted")
+        sys.exit(2)
 
 #============================================================================
 # MAIN LOOP

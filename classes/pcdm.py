@@ -626,18 +626,17 @@ class File(Resource):
             return False
 
         self.logger.info("Loading {0}".format(self.filename))
-        with self.open_stream() as stream:
-            data = stream.read()
-        headers = {
-            'Content-Type': self.mimetype,
-            'Digest': 'sha1={0}'.format(self.sha1()),
-            'Content-Disposition': 'attachment; filename="{0}"'.format(self.filename)
-            }
 
-        if uri is not None:
-            response = repository.put(uri, data=data, headers=headers)
-        else:
-            response = repository.post(repository.uri(), data=data, headers=headers)
+        with self.open_stream() as stream:
+            headers = {
+                'Content-Type': self.mimetype,
+                'Digest': 'sha1={0}'.format(self.sha1()),
+                'Content-Disposition': 'attachment; filename="{0}"'.format(self.filename)
+                }
+            if uri is not None:
+                response = repository.put(uri, data=stream, headers=headers)
+            else:
+                response = repository.post(repository.uri(), data=stream, headers=headers)
 
         if response.status_code == 201:
             self.uri = rdflib.URIRef(response.text)

@@ -276,6 +276,10 @@ class Repository():
         else:
             return uri
 
+    def uri(self):
+        return '/'.join([p.strip('/') for p in (self.endpoint, self.relpath)])
+
+
 # based on https://stackoverflow.com/a/12435256/5124907
 class TransactionKeepAlive(threading.Thread):
     def __init__(self, repository, interval):
@@ -290,6 +294,7 @@ class TransactionKeepAlive(threading.Thread):
 
     def stop(self):
         self.stopped.set()
+
 
 #============================================================================
 # PCDM RESOURCE (COMMON METHODS FOR ALL OBJECTS)
@@ -374,10 +379,7 @@ class Resource(object):
         if uri is not None:
             response = repository.put(uri)
         else:
-            response = repository.post(
-                '/'.join([p.strip('/') for p in (repository.endpoint,
-                                                 repository.relpath)])
-                )
+            response = repository.post(repository.uri())
 
         if response.status_code == 201:
             self.created = True
@@ -613,7 +615,7 @@ class File(Resource):
         return graph
 
     # upload a binary resource
-    def create_object(self, repository):
+    def create_object(self, repository, uri=None):
         if not repository.load_binaries:
             self.logger.info('Skipping loading for binary {0}'.format(self.filename))
             return True
@@ -623,19 +625,20 @@ class File(Resource):
             self.created = True
             return False
 
-        checksum = self.sha1()
         self.logger.info("Loading {0}".format(self.filename))
         with self.open_stream() as stream:
             data = stream.read()
-        headers = {'Content-Type': self.mimetype,
-                   'Digest': 'sha1={0}'.format(checksum),
-                   'Content-Disposition':
-                        'attachment; filename="{0}"'.format(self.filename)
-                    }
-        target_uri = '/'.join(
-            [p.strip('/') for p in (repository.endpoint, repository.relpath)]
-            )
-        response = repository.post(target_uri, data=data, headers=headers)
+        headers = {
+            'Content-Type': self.mimetype,
+            'Digest': 'sha1={0}'.format(self.sha1()),
+            'Content-Disposition': 'attachment; filename="{0}"'.format(self.filename)
+            }
+
+        if uri is not None:
+            response = repository.put(uri, data=data, headers=headers)
+        else:
+            response = repository.post(repository.uri(), data=data, headers=headers)
+
         if response.status_code == 201:
             self.uri = rdflib.URIRef(response.text)
             self.created = True

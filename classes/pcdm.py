@@ -10,6 +10,7 @@ from rdflib import Namespace
 import sys
 import logging
 from uuid import uuid4
+import threading
 
 #============================================================================
 # NAMESPACE BINDINGS
@@ -203,6 +204,29 @@ class Repository():
             self.logger.error("Failed to create transaction")
             raise RESTAPIException(response)
 
+    def maintain_transaction(self, **kwargs):
+        if self.transaction is not None:
+            url = os.path.join(self.transaction, 'fcr:tx')
+            self.logger.info(
+                "Maintaining transaction {0}".format(self.transaction)
+                )
+            self.logger.debug("POST {0}".format(url))
+            response = requests.post(url, cert=self.client_cert, auth=self.auth,
+                        verify=self.server_cert, **kwargs)
+            self.logger.debug("%s %s", response.status_code, response.reason)
+            if response.status_code == 204:
+                self.logger.info(
+                    "Transaction {0} is active until {1}".format(
+                        self.transaction, response.headers['Expires']
+                        )
+                    )
+                return True
+            else:
+                self.logger.error(
+                    "Failed to maintain transaction {0}".format(self.transaction)
+                    )
+                raise RESTAPIException(response)
+
     def commit_transaction(self, **kwargs):
         if self.transaction is not None:
             url = os.path.join(self.transaction, 'fcr:tx/fcr:commit')
@@ -254,6 +278,23 @@ class Repository():
 
     def uri(self):
         return '/'.join([p.strip('/') for p in (self.endpoint, self.relpath)])
+
+
+# based on https://stackoverflow.com/a/12435256/5124907
+class TransactionKeepAlive(threading.Thread):
+    def __init__(self, repository, interval):
+        super(TransactionKeepAlive, self).__init__(name='TransactionKeepAlive')
+        self.repository = repository
+        self.interval = interval
+        self.stopped = threading.Event()
+
+    def run(self):
+        while not self.stopped.wait(self.interval):
+            self.repository.maintain_transaction()
+
+    def stop(self):
+        self.stopped.set()
+
 
 #============================================================================
 # PCDM RESOURCE (COMMON METHODS FOR ALL OBJECTS)

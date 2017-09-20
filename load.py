@@ -5,6 +5,7 @@ from __future__ import print_function
 
 import argparse
 import csv
+from fractions import gcd
 import logging
 from importlib import import_module
 import os.path
@@ -108,6 +109,14 @@ def load_item(fcrepo, item, args, extra=None):
         logger.error("Load interrupted")
         sys.exit(2)
 
+# custom argument type for percentage loads
+def percentage(n):
+    p = int(n)
+    if not p > 0 and p < 100:
+        raise argparse.ArgumentTypeError("Percent param must be 1-99")
+    return p
+
+
 #============================================================================
 # MAIN LOOP
 #============================================================================
@@ -152,6 +161,14 @@ def main():
                                 top-level objects''',
                         action='store',
                         type=int,
+                        default=None
+                        )
+
+    # Load an evenly-spaced percentage of the total batch
+    parser.add_argument('-%', '--percent',
+                        help='load specified percentage of total items',
+                        action='store',
+                        type=percentage,
                         default=None
                         )
 
@@ -269,9 +286,33 @@ def main():
         skipfile = os.path.join(log_location, 'skipped.load.{0}.csv'.format(now))
         skipped = util.ItemLog(skipfile, fieldnames, 'path')
 
+        # set up interval from percent parameter and store set of items to load
+        if args.percent is not None:
+            gr_common_div = gcd(100, args.percent)
+            denom = int(100 / gr_common_div)
+            numer = int(args.percent / gr_common_div)
+            logger.info('Loading {0} of every {1} items (= {2}%)'.format(
+                            numer, denom, args.percent
+                            ))
+            load_set = set()
+            for i in range(0, batch.length, denom):
+                load_set.update(range(i, i + numer))
+            logger.info(
+                'Items to load: {0}'.format(
+                    ', '.join([str(s + 1) for s in sorted(load_set)])
+                    ))
+
         # create all batch objects in repository
         for n, item in enumerate(batch):
             is_loaded = False
+
+            if args.percent is not None and n not in load_set:
+                logger.info(
+                    'Loading {0} percent, skipping {1}'.format(args.percent, n)
+                    )
+                continue
+
+            # handle load limit parameter
             if args.limit is not None and n >= args.limit:
                 logger.info("Stopping after {0} item(s)".format(args.limit))
                 break

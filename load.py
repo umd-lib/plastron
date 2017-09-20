@@ -295,13 +295,11 @@ def main():
                             numer, denom, args.percent
                             ))
             load_set = set()
-            for i in range(int(batch.length / denom)):
-                load_set.update(
-                    [i * denom + j for j in range(denom) if j < numer]
-                    )
+            for i in range(0, batch.length, denom):
+                load_set.update(range(i, i + numer))
             logger.info(
                 'Items to load: {0}'.format(
-                    ', '.join([str(s) for s in sorted(load_set)])
+                    ', '.join([str(s + 1) for s in sorted(load_set)])
                     ))
 
         # create all batch objects in repository

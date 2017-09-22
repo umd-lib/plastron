@@ -19,6 +19,7 @@ import logging
 import logging.config
 from datetime import datetime
 from classes import pcdm,util
+from time import sleep
 
 logger = logging.getLogger(__name__)
 
@@ -197,6 +198,11 @@ def main():
                         help='file listing items to ignore',
                         action='store'
                         )
+    
+    parser.add_argument('--wait', '-w',
+                        help='wait n seconds between items',
+                        action='store'
+                        )
 
     args = parser.parse_args()
 
@@ -357,6 +363,10 @@ def main():
                 completed.writerow(row)
             else:
                 skipped.writerow(row)
+                
+            if args.wait:
+                logger.info("Pausing {0} seconds".format(args.wait))
+                sleep(int(args.wait))
 
     if not args.quiet:
         print_footer()

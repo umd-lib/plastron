@@ -103,65 +103,33 @@ class Repository():
         response = self.head(self.fullpath)
         return response.status_code == 200
 
-    def post(self, url, **kwargs):
+    def request(self, method, url, **kwargs):
         target_uri = self._insert_transaction_uri(url)
-        self.logger.debug("POST {0}".format(target_uri))
-        response = requests.post(
-            target_uri, cert=self.client_cert,
+        self.logger.debug("%s %s", method, target_uri)
+        response = requests.request(
+            method, target_uri, cert=self.client_cert,
             auth=self.auth, verify=self.server_cert, **kwargs
             )
         self.logger.debug("%s %s", response.status_code, response.reason)
         return response
+
+    def post(self, url, **kwargs):
+        return self.request('POST', url, **kwargs)
 
     def put(self, url, **kwargs):
-        target_uri = self._insert_transaction_uri(url)
-        self.logger.debug("PUT {0}".format(target_uri))
-        response = requests.put(
-            target_uri, cert=self.client_cert,
-            auth=self.auth, verify=self.server_cert, **kwargs
-            )
-        self.logger.debug("%s %s", response.status_code, response.reason)
-        return response
+        return self.request('PUT', url, **kwargs)
 
     def patch(self, url, **kwargs):
-        target_uri = self._insert_transaction_uri(url)
-        self.logger.debug("PATCH {0}".format(target_uri))
-        response = requests.patch(
-            target_uri, cert=self.client_cert,
-            auth=self.auth, verify=self.server_cert, **kwargs
-            )
-        self.logger.debug("%s %s", response.status_code, response.reason)
-        return response
+        return self.request('PATCH', url, **kwargs)
 
     def head(self, url, **kwargs):
-        target_uri = self._insert_transaction_uri(url)
-        self.logger.debug('HEAD {0}'.format(target_uri))
-        response = requests.head(
-            target_uri, cert=self.client_cert,
-            auth=self.auth, verify=self.server_cert, **kwargs
-            )
-        self.logger.debug("%s %s", response.status_code, response.reason)
-        return response
+        return self.request('HEAD', url, **kwargs)
 
     def get(self, url, **kwargs):
-        target_uri = self._insert_transaction_uri(url)
-        self.logger.debug('GET {0}'.format(target_uri))
-        response = requests.get(
-            target_uri, cert=self.client_cert,
-            auth=self.auth, verify=self.server_cert, **kwargs
-            )
-        self.logger.debug("%s %s", response.status_code, response.reason)
-        return response
+        return self.request('GET', url, **kwargs)
 
     def delete(self, url, **kwargs):
-        target_uri = self._insert_transaction_uri(url)
-        self.logger.debug('DELETE {0}'.format(target_uri))
-        response = requests.delete(
-            target_uri, cert=self.client_cert,
-            auth=self.auth, verify=self.server_cert, **kwargs
-            )
-        self.logger.debug("%s %s", response.status_code, response.reason)
-        return response
+        return self.request('DELETE', url, **kwargs)
 
     def recursive_get(self, url, traverse=[], **kwargs):
         head_response = self.head(url, **kwargs)

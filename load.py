@@ -6,12 +6,10 @@ from __future__ import print_function
 import argparse
 import csv
 from fractions import gcd
-import logging
 from importlib import import_module
 import os.path
 import pprint
 import rdflib
-import requests
 import sys
 import yaml
 import re
@@ -198,7 +196,7 @@ def main():
                         help='file listing items to ignore',
                         action='store'
                         )
-    
+
     parser.add_argument('--wait', '-w',
                         help='wait n seconds between items',
                         action='store'
@@ -363,7 +361,7 @@ def main():
                 completed.writerow(row)
             else:
                 skipped.writerow(row)
-                
+
             if args.wait:
                 logger.info("Pausing {0} seconds".format(args.wait))
                 sleep(int(args.wait))

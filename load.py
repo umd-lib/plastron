@@ -198,7 +198,7 @@ def main():
                         help='file listing items to ignore',
                         action='store'
                         )
-    
+
     parser.add_argument('--wait', '-w',
                         help='wait n seconds between items',
                         action='store'
@@ -255,6 +255,11 @@ def main():
     module_name = batch_options.get('HANDLER')
     handler = import_module('handler.' + module_name)
     logger.info('Loaded "{0}" handler'.format(module_name))
+
+    # "--nobinaries" implies "--noannotations"
+    if args.nobinaries:
+        logger.info("Setting --nobinaries implies --noannotations")
+        args.noannotations = True
 
     # Invoke the data handler by calling the load function on the batch config
     try:
@@ -363,7 +368,7 @@ def main():
                 completed.writerow(row)
             else:
                 skipped.writerow(row)
-                
+
             if args.wait:
                 logger.info("Pausing {0} seconds".format(args.wait))
                 sleep(int(args.wait))

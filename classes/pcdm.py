@@ -10,6 +10,7 @@ from rdflib import Namespace
 import sys
 import logging
 from uuid import uuid4
+import threading
 
 #============================================================================
 # NAMESPACE BINDINGS
@@ -102,65 +103,33 @@ class Repository():
         response = self.head(self.fullpath)
         return response.status_code == 200
 
-    def post(self, url, **kwargs):
+    def request(self, method, url, **kwargs):
         target_uri = self._insert_transaction_uri(url)
-        self.logger.debug("POST {0}".format(target_uri))
-        response = requests.post(
-            target_uri, cert=self.client_cert,
+        self.logger.debug("%s %s", method, target_uri)
+        response = requests.request(
+            method, target_uri, cert=self.client_cert,
             auth=self.auth, verify=self.server_cert, **kwargs
             )
         self.logger.debug("%s %s", response.status_code, response.reason)
         return response
+
+    def post(self, url, **kwargs):
+        return self.request('POST', url, **kwargs)
 
     def put(self, url, **kwargs):
-        target_uri = self._insert_transaction_uri(url)
-        self.logger.debug("PUT {0}".format(target_uri))
-        response = requests.put(
-            target_uri, cert=self.client_cert,
-            auth=self.auth, verify=self.server_cert, **kwargs
-            )
-        self.logger.debug("%s %s", response.status_code, response.reason)
-        return response
+        return self.request('PUT', url, **kwargs)
 
     def patch(self, url, **kwargs):
-        target_uri = self._insert_transaction_uri(url)
-        self.logger.debug("PATCH {0}".format(target_uri))
-        response = requests.patch(
-            target_uri, cert=self.client_cert,
-            auth=self.auth, verify=self.server_cert, **kwargs
-            )
-        self.logger.debug("%s %s", response.status_code, response.reason)
-        return response
+        return self.request('PATCH', url, **kwargs)
 
     def head(self, url, **kwargs):
-        target_uri = self._insert_transaction_uri(url)
-        self.logger.debug('HEAD {0}'.format(target_uri))
-        response = requests.head(
-            target_uri, cert=self.client_cert,
-            auth=self.auth, verify=self.server_cert, **kwargs
-            )
-        self.logger.debug("%s %s", response.status_code, response.reason)
-        return response
+        return self.request('HEAD', url, **kwargs)
 
     def get(self, url, **kwargs):
-        target_uri = self._insert_transaction_uri(url)
-        self.logger.debug('GET {0}'.format(target_uri))
-        response = requests.get(
-            target_uri, cert=self.client_cert,
-            auth=self.auth, verify=self.server_cert, **kwargs
-            )
-        self.logger.debug("%s %s", response.status_code, response.reason)
-        return response
+        return self.request('GET', url, **kwargs)
 
     def delete(self, url, **kwargs):
-        target_uri = self._insert_transaction_uri(url)
-        self.logger.debug('DELETE {0}'.format(target_uri))
-        response = requests.delete(
-            target_uri, cert=self.client_cert,
-            auth=self.auth, verify=self.server_cert, **kwargs
-            )
-        self.logger.debug("%s %s", response.status_code, response.reason)
-        return response
+        return self.request('DELETE', url, **kwargs)
 
     def recursive_get(self, url, traverse=[], **kwargs):
         head_response = self.head(url, **kwargs)
@@ -202,6 +171,29 @@ class Repository():
         else:
             self.logger.error("Failed to create transaction")
             raise RESTAPIException(response)
+
+    def maintain_transaction(self, **kwargs):
+        if self.transaction is not None:
+            url = os.path.join(self.transaction, 'fcr:tx')
+            self.logger.info(
+                "Maintaining transaction {0}".format(self.transaction)
+                )
+            self.logger.debug("POST {0}".format(url))
+            response = requests.post(url, cert=self.client_cert, auth=self.auth,
+                        verify=self.server_cert, **kwargs)
+            self.logger.debug("%s %s", response.status_code, response.reason)
+            if response.status_code == 204:
+                self.logger.info(
+                    "Transaction {0} is active until {1}".format(
+                        self.transaction, response.headers['Expires']
+                        )
+                    )
+                return True
+            else:
+                self.logger.error(
+                    "Failed to maintain transaction {0}".format(self.transaction)
+                    )
+                raise RESTAPIException(response)
 
     def commit_transaction(self, **kwargs):
         if self.transaction is not None:
@@ -251,6 +243,26 @@ class Repository():
             return '/'.join([p.strip('/') for p in (self.endpoint, relpath)])
         else:
             return uri
+
+    def uri(self):
+        return '/'.join([p.strip('/') for p in (self.endpoint, self.relpath)])
+
+
+# based on https://stackoverflow.com/a/12435256/5124907
+class TransactionKeepAlive(threading.Thread):
+    def __init__(self, repository, interval):
+        super(TransactionKeepAlive, self).__init__(name='TransactionKeepAlive')
+        self.repository = repository
+        self.interval = interval
+        self.stopped = threading.Event()
+
+    def run(self):
+        while not self.stopped.wait(self.interval):
+            self.repository.maintain_transaction()
+
+    def stop(self):
+        self.stopped.set()
+
 
 #============================================================================
 # PCDM RESOURCE (COMMON METHODS FOR ALL OBJECTS)
@@ -335,10 +347,7 @@ class Resource(object):
         if uri is not None:
             response = repository.put(uri)
         else:
-            response = repository.post(
-                '/'.join([p.strip('/') for p in (repository.endpoint,
-                                                 repository.relpath)])
-                )
+            response = repository.post(repository.uri())
 
         if response.status_code == 201:
             self.created = True
@@ -574,7 +583,7 @@ class File(Resource):
         return graph
 
     # upload a binary resource
-    def create_object(self, repository):
+    def create_object(self, repository, uri=None):
         if not repository.load_binaries:
             self.logger.info('Skipping loading for binary {0}'.format(self.filename))
             return True
@@ -584,19 +593,19 @@ class File(Resource):
             self.created = True
             return False
 
-        checksum = self.sha1()
         self.logger.info("Loading {0}".format(self.filename))
+
         with self.open_stream() as stream:
-            data = stream.read()
-        headers = {'Content-Type': self.mimetype,
-                   'Digest': 'sha1={0}'.format(checksum),
-                   'Content-Disposition':
-                        'attachment; filename="{0}"'.format(self.filename)
-                    }
-        target_uri = '/'.join(
-            [p.strip('/') for p in (repository.endpoint, repository.relpath)]
-            )
-        response = repository.post(target_uri, data=data, headers=headers)
+            headers = {
+                'Content-Type': self.mimetype,
+                'Digest': 'sha1={0}'.format(self.sha1()),
+                'Content-Disposition': 'attachment; filename="{0}"'.format(self.filename)
+                }
+            if uri is not None:
+                response = repository.put(uri, data=stream, headers=headers)
+            else:
+                response = repository.post(repository.uri(), data=stream, headers=headers)
+
         if response.status_code == 201:
             self.uri = rdflib.URIRef(response.text)
             self.created = True

@@ -5,6 +5,7 @@ import logging
 import os
 from rdflib import Graph, Literal, URIRef
 from classes import pcdm
+from classes.exceptions import ConfigException
 from namespaces import carriers, dcterms, rdf
 
 #============================================================================
@@ -13,12 +14,6 @@ from namespaces import carriers, dcterms, rdf
 
 def load(repo, batch_config):
     return Batch(repo, batch_config)
-
-class ConfigException(Exception):
-    def __init__(self, message):
-        self.message = message
-    def __str__(self):
-        return self.message
 
 #============================================================================
 # CSV BATCH CLASS

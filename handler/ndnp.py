@@ -93,7 +93,7 @@ class Batch():
             raise ConfigException(
                 'Missing required key COLLECTION in batch config'
                 )
-        self.collection = Collection.from_repo_uri(repo, collection_uri)
+        self.collection = Collection.from_repository(repo, collection_uri)
 
         self.fieldnames = ['aggregation', 'sequence', 'uri']
 
@@ -597,29 +597,6 @@ class Collection(pcdm.Collection):
 
     def __init__(self):
         super(Collection, self).__init__()
-
-    @classmethod
-    def from_repo_uri(klass, repository, uri):
-        response = repository.get(uri, headers={'Accept': 'application/rdf+xml'})
-        if response.status_code == 200:
-            graph = Graph().parse(data=response.text)
-            collection = klass()
-            collection.uri = URIRef(uri)
-            # mark as created and updated so that the create_object and update_object
-            # methods doesn't try try to modify it
-            collection.created = True
-            collection.updated = True
-
-            # default title is the URI
-            collection.title = str(collection.uri)
-            for o in graph.objects(subject=collection.uri, predicate=dcterms.title):
-                collection.title = str(o)
-        else:
-            raise ConfigException(
-                "Collection URI {0} could not be reached.".format(collection.uri)
-                )
-
-        return collection
 
 
 #============================================================================

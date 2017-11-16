@@ -450,6 +450,24 @@ class File(Resource):
 
 class Collection(Resource):
 
+    @classmethod
+    def from_repository(cls, repo, uri):
+        graph = repo.get_graph(uri)
+        collection = cls()
+        collection.uri = URIRef(uri)
+
+        # mark as created and updated so that the create_object and update_object
+        # methods doesn't try try to modify it
+        collection.created = True
+        collection.updated = True
+
+        # default title is the URI
+        collection.title = str(collection.uri)
+        for o in graph.objects(subject=collection.uri, predicate=dcterms.title):
+            collection.title = str(o)
+
+        return collection
+
     def __init__(self):
         super(Collection, self).__init__()
         self.title = None

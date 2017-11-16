@@ -10,7 +10,7 @@ import logging
 import logging.config
 from datetime import datetime
 from classes import pcdm
-from classes.exception import RESTAPIException
+from classes.exceptions import RESTAPIException
 
 logger = logging.getLogger(__name__)
 

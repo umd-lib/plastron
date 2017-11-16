@@ -6,12 +6,10 @@ from __future__ import print_function
 import argparse
 import csv
 from fractions import gcd
-import logging
 from importlib import import_module
 import os.path
 import pprint
 import rdflib
-import requests
 import sys
 import yaml
 import re

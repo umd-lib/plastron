@@ -10,6 +10,7 @@ import logging
 import logging.config
 from datetime import datetime
 from classes import pcdm
+from classes.exceptions import RESTAPIException
 
 logger = logging.getLogger(__name__)
 
@@ -32,7 +33,7 @@ def create_collection(fcrepo, name):
         fcrepo.commit_transaction()
         return collection
 
-    except (pcdm.RESTAPIException) as e:
+    except (RESTAPIException) as e:
         # failures here will be caught by the main loop's exception handler
         # and should trigger a system exit
         logger.error("Error in collection creation: {0}".format(e))

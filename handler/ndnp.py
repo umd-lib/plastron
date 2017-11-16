@@ -10,6 +10,7 @@ import sys
 import mimetypes
 from rdflib import Graph, Literal, Namespace, URIRef
 from classes import pcdm, ocr, oa
+from classes.exceptions import ConfigException, DataReadException
 import namespaces
 from namespaces import bibo, carriers, dc, dcmitype, dcterms, ebucore, fabio, \
         foaf, iana, ndnp, ore, pcdmuse, prov, rdf, sc
@@ -58,22 +59,6 @@ xmlns = {
 
 def load(repo, batch_config):
     return Batch(repo, batch_config)
-
-#============================================================================
-# EXCEPTION CLASSES
-#============================================================================
-
-class ConfigException(Exception):
-    def __init__(self, message):
-        self.message = message
-    def __str__(self):
-        return self.message
-
-class DataReadException(Exception):
-    def __init__(self, message):
-        self.message = message
-    def __str__(self):
-        return self.message
 
 #============================================================================
 # NDNP BATCH CLASS

@@ -12,6 +12,7 @@ from classes import pcdm
 import requests
 import sys
 import yaml
+from classes.exceptions import RESTAPIException
 
 logger = logging.getLogger(__name__)
 
@@ -74,7 +75,7 @@ def delete_items(fcrepo, uri_list, args):
         fcrepo.commit_transaction()
         return True
 
-    except pcdm.RESTAPIException as e:
+    except RESTAPIException as e:
         # if anything fails during deletion of a set of uris, attempt to
         # rollback the transaction. Failures here will be caught by the main
         # loop's exception handler and should trigger a system exit
@@ -171,7 +172,7 @@ def main():
             for item_uri in args.uris:
                 delete_items(fcrepo, [item_uri], args)
 
-    except pcdm.RESTAPIException as e:
+    except RESTAPIException as e:
         logger.error(
             "Unable to commit or rollback transaction, aborting"
             )

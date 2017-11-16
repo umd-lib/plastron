@@ -5,6 +5,7 @@ from uuid import uuid4
 from rdflib import Graph, URIRef
 from datetime import datetime as dt
 import namespaces
+from classes.exceptions import RESTAPIException
 
 class Resource(object):
     '''Class representing a Linked Data Platform Resource (LDPR)

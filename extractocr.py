@@ -11,6 +11,7 @@ from handler import ndnp
 import rdflib
 from rdflib import RDF
 from lxml import etree as ET
+from classes.exceptions import RESTAPIException, DataReadException
 
 logger = logging.getLogger(__name__)
 
@@ -27,7 +28,7 @@ def extract(fcrepo, uri):
         fcrepo.commit_transaction()
         return True
 
-    except (pcdm.RESTAPIException, ndnp.DataReadException) as e:
+    except (RESTAPIException, DataReadException) as e:
         # if anything fails during item creation or commiting the transaction
         # attempt to rollback the current transaction
         # failures here will be caught by the main loop's exception handler
@@ -106,7 +107,7 @@ def main():
             is_extracted = False
             try:
                 is_extracted = extract(fcrepo, uri)
-            except pcdm.RESTAPIException as e:
+            except RESTAPIException as e:
                 logger.error(
                     "Unable to commit or rollback transaction, aborting"
                     )

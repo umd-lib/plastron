@@ -8,6 +8,7 @@ from rdflib import Graph, Literal, URIRef
 from classes import ldp, ore
 from classes.exceptions import RESTAPIException
 from namespaces import dcterms, iana, pcdm, rdf
+from operator import attrgetter
 
 # alias the RDFlib Namespace
 ns = pcdm
@@ -232,7 +233,10 @@ class Resource(ldp.Resource):
         return [ obj for (rel, obj) in self.linked_objects if rel == pcdm.hasMember ]
 
     def ordered_components(self):
-        return [ obj for obj in self.components() if obj.ordered ]
+        orig_list = [ obj for obj in self.components() if obj.ordered ]
+        sort_key = self.sequence_attr[1]
+        sorted_list = sorted(orig_list, key=attrgetter(sort_key))
+        return sorted_list
 
     def unordered_components(self):
         return [ obj for obj in self.components() if not obj.ordered ]
@@ -270,14 +274,14 @@ class Resource(ldp.Resource):
             print(" ORDERED COMPONENTS")
             for n, p in enumerate(ordered):
                 print("  Part {0}: {1}".format(n+1, p.title))
-                for f in p.files:
-                    print("   |--{0}: {1}".format(f.title, f.localpath))
+                for f in p.files():
+                    print("   |--{0}: {1}".format(f.title, f.filename))
         if unordered:
             print(" UNORDERED COMPONENTS")
             for n, p in enumerate(unordered):
                 print("  - {1}".format(n+1, p.title))
-                for f in p.files:
-                    print("   |--{0}: {1}".format(f.title, f.localpath))
+                for f in p.files():
+                    print("   |--{0}: {1}".format(f.title, f.filename))
 
 
 #============================================================================

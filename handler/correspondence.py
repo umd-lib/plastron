@@ -150,8 +150,10 @@ class Batch():
         if self.count < self.length:
             id = self.to_load[self.count]
             item_map = self.letters[id]
+            letter = Letter(id, item_map, self.local_path)
+            letter.add_collection(self.collection)
             self.count += 1
-            return Letter(id, item_map, self.local_path)
+            return letter
         else:
             self.logger.info('Processing complete!')
             raise StopIteration()

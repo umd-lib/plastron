@@ -8,7 +8,7 @@ import yaml
 from rdflib import Graph, Literal, Namespace, URIRef
 from classes import pcdm
 from classes.exceptions import ConfigException, DataReadException
-from namespaces import bibo, dc, dcmitype, dcterms, pcdmuse, rdf
+from namespaces import bibo, dc, dcmitype, dcterms, fabio, pcdmuse, rdf
 
 #============================================================================
 # DATA LOADING FUNCTION
@@ -217,7 +217,7 @@ class Page(pcdm.Component):
     def graph(self):
         graph = super(Page, self).graph()
         graph.add((self.uri, dcterms.title, Literal(self.title)))
-        graph.add((self.uri, rdf.type, bibo.Page))
+        graph.add((self.uri, rdf.type, fabio.Page))
         return graph
 
 

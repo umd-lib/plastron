@@ -234,9 +234,12 @@ class Resource(ldp.Resource):
 
     def ordered_components(self):
         orig_list = [ obj for obj in self.components() if obj.ordered ]
-        sort_key = self.sequence_attr[1]
-        sorted_list = sorted(orig_list, key=attrgetter(sort_key))
-        return sorted_list
+        if not orig_list:
+            return []
+        else:
+            sort_key = self.sequence_attr[1]
+            sorted_list = sorted(orig_list, key=attrgetter(sort_key))
+            return sorted_list
 
     def unordered_components(self):
         return [ obj for obj in self.components() if not obj.ordered ]

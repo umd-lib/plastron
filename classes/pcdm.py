@@ -120,10 +120,7 @@ class Repository():
     def open_transaction(self, **kwargs):
         url = os.path.join(self.endpoint, 'fcr:tx')
         self.logger.info("Creating transaction")
-        self.logger.debug("POST {0}".format(url))
-        response = requests.post(url, cert=self.client_cert, auth=self.auth,
-                    verify=self.server_cert, **kwargs)
-        self.logger.debug("%s %s", response.status_code, response.reason)
+        response = self.post(url, **kwargs)
         if response.status_code == 201:
             self.transaction = response.headers['Location']
             self.logger.info("Created transaction {0}".format(self.transaction))
@@ -138,10 +135,7 @@ class Repository():
             self.logger.info(
                 "Maintaining transaction {0}".format(self.transaction)
                 )
-            self.logger.debug("POST {0}".format(url))
-            response = requests.post(url, cert=self.client_cert, auth=self.auth,
-                        verify=self.server_cert, **kwargs)
-            self.logger.debug("%s %s", response.status_code, response.reason)
+            response = self.post(url, **kwargs)
             if response.status_code == 204:
                 self.logger.info(
                     "Transaction {0} is active until {1}".format(
@@ -161,10 +155,7 @@ class Repository():
             self.logger.info(
                 "Committing transaction {0}".format(self.transaction)
                 )
-            self.logger.debug("POST {0}".format(url))
-            response = requests.post(url, cert=self.client_cert, auth=self.auth,
-                        verify=self.server_cert, **kwargs)
-            self.logger.debug("%s %s", response.status_code, response.reason)
+            response = self.post(url, **kwargs)
             if response.status_code == 204:
                 self.logger.info(
                     "Committed transaction {0}".format(self.transaction)
@@ -180,12 +171,20 @@ class Repository():
     def rollback_transaction(self, **kwargs):
         if self.transaction is not None:
             url = os.path.join(self.transaction, 'fcr:tx/fcr:rollback')
-            response = requests.post(url, cert=self.client_cert, auth=self.auth,
-                        verify=self.server_cert, **kwargs)
+            self.logger.info(
+                "Rolling back transaction {0}".format(self.transaction)
+                )
+            response = self.post(url, **kwargs)
             if response.status_code == 204:
+                self.logger.info(
+                    "Rolled back transaction {0}".format(self.transaction)
+                    )
                 self.transaction = None
                 return True
             else:
+                self.logger.error(
+                    "Failed to roll back transaction {0}".format(self.transaction)
+                    )
                 raise RESTAPIException(response)
 
     def _insert_transaction_uri(self, uri):

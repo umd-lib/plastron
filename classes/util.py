@@ -1,5 +1,9 @@
 import os
 import csv
+from namespaces import dcterms
+
+def get_title_string(graph, separator='; '):
+    return separator.join([ t for t in graph.objects(predicate=dcterms.title) ])
 
 class ItemLog():
     def __init__(self, filename, fieldnames, keyfield):

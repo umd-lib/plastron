@@ -1,4 +1,4 @@
-from rdflib import Namespace
+from rdflib import Namespace,Graph
 from rdflib.namespace import NamespaceManager
 
 # useful namespaces for use with RDFlib code
@@ -23,7 +23,9 @@ prov     = Namespace('http://www.w3.org/ns/prov#')
 rdf      = Namespace('http://www.w3.org/1999/02/22-rdf-syntax-ns#')
 sc       = Namespace('http://www.shared-canvas.org/ns/')
 
-def get_manager(graph):
+def get_manager(graph=None):
+    if graph is None:
+        graph = Graph()
     m = NamespaceManager(graph)
     m.bind('bibo', bibo)
     m.bind('carriers', carriers)

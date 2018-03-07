@@ -7,8 +7,10 @@ import yaml
 import logging
 import logging.config
 from datetime import datetime
-from classes import pcdm
-import rdflib
+import namespaces
+from rdflib.util import from_n3
+from classes.pcdm import Repository
+from classes.util import get_title_string
 
 logger = logging.getLogger(__name__)
 
@@ -51,14 +53,12 @@ def main():
 
     # Load required repository config file and create repository object
     with open(args.repo, 'r') as repoconfig:
-        fcrepo = pcdm.Repository(yaml.safe_load(repoconfig))
+        fcrepo = Repository(yaml.safe_load(repoconfig))
         logger.info('Loaded repo configuration from {0}'.format(args.repo))
 
     if args.recursive is not None:
-        args.predicates = [
-            rdflib.util.from_n3(p, nsm=pcdm.namespace_manager)
-            for p in args.recursive.split(',')
-            ]
+        manager = namespaces.get_manager()
+        args.predicates = [ from_n3(p, nsm=manager) for p in args.recursive.split(',') ]
         logger.info('Listing will traverse the following predicates: {0}'.format(
             ', '.join([ p.n3() for p in args.predicates ]))
             )
@@ -67,9 +67,9 @@ def main():
 
     for item_uri in sys.stdin:
         for (uri, graph) in fcrepo.recursive_get(item_uri.rstrip('\n'), traverse=args.predicates):
-            title = '; '.join([ t for t in graph.objects(predicate=pcdm.dcterms.title) ])
             if args.long:
-                print("{0} ({1})".format(uri, title))
+                title = get_title_string(graph)
+                print("{0} {1}".format(uri, title))
             else:
                 print(uri)
 

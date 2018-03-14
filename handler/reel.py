@@ -3,54 +3,10 @@
 import csv
 import logging
 import os
+from rdflib import Graph, Literal, URIRef
 from classes import pcdm
-import rdflib
-from rdflib import Namespace
-
-#============================================================================
-# NAMESPACE BINDINGS
-#============================================================================
-
-namespace_manager = rdflib.namespace.NamespaceManager(rdflib.Graph())
-
-bibo = Namespace('http://purl.org/ontology/bibo/')
-namespace_manager.bind('bibo', bibo, override=False)
-
-carriers = Namespace('http://id.loc.gov/vocabulary/carriers/')
-namespace_manager.bind('carriers', carriers, override=False)
-
-dc = Namespace('http://purl.org/dc/elements/1.1/')
-namespace_manager.bind('dc', dc, override=False)
-
-dcmitype = Namespace('http://purl.org/dc/dcmitype/')
-namespace_manager.bind('dcmitype', dcmitype, override=False)
-
-dcterms = Namespace('http://purl.org/dc/terms/')
-namespace_manager.bind('dcterms', dcterms, override=False)
-
-ebucore = Namespace('http://www.ebu.ch/metadata/ontologies/ebucore/ebucore#')
-namespace_manager.bind('ebucore', ebucore, override=False)
-
-foaf = Namespace('http://xmlns.com/foaf/0.1/')
-namespace_manager.bind('foaf', foaf, override=False)
-
-iana = Namespace('http://www.iana.org/assignments/relation/')
-namespace_manager.bind('iana', iana, override=False)
-
-ndnp = Namespace('http://chroniclingamerica.loc.gov/terms/')
-namespace_manager.bind('ndnp', ndnp, override=False)
-
-ore = Namespace('http://www.openarchives.org/ore/terms/')
-namespace_manager.bind('ore', ore, override=False)
-
-pcdm_ns = Namespace('http://pcdm.org/models#')
-namespace_manager.bind('pcdm', pcdm_ns, override=False)
-
-pcdm_use = Namespace('http://pcdm.org/use#')
-namespace_manager.bind('pcdmuse', pcdm_use, override=False)
-
-rdf = Namespace('http://www.w3.org/1999/02/22-rdf-syntax-ns#')
-namespace_manager.bind('rdf', rdf, override=False)
+from classes.exceptions import ConfigException
+from namespaces import carriers, dcterms, rdf
 
 #============================================================================
 # DATA LOADING FUNCTION
@@ -58,12 +14,6 @@ namespace_manager.bind('rdf', rdf, override=False)
 
 def load(repo, batch_config):
     return Batch(repo, batch_config)
-
-class ConfigException(Exception):
-    def __init__(self, message):
-        self.message = message
-    def __str__(self):
-        return self.message
 
 #============================================================================
 # CSV BATCH CLASS
@@ -78,14 +28,14 @@ class Batch():
             __name__ + '.' + self.__class__.__name__
             )
         self.collection = pcdm.Collection()
-        self.collection.uri = rdflib.URIRef(batch_config.get('COLLECTION'))
+        self.collection.uri = URIRef(batch_config.get('COLLECTION'))
 
         # check that the supplied collection exists and get title
         response = repo.get(
             self.collection.uri, headers={'Accept': 'application/rdf+xml'}
             )
         if response.status_code == 200:
-            coll_graph = rdflib.graph.Graph().parse(data=response.text)
+            coll_graph = Graph().parse(data=response.text)
             self.collection.title = str(self.collection.uri)
             for (subj, pred, obj) in coll_graph:
                 if str(pred) == "http://purl.org/dc/elements/1.1/title":
@@ -124,12 +74,12 @@ class Reel(pcdm.Item):
     '''class representing an NDNP reel'''
 
     def __init__(self, csvfile):
-        pcdm.Item.__init__(self)
+        super(Reel, self).__init__()
         self.id = os.path.splitext(os.path.basename(csvfile))[0]
         self.title = 'Reel Number {0}'.format(self.id)
         self.sequence_attr = ('Frame', 'sequence')
         self.path = csvfile
-        
+
         with open(self.path, 'r') as f:
             reader = csv.DictReader(f)
             self.components = [
@@ -137,14 +87,11 @@ class Reel(pcdm.Item):
                 ]
 
         self.graph.add(
-            (self.uri, dcterms.title, rdflib.Literal(self.title))
-            )
+            (self.uri, dcterms.title, Literal(self.title)))
         self.graph.add(
-            (self.uri, dcterms.identifier, rdflib.Literal(self.id))
-            )
+            (self.uri, dcterms.identifier, Literal(self.id)))
         self.graph.add(
-            (self.uri, rdf.type, carriers.hd)
-            )
+            (self.uri, rdf.type, carriers.hd))
 
 #============================================================================
 # NDNP FRAME OBJECT
@@ -155,11 +102,10 @@ class Frame(pcdm.Component):
     '''class referencing an existing page object for purpose of reel creation'''
 
     def __init__(self, reel, sequence, uri):
-        pcdm.Component.__init__(self)
+        super(Frame, self).__init__()
 
         self.sequence = sequence
-        self.uri = rdflib.URIRef(uri)
+        self.uri = URIRef(uri)
 
         self.title = "{0}, frame {1}".format(reel.title, self.sequence)
         self.ordered = True
-

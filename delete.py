@@ -4,14 +4,17 @@
 from __future__ import print_function
 
 import argparse
-import rdflib
+from rdflib.util import from_n3
 from datetime import datetime
 import logging
 import logging.config
-from classes import pcdm
+from classes.pcdm import Repository
+from classes.util import get_title_string
+import namespaces
 import requests
 import sys
 import yaml
+from classes.exceptions import RESTAPIException
 
 logger = logging.getLogger(__name__)
 
@@ -51,9 +54,10 @@ def get_uris_to_delete(fcrepo, uri, args):
 
 def delete_items(fcrepo, uri_list, args):
     if args.dryrun:
-        for (uri, graph) in get_uris_to_delete(fcrepo, item_uri, args):
-            title = '; '.join([ t for t in graph.objects(predicate=pcdm.dcterms.title) ])
-            logger.info("Would delete {0} ({1})".format(uri, title))
+        for uri in uri_list:
+            for (target_uri, graph) in get_uris_to_delete(fcrepo, uri, args):
+                title = get_title_string(graph)
+                logger.info("Would delete {0} {1}".format(target_uri, title))
         return True
 
     # open transaction
@@ -65,16 +69,16 @@ def delete_items(fcrepo, uri_list, args):
     try:
         for uri in uri_list:
             for (target_uri, graph) in get_uris_to_delete(fcrepo, uri, args):
-                title = '; '.join([ t for t in graph.objects(predicate=pcdm.dcterms.title) ])
+                title = get_title_string(graph)
                 fcrepo.delete(target_uri)
-                logger.info('Deleted resource {0} ({1})'.format(target_uri, title))
+                logger.info('Deleted resource {0} {1}'.format(target_uri, title))
 
         # commit transaction
         logger.info('Committing transaction')
         fcrepo.commit_transaction()
         return True
 
-    except pcdm.RESTAPIException as e:
+    except RESTAPIException as e:
         # if anything fails during deletion of a set of uris, attempt to
         # rollback the transaction. Failures here will be caught by the main
         # loop's exception handler and should trigger a system exit
@@ -141,7 +145,7 @@ def main():
 
     # Load required repository config file and create repository object
     with open(args.repo, 'r') as repoconfig:
-        fcrepo = pcdm.Repository(yaml.safe_load(repoconfig))
+        fcrepo = Repository(yaml.safe_load(repoconfig))
         logger.info('Loaded repo configuration from {0}'.format(args.repo))
 
     # "--ping" tests repository connection and exits
@@ -151,10 +155,8 @@ def main():
 
     if args.recursive is not None:
         logger.info('Recursive delete enabled')
-        args.predicates = [
-            rdflib.util.from_n3(p, nsm=pcdm.namespace_manager)
-            for p in args.recursive.split(',')
-            ]
+        manager = namespaces.get_manager()
+        args.predicates = [ from_n3(p, nsm=manager) for p in args.recursive.split(',') ]
         logger.info('Deletion will traverse the following predicates: {0}'.format(
             ', '.join([ p.n3() for p in args.predicates ]))
             )
@@ -168,10 +170,9 @@ def main():
             with open(args.file, 'r') as uri_list:
                 delete_items(fcrepo, uri_list, args)
         elif args.uris is not None:
-            for item_uri in args.uris:
-                delete_items(fcrepo, [item_uri], args)
+            delete_items(fcrepo, args.uris, args)
 
-    except pcdm.RESTAPIException as e:
+    except RESTAPIException as e:
         logger.error(
             "Unable to commit or rollback transaction, aborting"
             )

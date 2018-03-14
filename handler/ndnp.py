@@ -1,74 +1,22 @@
 ''' Classes for interpreting and loading metadata and files stored
     according to the NDNP specification. '''
 
-from classes import pcdm, ocr
 import csv
 import logging
 import lxml.etree as ET
 import os
-import rdflib
-from rdflib import Namespace, URIRef, RDF
 import requests
 import sys
 import mimetypes
+from rdflib import Graph, Literal, Namespace, URIRef
+from classes import pcdm, ocr, oa
+from classes.exceptions import ConfigException, DataReadException
+import namespaces
+from namespaces import bibo, carriers, dc, dcmitype, dcterms, ebucore, fabio, \
+        foaf, iana, ndnp, ore, pcdmuse, prov, rdf, sc
 
-#============================================================================
-# NAMESPACE BINDINGS
-#============================================================================
-
-namespace_manager = rdflib.namespace.NamespaceManager(rdflib.Graph())
-
-bibo = Namespace('http://purl.org/ontology/bibo/')
-namespace_manager.bind('bibo', bibo, override=False)
-
-carriers = Namespace('http://id.loc.gov/vocabulary/carriers/')
-namespace_manager.bind('carriers', carriers, override=False)
-
-dc = Namespace('http://purl.org/dc/elements/1.1/')
-namespace_manager.bind('dc', dc, override=False)
-
-dcmitype = Namespace('http://purl.org/dc/dcmitype/')
-namespace_manager.bind('dcmitype', dcmitype, override=False)
-
-dcterms = Namespace('http://purl.org/dc/terms/')
-namespace_manager.bind('dcterms', dcterms, override=False)
-
-ebucore = Namespace('http://www.ebu.ch/metadata/ontologies/ebucore/ebucore#')
-namespace_manager.bind('ebucore', ebucore, override=False)
-
-fabio = Namespace('http://purl.org/spar/fabio/')
-namespace_manager.bind('fabio', fabio, override=False)
-
-foaf = Namespace('http://xmlns.com/foaf/0.1/')
-namespace_manager.bind('foaf', foaf, override=False)
-
-iana = Namespace('http://www.iana.org/assignments/relation/')
-namespace_manager.bind('iana', iana, override=False)
-
-ndnp = Namespace('http://chroniclingamerica.loc.gov/terms/')
-namespace_manager.bind('ndnp', ndnp, override=False)
-
-ore = Namespace('http://www.openarchives.org/ore/terms/')
-namespace_manager.bind('ore', ore, override=False)
-
-pcdm_ns = Namespace('http://pcdm.org/models#')
-namespace_manager.bind('pcdm', pcdm_ns, override=False)
-
-pcdm_use = Namespace('http://pcdm.org/use#')
-namespace_manager.bind('pcdmuse', pcdm_use, override=False)
-
-rdf = Namespace('http://www.w3.org/1999/02/22-rdf-syntax-ns#')
-namespace_manager.bind('rdf', rdf, override=False)
-
-oa = Namespace('http://www.w3.org/ns/oa#')
-namespace_manager.bind('oa', oa, override=False)
-
-sc = Namespace('http://www.shared-canvas.org/ns/')
-namespace_manager.bind('sc', sc, override=False)
-
-prov = Namespace('http://www.w3.org/ns/prov#')
-namespace_manager.bind('prov', prov, override=False)
-
+# alias the RDFlib Namespace
+ns = ndnp
 
 #============================================================================
 # METADATA MAPPING
@@ -113,22 +61,6 @@ def load(repo, batch_config):
     return Batch(repo, batch_config)
 
 #============================================================================
-# EXCEPTION CLASSES
-#============================================================================
-
-class ConfigException(Exception):
-    def __init__(self, message):
-        self.message = message
-    def __str__(self):
-        return self.message
-
-class DataReadException(Exception):
-    def __init__(self, message):
-        self.message = message
-    def __str__(self):
-        return self.message
-
-#============================================================================
 # NDNP BATCH CLASS
 #============================================================================
 
@@ -146,7 +78,7 @@ class Batch():
             raise ConfigException(
                 'Missing required key COLLECTION in batch config'
                 )
-        self.collection = Collection.from_repo_uri(repo, collection_uri)
+        self.collection = Collection.from_repository(repo, collection_uri)
 
         self.fieldnames = ['aggregation', 'sequence', 'uri']
 
@@ -307,17 +239,17 @@ class Issue(pcdm.Item):
     def graph(self):
         graph = super(Issue, self).graph()
         # store required metadata as an RDF graph
-        graph.namespace_manager = namespace_manager
-        graph.add((self.uri, dcterms.title, rdflib.Literal(self.title)))
-        graph.add((self.uri, dc.date, rdflib.Literal(self.date)))
+        graph.namespace_manager = namespaces.get_manager(graph)
+        graph.add((self.uri, dcterms.title, Literal(self.title)))
+        graph.add((self.uri, dc.date, Literal(self.date)))
         graph.add((self.uri, rdf.type, bibo.Issue))
         # add optional metadata elements if present
         if hasattr(self, 'volume'):
-            graph.add((self.uri, bibo.volume, rdflib.Literal(self.volume)))
+            graph.add((self.uri, bibo.volume, Literal(self.volume)))
         if hasattr(self, 'issue'):
-            graph.add((self.uri, bibo.issue, rdflib.Literal(self.issue)))
+            graph.add((self.uri, bibo.issue, Literal(self.issue)))
         if hasattr(self, 'edition'):
-            graph.add((self.uri, bibo.edition, rdflib.Literal(self.edition)))
+            graph.add((self.uri, bibo.edition, Literal(self.edition)))
         return graph
 
     # actions to take upon successful creation of object in repository
@@ -354,20 +286,20 @@ class METSResource(object):
     def techmd(self, id):
         return self.xpath('METS:amdSec/METS:techMD[@ID=$id]', id=id)[0]
 
-class TextblockOnPage(pcdm.Annotation):
+class TextblockOnPage(oa.Annotation):
     def __init__(self, textblock, page, article=None):
         super(TextblockOnPage, self).__init__()
-        body = pcdm.TextualBody(textblock.text(scale=page.ocr.scale), 'text/plain')
+        body = oa.TextualBody(textblock.text(scale=page.ocr.scale), 'text/plain')
         if article is not None:
             body.linked_objects.append((dcterms.isPartOf, article))
-        target = pcdm.SpecificResource(page)
+        target = oa.SpecificResource(page)
         xywh = ','.join([ str(i) for i in textblock.xywh(page.ocr.scale) ])
-        selector = pcdm.FragmentSelector(
+        selector = oa.FragmentSelector(
             "xywh={0}".format(xywh),
-            rdflib.URIRef('http://www.w3.org/TR/media-frags/')
+            URIRef('http://www.w3.org/TR/media-frags/')
             )
-        xpath_selector = pcdm.XPathSelector('//*[@ID="{0}"]'.format(textblock.id))
-        ocr_resource = pcdm.SpecificResource(page.ocr_file)
+        xpath_selector = oa.XPathSelector('//*[@ID="{0}"]'.format(textblock.id))
+        ocr_resource = oa.SpecificResource(page.ocr_file)
         ocr_resource.add_selector(xpath_selector)
         self.linked_objects.append((prov.wasDerivedFrom, ocr_resource))
         self.add_body(body)
@@ -389,9 +321,9 @@ class IssueMetadata(pcdm.Component):
 
     def graph(self):
         graph = super(IssueMetadata, self).graph()
-        graph.namespace_manager = namespace_manager
+        graph.namespace_manager = namespaces.get_manager(graph)
         graph.add((self.uri, rdf.type, fabio.Metadata))
-        graph.add((self.uri, dcterms.title, rdflib.Literal(self.title)))
+        graph.add((self.uri, dcterms.title, Literal(self.title)))
         return graph
 
 class MetadataFile(pcdm.File):
@@ -399,7 +331,7 @@ class MetadataFile(pcdm.File):
 
     def graph(self):
         graph = super(MetadataFile, self).graph()
-        graph.namespace_manager = namespace_manager
+        graph.namespace_manager = namespaces.get_manager(graph)
         graph.add((self.uri, rdf.type, fabio.MetadataDocument))
         return graph
 
@@ -450,7 +382,7 @@ class Page(pcdm.Component):
     def from_repository(cls, repo, page_uri, graph=None):
         # insert transaction URI into the page_uri, since the returned
         # graph will have the transaction URI in all of its URIs
-        page_uri = rdflib.URIRef(repo._insert_transaction_uri(page_uri))
+        page_uri = URIRef(repo._insert_transaction_uri(page_uri))
 
         if graph is None:
             page_graph = repo.get_graph(page_uri)
@@ -467,7 +399,7 @@ class Page(pcdm.Component):
         page.created = True
         page.updated = True
 
-        for file_uri in page_graph.objects(subject=page_uri, predicate=pcdm_ns.hasFile):
+        for file_uri in page_graph.objects(subject=page_uri, predicate=pcdm.ns.hasFile):
             file = File.from_repository(repo, file_uri)
             page.add_file(file)
 
@@ -518,15 +450,15 @@ class Page(pcdm.Component):
 
     def graph(self):
         graph = super(Page, self).graph()
-        graph.namespace_manager = namespace_manager
-        graph.add((self.uri, dcterms.title, rdflib.Literal(self.title)))
-        graph.add((self.uri, pcdm_ns.memberOf, self.issue.uri))
+        graph.namespace_manager = namespaces.get_manager(graph)
+        graph.add((self.uri, dcterms.title, Literal(self.title)))
+        graph.add((self.uri, pcdm.ns.memberOf, self.issue.uri))
         graph.add((self.uri, rdf.type, ndnp.Page))
         # add optional metadata elements if present
         if hasattr(self, 'number'):
-            graph.add((self.uri, ndnp.number, rdflib.Literal(self.number)))
+            graph.add((self.uri, ndnp.number, Literal(self.number)))
         if hasattr(self, 'frame'):
-            graph.add((self.uri, ndnp.sequence, rdflib.Literal(self.frame)))
+            graph.add((self.uri, ndnp.sequence, Literal(self.frame)))
         return graph
 
     def files_for(self, use):
@@ -598,14 +530,14 @@ class File(pcdm.File):
             file.created = True
             file.updated = True
 
-            types = list(file_graph.objects(subject=file_uri, predicate=RDF.type))
-            if pcdm_use.PreservationMasterFile in types:
+            types = list(file_graph.objects(subject=file_uri, predicate=rdf.type))
+            if pcdmuse.PreservationMasterFile in types:
                 file.use = 'master'
-            elif pcdm_use.IntermediateFile in types:
+            elif pcdmuse.IntermediateFile in types:
                 file.use = 'service'
-            elif pcdm_use.ServiceFile in types:
+            elif pcdmuse.ServiceFile in types:
                 file.use = 'derivative'
-            elif pcdm_use.ExtractedText in types:
+            elif pcdmuse.ExtractedText in types:
                 file.use = 'ocr'
 
             if file.use == 'master':
@@ -620,23 +552,23 @@ class File(pcdm.File):
 
     def graph(self):
         graph = super(File, self).graph()
-        graph.namespace_manager = namespace_manager
-        graph.add((self.uri, dcterms.title, rdflib.Literal(self.title)))
+        graph.namespace_manager = namespaces.get_manager(graph)
+        graph.add((self.uri, dcterms.title, Literal(self.title)))
         graph.add((self.uri, dcterms.type, dcmitype.Text))
 
         if self.width is not None:
-            graph.add((self.uri, ebucore.width, rdflib.Literal(self.width)))
+            graph.add((self.uri, ebucore.width, Literal(self.width)))
         if self.height is not None:
-            graph.add((self.uri, ebucore.height, rdflib.Literal(self.height)))
+            graph.add((self.uri, ebucore.height, Literal(self.height)))
 
         if self.basename.endswith('.tif'):
-            graph.add((self.uri, rdf.type, pcdm_use.PreservationMasterFile))
+            graph.add((self.uri, rdf.type, pcdmuse.PreservationMasterFile))
         elif self.basename.endswith('.jp2'):
-            graph.add((self.uri, rdf.type, pcdm_use.IntermediateFile))
+            graph.add((self.uri, rdf.type, pcdmuse.IntermediateFile))
         elif self.basename.endswith('.pdf'):
-            graph.add((self.uri, rdf.type, pcdm_use.ServiceFile))
+            graph.add((self.uri, rdf.type, pcdmuse.ServiceFile))
         elif self.basename.endswith('.xml'):
-            graph.add((self.uri, rdf.type, pcdm_use.ExtractedText))
+            graph.add((self.uri, rdf.type, pcdmuse.ExtractedText))
 
         return graph
 
@@ -650,29 +582,6 @@ class Collection(pcdm.Collection):
 
     def __init__(self):
         super(Collection, self).__init__()
-
-    @classmethod
-    def from_repo_uri(klass, repository, uri):
-        response = repository.get(uri, headers={'Accept': 'application/rdf+xml'})
-        if response.status_code == 200:
-            graph = rdflib.graph.Graph().parse(data=response.text)
-            collection = klass()
-            collection.uri = rdflib.URIRef(uri)
-            # mark as created and updated so that the create_object and update_object
-            # methods doesn't try try to modify it
-            collection.created = True
-            collection.updated = True
-
-            # default title is the URI
-            collection.title = str(collection.uri)
-            for o in graph.objects(subject=collection.uri, predicate=dcterms.title):
-                collection.title = str(o)
-        else:
-            raise ConfigException(
-                "Collection URI {0} could not be reached.".format(collection.uri)
-                )
-
-        return collection
 
 
 #============================================================================
@@ -696,12 +605,12 @@ class Article(pcdm.Component):
 
     def graph(self):
         graph = super(Article, self).graph()
-        graph.namespace_manager = namespace_manager
-        graph.add((self.uri, dcterms.title, rdflib.Literal(self.title)))
-        graph.add((self.uri, pcdm_ns.memberOf, self.issue.uri))
+        graph.namespace_manager = namespaces.get_manager(graph)
+        graph.add((self.uri, dcterms.title, Literal(self.title)))
+        graph.add((self.uri, pcdm.ns.memberOf, self.issue.uri))
         graph.add((self.uri, rdf.type, bibo.Article))
         if self.start_page is not None:
-            graph.add((self.uri, bibo.pageStart, rdflib.Literal(self.start_page)))
+            graph.add((self.uri, bibo.pageStart, Literal(self.start_page)))
         if self.end_page is not None:
-            graph.add((self.uri, bibo.pageEnd, rdflib.Literal(self.end_page)))
+            graph.add((self.uri, bibo.pageEnd, Literal(self.end_page)))
         return graph

@@ -6,12 +6,10 @@ from __future__ import print_function
 import argparse
 import csv
 from fractions import gcd
-import logging
 from importlib import import_module
 import os.path
 import pprint
 import rdflib
-import requests
 import sys
 import yaml
 import re
@@ -19,6 +17,7 @@ import logging
 import logging.config
 from datetime import datetime
 from classes import pcdm,util
+from classes.exceptions import ConfigException, DataReadException, RESTAPIException
 from time import sleep
 
 logger = logging.getLogger(__name__)
@@ -95,7 +94,7 @@ def load_item(fcrepo, item, args, extra=None):
         item.post_creation_hook()
         return True
 
-    except (pcdm.RESTAPIException, FileNotFoundError) as e:
+    except (RESTAPIException, FileNotFoundError) as e:
         # if anything fails during item creation or commiting the transaction
         # attempt to rollback the current transaction
         # failures here will be caught by the main loop's exception handler
@@ -264,7 +263,7 @@ def main():
     # Invoke the data handler by calling the load function on the batch config
     try:
         batch = handler.load(fcrepo, batch_options)
-    except handler.ConfigException as e:
+    except ConfigException as e:
         logger.error(e.message)
         logger.error(
             "Failed to load batch configuration from {0}".format(args.batch)
@@ -344,12 +343,12 @@ def main():
                 is_loaded = load_item(
                     fcrepo, item, args, extra=batch_options.get('EXTRA')
                     )
-            except pcdm.RESTAPIException as e:
+            except RESTAPIException as e:
                 logger.error(
                     "Unable to commit or rollback transaction, aborting"
                     )
                 sys.exit(1)
-            except handler.DataReadException as e:
+            except DataReadException as e:
                 logger.error(
                     "Skipping item {0}: {1}".format(n + 1, e.message)
                     )

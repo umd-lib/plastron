@@ -218,6 +218,7 @@ class Page(pcdm.Component):
         graph = super(Page, self).graph()
         graph.add((self.uri, dcterms.title, Literal(self.title)))
         graph.add((self.uri, rdf.type, fabio.Page))
+        graph.add((self.uri, fabio.hasSequenceIdentifier, Literal(self.id)))
         return graph
 
 

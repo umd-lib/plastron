@@ -59,6 +59,18 @@ class Repository():
         response = self.head(self.fullpath)
         return response.status_code == 200
 
+    def test_connection(self):
+        # test connection to fcrepo
+        self.logger.debug("fcrepo.endpoint = %s", self.endpoint)
+        self.logger.debug("fcrepo.relpath = %s", self.relpath)
+        self.logger.debug("fcrepo.fullpath = %s", self.fullpath)
+        self.logger.info("Testing connection to {0}".format(self.fullpath))
+        if self.is_reachable():
+            self.logger.info("Connection successful.")
+        else:
+            self.logger.warn("Unable to connect.")
+            raise Exception("Unable to connect")
+
     def request(self, method, url, **kwargs):
         target_uri = self._insert_transaction_uri(url)
         self.logger.debug("%s %s", method, target_uri)

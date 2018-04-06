@@ -152,7 +152,47 @@ optional arguments:
 ### Configuration Templates
 Templates for creating the configuration files can be found at [config/templates](./config/templates)
 
+## Extending
+
+### Adding Commands
+
+Commands are implemented as a package in `commands.{cmd_name}` that contain, at a
+minimum, a class name `Command`. This class must have an `__init__` method that
+takes an [argparse subparsers object] and creates and configures a subparser to
+handle its specific command-line arguments. It must also have a `__call__` method
+that takes a `pcdm.Repository` object and an [argparse.Namespace] object, and
+executes the actual command.
+
+To be enabled, the module name must be added to the `__all__` list in
+[`commands/__init__.py`](commands/__init__.py).
+
+For a simple example, see the ping command, as implemented in
+[`commands/ping.py`](commands/ping.py):
+
+```python
+from classes.exceptions import FailureException
+
+class Command:
+    def __init__(self, subparsers):
+        parser_ping = subparsers.add_parser('ping',
+                description='Check connection to the repository')
+        parser_ping.set_defaults(cmd_name='ping')
+
+    def __call__(self, fcrepo, args):
+        try:
+            fcrepo.test_connection()
+        except:
+            raise FailureException()
+```
+
+The `FailureException` is caught by the `plastron` script and causes it to exit with
+a status code of 1. Any `KeyboardInterrupt` exceptions (for instance, due to the
+user pressing Ctrl+C) are also caught by `plastron` and cause it to exit with a
+status code of 2.
+
 ## License
 
 See the [LICENSE](LICENSE.md) file for license rights and limitations (Apache 2.0).
 
+[argparse subparsers object]: https://docs.python.org/3/library/argparse.html#sub-commands
+[argparse.Namespace]: https://docs.python.org/3/library/argparse.html#the-namespace-object

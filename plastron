@@ -11,18 +11,12 @@ import yaml
 import logging
 import logging.config
 from datetime import datetime
-from classes import pcdm
+from classes.pcdm import Repository
 from classes.exceptions import FailureException
+import commands
 
 logger = logging.getLogger(__name__)
 now = datetime.utcnow().strftime('%Y%m%d%H%M%S')
-
-# custom argument type for percentage loads
-def percentage(n):
-    p = int(n)
-    if not p > 0 and p < 100:
-        raise argparse.ArgumentTypeError("Percent param must be 1-99")
-    return p
 
 #============================================================================
 # MAIN LOOP
@@ -51,110 +45,11 @@ def main():
 
     subparsers = parser.add_subparsers(title='commands')
 
-    parser_ping = subparsers.add_parser('ping',
-            description='Check connection to the repository')
-    parser_ping.set_defaults(cmd_name='ping')
-
-    parser_load = subparsers.add_parser('load',
-            description='Load a batch into the repository')
-    required = parser_load.add_argument_group('required arguments')
-    required.add_argument('-b', '--batch',
-                        help='path to batch configuration file',
-                        action='store',
-                        required=True
-                        )
-    parser_load.add_argument('-d', '--dryrun',
-                        help='iterate over the batch without POSTing',
-                        action='store_true'
-                        )
-    # useful for testing when file loading is too slow
-    parser_load.add_argument('-n', '--nobinaries',
-                        help='iterate without uploading binaries',
-                        action='store_true'
-                        )
-    parser_load.add_argument('-l', '--limit',
-                        help='limit the load to a specified number of top-level objects',
-                        action='store',
-                        type=int,
-                        default=None
-                        )
-    # load an evenly-spaced percentage of the total batch
-    parser_load.add_argument('-%', '--percent',
-                        help='load specified percentage of total items',
-                        action='store',
-                        type=percentage,
-                        default=None
-                        )
-    parser_load.add_argument('--noannotations',
-                        help='iterate without loading annotations (e.g. OCR)',
-                        action='store_true'
-                        )
-    parser_load.add_argument('--ignore', '-i',
-                        help='file listing items to ignore',
-                        action='store'
-                        )
-    parser_load.add_argument('--wait', '-w',
-                        help='wait n seconds between items',
-                        action='store'
-                        )
-    parser_load.set_defaults(cmd_name='load')
-
-    parser_list = subparsers.add_parser('list', aliases=['ls'],
-            description='List objects in the repository')
-    # long mode to print more than just the URIs (name modeled after ls -l)
-    parser_list.add_argument('-l', '--long',
-                        help='Display additional information besides the URI',
-                        action='store_true'
-                        )
-    parser_list.add_argument('-R', '--recursive',
-                        help='List additional objects found by traversing the given predicate(s)',
-                        action='store'
-                        )
-    parser_list.add_argument('uris', nargs='*',
-                        help='URIs of repository objects to list'
-                        )
-    parser_list.set_defaults(cmd_name='list')
-
-    parser_mkcol = subparsers.add_parser('mkcol',
-            description='Create a PCDM Collection in the repository')
-    parser_mkcol.add_argument('-n', '--name',
-                        help='Name of the collection.',
-                        action='store',
-                        required=True
-                        )
-    # if given, will write the collection URI to it
-    parser_mkcol.add_argument('-b', '--batch',
-                        help='Path to batch configuration file.',
-                        action='store'
-                        )
-    parser_mkcol.set_defaults(cmd_name='mkcol')
-
-    parser_delete = subparsers.add_parser('delete', aliases=['del', 'rm'],
-            description='Delete objects from the repository')
-    parser_delete.add_argument('-R', '--recursive',
-                        help='Delete additional objects found by traversing the given predicate(s)',
-                        action='store'
-                        )
-    parser_delete.add_argument('-d', '--dryrun',
-                        help='Simulate a delete without modifying the repository',
-                        action='store_true'
-                        )
-    parser_delete.add_argument('-f', '--file',
-                        help='File containing a list of URIs to delete',
-                        action='store'
-                        )
-    parser_delete.add_argument('uris', nargs='*',
-                        help='Repository URIs to be deleted.'
-                        )
-    parser_delete.set_defaults(cmd_name='delete')
-
-    parser_extractocr = subparsers.add_parser('extractocr',
-            description='Create annotations from OCR data stored in the repository')
-    parser_extractocr.add_argument('--ignore', '-i',
-                        help='file listing items to ignore',
-                        action='store'
-                        )
-    parser_extractocr.set_defaults(cmd_name='extractocr')
+    # load all defined subcommands
+    command_for = {}
+    for name in commands.__all__:
+        command_module = import_module('commands.' + name)
+        command_for[name] = command_module.Command(subparsers)
 
     # parse command line args
     args = parser.parse_args()
@@ -162,7 +57,7 @@ def main():
     # load required repository config file and create repository object
     with open(args.repo, 'r') as repo_config_file:
         repo_config = yaml.safe_load(repo_config_file)
-        fcrepo = pcdm.Repository(repo_config)
+        fcrepo = Repository(repo_config)
 
     # get basic logging options
     with open('config/logging.yml', 'r') as configfile:
@@ -185,11 +80,12 @@ def main():
 
     logger.info('Loaded repo configuration from {0}'.format(args.repo))
 
-    command = import_module('command.' + args.cmd_name)
+    # get the selected subcommand
+    command = command_for[args.cmd_name]
 
     try:
         # dispatch to the selected subcommand
-        command.run(fcrepo, args)
+        command(fcrepo, args)
     except FailureException as e:
         # something failed, exit with non-zero status
         sys.exit(1)

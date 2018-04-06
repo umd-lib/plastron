@@ -1,6 +1,6 @@
 import yaml
 from classes import pcdm
-from classes.exceptions import RESTAPIException
+from classes.exceptions import RESTAPIException, FailureException
 import logging
 logger = logging.getLogger(__name__)
 
@@ -19,9 +19,8 @@ def run(fcrepo, args):
         fcrepo.commit_transaction()
 
     except (RESTAPIException) as e:
-        # failures here will be caught by the main loop's exception handler
-        # and should trigger a system exit
         logger.error("Error in collection creation: {0}".format(e))
+        raise FailureException()
 
     if args.batch is not None:
         with open(args.batch, 'r') as batchconfig:

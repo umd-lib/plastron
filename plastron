@@ -12,6 +12,7 @@ import logging
 import logging.config
 from datetime import datetime
 from classes import pcdm
+from classes.exceptions import FailureException
 
 logger = logging.getLogger(__name__)
 now = datetime.utcnow().strftime('%Y%m%d%H%M%S')
@@ -180,8 +181,15 @@ def main():
 
     command = import_module('command.' + args.cmd_name)
 
-    # dispatch to the selected subcommand
-    command.run(fcrepo, args)
+    try:
+        # dispatch to the selected subcommand
+        command.run(fcrepo, args)
+    except FailureException as e:
+        # something failed, exit with non-zero status
+        sys.exit(1)
+    except KeyboardInterrupt as e:
+        # aborted due to Ctrl+C
+        sys.exit(2)
 
 if __name__ == "__main__":
     main()

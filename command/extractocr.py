@@ -1,4 +1,4 @@
-from classes.exceptions import RESTAPIException
+from classes.exceptions import RESTAPIException, DataReadException, FailureException
 from classes import util
 from handler import ndnp
 import logging
@@ -14,7 +14,7 @@ def run(fcrepo, args):
         completed = util.ItemLog('logs/annotated.csv', fieldnames, 'uri')
     except Exception as e:
         logger.error('Non-standard map file specified: {0}'.format(e))
-        sys.exit(1)
+        raise FailureException()
 
     logger.info('Found {0} completed items'.format(len(completed)))
 
@@ -23,7 +23,7 @@ def run(fcrepo, args):
             ignored = util.ItemLog(args.ignore, fieldnames, 'uri')
         except Exception as e:
             logger.error('Non-standard ignore file specified: {0}'.format(e))
-            sys.exit(1)
+            raise FailureException()
     else:
         ignored = []
 
@@ -46,7 +46,7 @@ def run(fcrepo, args):
                 logger.error(
                     "Unable to commit or rollback transaction, aborting"
                     )
-                sys.exit(1)
+                raise FailureException()
 
             row = {
                 'uri': uri,

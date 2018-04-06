@@ -1,4 +1,4 @@
-from classes.exceptions import RESTAPIException
+from classes.exceptions import RESTAPIException, FailureException
 from classes.util import print_header, print_footer, parse_predicate_list
 import logging
 
@@ -30,7 +30,7 @@ def run(fcrepo, args):
         logger.error(
             "Unable to commit or rollback transaction, aborting"
             )
-        sys.exit(1)
+        raise FailureException()
 
     if not args.quiet:
         print_footer()

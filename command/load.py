@@ -2,14 +2,13 @@ import csv
 from fractions import gcd
 from importlib import import_module
 import os.path
-import sys
 import yaml
 import re
 import logging
 import logging.config
 from datetime import datetime
 from classes import pcdm,util
-from classes.exceptions import ConfigException, DataReadException, RESTAPIException
+from classes.exceptions import ConfigException, DataReadException, RESTAPIException, FailureException
 from time import sleep
 import namespaces
 import logging
@@ -51,7 +50,7 @@ def run(fcrepo, args):
         logger.error(
             "Failed to load batch configuration from {0}".format(args.batch)
             )
-        sys.exit(1)
+        raise FailureException()
 
     if not args.dryrun:
         fcrepo.test_connection()
@@ -63,7 +62,7 @@ def run(fcrepo, args):
             completed = util.ItemLog(mapfile, fieldnames, 'path')
         except Exception as e:
             logger.error('Non-standard map file specified: {0}'.format(e))
-            sys.exit(1)
+            raise FailureException()
 
         logger.info('Found {0} completed items'.format(len(completed)))
 
@@ -72,7 +71,7 @@ def run(fcrepo, args):
                 ignored = util.ItemLog(args.ignore, fieldnames, 'path')
             except Exception as e:
                 logger.error('Non-standard ignore file specified: {0}'.format(e))
-                sys.exit(1)
+                raise FailureException()
         else:
             ignored = []
 
@@ -130,7 +129,7 @@ def run(fcrepo, args):
                 logger.error(
                     "Unable to commit or rollback transaction, aborting"
                     )
-                sys.exit(1)
+                raise FailureException()
             except DataReadException as e:
                 logger.error(
                     "Skipping item {0}: {1}".format(n + 1, e.message)
@@ -216,4 +215,4 @@ def load_item(fcrepo, item, args, extra=None):
         # set the stop flag on the keep-alive ping
         keep_alive.stop()
         logger.error("Load interrupted")
-        sys.exit(2)
+        raise e

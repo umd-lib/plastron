@@ -32,7 +32,7 @@ def main():
     '''Parse args and handle options.'''
 
     parser = argparse.ArgumentParser(
-        description='A configurable batch loader for Fedora 4.'
+        description='Batch operation tool for Fedora 4.'
         )
     common_required = parser.add_argument_group('required arguments')
     common_required.add_argument('-r', '--repo',
@@ -49,12 +49,14 @@ def main():
                         action='store_true'
                         )
 
-    subparsers = parser.add_subparsers()
+    subparsers = parser.add_subparsers(title='commands')
 
-    parser_ping = subparsers.add_parser('ping')
+    parser_ping = subparsers.add_parser('ping',
+            description='Check connection to the repository')
     parser_ping.set_defaults(cmd_name='ping')
 
-    parser_load = subparsers.add_parser('load')
+    parser_load = subparsers.add_parser('load',
+            description='Load a batch into the repository')
     required = parser_load.add_argument_group('required arguments')
     required.add_argument('-b', '--batch',
                         help='path to batch configuration file',
@@ -97,7 +99,8 @@ def main():
                         )
     parser_load.set_defaults(cmd_name='load')
 
-    parser_list = subparsers.add_parser('list', aliases=['ls'])
+    parser_list = subparsers.add_parser('list', aliases=['ls'],
+            description='List objects in the repository')
     # long mode to print more than just the URIs (name modeled after ls -l)
     parser_list.add_argument('-l', '--long',
                         help='Display additional information besides the URI',
@@ -112,7 +115,8 @@ def main():
                         )
     parser_list.set_defaults(cmd_name='list')
 
-    parser_mkcol = subparsers.add_parser('mkcol')
+    parser_mkcol = subparsers.add_parser('mkcol',
+            description='Create a PCDM Collection in the repository')
     parser_mkcol.add_argument('-n', '--name',
                         help='Name of the collection.',
                         action='store',
@@ -125,7 +129,8 @@ def main():
                         )
     parser_mkcol.set_defaults(cmd_name='mkcol')
 
-    parser_delete = subparsers.add_parser('delete', aliases=['del', 'rm'])
+    parser_delete = subparsers.add_parser('delete', aliases=['del', 'rm'],
+            description='Delete objects from the repository')
     parser_delete.add_argument('-R', '--recursive',
                         help='Delete additional objects found by traversing the given predicate(s)',
                         action='store'
@@ -143,7 +148,8 @@ def main():
                         )
     parser_delete.set_defaults(cmd_name='delete')
 
-    parser_extractocr = subparsers.add_parser('extractocr')
+    parser_extractocr = subparsers.add_parser('extractocr',
+            description='Create annotations from OCR data stored in the repository')
     parser_extractocr.add_argument('--ignore', '-i',
                         help='file listing items to ignore',
                         action='store'

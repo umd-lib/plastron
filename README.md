@@ -152,6 +152,39 @@ optional arguments:
 ### Configuration Templates
 Templates for creating the configuration files can be found at [config/templates](./config/templates)
 
+### Repository Configuration
+
+The repository connection is configured in a YAML file and passed to `plastron`
+with the `-r` or `--repo` option. These are the recognized configuration keys:
+
+#### Required
+
+| Option        | Description |
+| ------------- | ----------- |
+|`REST_ENDPOINT`|Respository root URL|
+|`RELPATH`      |Path within repository to load objects to|
+|`LOG_DIR`      |Directory to write log files|
+
+#### Client Certificate Authentication
+
+| Option      | Description |
+| ----------- | ----------- |
+|`CLIENT_CERT`|PEM-encoded client SSL cert for authentication|
+|`CLIENT_KEY` |PEM-encoded client SSL key for authentication|
+
+#### Password Authentication
+
+| Option          | Description |
+| --------------- | ----------- |
+|`FEDORA_USER`    |Username for authentication|
+|`FEDORA_PASSWORD`|Password for authentication|
+
+#### Optional
+
+| Option      | Description |
+| ----------- | ----------- |
+|`SERVER_CERT`|Path to a PEM-encoded copy of the server's SSL certificate; only needed for servers using self-signed certs|
+
 ## Extending
 
 ### Adding Commands

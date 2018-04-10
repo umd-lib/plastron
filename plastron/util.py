@@ -1,7 +1,7 @@
 import os
 import csv
-import namespaces
-from namespaces import dcterms
+from plastron import namespaces
+from plastron.namespaces import dcterms
 from rdflib.util import from_n3
 
 def get_title_string(graph, separator='; '):

@@ -1,5 +1,5 @@
-from classes.exceptions import RESTAPIException, FailureException
-from classes.util import get_title_string, print_header, print_footer, parse_predicate_list
+from plastron.exceptions import RESTAPIException, FailureException
+from plastron.util import get_title_string, print_header, print_footer, parse_predicate_list
 import logging
 
 logger = logging.getLogger(__name__)

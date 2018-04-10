@@ -9,10 +9,10 @@ import requests
 import sys
 import mimetypes
 from rdflib import Graph, Literal, Namespace, URIRef
-from classes import pcdm, ocr, oa
-from classes.exceptions import ConfigException, DataReadException
-import namespaces
-from namespaces import bibo, carriers, dc, dcmitype, dcterms, ebucore, fabio, \
+from plastron import pcdm, ocr, oa
+from plastron.exceptions import ConfigException, DataReadException
+from plastron import namespaces
+from plastron.namespaces import bibo, carriers, dc, dcmitype, dcterms, ebucore, fabio, \
         foaf, iana, ndnp, ore, pcdmuse, prov, rdf, sc
 
 # alias the RDFlib Namespace

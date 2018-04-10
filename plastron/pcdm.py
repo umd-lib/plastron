@@ -5,9 +5,9 @@ import requests
 import logging
 import threading
 from rdflib import Graph, Literal, URIRef
-from classes import ldp, ore
-from classes.exceptions import RESTAPIException
-from namespaces import dcterms, iana, pcdm, rdf
+from plastron import ldp, ore
+from plastron.exceptions import RESTAPIException
+from plastron.namespaces import dcterms, iana, pcdm, rdf
 from operator import attrgetter
 
 # alias the RDFlib Namespace

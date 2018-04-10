@@ -6,9 +6,9 @@ import re
 import sys
 import yaml
 from rdflib import Graph, Literal, Namespace, URIRef
-from classes import pcdm
-from classes.exceptions import ConfigException, DataReadException
-from namespaces import bibo, dc, dcmitype, dcterms, fabio, pcdmuse, rdf
+from plastron import pcdm
+from plastron.exceptions import ConfigException, DataReadException
+from plastron.namespaces import bibo, dc, dcmitype, dcterms, fabio, pcdmuse, rdf
 
 #============================================================================
 # DATA LOADING FUNCTION

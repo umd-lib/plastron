@@ -1,5 +1,5 @@
 import logging
-from classes.util import get_title_string, parse_predicate_list
+from plastron.util import get_title_string, parse_predicate_list
 
 logger = logging.getLogger(__name__)
 

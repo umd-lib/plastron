@@ -1,4 +1,4 @@
-from classes.exceptions import FailureException
+from plastron.exceptions import FailureException
 
 class Command:
     def __init__(self, subparsers):

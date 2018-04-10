@@ -36,13 +36,11 @@ class Batch():
                          'COLLECTION',
                          'ROOT',
                          'MAPFILE',
-                         'BATCH_INDEX',
                          'LOG_LOCATION',
                          'LOG_CONFIG',
                          'METADATA_FILE',
-                         'METADATA_PATH',
                          'DATA_PATH'
-                         ] 
+                         ]
         for key in required_keys:
             if not config.get(key):
                 raise ConfigException(
@@ -51,135 +49,66 @@ class Batch():
 
         # Set configuration Properties
         self.local_path    = os.path.normpath(config.get('ROOT'))
-        self.index_file    = os.path.join(self.local_path,
-                                          config.get('BATCH_INDEX'))
-        self.data_path     = os.path.join(self.local_path, 
+        self.data_path     = os.path.join(self.local_path,
                                           config['DATA_PATH'])
-        self.metadata_path = os.path.join(self.local_path, 
-                                          config['METADATA_PATH'])
         self.metadata_file = os.path.join(self.local_path,
                                           config.get('METADATA_FILE'))
         self.collection    = pcdm.Collection.from_repository(repo,
                                                      config.get('COLLECTION'))
 
         # Create data structures to accumulate process results
-        self.items       = {}
         self.incomplete  = []
         self.extra_files = []
 
-        # Check for required metadata file and path
-        if not os.path.isdir(self.metadata_path):
-            os.mkdir(self.metadata_path)
+        # Check for required metadata file
         if not os.path.isfile(self.metadata_file):
             raise ConfigException('Specified metadata file could not be found')
 
-        # Generate index of all files in the data path
-        self.logger.info('Walking the "data path" tree to create a file index')
-        self.all_files = {}
-        for root, dirs, files in os.walk(self.data_path):
-            for f in files:
-                self.all_files[f] = os.path.join(root,f)
-        self.logger.info("Found {0} files".format(len(self.all_files)))
-
-        # Generate item-level metadata graphs and store as files
-        with open(self.metadata_file, 'r') as f:
-            self.logger.info('Parsing the master metadata graph')
-            g = Graph().parse(f, format="turtle")
-            # For each of the unique subjects in the graph
-            for subj_uri in set([i for i in g.subjects()]):
-                # Get the item identifier
-                itembase = os.path.basename(subj_uri)
-                # Create the path to the output file
-                outfile = os.path.join(self.metadata_path, itembase) + '.ttl'
-                # Create a graph of all triples with that subject
-                itemgraph = Graph()
-                itemgraph += g.triples((subj_uri, None, None))
-                # Serialize the graph to the path location
-                self.logger.info('Serializing graph {0}'.format(outfile))
-                itemgraph.serialize(destination=outfile, format="turtle")
-
-        # If available, read batch index from file
-        if os.path.isfile(self.index_file):
-            self.logger.info("Reading batch index from {0}".format(self.index_file))
-            with open(self.index_file, 'r') as infile:
-                self.items = yaml.load(infile)
-
-        # Otherwise, construct the index by reading graph files
+        # check for an existing file index
+        file_index = os.path.join(self.local_path, 'file_index.yml')
+        if os.path.isfile(file_index):
+            self.logger.info('Found file index in {0}'.format(file_index))
+            with open(file_index, 'r') as index:
+                self.all_files = yaml.load(index)
         else:
-            for f in os.listdir(self.metadata_path):
-                fullpath = os.path.join(self.metadata_path, f)
-                # skip files starting with dot
-                if f.startswith('.'):
-                    self.extra_files.append(fullpath)
-                    continue
-                else:
-                    try:
-                        id = os.path.basename(f).rstrip('.ttl')
-                        self.items[id] = self.create_item(fullpath)
-                    except:
-                        self.incomplete.append(fullpath)
+            # Generate index of all files in the data path
+            # maps the basename to a full path
+            self.logger.info(
+                    'Walking the {0} tree to create a file index'.format(self.data_path))
+            self.all_files = {}
+            for root, dirs, files in os.walk(self.data_path):
+                for f in files:
+                    if f in self.all_files:
+                        raise DataReadException('Filename {0} is not unique'.format(f))
+                    self.all_files[f] = os.path.join(root, f)
 
-            for id in self.items:
-                print('=' * 65)
-                print(id.upper())
-                print('FILES:', self.items[id]['files'])
-                print('PARTS:', self.items[id]['parts'])
-                print('METADATA:', self.items[id]['metadata'])
+            self.logger.info("Found {0} files".format(len(self.all_files)))
 
-            # Serialize the index to a YAML file
-            self.logger.info("Serializing index to {0}".format(
-                                                        self.index_file))
-            with open(self.index_file, 'w') as outfile:
-                yaml.dump(self.items, outfile, default_flow_style=False)
+            # save index to file
+            with open(file_index, 'w') as index:
+                yaml.dump(self.all_files, index, default_flow_style=False)
 
-        # Create list of complete item keys and set up counters
-        self.to_load = sorted(self.items.keys())
-        self.length = len(self.to_load)
+        with open(self.metadata_file, 'r') as f:
+            self.logger.info(
+                    'Parsing the master metadata graph in {0}'.format(self.metadata_file))
+            self.master_graph = Graph().parse(f, format="turtle")
+
+        self.subjects = sorted(set(self.master_graph.subjects()))
+        self.length = len(self.subjects)
         self.count = 0
         self.logger.info("Batch contains {0} items.".format(self.length))
-
-    def create_item(self, item_metadata):
-        data = {'metadata':  os.path.relpath(item_metadata, self.local_path),
-                'parts': {},
-                'files': []
-                }
-        item_graph = Graph().parse(item_metadata, format="turtle")
-        subject    = next(item_graph.subjects())
-        extent     = int(item_graph.value(subject, dcterms.extent).split(' ')[0])
-        parts      = {}
-
-        # Parse each filename in hasPart and allocate to correct location in item entry
-        for filename in [str(f) for f in item_graph.objects(predicate=dcterms.hasPart)]:
-            normalized = filename.replace('_', '-')
-            basename, ext = os.path.splitext(normalized)
-            base_parts = basename.split('-')
-            # handle files with no sequence id
-            if len(base_parts) == 2:
-                data['files'].append(self.all_files[filename])
-            # handle files with a sequence id
-            elif len(base_parts) == 3:
-                page_no = str(int(base_parts[2]))
-                if page_no not in parts:
-                    parts[page_no] = {'files': [self.all_files[filename]], 'parts': {}}
-                else:
-                    parts[page_no]['files'].append(self.all_files[filename])
-            else:
-                print("ERROR!")
-
-        # Add items in parts dict to index entry according to position in sequence
-        for n, p in enumerate(sorted(parts.keys())):
-            data['parts'][n+1] = parts[p]
-
-        return data
 
     def __iter__(self):
         return self
 
     def __next__(self):
         if self.count < self.length:
-            id = self.to_load[self.count]
-            item_map = self.items[id]
-            item = Item(id, item_map, self.local_path)
+            subject = self.subjects[self.count]
+            item_graph = Graph()
+            for triple in self.master_graph.triples((subject, None, None)):
+                item_graph.add(triple)
+            item = Item.from_graph(item_graph, self.all_files)
+            item.path = str(subject)
             item.add_collection(self.collection)
             self.count += 1
             return item
@@ -196,33 +125,63 @@ class Item(pcdm.Item):
 
     '''Class representing a paged repository item resource'''
 
-    def __init__(self, id, item_map, root):
-        super().__init__()
-        self.id = id
-        self.title = id
-        self.path = os.path.join(root, item_map['metadata'])
-        self.filepaths = [os.path.join(root, f) for f in item_map['files']]
-        self.parts = item_map['parts'].items()
+    @classmethod
+    def from_graph(cls, graph, all_files):
+        item = cls(title=next(graph.objects(predicate=dcterms.title)))
+        item.src_graph = graph
+        item.all_files = all_files
+        return item
+
+    def __init__(self, title=None, files=None, parts=None):
+        super(Item, self).__init__()
+        self.src_graph = None
+        self.title = title
+        self.filepaths = files
+        self.parts = parts
         self.sequence_attr = ('Page', 'id')
-        self.root = root
 
     def read_data(self):
-        self.title = next(self.graph().objects(predicate=dcterms.title))
-        for path in self.filepaths:
+        files = []
+        parts = {}
+
+        if self.src_graph is not None:
+            # Parse each filename in hasPart and allocate to correct location in item entry
+            for part in self.src_graph.objects(predicate=dcterms.hasPart):
+                filename = str(part)
+                if not filename in self.all_files:
+                    raise DataReadException('File {0} not found'.format(filename))
+
+                normalized = filename.replace('_', '-')
+                basename, ext = os.path.splitext(normalized)
+                base_parts = basename.split('-')
+
+                # handle files with no sequence id
+                if len(base_parts) == 2:
+                    files.append(self.all_files[filename])
+                # handle files with a sequence id
+                elif len(base_parts) == 3:
+                    page_no = str(int(base_parts[2]))
+                    if page_no not in parts:
+                        parts[page_no] = Page(page_no, [self.all_files[filename]], self)
+                    else:
+                        parts[page_no].add_file(File.from_localpath(self.all_files[filename]))
+                else:
+                    item.logger.warning(
+                            'Filename {0} does not match a known pattern'.format(filename))
+
+                # remove the dcterms:hasPart triples
+                self.src_graph.remove((None, dcterms.hasPart, part))
+
+        for path in files:
             self.add_file(File.from_localpath(path))
-        for (id, data) in self.parts:
-            self.add_component(Page(id, data['files'], self))
+        for id, page in parts.items():
+            self.add_component(page)
 
     def graph(self):
         graph = super(Item, self).graph()
-        if os.path.isfile(self.path):
-            metadata = Graph().parse(self.path, format='turtle')
-            for (s,p,o) in metadata:
+        if self.src_graph is not None:
+            for (s, p, o) in self.src_graph:
                 graph.add((self.uri, p, o))
-        else:
-            raise DataReadException(
-                "File {0} not found".format(self.id + '.ttl')
-                )
         return graph
 
 
@@ -240,8 +199,7 @@ class Page(pcdm.Component):
         self.title = "{0}, Page {1}".format(item.title, self.id)
         self.ordered = True
         for f in files:
-            filepath = os.path.join(item.root, f)
-            self.add_file(File.from_localpath(filepath))
+            self.add_file(File.from_localpath(f))
 
     def graph(self):
         graph = super(Page, self).graph()

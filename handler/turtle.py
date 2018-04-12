@@ -162,9 +162,9 @@ class Item(pcdm.Item):
                 elif len(base_parts) == 3:
                     page_no = str(int(base_parts[2]))
                     if page_no not in parts:
-                        parts[page_no] = Page(page_no, [self.all_files[filename]], self)
+                        parts[page_no] = [ self.all_files[filename] ]
                     else:
-                        parts[page_no].add_file(File.from_localpath(self.all_files[filename]))
+                        parts[page_no].append(self.all_files[filename])
                 else:
                     item.logger.warning(
                             'Filename {0} does not match a known pattern'.format(filename))
@@ -174,8 +174,9 @@ class Item(pcdm.Item):
 
         for path in files:
             self.add_file(File.from_localpath(path))
-        for id, page in parts.items():
-            self.add_component(page)
+        # renumber the parts from 1
+        for (n, key) in enumerate(sorted(parts.keys()), 1):
+            self.add_component(Page(n, parts[key], self))
 
     def graph(self):
         graph = super(Item, self).graph()

@@ -27,6 +27,10 @@ loggers:
     level: DEBUG
     handlers: [console,file]
     propagate: no
+  commands:
+    level: DEBUG
+    handlers: [console,file]
+    propagate: no
 root:
   level: DEBUG
   handlers: [console,file]

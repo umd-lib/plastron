@@ -76,13 +76,18 @@ class Batch():
             self.logger.info(
                     'Walking the {0} tree to create a file index'.format(self.data_path))
             self.all_files = {}
+            file_count = 0;
             for root, dirs, files in os.walk(self.data_path):
                 for f in files:
-                    if f in self.all_files:
-                        raise DataReadException('Filename {0} is not unique'.format(f))
-                    self.all_files[f] = os.path.join(root, f)
+                    file_count += 1
+                    if f not in self.all_files:
+                        self.all_files[f] = [os.path.join(root, f)]
+                    else:
+                        self.all_files[f].append(os.path.join(root, f))
 
-            self.logger.info("Found {0} files".format(len(self.all_files)))
+            self.logger.info("Found {0} files with {1} unique filenames"
+                    .format(file_count, len(self.all_files)))
+
 
             # save index to file
             with open(file_index, 'w') as index:
@@ -148,8 +153,13 @@ class Item(pcdm.Item):
             # Parse each filename in hasPart and allocate to correct location in item entry
             for part in self.src_graph.objects(predicate=dcterms.hasPart):
                 filename = str(part)
+                # ensure exactly one path that is mapped from the basename
                 if not filename in self.all_files:
                     raise DataReadException('File {0} not found'.format(filename))
+                elif len(self.all_files[filename]) > 1:
+                    raise DataReadException('Filename {0} is not unique'.format(f))
+
+                file_path = self.all_files[filename][0]
 
                 normalized = filename.replace('_', '-')
                 basename, ext = os.path.splitext(normalized)
@@ -157,14 +167,14 @@ class Item(pcdm.Item):
 
                 # handle files with no sequence id
                 if len(base_parts) == 2:
-                    files.append(self.all_files[filename])
+                    files.append(file_path)
                 # handle files with a sequence id
                 elif len(base_parts) == 3:
                     page_no = str(int(base_parts[2]))
                     if page_no not in parts:
-                        parts[page_no] = [ self.all_files[filename] ]
+                        parts[page_no] = [ file_path ]
                     else:
-                        parts[page_no].append(self.all_files[filename])
+                        parts[page_no].append(file_path)
                 else:
                     item.logger.warning(
                             'Filename {0} does not match a known pattern'.format(filename))

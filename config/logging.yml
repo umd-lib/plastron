@@ -9,12 +9,11 @@ handlers:
     class: logging.StreamHandler
     level: INFO
     formatter: messageonly
-    stream: ext://sys.stdout
+    stream: ext://sys.stderr
   file:
     class: logging.FileHandler
     level: DEBUG
     formatter: full
-    filename: 'logs/load.py.log'
 loggers:
   __main__:
     level: DEBUG
@@ -25,6 +24,10 @@ loggers:
     handlers: [console,file]
     propagate: no
   classes.ndnp:
+    level: DEBUG
+    handlers: [console,file]
+    propagate: no
+  commands:
     level: DEBUG
     handlers: [console,file]
     propagate: no

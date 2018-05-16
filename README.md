@@ -7,8 +7,8 @@ Utility for batch operations on a Fedora 4 repository.
 Requires Python 3.
 
 ```
-git clone git@github.com:umd-lib/newspaper-batchload.git
-cd newspaper-batchload
+git clone git@github.com:umd-lib/plastron.git
+cd plastron
 pip install -r requirements.txt
 ```
 

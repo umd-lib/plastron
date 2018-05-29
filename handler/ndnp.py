@@ -410,11 +410,15 @@ class Page(pcdm.Component):
 
     def __init__(self, issue, reel, number, title=None, frame=None):
         super(Page, self).__init__()
-        self.issue = issue
-        self.reel = reel
-        self.number = number
         self.title = title
-        self.frame = frame
+        if issue is not None:
+            self.issue = issue
+        if reel is not None:
+            self.reel = reel
+        if number is not None:
+            self.number = number
+        if frame is not None:
+            self.frame = frame
         self.ordered = True
 
     def parse_ocr(self):

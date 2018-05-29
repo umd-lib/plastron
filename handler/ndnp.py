@@ -411,15 +411,13 @@ class Page(pcdm.Component):
     def __init__(self, issue, reel, number, title=None, frame=None):
         super(Page, self).__init__()
         self.title = title
-        if issue is not None:
-            self.issue = issue
+        self.issue = issue
+        self.number = number
+        self.ordered = True
         if reel is not None:
             self.reel = reel
-        if number is not None:
-            self.number = number
         if frame is not None:
             self.frame = frame
-        self.ordered = True
 
     def parse_ocr(self):
         # try to get an OCR file

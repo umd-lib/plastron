@@ -347,7 +347,9 @@ class Page(pcdm.Component):
     def from_mets(cls, issue_mets, div, issue):
         dmdsec = issue_mets.dmdsec(div.get('DMDID'))
         number = dmdsec.find('.//MODS:start', xmlns).text
-        reel = dmdsec.find('.//MODS:identifier[@type="reel number"]', xmlns).text
+        reel = dmdsec.find('.//MODS:identifier[@type="reel number"]', xmlns)
+        if reel is not None:
+            reel = reel.text
         frame = dmdsec.find('.//MODS:identifier[@type="reel sequence number"]', xmlns)
         if frame is not None:
             frame = frame.text
@@ -410,12 +412,14 @@ class Page(pcdm.Component):
 
     def __init__(self, issue, reel, number, title=None, frame=None):
         super(Page, self).__init__()
-        self.issue = issue
-        self.reel = reel
-        self.number = number
         self.title = title
-        self.frame = frame
+        self.issue = issue
+        self.number = number
         self.ordered = True
+        if reel is not None:
+            self.reel = reel
+        if frame is not None:
+            self.frame = frame
 
     def parse_ocr(self):
         # try to get an OCR file

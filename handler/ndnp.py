@@ -347,7 +347,9 @@ class Page(pcdm.Component):
     def from_mets(cls, issue_mets, div, issue):
         dmdsec = issue_mets.dmdsec(div.get('DMDID'))
         number = dmdsec.find('.//MODS:start', xmlns).text
-        reel = dmdsec.find('.//MODS:identifier[@type="reel number"]', xmlns).text
+        reel = dmdsec.find('.//MODS:identifier[@type="reel number"]', xmlns)
+        if reel is not None:
+            reel = reel.text
         frame = dmdsec.find('.//MODS:identifier[@type="reel sequence number"]', xmlns)
         if frame is not None:
             frame = frame.text

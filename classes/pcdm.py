@@ -43,6 +43,11 @@ class Repository():
         else:
             self.server_cert = None
 
+        self.session = requests.Session()
+        self.session.auth = self.auth
+        self.session.cert = self.client_cert
+        self.session.verify = self.server_cert
+
     def at_path(self, relpath):
         self._path_stack.append(self.relpath)
         self.relpath = relpath
@@ -74,10 +79,7 @@ class Repository():
     def request(self, method, url, **kwargs):
         target_uri = self._insert_transaction_uri(url)
         self.logger.debug("%s %s", method, target_uri)
-        response = requests.request(
-            method, target_uri, cert=self.client_cert,
-            auth=self.auth, verify=self.server_cert, **kwargs
-            )
+        response = self.session.request(method, target_uri, **kwargs)
         self.logger.debug("%s %s", response.status_code, response.reason)
         return response
 

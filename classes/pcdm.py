@@ -25,8 +25,7 @@ class Repository():
         self.fullpath = '/'.join(
             [p.strip('/') for p in (self.endpoint, self.relpath)]
             )
-        self.auth = None
-        self.client_cert = None
+        self.session = requests.Session()
         self.transaction = None
         self.load_binaries = True
         self.logger = logging.getLogger(
@@ -34,19 +33,12 @@ class Repository():
             )
 
         if 'CLIENT_CERT' in config and 'CLIENT_KEY' in config:
-            self.client_cert = (config['CLIENT_CERT'], config['CLIENT_KEY'])
+            self.session.cert = (config['CLIENT_CERT'], config['CLIENT_KEY'])
         elif 'FEDORA_USER' in config and 'FEDORA_PASSWORD' in config:
-            self.auth = (config['FEDORA_USER'], config['FEDORA_PASSWORD'])
+            self.session.auth = (config['FEDORA_USER'], config['FEDORA_PASSWORD'])
 
         if 'SERVER_CERT' in config:
-            self.server_cert = config['SERVER_CERT']
-        else:
-            self.server_cert = None
-
-        self.session = requests.Session()
-        self.session.auth = self.auth
-        self.session.cert = self.client_cert
-        self.session.verify = self.server_cert
+            self.session.verify = config['SERVER_CERT']
 
     def at_path(self, relpath):
         self._path_stack.append(self.relpath)

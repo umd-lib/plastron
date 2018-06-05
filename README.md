@@ -205,21 +205,18 @@ with the `-r` or `--repo` option. These are the recognized configuration keys:
 
 ### Adding Commands
 
-Commands are implemented as a package in `commands.{cmd_name}` that contain, at a
-minimum, a class name `Command`. This class must have an `__init__` method that
-takes an [argparse subparsers object] and creates and configures a subparser to
-handle its specific command-line arguments. It must also have a `__call__` method
-that takes a `pcdm.Repository` object and an [argparse.Namespace] object, and
-executes the actual command.
-
-To be enabled, the module name must be added to the `__all__` list in
-[`commands/__init__.py`](commands/__init__.py).
+Commands are implemented as a package in `plastron.commands.{cmd_name}` that
+contain, at a minimum, a class name `Command`. This class must have an `__init__`
+method that takes an [argparse subparsers object] and creates and configures a
+subparser to handle its specific command-line arguments. It must also have a
+`__call__` method that takes a `pcdm.Repository` object and an [argparse.Namespace]
+object, and executes the actual command.
 
 For a simple example, see the ping command, as implemented in
-[`commands/ping.py`](commands/ping.py):
+[`plastron/commands/ping.py`](plastron/commands/ping.py):
 
 ```python
-from classes.exceptions import FailureException
+from plastron.exceptions import FailureException
 
 class Command:
     def __init__(self, subparsers):

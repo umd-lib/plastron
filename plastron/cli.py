@@ -5,6 +5,7 @@ from __future__ import print_function
 
 import argparse
 from importlib import import_module
+from pkgutil import iter_modules
 import os.path
 import sys
 import yaml
@@ -52,11 +53,12 @@ def main():
 
     subparsers = parser.add_subparsers(title='commands')
 
-    # load all defined subcommands
-    command_for = {}
-    for name in commands.__all__:
-        command_module = import_module('plastron.commands.' + name)
-        command_for[name] = command_module.Command(subparsers)
+    # load all defined subcommands from the plastron.commands package
+    command_for = {
+        name: import_module(commands.__name__ + '.' + name).Command(subparsers)
+        for finder, name, ispkg
+        in iter_modules(commands.__path__)
+    }
 
     # parse command line args
     args = parser.parse_args()

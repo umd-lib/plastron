@@ -18,7 +18,7 @@ ns = pcdm
 #============================================================================
 
 class Repository():
-    def __init__(self, config):
+    def __init__(self, config, ua_string=None):
         self.endpoint = config['REST_ENDPOINT']
         self.relpath = config['RELPATH']
         self._path_stack = [ self.relpath ]
@@ -31,6 +31,7 @@ class Repository():
         self.logger = logging.getLogger(
             __name__ + '.' + self.__class__.__name__
             )
+        self.ua_string = ua_string
 
         if 'CLIENT_CERT' in config and 'CLIENT_KEY' in config:
             self.session.cert = (config['CLIENT_CERT'], config['CLIENT_KEY'])
@@ -71,6 +72,10 @@ class Repository():
     def request(self, method, url, **kwargs):
         target_uri = self._insert_transaction_uri(url)
         self.logger.debug("%s %s", method, target_uri)
+        if self.ua_string is not None:
+            if 'headers' not in kwargs:
+                kwargs['headers'] = {}
+            kwargs['headers']['User-Agent'] = self.ua_string
         response = self.session.request(method, target_uri, **kwargs)
         self.logger.debug("%s %s", response.status_code, response.reason)
         return response

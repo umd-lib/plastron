@@ -5,15 +5,16 @@ from __future__ import print_function
 
 import argparse
 from importlib import import_module
+from pkgutil import iter_modules
 import os.path
 import sys
 import yaml
 import logging
 import logging.config
 from datetime import datetime
-from classes.pcdm import Repository
-from classes.exceptions import FailureException
-import commands
+from plastron.pcdm import Repository
+from plastron.exceptions import FailureException
+from plastron import commands, version
 
 logger = logging.getLogger(__name__)
 now = datetime.utcnow().strftime('%Y%m%d%H%M%S')
@@ -26,33 +27,51 @@ def main():
     '''Parse args and handle options.'''
 
     parser = argparse.ArgumentParser(
-        description='Batch operation tool for Fedora 4.'
-        )
-    common_required = parser.add_argument_group('required arguments')
+            prog='plastron',
+            description='Batch operation tool for Fedora 4.'
+            )
+    parser.set_defaults(cmd_name=None)
+
+    common_required = parser.add_mutually_exclusive_group(required=True)
     common_required.add_argument('-r', '--repo',
-                        help='Path to repository configuration file.',
-                        action='store',
-                        required=True
-                        )
+            help='Path to repository configuration file.',
+            action='store'
+            )
+    common_required.add_argument('-V', '--version',
+            help='Print version and exit.',
+            action='store_true'
+            )
+
     parser.add_argument('-v', '--verbose',
-                        help='increase the verbosity of the status output',
-                        action='store_true'
-                        )
+            help='increase the verbosity of the status output',
+            action='store_true'
+            )
     parser.add_argument('-q', '--quiet',
-                        help='decrease the verbosity of the status output',
-                        action='store_true'
-                        )
+            help='decrease the verbosity of the status output',
+            action='store_true'
+            )
 
     subparsers = parser.add_subparsers(title='commands')
 
-    # load all defined subcommands
-    command_for = {}
-    for name in commands.__all__:
-        command_module = import_module('commands.' + name)
-        command_for[name] = command_module.Command(subparsers)
+    # load all defined subcommands from the plastron.commands package
+    command_for = {
+        name: import_module(commands.__name__ + '.' + name).Command(subparsers)
+        for finder, name, ispkg
+        in iter_modules(commands.__path__)
+    }
 
     # parse command line args
     args = parser.parse_args()
+
+    # version check and exit
+    if args.version:
+        print(version)
+        sys.exit(0)
+
+    # if no subcommand was selected, display the help
+    if args.cmd_name is None:
+        parser.print_help()
+        sys.exit(0)
 
     # load required repository config file and create repository object
     with open(args.repo, 'r') as repo_config_file:

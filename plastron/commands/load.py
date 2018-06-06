@@ -7,12 +7,12 @@ import re
 import logging
 import logging.config
 from datetime import datetime
-from classes import pcdm,util
-from classes.exceptions import ConfigException, DataReadException, RESTAPIException, FailureException
+from plastron import pcdm,util
+from plastron.exceptions import ConfigException, DataReadException, RESTAPIException, FailureException
 from time import sleep
-import namespaces
+from plastron import namespaces
 import logging
-from classes.util import print_header, print_footer
+from plastron.util import print_header, print_footer
 
 logger = logging.getLogger(__name__)
 now = datetime.utcnow().strftime('%Y%m%d%H%M%S')
@@ -80,7 +80,7 @@ class Command:
         # Define the data_handler function for the data being loaded
         logger.info("Initializing data handler")
         module_name = batch_options.get('HANDLER')
-        handler = import_module('handler.' + module_name)
+        handler = import_module('plastron.handlers.' + module_name)
         logger.info('Loaded "{0}" handler'.format(module_name))
 
         # "--nobinaries" implies "--noannotations"

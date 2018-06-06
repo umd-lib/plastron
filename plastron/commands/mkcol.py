@@ -1,6 +1,6 @@
 import yaml
-from classes import pcdm
-from classes.exceptions import RESTAPIException, FailureException
+from plastron import pcdm
+from plastron.exceptions import RESTAPIException, FailureException
 import logging
 logger = logging.getLogger(__name__)
 

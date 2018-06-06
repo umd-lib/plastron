@@ -1,6 +1,6 @@
 from rdflib import Literal
-from classes import ldp
-from namespaces import dcterms, oa, rdf
+from plastron import ldp
+from plastron.namespaces import dcterms, oa, rdf
 
 # alias the RDFlib Namespace
 ns = oa

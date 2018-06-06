@@ -1,7 +1,7 @@
 from datetime import datetime
-from classes.exceptions import RESTAPIException, DataReadException, FailureException
-from classes import util
-from handler import ndnp
+from plastron.exceptions import RESTAPIException, DataReadException, FailureException
+from plastron import util
+from plastron.handlers import ndnp
 import logging
 
 logger = logging.getLogger(__name__)

@@ -7,30 +7,46 @@ Utility for batch operations on a Fedora 4 repository.
 Requires Python 3.
 
 ```
+**TODO**
+add end-user instructions here once this is available via PyPI/pip
+**TODO**
+```
+
+### Installation for development
+
+To install Plastron in [development mode], do the following:
+
+```
 git clone git@github.com:umd-lib/plastron.git
 cd plastron
-pip install -r requirements.txt
+pip install -e .
 ```
 
 ## Common Options
 
 ```
-$ ./plastron --help
-usage: plastron [-h] -r REPO [-v] [-q]
+$ plastron --help
+usage: plastron [-h] (-r REPO | -V) [-v] [-q]
                 {ping,load,list,ls,mkcol,delete,del,rm,extractocr} ...
 
 Batch operation tool for Fedora 4.
 
 optional arguments:
   -h, --help            show this help message and exit
+  -r REPO, --repo REPO  Path to repository configuration file.
+  -V, --version         Print version and exit.
   -v, --verbose         increase the verbosity of the status output
   -q, --quiet           decrease the verbosity of the status output
 
-required arguments:
-  -r REPO, --repo REPO  Path to repository configuration file.
-
 commands:
   {ping,load,list,ls,mkcol,delete,del,rm,extractocr}
+```
+
+### Check version
+
+```
+$ plastron --version
+2.0.0.dev1
 ```
 
 ## Commands
@@ -42,7 +58,7 @@ the `-r` or `--repo` option *before* the command name. For example,
 ### Ping (ping)
 
 ```
-$ ./plastron ping --help
+$ plastron ping --help
 usage: plastron ping [-h]
 
 Check connection to the repository
@@ -54,7 +70,7 @@ optional arguments:
 ### Load (load)
 
 ```
-$ ./plastron load --help
+$ plastron load --help
 usage: plastron load [-h] -b BATCH [-d] [-n] [-l LIMIT] [-% PERCENT]
                      [--noannotations] [--ignore IGNORE] [--wait WAIT]
 
@@ -82,7 +98,7 @@ required arguments:
 ### List (list, ls)
 
 ```
-$ ./plastron list --help
+$ plastron list --help
 usage: plastron list [-h] [-l] [-R RECURSIVE] [uris [uris ...]]
 
 List objects in the repository
@@ -101,7 +117,7 @@ optional arguments:
 ### Create Collection (mkcol)
 
 ```
-$ ./plastron mkcol --help
+$ plastron mkcol --help
 usage: plastron mkcol [-h] -n NAME [-b BATCH]
 
 Create a PCDM Collection in the repository
@@ -116,7 +132,7 @@ optional arguments:
 ### Delete (delete, del, rm)
 
 ```
-$ ./plastron delete --help
+$ plastron delete --help
 usage: plastron delete [-h] [-R RECURSIVE] [-d] [-f FILE] [uris [uris ...]]
 
 Delete objects from the repository
@@ -136,7 +152,7 @@ optional arguments:
 ### Extract OCR (extractocr)
 
 ```
-$ ./plastron extractocr --help
+$ plastron extractocr --help
 usage: plastron extractocr [-h] [--ignore IGNORE]
 
 Create annotations from OCR data stored in the repository
@@ -189,21 +205,18 @@ with the `-r` or `--repo` option. These are the recognized configuration keys:
 
 ### Adding Commands
 
-Commands are implemented as a package in `commands.{cmd_name}` that contain, at a
-minimum, a class name `Command`. This class must have an `__init__` method that
-takes an [argparse subparsers object] and creates and configures a subparser to
-handle its specific command-line arguments. It must also have a `__call__` method
-that takes a `pcdm.Repository` object and an [argparse.Namespace] object, and
-executes the actual command.
-
-To be enabled, the module name must be added to the `__all__` list in
-[`commands/__init__.py`](commands/__init__.py).
+Commands are implemented as a package in `plastron.commands.{cmd_name}` that
+contain, at a minimum, a class name `Command`. This class must have an `__init__`
+method that takes an [argparse subparsers object] and creates and configures a
+subparser to handle its specific command-line arguments. It must also have a
+`__call__` method that takes a `pcdm.Repository` object and an [argparse.Namespace]
+object, and executes the actual command.
 
 For a simple example, see the ping command, as implemented in
-[`commands/ping.py`](commands/ping.py):
+[`plastron/commands/ping.py`](plastron/commands/ping.py):
 
 ```python
-from classes.exceptions import FailureException
+from plastron.exceptions import FailureException
 
 class Command:
     def __init__(self, subparsers):
@@ -220,12 +233,13 @@ class Command:
 
 The `FailureException` is caught by the `plastron` script and causes it to exit with
 a status code of 1. Any `KeyboardInterrupt` exceptions (for instance, due to the
-user pressing Ctrl+C) are also caught by `plastron` and cause it to exit with a
-status code of 2.
+user pressing <kbd>Ctrl+C</kbd>) are also caught by the `plastron` script and cause
+it to exit with a status code of 2.
 
 ## License
 
 See the [LICENSE](LICENSE.md) file for license rights and limitations (Apache 2.0).
 
+[development mode]: https://packaging.python.org/tutorials/installing-packages/#installing-from-vcs
 [argparse subparsers object]: https://docs.python.org/3/library/argparse.html#sub-commands
 [argparse.Namespace]: https://docs.python.org/3/library/argparse.html#the-namespace-object

@@ -237,7 +237,7 @@ class LabeledThing(ldp.Resource):
     def from_graph(cls, graph, subject):
         label = graph.value(subject=subject, predicate=rdfs.label)
         same_as = graph.value(subject=subject, predicate=owl.sameAs)
-        types = graph.objects(subject=subject, predicate=rdf.type)
+        types = list(graph.objects(subject=subject, predicate=rdf.type))
         return cls(label, same_as, types)
 
     def __init__(self, label, same_as=None, types=[]):

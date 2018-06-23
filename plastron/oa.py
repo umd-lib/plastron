@@ -1,89 +1,57 @@
-from rdflib import Literal
-from plastron import ldp
-from plastron.namespaces import dcterms, oa, rdf
+from rdflib import RDF
+from plastron import ldp, rdf
+from plastron.namespaces import dcterms, oa
 
 # alias the RDFlib Namespace
 ns = oa
 
 # Annotation resources
-
+@rdf.object_property('body', oa.hasBody, multivalue=True, embed=True)
+@rdf.object_property('target', oa.hasTarget, multivalue=True, embed=True)
+@rdf.object_property('motivation', oa.motivatedBy)
+@rdf.rdf_class(oa.Annotation)
 class Annotation(ldp.Resource):
-    def __init__(self):
-        super(Annotation, self).__init__()
-        self.motivation = None
+    def __str__(self):
+        return ' '.join([ str(body) for body in self.body ])
 
     def add_body(self, body):
-        self.linked_objects.append((oa.hasBody, body))
-        self.title = body.title
+        self.body.append(body)
         body.annotation = self
 
     def add_target(self, target):
-        self.linked_objects.append((oa.hasTarget, target))
+        self.target.append(target)
         target.annotation = self
 
-    def graph(self):
-        graph = super(Annotation, self).graph()
-        graph.add((self.uri, rdf.type, oa.Annotation))
-        if self.motivation is not None:
-            graph.add((self.uri, oa.motivatedBy, self.motivation))
-        return graph
-
+@rdf.data_property('value', RDF.value)
+@rdf.data_property('content_type', dcterms['format'])
+@rdf.rdf_class(oa.TextualBody)
 class TextualBody(ldp.Resource):
-    def __init__(self, value, content_type):
-        super(TextualBody, self).__init__()
-        self.value = value
-        self.content_type = content_type
+    def __str__(self):
         if len(self.value) <= 25:
-            self.title = self.value
+            return self.value
         else:
-            self.title = self.value[:24] + '…'
+            return self.value[:24] + '…'
 
-    def graph(self):
-        graph = super(TextualBody, self).graph()
-        graph.add((self.uri, rdf.value, Literal(self.value)))
-        graph.add((self.uri, dcterms['format'], Literal(self.content_type)))
-        graph.add((self.uri, rdf.type, oa.TextualBody))
-        return graph
-
+@rdf.object_property('selector', oa.hasSelector, multivalue=True, embed=True)
+@rdf.object_property('source', oa.hasSource)
+@rdf.rdf_class(oa.SpecificResource)
 class SpecificResource(ldp.Resource):
-    def __init__(self, source):
-        super(SpecificResource, self).__init__()
-        self.source = source
+    def __str__(self):
+        return ' '.join([ str(selector) for selector in self.selector ])
 
     def add_selector(self, selector):
-        self.title = selector.title
-        self.linked_objects.append((oa.hasSelector, selector))
+        self.selector.append(selector)
         selector.annotation = self
 
-    def graph(self):
-        graph = super(SpecificResource, self).graph()
-        graph.add((self.uri, oa.hasSource, self.source.uri))
-        graph.add((self.uri, rdf.type, oa.SpecificResource))
-        return graph
-
+@rdf.data_property('value', RDF.value)
+@rdf.object_property('conforms_to', dcterms.conformsTo)
+@rdf.rdf_class(oa.FragmentSelector)
 class FragmentSelector(ldp.Resource):
-    def __init__(self, value, conforms_to=None):
-        super(FragmentSelector, self).__init__()
-        self.value = value
-        self.conforms_to = conforms_to
-        self.title = self.value
+    def __str__(self):
+        return self.value
 
-    def graph(self):
-        graph = super(FragmentSelector, self).graph()
-        graph.add((self.uri, rdf.value, Literal(self.value)))
-        graph.add((self.uri, rdf.type, oa.FragmentSelector))
-        if self.conforms_to is not None:
-            graph.add((self.uri, dcterms.conformsTo, self.conforms_to))
-        return graph
-
+@rdf.data_property('value', RDF.value)
+@rdf.rdf_class(oa.XPathSelector)
 class XPathSelector(ldp.Resource):
-    def __init__(self, value):
-        super(XPathSelector, self).__init__()
-        self.value = value
-        self.title = self.value
-
-    def graph(self):
-        graph = super(XPathSelector, self).graph()
-        graph.add((self.uri, rdf.value, Literal(self.value)))
-        graph.add((self.uri, rdf.type, oa.XPathSelector))
-        return graph
+    def __str__(self):
+        return self.value

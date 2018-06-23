@@ -3,52 +3,21 @@
 import csv
 import logging
 import os
-from rdflib import Graph, Literal, URIRef
 from plastron import pcdm
-from plastron.exceptions import ConfigException
-from plastron.namespaces import carriers, dcterms, rdf
-
-#============================================================================
-# DATA LOADING FUNCTION
-#============================================================================
-
-def load(repo, batch_config):
-    return Batch(repo, batch_config)
-
-#============================================================================
-# CSV BATCH CLASS
-#============================================================================
+from plastron.models.newspaper import Reel, Page
 
 class Batch():
-
-    '''iterator class representing the set of resources to be loaded'''
-
-    def __init__(self, repo, batch_config):
+    def __init__(self, repo, config):
         self.logger = logging.getLogger(
             __name__ + '.' + self.__class__.__name__
             )
-        self.collection = pcdm.Collection()
-        self.collection.uri = URIRef(batch_config.get('COLLECTION'))
+        self.repo = repo
+        self.collection = pcdm.Collection.from_repository(repo, config.collection_uri)
 
-        # check that the supplied collection exists and get title
-        response = repo.get(
-            self.collection.uri, headers={'Accept': 'application/rdf+xml'}
-            )
-        if response.status_code == 200:
-            coll_graph = Graph().parse(data=response.text)
-            self.collection.title = str(self.collection.uri)
-            for (subj, pred, obj) in coll_graph:
-                if str(pred) == "http://purl.org/dc/elements/1.1/title":
-                    self.collection.title = obj
-        else:
-            raise ConfigException(
-                "Collection URI {0} could not be reached.".format(
-                    self.collection.uri
-                    )
-                )
-        self.collections = [self.collection]
-        self.path = batch_config.get('LOCAL_PATH')
-        self.files = [os.path.join(self.path, f) for f in os.listdir(self.path)]
+        with os.scandir(config.batch_file) as files:
+            self.files = [ entry.path for entry in files if
+                    entry.name.endswith('.csv') ]
+
         self.length = len(self.files)
         self.num = 0
 
@@ -57,55 +26,25 @@ class Batch():
 
     def __next__(self):
         if self.num < self.length:
-            reel = Reel(self.files[self.num])
-            reel.collections = self.collections
+            item = BatchItem(self, self.files[self.num])
             self.num += 1
-            return reel
+            return item
         else:
             self.logger.info('Processing complete!')
             raise StopIteration()
 
-#============================================================================
-# NDNP REEL OBJECT
-#============================================================================
+class BatchItem():
+    def __init__(self, batch, filename):
+        self.batch = batch
+        self.path = filename
 
-class Reel(pcdm.Item):
-
-    '''class representing an NDNP reel'''
-
-    def __init__(self, csvfile):
-        super(Reel, self).__init__()
-        self.id = os.path.splitext(os.path.basename(csvfile))[0]
-        self.title = 'Reel Number {0}'.format(self.id)
-        self.sequence_attr = ('Frame', 'sequence')
-        self.path = csvfile
+    def read_data(self):
+        id = os.path.splitext(os.path.basename(self.path))[0]
+        reel = Reel(id=id, title=f'Reel Number {id}', collections=[ self.batch.collection ])
 
         with open(self.path, 'r') as f:
             reader = csv.DictReader(f)
-            self.components = [
-                Frame(self, row['sequence'], row['uri']) for row in reader
-                ]
+            for row in reader:
+                reel.components.append(Page.from_repository(self.batch.repo, row['uri']))
 
-        self.graph.add(
-            (self.uri, dcterms.title, Literal(self.title)))
-        self.graph.add(
-            (self.uri, dcterms.identifier, Literal(self.id)))
-        self.graph.add(
-            (self.uri, rdf.type, carriers.hd))
-
-#============================================================================
-# NDNP FRAME OBJECT
-#============================================================================
-
-class Frame(pcdm.Component):
-
-    '''class referencing an existing page object for purpose of reel creation'''
-
-    def __init__(self, reel, sequence, uri):
-        super(Frame, self).__init__()
-
-        self.sequence = sequence
-        self.uri = URIRef(uri)
-
-        self.title = "{0}, frame {1}".format(reel.title, self.sequence)
-        self.ordered = True
+        return reel

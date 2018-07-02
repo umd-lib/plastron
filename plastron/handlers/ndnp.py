@@ -9,10 +9,10 @@ import requests
 import sys
 import mimetypes
 from rdflib import Graph, Literal, Namespace, URIRef
-from classes import pcdm, ocr, oa
-from classes.exceptions import ConfigException, DataReadException
-import namespaces
-from namespaces import bibo, carriers, dc, dcmitype, dcterms, ebucore, fabio, \
+from plastron import pcdm, ocr, oa
+from plastron.exceptions import ConfigException, DataReadException
+from plastron import namespaces
+from plastron.namespaces import bibo, carriers, dc, dcmitype, dcterms, ebucore, fabio, \
         foaf, iana, ndnp, ore, pcdmuse, prov, rdf, sc
 
 # alias the RDFlib Namespace
@@ -347,7 +347,9 @@ class Page(pcdm.Component):
     def from_mets(cls, issue_mets, div, issue):
         dmdsec = issue_mets.dmdsec(div.get('DMDID'))
         number = dmdsec.find('.//MODS:start', xmlns).text
-        reel = dmdsec.find('.//MODS:identifier[@type="reel number"]', xmlns).text
+        reel = dmdsec.find('.//MODS:identifier[@type="reel number"]', xmlns)
+        if reel is not None:
+            reel = reel.text
         frame = dmdsec.find('.//MODS:identifier[@type="reel sequence number"]', xmlns)
         if frame is not None:
             frame = frame.text
@@ -410,12 +412,14 @@ class Page(pcdm.Component):
 
     def __init__(self, issue, reel, number, title=None, frame=None):
         super(Page, self).__init__()
-        self.issue = issue
-        self.reel = reel
-        self.number = number
         self.title = title
-        self.frame = frame
+        self.issue = issue
+        self.number = number
         self.ordered = True
+        if reel is not None:
+            self.reel = reel
+        if frame is not None:
+            self.frame = frame
 
     def parse_ocr(self):
         # try to get an OCR file

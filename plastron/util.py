@@ -1,9 +1,26 @@
 import os
 import csv
-from namespaces import dcterms
+from plastron import namespaces
+from plastron.namespaces import dcterms
+from rdflib.util import from_n3
 
 def get_title_string(graph, separator='; '):
     return separator.join([ t for t in graph.objects(predicate=dcterms.title) ])
+
+def parse_predicate_list(string, delimiter=','):
+    manager = namespaces.get_manager()
+    return [ from_n3(p, nsm=manager) for p in string.split(delimiter) ]
+
+def print_header():
+    '''Common header formatting.'''
+    title = '|     PLASTRON     |'
+    bar = '+' + '='*(len(title)-2) + '+'
+    spacer = '|' + ' '*(len(title)-2) + '|'
+    print('\n'.join(['', bar, spacer, title, spacer, bar, '']))
+
+def print_footer():
+    '''Report success or failure and resources created.'''
+    print('\nScript complete. Goodbye!\n')
 
 class ItemLog():
     def __init__(self, filename, fieldnames, keyfield):

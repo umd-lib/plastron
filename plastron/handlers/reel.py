@@ -4,9 +4,9 @@ import csv
 import logging
 import os
 from rdflib import Graph, Literal, URIRef
-from classes import pcdm
-from classes.exceptions import ConfigException
-from namespaces import carriers, dcterms, rdf
+from plastron import pcdm
+from plastron.exceptions import ConfigException
+from plastron.namespaces import carriers, dcterms, rdf
 
 #============================================================================
 # DATA LOADING FUNCTION

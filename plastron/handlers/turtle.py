@@ -6,9 +6,9 @@ import re
 import sys
 import yaml
 from rdflib import Graph, Literal, Namespace, URIRef
-from classes import pcdm
-from classes.exceptions import ConfigException, DataReadException
-from namespaces import bibo, dc, dcmitype, dcterms, fabio, pcdmuse, rdf
+from plastron import pcdm, ldp
+from plastron.exceptions import ConfigException, DataReadException
+from plastron.namespaces import bibo, dc, dcmitype, dcterms, edm, fabio, geo, pcdmuse, rdf, rdfs, owl
 
 #============================================================================
 # DATA LOADING FUNCTION
@@ -17,6 +17,11 @@ from namespaces import bibo, dc, dcmitype, dcterms, fabio, pcdmuse, rdf
 def load(repo, batch_config):
     return Batch(repo, batch_config)
 
+def create_authority(graph, subject):
+    if (subject, rdf.type, edm.Place) in graph:
+        return Place.from_graph(graph, subject)
+    else:
+        return LabeledThing.from_graph(graph, subject)
 
 #============================================================================
 # BATCH CLASS (FOR PAGED BINARIES PLUS RDF METADATA)
@@ -98,7 +103,17 @@ class Batch():
                     'Parsing the master metadata graph in {0}'.format(self.metadata_file))
             self.master_graph = Graph().parse(f, format="turtle")
 
-        self.subjects = sorted(set(self.master_graph.subjects()))
+        # get subject URIs that are http: or https: URIs
+        self.subjects = sorted(set([ uri for uri in self.master_graph.subjects() if
+            str(uri).startswith('http:') or str(uri).startswith('https:') ]))
+
+        # get the master list of LabeledThing objects
+        # keyed by the urn:uuid:... URI from the master graph
+        authority_subjects = set([ uri for uri in self.master_graph.subjects()
+                if str(uri).startswith('urn:uuid:')])
+        self.authorities = { str(s): create_authority(self.master_graph, s)
+                for s in authority_subjects }
+
         self.length = len(self.subjects)
         self.count = 0
         self.logger.info("Batch contains {0} items.".format(self.length))
@@ -112,7 +127,7 @@ class Batch():
             item_graph = Graph()
             for triple in self.master_graph.triples((subject, None, None)):
                 item_graph.add(triple)
-            item = Item.from_graph(item_graph, self.all_files)
+            item = Item.from_graph(item_graph, self.all_files, self.authorities)
             item.path = str(subject)
             item.add_collection(self.collection)
             self.count += 1
@@ -131,10 +146,32 @@ class Item(pcdm.Item):
     '''Class representing a paged repository item resource'''
 
     @classmethod
-    def from_graph(cls, graph, all_files):
+    def from_graph(cls, graph, all_files, authorities):
         item = cls(title=next(graph.objects(predicate=dcterms.title)))
-        item.src_graph = graph
+        props = []
+        fragments = set()
+        item_graph = Graph()
+        for (s, p, o) in graph:
+            if str(o).startswith('urn:uuid:'):
+                # the object is a labeled authority construction
+                # source RDF uses urn:uuid URIs, after load these get
+                # transformed to fragment identifiers on the main
+                # resource
+                authority = authorities[str(o)]
+                props.append((p, authority))
+                fragments.add(authority)
+            else:
+                # just add the raw triple to the item graph
+                item_graph.add((s, p, o))
+
+        item.src_graph = item_graph
         item.all_files = all_files
+        item.fragments = list(fragments)
+        # link to the labeled authority objects using the original
+        # predicates
+        for (p, authority) in props:
+            item.linked_objects.append((p, authority))
+
         return item
 
     def __init__(self, title=None, files=None, parts=None):
@@ -195,6 +232,47 @@ class Item(pcdm.Item):
                 graph.add((self.uri, p, o))
         return graph
 
+class LabeledThing(ldp.Resource):
+    @classmethod
+    def from_graph(cls, graph, subject):
+        label = graph.value(subject=subject, predicate=rdfs.label)
+        same_as = graph.value(subject=subject, predicate=owl.sameAs)
+        types = list(graph.objects(subject=subject, predicate=rdf.type))
+        return cls(label, same_as, types)
+
+    def __init__(self, label, same_as=None, types=[]):
+        super(LabeledThing, self).__init__()
+        self.label = label
+        self.title = label
+        self.same_as = same_as
+        self.types = types
+
+    def graph(self):
+        graph = super(LabeledThing, self).graph()
+        graph.add((self.uri, rdfs.label, Literal(self.label)))
+        for type in self.types:
+            graph.add((self.uri, rdf.type, type))
+        if self.same_as is not None:
+            graph.add((self.uri, owl.sameAs, self.same_as))
+        return graph
+
+class Place(LabeledThing):
+    @classmethod
+    def from_graph(cls, graph, subject):
+        place = super(Place, cls).from_graph(graph, subject)
+        lat = graph.value(subject=subject, predicate=geo.lat)
+        lon = graph.value(subject=subject, predicate=geo.long)
+        if lat is not None and lon is not None:
+            place.lat_long = (lat, lon)
+        return place
+
+    def graph(self):
+        graph = super(Place, self).graph()
+        if self.lat_long is not None:
+            graph.add((self.uri, geo.lat, self.lat_long[0]))
+            graph.add((self.uri, geo.long, self.lat_long[1]))
+
+        return graph
 
 #============================================================================
 # PAGE (COMPONENT) CLASS

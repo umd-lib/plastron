@@ -5,9 +5,9 @@ import requests
 import logging
 import threading
 from rdflib import Graph, Literal, URIRef
-from classes import ldp, ore
-from classes.exceptions import RESTAPIException
-from namespaces import dcterms, iana, pcdm, rdf
+from plastron import ldp, ore
+from plastron.exceptions import RESTAPIException
+from plastron.namespaces import dcterms, iana, pcdm, rdf
 from operator import attrgetter
 
 # alias the RDFlib Namespace
@@ -18,30 +18,28 @@ ns = pcdm
 #============================================================================
 
 class Repository():
-    def __init__(self, config):
+    def __init__(self, config, ua_string=None):
         self.endpoint = config['REST_ENDPOINT']
         self.relpath = config['RELPATH']
         self._path_stack = [ self.relpath ]
         self.fullpath = '/'.join(
             [p.strip('/') for p in (self.endpoint, self.relpath)]
             )
-        self.auth = None
-        self.client_cert = None
+        self.session = requests.Session()
         self.transaction = None
         self.load_binaries = True
         self.logger = logging.getLogger(
             __name__ + '.' + self.__class__.__name__
             )
+        self.ua_string = ua_string
 
         if 'CLIENT_CERT' in config and 'CLIENT_KEY' in config:
-            self.client_cert = (config['CLIENT_CERT'], config['CLIENT_KEY'])
+            self.session.cert = (config['CLIENT_CERT'], config['CLIENT_KEY'])
         elif 'FEDORA_USER' in config and 'FEDORA_PASSWORD' in config:
-            self.auth = (config['FEDORA_USER'], config['FEDORA_PASSWORD'])
+            self.session.auth = (config['FEDORA_USER'], config['FEDORA_PASSWORD'])
 
         if 'SERVER_CERT' in config:
-            self.server_cert = config['SERVER_CERT']
-        else:
-            self.server_cert = None
+            self.session.verify = config['SERVER_CERT']
 
     def at_path(self, relpath):
         self._path_stack.append(self.relpath)
@@ -59,13 +57,26 @@ class Repository():
         response = self.head(self.fullpath)
         return response.status_code == 200
 
+    def test_connection(self):
+        # test connection to fcrepo
+        self.logger.debug("fcrepo.endpoint = %s", self.endpoint)
+        self.logger.debug("fcrepo.relpath = %s", self.relpath)
+        self.logger.debug("fcrepo.fullpath = %s", self.fullpath)
+        self.logger.info("Testing connection to {0}".format(self.fullpath))
+        if self.is_reachable():
+            self.logger.info("Connection successful.")
+        else:
+            self.logger.warn("Unable to connect.")
+            raise Exception("Unable to connect")
+
     def request(self, method, url, **kwargs):
         target_uri = self._insert_transaction_uri(url)
         self.logger.debug("%s %s", method, target_uri)
-        response = requests.request(
-            method, target_uri, cert=self.client_cert,
-            auth=self.auth, verify=self.server_cert, **kwargs
-            )
+        if self.ua_string is not None:
+            if 'headers' not in kwargs:
+                kwargs['headers'] = {}
+            kwargs['headers']['User-Agent'] = self.ua_string
+        response = self.session.request(method, target_uri, **kwargs)
         self.logger.debug("%s %s", response.status_code, response.reason)
         return response
 

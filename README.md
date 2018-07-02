@@ -1,22 +1,80 @@
-Utility for batch loading newspaper content into a Fedora 4 repository.
+# Plastron
+
+Utility for batch operations on a Fedora 4 repository.
 
 ## Installation
 
 Requires Python 3.
 
 ```
-git clone git@github.com:umd-lib/newspaper-batchload.git
-cd newspaper-batchload
-pip install -r requirements.txt
+**TODO**
+add end-user instructions here once this is available via PyPI/pip
+**TODO**
 ```
 
-## Running
+### Installation for development
+
+To install Plastron in [development mode], do the following:
 
 ```
-usage: load.py [-h] -r REPO -b BATCH [-d] [-n] [-l LIMIT] [-% PERCENT] [-p]
-               [-v] [-q] [--noannotations] [--ignore IGNORE] [--wait WAIT]
+git clone git@github.com:umd-lib/plastron.git
+cd plastron
+pip install -e .
+```
 
-A configurable batch loader for Fedora 4.
+## Common Options
+
+```
+$ plastron --help
+usage: plastron [-h] (-r REPO | -V) [-v] [-q]
+                {ping,load,list,ls,mkcol,delete,del,rm,extractocr} ...
+
+Batch operation tool for Fedora 4.
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -r REPO, --repo REPO  Path to repository configuration file.
+  -V, --version         Print version and exit.
+  -v, --verbose         increase the verbosity of the status output
+  -q, --quiet           decrease the verbosity of the status output
+
+commands:
+  {ping,load,list,ls,mkcol,delete,del,rm,extractocr}
+```
+
+### Check version
+
+```
+$ plastron --version
+2.0.0.dev1
+```
+
+## Commands
+
+All commands require you to specify a repository configuration file using
+the `-r` or `--repo` option *before* the command name. For example,
+`plastron -r path/to/repo.yml ping`.
+
+### Ping (ping)
+
+```
+$ plastron ping --help
+usage: plastron ping [-h]
+
+Check connection to the repository
+
+optional arguments:
+  -h, --help  show this help message and exit
+```
+
+### Load (load)
+
+```
+$ plastron load --help
+usage: plastron load [-h] -b BATCH [-d] [-n] [-l LIMIT] [-% PERCENT]
+                     [--noannotations] [--ignore IGNORE] [--wait WAIT]
+
+Load a batch into the repository
 
 optional arguments:
   -h, --help            show this help message and exit
@@ -27,80 +85,63 @@ optional arguments:
                         objects
   -% PERCENT, --percent PERCENT
                         load specified percentage of total items
-  -p, --ping            check the repo connection and exit
-  -v, --verbose         increase the verbosity of the status output
-  -q, --quiet           decrease the verbosity of the status output
   --noannotations       iterate without loading annotations (e.g. OCR)
   --ignore IGNORE, -i IGNORE
                         file listing items to ignore
   --wait WAIT, -w WAIT  wait n seconds between items
 
 required arguments:
-  -r REPO, --repo REPO  path to repository configuration file
   -b BATCH, --batch BATCH
-                        path to batch configuration file
+                        path to batch configuration file                    
 ```
 
-## Create Collection
+### List (list, ls)
 
 ```
-usage: create_collection.py [-h] -r REPO -n NAME [-b BATCH]
+$ plastron list --help
+usage: plastron list [-h] [-l] [-R RECURSIVE] [uris [uris ...]]
 
-Collection creation tool for Fedora 4.
+List objects in the repository
+
+positional arguments:
+  uris                  URIs of repository objects to list
 
 optional arguments:
   -h, --help            show this help message and exit
-  -r REPO, --repo REPO  Path to repository configuration file.
-  -n NAME, --name NAME  Name of the collection.
-  -b BATCH, --batch BATCH
-                        Path to batch configuration file.
-```
-
-## Extract OCR
-
-```
-usage: extractocr.py [-h] -r REPO [--ignore IGNORE]
-
-Extract OCR text and create annotations.
-
-optional arguments:
-  -h, --help            show this help message and exit
-  -r REPO, --repo REPO  Path to repository configuration file.
-  --ignore IGNORE, -i IGNORE
-                        file listing items to ignore
-```
-
-## Object Lister
-
-```
-usage: list.py [-h] -r REPO [-l] [-R RECURSIVE]
-
-Object lister for Fedora 4.
-
-optional arguments:
-  -h, --help            show this help message and exit
-  -r REPO, --repo REPO  Path to repository configuration file.
   -l, --long            Display additional information besides the URI
   -R RECURSIVE, --recursive RECURSIVE
                         List additional objects found by traversing the given
                         predicate(s)
 ```
 
-## Delete Tool
+### Create Collection (mkcol)
 
 ```
-usage: delete.py [-h] -r REPO [-p] [-R RECURSIVE] [-d] [-f FILE]
-                 [uris [uris ...]]
+$ plastron mkcol --help
+usage: plastron mkcol [-h] -n NAME [-b BATCH]
 
-Delete tool for Fedora 4.
-
-positional arguments:
-  uris                  Zero or more repository URIs to be deleted.
+Create a PCDM Collection in the repository
 
 optional arguments:
   -h, --help            show this help message and exit
-  -r REPO, --repo REPO  Path to repository configuration file.
-  -p, --ping            Check the connection to the repository and exit.
+  -n NAME, --name NAME  Name of the collection.
+  -b BATCH, --batch BATCH
+                        Path to batch configuration file.
+```
+
+### Delete (delete, del, rm)
+
+```
+$ plastron delete --help
+usage: plastron delete [-h] [-R RECURSIVE] [-d] [-f FILE] [uris [uris ...]]
+
+Delete objects from the repository
+
+positional arguments:
+  uris                  Repository URIs to be deleted.
+
+optional arguments:
+  -h, --help            show this help message and exit
   -R RECURSIVE, --recursive RECURSIVE
                         Delete additional objects found by traversing the
                         given predicate(s)
@@ -108,10 +149,97 @@ optional arguments:
   -f FILE, --file FILE  File containing a list of URIs to delete
 ```
 
+### Extract OCR (extractocr)
+
+```
+$ plastron extractocr --help
+usage: plastron extractocr [-h] [--ignore IGNORE]
+
+Create annotations from OCR data stored in the repository
+
+optional arguments:
+  -h, --help            show this help message and exit
+  --ignore IGNORE, -i IGNORE
+                        file listing items to ignore
+```
+
+## Configuration
+
 ### Configuration Templates
 Templates for creating the configuration files can be found at [config/templates](./config/templates)
+
+### Repository Configuration
+
+The repository connection is configured in a YAML file and passed to `plastron`
+with the `-r` or `--repo` option. These are the recognized configuration keys:
+
+#### Required
+
+| Option        | Description |
+| ------------- | ----------- |
+|`REST_ENDPOINT`|Respository root URL|
+|`RELPATH`      |Path within repository to load objects to|
+|`LOG_DIR`      |Directory to write log files|
+
+#### Client Certificate Authentication
+
+| Option      | Description |
+| ----------- | ----------- |
+|`CLIENT_CERT`|PEM-encoded client SSL cert for authentication|
+|`CLIENT_KEY` |PEM-encoded client SSL key for authentication|
+
+#### Password Authentication
+
+| Option          | Description |
+| --------------- | ----------- |
+|`FEDORA_USER`    |Username for authentication|
+|`FEDORA_PASSWORD`|Password for authentication|
+
+#### Optional
+
+| Option      | Description |
+| ----------- | ----------- |
+|`SERVER_CERT`|Path to a PEM-encoded copy of the server's SSL certificate; only needed for servers using self-signed certs|
+
+## Extending
+
+### Adding Commands
+
+Commands are implemented as a package in `plastron.commands.{cmd_name}` that
+contain, at a minimum, a class name `Command`. This class must have an `__init__`
+method that takes an [argparse subparsers object] and creates and configures a
+subparser to handle its specific command-line arguments. It must also have a
+`__call__` method that takes a `pcdm.Repository` object and an [argparse.Namespace]
+object, and executes the actual command.
+
+For a simple example, see the ping command, as implemented in
+[`plastron/commands/ping.py`](plastron/commands/ping.py):
+
+```python
+from plastron.exceptions import FailureException
+
+class Command:
+    def __init__(self, subparsers):
+        parser_ping = subparsers.add_parser('ping',
+                description='Check connection to the repository')
+        parser_ping.set_defaults(cmd_name='ping')
+
+    def __call__(self, fcrepo, args):
+        try:
+            fcrepo.test_connection()
+        except:
+            raise FailureException()
+```
+
+The `FailureException` is caught by the `plastron` script and causes it to exit with
+a status code of 1. Any `KeyboardInterrupt` exceptions (for instance, due to the
+user pressing <kbd>Ctrl+C</kbd>) are also caught by the `plastron` script and cause
+it to exit with a status code of 2.
 
 ## License
 
 See the [LICENSE](LICENSE.md) file for license rights and limitations (Apache 2.0).
 
+[development mode]: https://packaging.python.org/tutorials/installing-packages/#installing-from-vcs
+[argparse subparsers object]: https://docs.python.org/3/library/argparse.html#sub-commands
+[argparse.Namespace]: https://docs.python.org/3/library/argparse.html#the-namespace-object

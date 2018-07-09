@@ -28,6 +28,7 @@ class Repository():
         self.session = requests.Session()
         self.transaction = None
         self.load_binaries = True
+        self.log_dir = config['LOG_DIR']
         self.logger = logging.getLogger(
             __name__ + '.' + self.__class__.__name__
             )

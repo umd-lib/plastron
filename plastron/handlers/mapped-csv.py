@@ -41,10 +41,15 @@ class Batch():
         # Set configuration properties
         self.root          = os.path.normpath(config.get('ROOT'))
         self.data_path     = os.path.join(self.root, config['DATA_PATH'])
-        self.metadata_file = os.path.join(self.root, config.get('METADATA_FILE'))
-        self.collection    = pcdm.Collection.from_repository(
-                                                repo, config.get('COLLECTION'))
-        self.metadata_map  = os.path.join(self.root, config.get('METADATA_MAP'))
+        self.metadata_file = os.path.join(
+                                self.root, config.get('METADATA_FILE')
+                                )
+        self.collection = pcdm.Collection.from_repository(
+                                repo, config.get('COLLECTION')
+                                )
+        self.metadata_map = os.path.join(
+                                self.root, config.get('METADATA_MAP')
+                                )
 
         # Check for required files and parse them
         required_files = ['metadata_file', 'metadata_map']
@@ -52,11 +57,12 @@ class Batch():
             if not os.path.isfile(getattr(self, rf)):
                 raise ConfigException('{} could not be found'.format(rf))
         with open(self.metadata_map, 'r') as f:
-            self.logger.info('Parsing the metadata map in {0}'.format(self.metadata_map))
+            self.logger.info(
+                'Parsing the metadata map in {0}'.format(self.metadata_map)
+                )
             self.mapping = yaml.safe_load(f)
         with open(self.metadata_file, 'r') as f:
             self.rows = [r for r in csv.DictReader(f)]
-
         self.length = len(self.rows)
         self.logger.info('Batch contains {0} items.'.format(self.length))
         self.count = 0
@@ -67,8 +73,11 @@ class Batch():
     def __next__(self):
         if self.count < self.length:
             row = self.rows[self.count]
-            item = Item(row, self.mapping, files=row.pop('files'))
+            fnames = row.pop('files').split(self.mapping['files']['separator'])
+            file_list = [os.path.join(self.data_path, f) for f in fnames]
+            item = Item(row, self.mapping, files=file_list)
             item.add_collection(self.collection)
+            item.path = '{}, item {}'.format(self.metadata_file, self.count)
             self.count += 1
             return item
         else:
@@ -84,20 +93,29 @@ class Item(pcdm.Item):
     '''Class representing a self-contained repository resource'''
     def __init__(self, data, map, title=None, files=None, parts=None):
         super(Item, self).__init__()
-        self.graph = Graph()
-        for key, value in data.items():
-            if key in map:
-                ns, pred = map[key]['predicate'].split(':')
+        self.src_graph = Graph()
+        self.data = data
+        self.map = map
+        self.title = data['title']
+        self.files = files
+
+    def read_data(self):
+        for key, value in self.data.items():
+            if key in self.map:
+                ns, pred = self.map[key]['predicate'].split(':')
                 pred_uri = getattr(globals()[ns], pred)
-                self.graph.add((self.uri, pred_uri, Literal(value)))
+                self.src_graph.add((self.uri, pred_uri, Literal(value)))
             else:
                 pass
-        if map['files']['separator'] is not None:
-            file_list = files.split(map['files']['separator'])
-        else:
-            file_list = files
-        for f in file_list:
+        for f in self.files:
             self.add_file(File.from_localpath(f))
+
+    def graph(self):
+        graph = super(Item, self).graph()
+        if self.src_graph is not None:
+            for (s, p, o) in self.src_graph:
+                graph.add((self.uri, p, o))
+        return graph
 
 
 #============================================================================

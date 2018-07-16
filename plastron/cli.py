@@ -79,8 +79,8 @@ def main():
         fcrepo = Repository(repo_config, ua_string='plastron/{0}'.format(version))
 
     # get basic logging options
-    with open('config/logging.yml', 'r') as configfile:
-        logging_options = yaml.safe_load(configfile)
+    with open(repo_config.get('LOGGING_CONFIG'), 'r') as logging_config_file:
+        logging_options = yaml.safe_load(logging_config_file)
 
     # log file configuration
     log_dirname = repo_config.get('LOG_DIR')

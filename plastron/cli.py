@@ -76,7 +76,9 @@ def main():
     # load required repository config file and create repository object
     with open(args.repo, 'r') as repo_config_file:
         repo_config = yaml.safe_load(repo_config_file)
-        fcrepo = Repository(repo_config, ua_string='plastron/{0}'.format(version))
+        fcrepo = Repository(
+            repo_config, ua_string='plastron/{0}'.format(version)
+            )
 
     # get basic logging options
     with open(repo_config.get('LOGGING_CONFIG'), 'r') as logging_config_file:

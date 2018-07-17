@@ -4,10 +4,10 @@ import os
 import sys
 import yaml
 from rdflib import Graph, Literal, Namespace, URIRef
-from plastron import pcdm, ldp
+from rdflib.util import from_n3
+from plastron import pcdm, ldp, namespaces
 from plastron.exceptions import ConfigException, DataReadException
-from plastron.namespaces import bibo, dc, dcmitype, dcterms, edm, fabio, \
-                                geo, pcdmuse, rdf, rdfs, owl
+from plastron.namespaces import dcmitype, dcterms, pcdmuse, rdf
 
 #============================================================================
 # DATA LOADING FUNCTION
@@ -100,11 +100,21 @@ class Item(pcdm.Item):
         self.files = files
 
     def read_data(self):
+        nsm = namespaces.get_manager()
         for key, value in self.data.items():
             if key in self.map:
-                ns, pred = self.map[key]['predicate'].split(':')
-                pred_uri = getattr(globals()[ns], pred)
-                self.src_graph.add((self.uri, pred_uri, Literal(value)))
+                mapping = self.map[key]
+                pred_uri = from_n3(mapping['predicate'], nsm=nsm)
+                if mapping.get('uriref', False):
+                    o = URIRef(value)
+                else:
+                    datatype = mapping.get('datatype', None)
+                    if datatype is not None:
+                        datatype_uri = from_n3(datatype, nsm=nsm)
+                        o = Literal(value, datatype=datatype_uri)
+                    else:
+                        o = Literal(value)
+                self.src_graph.add((self.uri, pred_uri, o))
             else:
                 pass
         for f in self.files:

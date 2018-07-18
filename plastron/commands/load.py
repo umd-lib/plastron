@@ -96,7 +96,7 @@ class Command:
             logger.error(
                 "Failed to load batch configuration from {0}".format(args.batch)
                 )
-            raise FailureException()
+            raise FailureException(e.message)
 
         if not args.dryrun:
             fcrepo.test_connection()

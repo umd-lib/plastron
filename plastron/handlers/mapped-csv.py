@@ -6,6 +6,7 @@ import yaml
 from rdflib import Graph, Literal, Namespace, URIRef
 from rdflib.util import from_n3
 from plastron import pcdm, ldp, namespaces
+from plastron.util import LocalFile, RemoteFile
 from plastron.exceptions import ConfigException, DataReadException
 from plastron.namespaces import dcmitype, dcterms, pcdmuse, rdf
 from collections import OrderedDict
@@ -111,7 +112,14 @@ class Batch():
                         filenames = [ filenames ]
 
                     for f in filenames:
-                        file = File.from_localpath(os.path.join(self.data_path, f))
+                        if 'host' in filename_conf:
+                            source = RemoteFile(filename_conf['host'], f)
+                        else:
+                            # local file
+                            localpath = os.path.join(self.data_path, f)
+                            source = LocalFile(localpath)
+
+                        file = File(source)
                         for column, conf in mapping.items():
                             set_value(file, column, conf, line)
                         yield file

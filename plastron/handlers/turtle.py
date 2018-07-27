@@ -9,6 +9,7 @@ from rdflib import Graph, Literal, Namespace, URIRef
 from plastron import pcdm, ldp
 from plastron.exceptions import ConfigException, DataReadException
 from plastron.namespaces import bibo, dc, dcmitype, dcterms, edm, fabio, geo, pcdmuse, rdf, rdfs, owl
+from plastron.util import LocalFile
 
 #============================================================================
 # DATA LOADING FUNCTION
@@ -220,7 +221,7 @@ class Item(pcdm.Item):
                 self.src_graph.remove((None, dcterms.hasPart, part))
 
         for path in files:
-            self.add_file(File.from_localpath(path))
+            self.add_file(File(LocalFile(path)))
         # renumber the parts from 1
         for (n, key) in enumerate(sorted(parts.keys()), 1):
             self.add_component(Page(n, parts[key], self))
@@ -288,7 +289,7 @@ class Page(pcdm.Component):
         self.title = "{0}, Page {1}".format(item.title, self.id)
         self.ordered = True
         for f in files:
-            self.add_file(File.from_localpath(f))
+            self.add_file(File(LocalFile(f)))
 
     def graph(self):
         graph = super(Page, self).graph()

@@ -31,6 +31,10 @@ DEFAULT_LOGGING_OPTIONS = {
                 'level': 'DEBUG',
                 'handlers': ['console', 'file'],
                 'propagate': False
+                },
+            # suppress logging output from paramiko by default
+            'paramiko': {
+                'propagate': False
                 }
             },
         'root': {

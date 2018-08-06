@@ -134,7 +134,9 @@ class Batch():
                 yield item
 
     def __iter__(self):
-        return self.get_items(self.rows, self.mapping)
+        for item in self.get_items(self.rows, self.mapping):
+            item.add_collection(self.collection)
+            yield item
 
 #============================================================================
 # ITEM CLASS

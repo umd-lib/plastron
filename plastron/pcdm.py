@@ -5,8 +5,9 @@ import threading
 from rdflib import Graph, Literal, URIRef
 from plastron import ldp, ore
 from plastron.exceptions import RESTAPIException
-from plastron.namespaces import dcterms, iana, pcdm, rdf
+from plastron.namespaces import dcterms, iana, pcdm, rdf, ebucore
 from operator import attrgetter
+from PIL import Image
 
 # alias the RDFlib Namespace
 ns = pcdm
@@ -391,6 +392,8 @@ class File(Resource):
         super(File, self).__init__()
         self.source = source
         self.filename = source.filename
+        self.width = None
+        self.height = None
         if title is not None:
             self.title = title
         else:
@@ -400,6 +403,22 @@ class File(Resource):
         graph = super(File, self).graph()
         graph.add((self.uri, rdf.type, pcdm.File))
         graph.add((self.uri, dcterms.title, Literal(self.title)))
+
+        # if this is an image file, see if we can get dimensions
+        if self.source.mimetype().startswith('image/'):
+            if self.width is None or self.height is None:
+                # use PIL
+                try:
+                    with Image.open(self.source.data()) as img:
+                        self.width = img.width
+                        self.height = img.height
+                except IOError as e:
+                    self.logger.warn(f'Cannot read image file: {e}')
+
+        if self.width is not None:
+            graph.add((self.uri, ebucore.width, Literal(self.width)))
+        if self.height is not None:
+            graph.add((self.uri, ebucore.height, Literal(self.height)))
         return graph
 
     # upload a binary resource

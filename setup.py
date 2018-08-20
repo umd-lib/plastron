@@ -74,13 +74,15 @@ setup(
     # For an analysis of "install_requires" vs pip's requirements files see:
     # https://packaging.python.org/en/latest/requirements.html
     install_requires=[
-            'lxml',
-            'PyYAML',
+            'lxml>3.6.0',
+            'paramiko',
+            'Pillow',
+            'PyYAML>3.12',
             'rdflib',
             'requests',
             'setuptools',
             ],
-    python_requires='>=3',
+    python_requires='>=3.6',
 
     # List additional groups of dependencies here (e.g. development
     # dependencies). Users will be able to install these using the "extras"

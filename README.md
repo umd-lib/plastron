@@ -4,7 +4,7 @@ Utility for batch operations on a Fedora 4 repository.
 
 ## Installation
 
-Requires Python 3.
+Requires Python 3.6+
 
 ```
 **TODO**

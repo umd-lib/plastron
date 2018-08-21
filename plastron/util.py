@@ -5,7 +5,8 @@ import mimetypes
 import os
 from paramiko import SSHClient, SFTPClient
 from plastron import namespaces
-from plastron.namespaces import dcterms
+from plastron.namespaces import dcterms, ebucore
+from rdflib import URIRef
 from rdflib.util import from_n3
 
 def get_title_string(graph, separator='; '):
@@ -106,6 +107,7 @@ class LocalFile(BinarySource):
 class RepositoryFile(BinarySource):
     def __init__(self, repo, file_uri):
         super(RepositoryFile, self).__init__()
+        file_uri = URIRef(file_uri)
         head_res = repo.head(file_uri)
         if 'describedby' in head_res.links:
             rdf_uri = head_res.links['describedby']['url']
@@ -115,11 +117,15 @@ class RepositoryFile(BinarySource):
             self.repo = repo
 
             self.title = file_graph.value(subject=file_uri, predicate=dcterms.title)
-            self.mimetype = file_graph.value(subject=file_uri, predicate=ebucore.hasMimeType)
+            self._mimetype = file_graph.value(subject=file_uri, predicate=ebucore.hasMimeType)
             self.filename = file_graph.value(subject=file_uri, predicate=ebucore.filename)
             self.file_graph = file_graph
+            self.metadata_uri = rdf_uri
         else:
             raise Exception("No metadata for resource")
+
+    def mimetype(self):
+        return self._mimetype
 
     def data(self):
         return self.repo.get(self.file_uri, stream=True).raw

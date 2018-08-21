@@ -4,12 +4,31 @@ Utility for batch operations on a Fedora 4 repository.
 
 ## Installation
 
-Requires Python 3.
+Requires Python 3.6+
 
 ```
 **TODO**
 add end-user instructions here once this is available via PyPI/pip
 **TODO**
+```
+
+### Installing Python 3 with pyenv (Optional)
+
+If you don't already have a Python 3 environment, or would like to install Plastron
+into its own isolated environment, a very convenient way to do this is to use the
+[pyenv] Python version manager.
+
+[Installing pyenv](https://github.com/pyenv/pyenv#installation)
+
+```
+# install Python 3.7.0
+pyenv install 3.7.0
+
+# create a new virtual environment based on 3.7.0 for Plastron
+pyenv virtualenv 3.7.0 plastron
+
+# switch to that environment in your current shell
+pyenv shell plastron
 ```
 
 ### Installation for development
@@ -46,7 +65,7 @@ commands:
 
 ```
 $ plastron --version
-2.0.0.dev1
+2.1.0
 ```
 
 ## Commands
@@ -240,6 +259,7 @@ it to exit with a status code of 2.
 
 See the [LICENSE](LICENSE.md) file for license rights and limitations (Apache 2.0).
 
+[pyenv]: https://github.com/pyenv/pyenv
 [development mode]: https://packaging.python.org/tutorials/installing-packages/#installing-from-vcs
 [argparse subparsers object]: https://docs.python.org/3/library/argparse.html#sub-commands
 [argparse.Namespace]: https://docs.python.org/3/library/argparse.html#the-namespace-object

@@ -14,6 +14,7 @@ from plastron.exceptions import ConfigException, DataReadException
 from plastron import namespaces
 from plastron.namespaces import bibo, carriers, dc, dcmitype, dcterms, ebucore, fabio, \
         foaf, iana, ndnp, ore, pcdmuse, prov, rdf, sc
+from plastron.util import LocalFile, RepositoryFile
 
 # alias the RDFlib Namespace
 ns = ndnp
@@ -197,12 +198,12 @@ class Issue(pcdm.Item):
             self.edition = root.find(m['edition']).text
 
         # add the issue and article-level XML files as related objects
-        self.add_related(IssueMetadata(MetadataFile.from_localpath(
-            localpath=self.path,
+        self.add_related(IssueMetadata(MetadataFile(
+            LocalFile(self.path),
             title='{0}, issue METS metadata'.format(self.title)
             )))
-        self.add_related(IssueMetadata(MetadataFile.from_localpath(
-            localpath=self.article_path,
+        self.add_related(IssueMetadata(MetadataFile(
+            LocalFile(self.article_path),
             title='{0}, article METS metadata'.format(self.title)
             )))
 
@@ -433,7 +434,7 @@ class Page(pcdm.Component):
 
         # load ALTO XML into page object, for text extraction
         try:
-            with ocr_file.open_stream() as stream:
+            with ocr_file.source.data() as stream:
                 tree = ET.parse(stream)
         except OSError as e:
             raise DataReadException("Unable to read {0}".format(ocr_file.filename))
@@ -486,11 +487,8 @@ class File(pcdm.File):
         localpath = os.path.join(base_dir, os.path.basename(href))
         basename = os.path.basename(localpath)
         mimetype = techmd['PREMIS'].find('.//premis:formatName', xmlns).text
-        file = cls.from_localpath(
-            localpath,
-            mimetype=mimetype,
-            title="{0} ({1})".format(basename, use)
-            )
+        source = LocalFile(localpath, mimetype=mimetype)
+        file = cls(source, title=f'{basename} ({use})')
         file.use = use
         file.basename = basename
 
@@ -510,49 +508,31 @@ class File(pcdm.File):
 
     @classmethod
     def from_repository(cls, repo, file_uri):
-        head_res = repo.head(file_uri)
-        if 'describedby' in head_res.links:
-            rdf_uri = head_res.links['describedby']['url']
-            file_graph = repo.get_graph(rdf_uri)
+        source = RepositoryFile(repo, file_uri)
+        file_graph = source.file_graph
+        title = file_graph.value(subject=file_uri, predicate=dcterms.title)
+        file = cls(source, title=title)
+        file.uri = file_uri
+        file.created = True
+        file.updated = True
 
-            title = file_graph.value(subject=file_uri, predicate=dcterms.title)
-            mimetype = file_graph.value(subject=file_uri,
-                    predicate=ebucore.hasMimeType)
-            filename = file_graph.value(subject=file_uri,
-                    predicate=ebucore.filename)
+        types = list(file_graph.objects(subject=file_uri, predicate=rdf.type))
+        if pcdmuse.PreservationMasterFile in types:
+            file.use = 'master'
+        elif pcdmuse.IntermediateFile in types:
+            file.use = 'service'
+        elif pcdmuse.ServiceFile in types:
+            file.use = 'derivative'
+        elif pcdmuse.ExtractedText in types:
+            file.use = 'ocr'
 
-            def open_stream():
-                return repo.get(file_uri, stream=True).raw
+        if file.use == 'master':
+            file.width = file_graph.value(subject=file_uri, predicate=ebucore.width)
+            file.height = file_graph.value(subject=file_uri, predicate=ebucore.height)
+            #TODO: how to not hardocde this?
+            file.resolution = (400,400)
 
-            file = cls(
-                filename=filename,
-                mimetype=mimetype,
-                title=title,
-                open_stream=open_stream
-                )
-            file.uri = file_uri
-            file.created = True
-            file.updated = True
-
-            types = list(file_graph.objects(subject=file_uri, predicate=rdf.type))
-            if pcdmuse.PreservationMasterFile in types:
-                file.use = 'master'
-            elif pcdmuse.IntermediateFile in types:
-                file.use = 'service'
-            elif pcdmuse.ServiceFile in types:
-                file.use = 'derivative'
-            elif pcdmuse.ExtractedText in types:
-                file.use = 'ocr'
-
-            if file.use == 'master':
-                file.width = file_graph.value(subject=file_uri, predicate=ebucore.width)
-                file.height = file_graph.value(subject=file_uri, predicate=ebucore.height)
-                #TODO: how to not hardocde this?
-                file.resolution = (400,400)
-
-            return file
-        else:
-            raise Exception("No metadata for resource")
+        return file
 
     def graph(self):
         graph = super(File, self).graph()
@@ -565,13 +545,13 @@ class File(pcdm.File):
         if self.height is not None:
             graph.add((self.uri, ebucore.height, Literal(self.height)))
 
-        if self.basename.endswith('.tif'):
+        if self.filename.endswith('.tif'):
             graph.add((self.uri, rdf.type, pcdmuse.PreservationMasterFile))
-        elif self.basename.endswith('.jp2'):
+        elif self.filename.endswith('.jp2'):
             graph.add((self.uri, rdf.type, pcdmuse.IntermediateFile))
-        elif self.basename.endswith('.pdf'):
+        elif self.filename.endswith('.pdf'):
             graph.add((self.uri, rdf.type, pcdmuse.ServiceFile))
-        elif self.basename.endswith('.xml'):
+        elif self.filename.endswith('.xml'):
             graph.add((self.uri, rdf.type, pcdmuse.ExtractedText))
 
         return graph

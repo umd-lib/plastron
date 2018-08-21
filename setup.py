@@ -74,13 +74,15 @@ setup(
     # For an analysis of "install_requires" vs pip's requirements files see:
     # https://packaging.python.org/en/latest/requirements.html
     install_requires=[
-            'lxml',
-            'PyYAML',
+            'lxml>3.6.0',
+            'paramiko',
+            'Pillow',
+            'PyYAML>3.12',
             'rdflib',
             'requests',
             'setuptools',
             ],
-    python_requires='>=3',
+    python_requires='>=3.6',
 
     # List additional groups of dependencies here (e.g. development
     # dependencies). Users will be able to install these using the "extras"
@@ -95,7 +97,7 @@ setup(
     #    'test': ['coverage'],
     #},
 
-    #TODO: logging.yml? templates/*.yml?
+    #TODO: config/templates/*.yml?
     # If there are data files included in your packages that need to be
     # installed, specify them here.
     #
@@ -108,9 +110,6 @@ setup(
     # Although 'package_data' is the preferred approach, in some case you may
     # need to place data files outside of your packages. See:
     # http://docs.python.org/3.4/distutils/setupscript.html#installing-additional-files
-    #
-    # In this case, 'data_file' will be installed into '<sys.prefix>/my_data'
-    data_files=[('config', ['config/logging.yml'])],
 
     # To provide executable scripts, use entry points in preference to the
     # "scripts" keyword. Entry points provide cross-platform support and allow

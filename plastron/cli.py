@@ -14,6 +14,7 @@ import logging.config
 from datetime import datetime
 from plastron.pcdm import Repository
 from plastron.exceptions import FailureException
+from plastron.logging import DEFAULT_LOGGING_OPTIONS
 from plastron import commands, version
 
 logger = logging.getLogger(__name__)
@@ -76,11 +77,16 @@ def main():
     # load required repository config file and create repository object
     with open(args.repo, 'r') as repo_config_file:
         repo_config = yaml.safe_load(repo_config_file)
-        fcrepo = Repository(repo_config, ua_string='plastron/{0}'.format(version))
+        fcrepo = Repository(
+            repo_config, ua_string='plastron/{0}'.format(version)
+            )
 
     # get basic logging options
-    with open('config/logging.yml', 'r') as configfile:
-        logging_options = yaml.safe_load(configfile)
+    if 'LOGGING_CONFIG' in repo_config:
+        with open(repo_config.get('LOGGING_CONFIG'), 'r') as logging_config_file:
+            logging_options = yaml.safe_load(logging_config_file)
+    else:
+        logging_options = DEFAULT_LOGGING_OPTIONS
 
     # log file configuration
     log_dirname = repo_config.get('LOG_DIR')

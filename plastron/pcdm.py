@@ -1,5 +1,3 @@
-import hashlib
-import mimetypes
 import os
 import requests
 import logging
@@ -7,8 +5,9 @@ import threading
 from rdflib import Graph, Literal, URIRef
 from plastron import ldp, ore
 from plastron.exceptions import RESTAPIException
-from plastron.namespaces import dcterms, iana, pcdm, rdf
+from plastron.namespaces import dcterms, iana, pcdm, rdf, ebucore
 from operator import attrgetter
+from PIL import Image
 
 # alias the RDFlib Namespace
 ns = pcdm
@@ -28,6 +27,7 @@ class Repository():
         self.session = requests.Session()
         self.transaction = None
         self.load_binaries = True
+        self.log_dir = config['LOG_DIR']
         self.logger = logging.getLogger(
             __name__ + '.' + self.__class__.__name__
             )
@@ -239,6 +239,12 @@ class TransactionKeepAlive(threading.Thread):
 #============================================================================
 
 class Resource(ldp.Resource):
+    def __str__(self):
+        if hasattr(self, 'title'):
+            return self.title
+        else:
+            return repr(self)
+
     def components(self):
         return [ obj for (rel, obj) in self.linked_objects if rel == pcdm.hasMember ]
 
@@ -279,22 +285,29 @@ class Resource(ldp.Resource):
         obj.linked_objects.append((pcdm.relatedObjectOf, self))
 
     # show the item graph and tree of related objects
-    def print_item_tree(self):
-        print(self.title)
+    def print_item_tree(self, indent='', label=None):
+        if label is not None:
+            print(indent + '[' + label + '] ' + str(self))
+        else:
+            print(indent + str(self))
+
         ordered = self.ordered_components()
-        unordered = self.unordered_components()
         if ordered:
-            print(" ORDERED COMPONENTS")
+            print(indent + '  {Ordered Components}')
             for n, p in enumerate(ordered):
-                print("  Part {0}: {1}".format(n+1, p.title))
-                for f in p.files():
-                    print("   |--{0}: {1}".format(f.title, f.filename))
+                p.print_item_tree(indent='    ' + indent, label=n)
+
+        unordered = self.unordered_components()
         if unordered:
-            print(" UNORDERED COMPONENTS")
-            for n, p in enumerate(unordered):
-                print("  - {1}".format(n+1, p.title))
-                for f in p.files():
-                    print("   |--{0}: {1}".format(f.title, f.filename))
+            print(indent + '  {Unordered Components}')
+            for p in unordered:
+                p.print_item_tree(indent='     ' + indent)
+
+        files = self.files()
+        if files:
+            print(indent + '  {Files}')
+            for f in files:
+                print(indent + '    ' + str(f))
 
 
 #============================================================================
@@ -375,26 +388,12 @@ class Component(Resource):
 #============================================================================
 
 class File(Resource):
-    @classmethod
-    def from_localpath(cls, localpath, mimetype=None, title=None):
-        if mimetype is None:
-            mimetype = mimetypes.guess_type(localpath)[0]
-
-        def open_stream():
-            return open(localpath, 'rb')
-
-        return cls(
-            filename=os.path.basename(localpath),
-            mimetype=mimetype,
-            title=title,
-            open_stream=open_stream
-            )
-
-    def __init__(self, filename, mimetype, title=None, open_stream=None):
+    def __init__(self, source, title=None):
         super(File, self).__init__()
-        self.filename = filename
-        self.mimetype = mimetype
-        self.open_stream = open_stream
+        self.source = source
+        self.filename = source.filename
+        self.width = None
+        self.height = None
         if title is not None:
             self.title = title
         else:
@@ -404,12 +403,28 @@ class File(Resource):
         graph = super(File, self).graph()
         graph.add((self.uri, rdf.type, pcdm.File))
         graph.add((self.uri, dcterms.title, Literal(self.title)))
+
+        # if this is an image file, see if we can get dimensions
+        if self.source.mimetype().startswith('image/'):
+            if self.width is None or self.height is None:
+                # use PIL
+                try:
+                    with Image.open(self.source.data()) as img:
+                        self.width = img.width
+                        self.height = img.height
+                except IOError as e:
+                    self.logger.warn(f'Cannot read image file: {e}')
+
+        if self.width is not None:
+            graph.add((self.uri, ebucore.width, Literal(self.width)))
+        if self.height is not None:
+            graph.add((self.uri, ebucore.height, Literal(self.height)))
         return graph
 
     # upload a binary resource
     def create_object(self, repository, uri=None):
         if not repository.load_binaries:
-            self.logger.info('Skipping loading for binary {0}'.format(self.filename))
+            self.logger.info(f'Skipping loading for binary {self.source.filename}')
             return True
         elif self.created:
             return False
@@ -417,13 +432,13 @@ class File(Resource):
             self.created = True
             return False
 
-        self.logger.info("Loading {0}".format(self.filename))
+        self.logger.info(f'Loading {self.source.filename}')
 
-        with self.open_stream() as stream:
+        with self.source.data() as stream:
             headers = {
-                'Content-Type': self.mimetype,
-                'Digest': 'sha1={0}'.format(self.sha1()),
-                'Content-Disposition': 'attachment; filename="{0}"'.format(self.filename)
+                'Content-Type': self.source.mimetype(),
+                'Digest': self.source.digest(),
+                'Content-Disposition': f'attachment; filename="{self.source.filename}"'
                 }
             if uri is not None:
                 response = repository.put(uri, data=stream, headers=headers)
@@ -439,22 +454,11 @@ class File(Resource):
 
     def update_object(self, repository):
         if not repository.load_binaries:
-            self.logger.info('Skipping update for binary {0}'.format(self.filename))
+            self.logger.info(f'Skipping update for binary {self.source.filename}')
             return True
         fcr_metadata = str(self.uri) + '/fcr:metadata'
         super(File, self).update_object(repository, patch_uri=fcr_metadata)
 
-    # generate SHA1 checksum on a file
-    def sha1(self):
-        BUF_SIZE = 65536
-        sha1 = hashlib.sha1()
-        with self.open_stream() as stream:
-            while True:
-                data = stream.read(BUF_SIZE)
-                if not data:
-                    break
-                sha1.update(data)
-        return sha1.hexdigest()
 
 #============================================================================
 # PCDM COLLECTION OBJECT

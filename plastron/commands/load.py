@@ -70,7 +70,7 @@ class Command:
         # Load batch configuration
         with open(args.batch, 'r') as batch_config:
             batch_options = yaml.safe_load(batch_config)
-            log_location = batch_options.get('LOG_LOCATION')
+            log_location = fcrepo.log_dir
 
         logger.info('Loaded batch configuration from {0}'.format(args.batch))
 
@@ -96,7 +96,7 @@ class Command:
             logger.error(
                 "Failed to load batch configuration from {0}".format(args.batch)
                 )
-            raise FailureException()
+            raise FailureException(e.message)
 
         if not args.dryrun:
             fcrepo.test_connection()
@@ -121,7 +121,9 @@ class Command:
             else:
                 ignored = []
 
-            skipfile = os.path.join(log_location, 'skipped.load.{0}.csv'.format(now))
+            skipfile = os.path.join(
+                log_location, 'skipped.load.{0}.csv'.format(now)
+                )
             skipped = util.ItemLog(skipfile, fieldnames, 'path')
 
             # set up interval from percent parameter and store set of items to load

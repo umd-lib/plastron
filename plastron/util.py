@@ -102,7 +102,7 @@ class LocalFile(BinarySource):
                 if not data:
                     break
                 sha1.update(data)
-        return 'sha1=' + sha1.hexdigest()
+        return 'sha=' + sha1.hexdigest()
 
 class RepositoryFile(BinarySource):
     def __init__(self, repo, file_uri):
@@ -173,4 +173,4 @@ class RemoteFile(BinarySource):
 
     def digest(self):
         sha1sum = self.ssh_exec(f'sha1sum "{self.remotepath}"').split()[0]
-        return 'sha1=' + sha1sum
+        return 'sha=' + sha1sum

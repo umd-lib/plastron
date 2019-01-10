@@ -1,7 +1,7 @@
 setuptools==39.0.1
 rdflib==4.2.1
-requests==2.10.0
+requests>=2.20.0
 lxml>3.6.0
 PyYAML>3.12
-paramiko==2.4.1
+paramiko>=2.4.2
 Pillow==5.2.0

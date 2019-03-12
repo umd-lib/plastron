@@ -279,13 +279,22 @@ class METSResource(object):
                 smart_strings = False)
 
     def dmdsec(self, id):
-        return self.xpath('METS:dmdSec[@ID=$id]', id=id)[0]
+        try:
+            return self.xpath('METS:dmdSec[@ID=$id]', id=id)[0]
+        except IndexError:
+            raise DataReadException(f'Cannot find METS:dmdSec element with ID "{id}"')
 
     def file(self, id):
-        return self.xpath('METS:fileSec//METS:file[@ID=$id]', id=id)[0]
+        try:
+            return self.xpath('METS:fileSec//METS:file[@ID=$id]', id=id)[0]
+        except IndexError:
+            raise DataReadException(f'Cannot find METS:file element with ID "{id}"')
 
     def techmd(self, id):
-        return self.xpath('METS:amdSec/METS:techMD[@ID=$id]', id=id)[0]
+        try:
+            return self.xpath('METS:amdSec/METS:techMD[@ID=$id]', id=id)[0]
+        except IndexError:
+            raise DataReadException(f'Cannot find METS:techMD element with ID "{id}"')
 
 class TextblockOnPage(oa.Annotation):
     def __init__(self, textblock, page, article=None):
@@ -363,6 +372,9 @@ class Page(pcdm.Component):
         for fptr in div.findall('METS:fptr', xmlns):
             fileid = fptr.get('FILEID')
             filexml = issue_mets.file(fileid)
+
+            if 'ADMID' not in filexml.attrib:
+                raise DataReadException(f'No ADMID found for {fileid}, cannot lookup technical metadata')
 
             # get technical metadata by type
             techmd = {}

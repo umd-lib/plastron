@@ -11,13 +11,6 @@ from plastron.exceptions import ConfigException, DataReadException
 from plastron.namespaces import bibo, dc, dcmitype, dcterms, edm, fabio, geo, pcdmuse, rdf, rdfs, owl
 from plastron.util import LocalFile
 
-#============================================================================
-# DATA LOADING FUNCTION
-#============================================================================
-
-def load(repo, batch_config):
-    return Batch(repo, batch_config)
-
 def create_authority(graph, subject):
     if (subject, rdf.type, edm.Place) in graph:
         return Place.from_graph(graph, subject)
@@ -37,41 +30,18 @@ class Batch():
             __name__ + '.' + self.__class__.__name__
             )
 
-        # Check for required configuration items and set up paths
-        required_keys = ['HANDLER',
-                         'COLLECTION',
-                         'ROOT',
-                         'MAPFILE',
-                         'LOG_LOCATION',
-                         'LOG_CONFIG',
-                         'METADATA_FILE',
-                         'DATA_PATH'
-                         ]
-        for key in required_keys:
-            if not config.get(key):
-                raise ConfigException(
-                    'Missing required key {0} in batch config'.format(key)
-                    )
-
-        # Set configuration Properties
-        self.local_path    = os.path.normpath(config.get('ROOT'))
-        self.data_path     = os.path.join(self.local_path,
-                                          config['DATA_PATH'])
-        self.metadata_file = os.path.join(self.local_path,
-                                          config.get('METADATA_FILE'))
-        self.collection    = pcdm.Collection.from_repository(repo,
-                                                     config.get('COLLECTION'))
+        self.collection = pcdm.Collection.from_repository(repo, config.collection_uri)
 
         # Create data structures to accumulate process results
         self.incomplete  = []
         self.extra_files = []
 
         # Check for required metadata file
-        if not os.path.isfile(self.metadata_file):
+        if not os.path.isfile(config.batch_file):
             raise ConfigException('Specified metadata file could not be found')
 
         # check for an existing file index
-        file_index = os.path.join(self.local_path, 'file_index.yml')
+        file_index = os.path.join(config.data_dir, 'file_index.yml')
         if os.path.isfile(file_index):
             self.logger.info('Found file index in {0}'.format(file_index))
             with open(file_index, 'r') as index:
@@ -79,11 +49,10 @@ class Batch():
         else:
             # Generate index of all files in the data path
             # maps the basename to a full path
-            self.logger.info(
-                    'Walking the {0} tree to create a file index'.format(self.data_path))
+            self.logger.info(f'Walking the {config.data_dir} tree to create a file index')
             self.all_files = {}
             file_count = 0;
-            for root, dirs, files in os.walk(self.data_path):
+            for root, dirs, files in os.walk(config.data_dir):
                 for f in files:
                     file_count += 1
                     if f not in self.all_files:
@@ -94,14 +63,13 @@ class Batch():
             self.logger.info("Found {0} files with {1} unique filenames"
                     .format(file_count, len(self.all_files)))
 
-
             # save index to file
             with open(file_index, 'w') as index:
                 yaml.dump(self.all_files, index, default_flow_style=False)
 
-        with open(self.metadata_file, 'r') as f:
+        with open(config.batch_file, 'r') as f:
             self.logger.info(
-                    'Parsing the master metadata graph in {0}'.format(self.metadata_file))
+                    'Parsing the master metadata graph in {0}'.format(config.batch_file))
             self.master_graph = Graph().parse(f, format="turtle")
 
         # get subject URIs that are http: or https: URIs

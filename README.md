@@ -220,6 +220,28 @@ with the `-r` or `--repo` option. These are the recognized configuration keys:
 | ----------- | ----------- |
 |`SERVER_CERT`|Path to a PEM-encoded copy of the server's SSL certificate; only needed for servers using self-signed certs|
 
+### Batch Configuration
+
+#### Required
+
+| Option | Description |
+| ------ | ----------- |
+|`BATCH_FILE`|The "main" file of the batch|
+|`COLLECTION`|URI of the repository collection that the objects will be added to|
+|`HANDLER`|The handler to use|
+
+#### Optional
+
+| Option | Description | Default |
+| ------ | ----------- | ------- |
+|`ROOT_DIR`| |The directory containing the batch configuration file|
+|`DATA_DIR`|Where to find the data files for the batch; relative to `ROOT_DIR`|`data`|
+|`LOG_DIR`|Where to write the mapfile, skipfile, and other logging info; relative to `ROOT_DIR`|`logs`|
+|`MAPFILE`|Where to store the record of completed items in this batch; relative to `LOG_DIR`|`mapfile.csv`|
+|`HANDLER_OPTIONS`|Any additional options required by the handler| |
+
+**Note:** The `plastron.load.*.log` files are currently written to the repository log directory, *not* to batch log directory.
+
 ## Extending
 
 ### Adding Commands

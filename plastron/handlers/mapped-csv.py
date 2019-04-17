@@ -12,13 +12,6 @@ from plastron.namespaces import dcmitype, dcterms, pcdmuse, rdf
 from collections import OrderedDict
 
 #============================================================================
-# DATA LOADING FUNCTION
-#============================================================================
-
-def load(repo, batch_config):
-    return Batch(repo, batch_config)
-
-#============================================================================
 # BATCH CLASS (FOR BINARIES PLUS CSV METADATA)
 #============================================================================
 
@@ -26,40 +19,31 @@ class Batch():
     '''Class representing the mapped and parsed CSV data'''
     def __init__(self, repo, config):
         self.logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
-        # Check for required configuration items and set up paths
-        required_keys = ['HANDLER',
-                         'COLLECTION',
-                         'ROOT',
-                         'MAPFILE',
-                         'METADATA_FILE',
-                         'METADATA_MAP',
-                         'DATA_PATH'
-                         ]
-        for key in required_keys:
-            if not config.get(key):
-                raise ConfigException(
-                    'Missing required key {0} in batch config'.format(key))
 
         # Set configuration properties
-        self.root          = os.path.normpath(config.get('ROOT'))
-        self.data_path     = os.path.join(self.root, config['DATA_PATH'])
-        self.metadata_file = os.path.join(
-                                self.root, config.get('METADATA_FILE')
-                                )
-        self.collection = pcdm.Collection.from_repository(
-                                repo, config.get('COLLECTION')
-                                )
-        self.metadata_map = os.path.join(
-                                self.root, config.get('METADATA_MAP')
-                                )
+        self.collection = pcdm.Collection.from_repository(repo, config.collection_uri)
+
+        missing_fields = []
+        try:
+            self.file_path = os.path.join(config.data_dir, config.handler_options['FILE_PATH'])
+        except KeyError:
+            missing_fields.append('FILE_PATH')
+        try:
+            self.metadata_map = os.path.join(config.data_dir, config.handler_options['METADATA_MAP'])
+        except KeyError:
+            missing_fields.append('METADATA_MAP')
+
+        if missing_fields:
+            raise ConfigException('Missing required HANDLER_OPTIONS in batch configuration: '
+                    + ', '.join(missing_fields))
 
         # load the metadata map and metadata file
         try:
             with open(self.metadata_map, 'r') as f:
                 self.logger.info(f'Parsing the metadata map in {self.metadata_map}')
                 self.mapping = yaml.safe_load(f)
-            with open(self.metadata_file, 'r') as f:
-                self.logger.info(f'Reading metadata file {self.metadata_file}')
+            with open(config.batch_file, 'r') as f:
+                self.logger.info(f'Reading metadata file {config.batch_file}')
                 self.rows = [r for r in csv.DictReader(f)]
         except FileNotFoundError as e:
             raise ConfigException(e)
@@ -116,7 +100,7 @@ class Batch():
                             source = RemoteFile(filename_conf['host'], f)
                         else:
                             # local file
-                            localpath = os.path.join(self.data_path, f)
+                            localpath = os.path.join(self.file_path, f)
                             source = LocalFile(localpath)
 
                         file = File(source)
@@ -202,7 +186,11 @@ def set_value(item, column, conf, line):
                 value = conf['value']
         pred_uri = from_n3(conf['predicate'], nsm=nsm)
         if conf.get('uriref', False):
-            o = URIRef(from_n3(value, nsm=nsm))
+            try:
+                o = URIRef(from_n3(value, nsm=nsm))
+            except KeyError:
+                # prefix not found, assume it is not a prefixed form
+                o = URIRef(value)
         else:
             datatype = conf.get('datatype', None)
             if datatype is not None:

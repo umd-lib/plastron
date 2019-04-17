@@ -55,13 +55,6 @@ xmlns = {
 }
 
 #============================================================================
-# DATA LOADING FUNCTION
-#============================================================================
-
-def load(repo, batch_config):
-    return Batch(repo, batch_config)
-
-#============================================================================
 # NDNP BATCH CLASS
 #============================================================================
 
@@ -73,28 +66,22 @@ class Batch():
         self.logger = logging.getLogger(
             __name__ + '.' + self.__class__.__name__
             )
-        self.batchfile = config.get('LOCAL_PATH')
-        collection_uri = config.get('COLLECTION')
-        if collection_uri is None:
-            raise ConfigException(
-                'Missing required key COLLECTION in batch config'
-                )
-        self.collection = Collection.from_repository(repo, collection_uri)
+        self.collection = Collection.from_repository(repo, config.collection_uri)
 
         self.fieldnames = ['aggregation', 'sequence', 'uri']
 
         try:
-            tree = ET.parse(self.batchfile)
+            tree = ET.parse(config.batch_file)
         except OSError as e:
-            raise DataReadException("Unable to read {0}".format(self.batchfile))
+            raise DataReadException(f'Unable to read {config.batch_file}')
         except ET.XMLSyntaxError as e:
-            raise DataReadException("Unable to parse {0} as XML".format(self.batchfile))
+            raise DataReadException(f'Unable to parse {config.batch_file} as XML')
 
         root = tree.getroot()
         m = XPATHMAP
 
         # read over the index XML file assembling a list of paths to the issues
-        self.basepath = os.path.dirname(self.batchfile)
+        self.basepath = os.path.dirname(config.batch_file)
         self.issues = []
         for i in root.findall(m['batch']['issues']):
             sanitized_path = i.text[:-6] + i.text[-4:]
@@ -110,7 +97,7 @@ class Batch():
             [r.get('reelNumber') for r in root.findall(m['batch']['reels'])]
             )
         self.logger.info('Batch contains {0} reels'.format(len(self.reels)))
-        self.path_to_reels = os.path.join(config.get('LOG_LOCATION'), 'reels')
+        self.path_to_reels = os.path.join(config.log_dir, 'reels')
         if not os.path.isdir(self.path_to_reels):
             os.makedirs(self.path_to_reels)
         for n, reel in enumerate(self.reels):

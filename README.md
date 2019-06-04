@@ -235,9 +235,9 @@ with the `-r` or `--repo` option. These are the recognized configuration keys:
 | Option | Description | Default |
 | ------ | ----------- | ------- |
 |`ROOT_DIR`| |The directory containing the batch configuration file|
-|`DATA_DIR`|Where to find the data files for the batch; relative to `ROOT_DIR`|`data`|
-|`LOG_DIR`|Where to write the mapfile, skipfile, and other logging info; relative to `ROOT_DIR`|`logs`|
-|`MAPFILE`|Where to store the record of completed items in this batch; relative to `LOG_DIR`|`mapfile.csv`|
+|`DATA_DIR`|Where to find the data files for the batch; relative paths are relative to `ROOT_DIR`|`data`|
+|`LOG_DIR`|Where to write the mapfile, skipfile, and other logging info; relative paths are relative to `ROOT_DIR`|`logs`|
+|`MAPFILE`|Where to store the record of completed items in this batch; relative paths are relative to `LOG_DIR`|`mapfile.csv`|
 |`HANDLER_OPTIONS`|Any additional options required by the handler| |
 
 **Note:** The `plastron.load.*.log` files are currently written to the repository log directory, *not* to batch log directory.

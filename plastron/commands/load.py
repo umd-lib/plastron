@@ -68,18 +68,24 @@ class Command:
             print_header()
 
         # Load batch configuration
-        with open(args.batch, 'r') as batch_config:
-            batch_options = yaml.safe_load(batch_config)
-            log_location = fcrepo.log_dir
+        try:
+            batch_config = BatchConfig(args.batch)
+        except ConfigException as e:
+            logger.error(e.message)
+            logger.error(f'Failed to load batch configuration from {args.batch}')
+            raise FailureException(e.message)
 
-        logger.info('Loaded batch configuration from {0}'.format(args.batch))
+        logger.info(f'Loaded batch configuration from {args.batch}')
+
+        if not os.path.isdir(batch_config.log_dir):
+            os.makedirs(batch_config.log_dir)
 
         if args.nobinaries:
             fcrepo.load_binaries = False
 
         # Define the data_handler function for the data being loaded
         logger.info("Initializing data handler")
-        module_name = batch_options.get('HANDLER')
+        module_name = batch_config.handler
         handler = import_module('plastron.handlers.' + module_name)
         logger.info('Loaded "{0}" handler'.format(module_name))
 
@@ -88,24 +94,20 @@ class Command:
             logger.info("Setting --nobinaries implies --noannotations")
             args.noannotations = True
 
-        # Invoke the data handler by calling the load function on the batch config
         try:
-            batch = handler.load(fcrepo, batch_options)
-        except ConfigException as e:
+            batch = handler.Batch(fcrepo, batch_config)
+        except (ConfigException, DataReadException) as e:
             logger.error(e.message)
-            logger.error(
-                "Failed to load batch configuration from {0}".format(args.batch)
-                )
+            logger.error('Failed to initialize batch')
             raise FailureException(e.message)
 
         if not args.dryrun:
             fcrepo.test_connection()
 
             # read the log of completed items
-            mapfile = os.path.join(log_location, batch_options.get('MAPFILE'))
             fieldnames = ['number', 'timestamp', 'title', 'path', 'uri']
             try:
-                completed = util.ItemLog(mapfile, fieldnames, 'path')
+                completed = util.ItemLog(batch_config.mapfile, fieldnames, 'path')
             except Exception as e:
                 logger.error('Non-standard map file specified: {0}'.format(e))
                 raise FailureException()
@@ -122,7 +124,7 @@ class Command:
                 ignored = []
 
             skipfile = os.path.join(
-                log_location, 'skipped.load.{0}.csv'.format(now)
+                batch_config.log_dir, 'skipped.load.{0}.csv'.format(now)
                 )
             skipped = util.ItemLog(skipfile, fieldnames, 'path')
 
@@ -171,7 +173,7 @@ class Command:
                 try:
                     logger.info('Loading item {0}'.format(n+1))
                     is_loaded = load_item(
-                        fcrepo, item, args, extra=batch_options.get('EXTRA')
+                        fcrepo, item, args, extra=batch_config.extra
                         )
                 except RESTAPIException as e:
                     logger.error(
@@ -271,3 +273,40 @@ def load_item(fcrepo, item, args, extra=None):
         keep_alive.stop()
         logger.error("Load interrupted")
         raise e
+
+class BatchConfig:
+    def __init__(self, filename):
+        self.filename = filename
+        with open(filename, 'r') as config_file:
+            options = yaml.safe_load(config_file)
+
+        # root_dir defaults to the same directory as the config file
+        self.root_dir = options.get('ROOT_DIR', os.path.dirname(self.filename))
+        # data_dir defaults to <root_dir>/data
+        self.data_dir = os.path.join(self.root_dir, options.get('DATA_DIR', 'data'))
+        # log_dir defaults to <root_dir>/logs
+        self.log_dir = os.path.join(self.root_dir, options.get('LOG_DIR', 'logs'))
+        # mapfile defaults to <log_dir>/mapfile.csv
+        self.mapfile = os.path.join(self.log_dir, options.get('MAPFILE', 'mapfile.csv'))
+
+        self.handler_options = options.get('HANDLER_OPTIONS', {})
+        self.extra = options.get('EXTRA', None)
+
+        # required fields
+        missing_fields = []
+        try:
+            self.batch_file = os.path.join(self.data_dir, options['BATCH_FILE'])
+        except KeyError:
+            missing_fields.append('BATCH_FILE')
+        try:
+            self.collection_uri = options['COLLECTION']
+        except KeyError:
+            missing_fields.append('COLLECTION')
+        try:
+            self.handler = options['HANDLER']
+        except KeyError:
+            missing_fields.append('HANDLER')
+
+        if missing_fields:
+            raise ConfigException('Missing required batch configuration field(s): '
+                    + ', '.join(missing_fields))

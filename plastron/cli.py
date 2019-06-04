@@ -90,6 +90,8 @@ def main():
 
     # log file configuration
     log_dirname = repo_config.get('LOG_DIR')
+    if not os.path.isdir(log_dirname):
+        os.makedirs(log_dirname)
     log_filename = 'plastron.{0}.{1}.log'.format(args.cmd_name, now)
     logfile = os.path.join(log_dirname, log_filename)
     logging_options['handlers']['file']['filename'] = logfile

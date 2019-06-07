@@ -65,7 +65,7 @@ commands:
 
 ```
 $ plastron --version
-2.1.0
+2.3.0-dev
 ```
 
 ## Commands

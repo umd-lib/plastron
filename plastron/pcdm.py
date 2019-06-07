@@ -255,14 +255,7 @@ class Collection(Resource):
 @rdf.rdf_class(fabio.Page)
 class Page(Component):
     """One page of an item-level resource"""
-
-    def __init__(self, id, files, item):
-        super().__init__()
-        self.id = str(id)
-        self.title = "{0}, Page {1}".format(item.title, self.id)
-        self.ordered = True
-        for path in files:
-            self.add_file(get_file_object(path))
+    pass
 
 FILE_CLASS_FOR = {
         '.tif': PreservationMasterFile,

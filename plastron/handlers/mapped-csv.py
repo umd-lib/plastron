@@ -5,15 +5,31 @@ import sys
 import yaml
 from rdflib import Graph, Literal, Namespace, URIRef
 from rdflib.util import from_n3
-from plastron import pcdm, ldp, namespaces
+from plastron import pcdm, ldp, namespaces, rdf
 from plastron.util import LocalFile, RemoteFile
 from plastron.exceptions import ConfigException, DataReadException
-from plastron.namespaces import dcmitype, dcterms, pcdmuse, rdf
+from plastron.namespaces import dcmitype, dcterms, pcdmuse
 from collections import OrderedDict
 
-#============================================================================
-# BATCH CLASS (FOR BINARIES PLUS CSV METADATA)
-#============================================================================
+nsm = namespaces.get_manager()
+
+FILE_CLASS_FOR = {
+        '.tif': pcdm.PreservationMasterFile,
+        '.jpg': pcdm.IntermediateFile,
+        '.txt': pcdm.ExtractedText,
+        '.xml': pcdm.ExtractedText,
+        }
+
+def get_file_object(path, source=None):
+    extension = path[path.rfind('.'):]
+    if extension in FILE_CLASS_FOR:
+        cls = FILE_CLASS_FOR[extension]
+    else:
+        cls = pcdm.File
+    if source is None:
+        source = LocalFile(path)
+    f = cls(source)
+    return f
 
 class Batch():
     '''Class representing the mapped and parsed CSV data'''
@@ -54,7 +70,30 @@ class Batch():
         else:
             self.length = len(self.rows)
 
+    def get_column_value(self, row, column):
+        conf = self.mapping[column]
+        value = row.get(column, None)
+        if value is None:
+            # this is a "dummy" column that is not actually in the
+            # source CSV file but should be generated, either from
+            # a format-string pattern or a static value
+            if 'pattern' in conf:
+                value = conf['pattern'].format(**row)
+            elif 'value' in conf:
+                value = conf['value']
+        if conf.get('uriref', False):
+            try:
+                return URIRef(from_n3(value, nsm=nsm))
+            except KeyError:
+                # prefix not found, assume it is not a prefixed form
+                return URIRef(value)
+        else:
+            return value
+
+
     def get_items(self, lines, mapping):
+        cls = create_class_from_mapping(mapping)
+
         key_column = get_flagged_column(mapping, 'key')
         filename_column = get_flagged_column(mapping, 'filename')
 
@@ -66,13 +105,12 @@ class Batch():
             for key in keys:
                 # add an item for each unique key
                 sub_lines = [line for line in lines if line[key_column] == key]
-                item = Item()
+                attrs = { column: self.get_column_value(sub_lines[0], column) for column in mapping.keys() }
+                item = cls(**attrs)
                 item.path = key
-                item.title = key
                 item.ordered = False
-                for column, conf in mapping.items():
-                    set_value(item, column, conf, sub_lines[0])
 
+                # add any members or files
                 if 'members' in key_conf:
                     # this key_column is a subject with member items
                     for component in self.get_items(sub_lines, key_conf['members']):
@@ -95,83 +133,57 @@ class Batch():
                     else:
                         filenames = [ filenames ]
 
-                    for f in filenames:
+                    for filename in filenames:
                         if 'host' in filename_conf:
-                            source = RemoteFile(filename_conf['host'], f)
+                            source = RemoteFile(filename_conf['host'], filename)
                         else:
                             # local file
-                            localpath = os.path.join(self.file_path, f)
+                            localpath = os.path.join(self.file_path, filename)
                             source = LocalFile(localpath)
 
-                        file = File(source)
+                        f = get_file_object(filename, source)
                         for column, conf in mapping.items():
-                            set_value(file, column, conf, line)
-                        yield file
+                            set_value(f, column, conf, line)
+                        yield f
 
         else:
             # each line is its own (implicit) subject
             # for an Item resource
             for line in lines:
-                item = Item()
-                for column, conf in mapping.items():
-                    set_value(item, column, conf, line)
+                attrs = { column: self.get_column_value(line, column) for column in mapping.keys() }
+                item = cls(**attrs)
                 yield item
 
     def __iter__(self):
         for item in self.get_items(self.rows, self.mapping):
             item.add_collection(self.collection)
-            yield item
+            yield BatchItem(item)
 
-#============================================================================
-# ITEM CLASS
-#============================================================================
-
-class Item(pcdm.Item):
-    '''Class representing a self-contained repository resource'''
-    def __init__(self):
-        super(Item, self).__init__()
-        self.src_graph = Graph()
+class BatchItem:
+    def __init__(self, item):
+        self.item = item
+        self.path = item.path
 
     def read_data(self):
-        pass
+        return self.item
 
-    def graph(self):
-        graph = super(Item, self).graph()
-        if self.src_graph is not None:
-            for (s, p, o) in self.src_graph:
-                graph.add((self.uri, p, o))
-        return graph
-
-
-#============================================================================
-# FILE CLASS
-#============================================================================
-
-class File(pcdm.File):
-    '''Class representing file associated with an item resource'''
-    def __init__(self, *args, **kwargs):
-        super(File, self).__init__(*args, **kwargs)
-        self.src_graph = Graph()
-
-    def graph(self):
-        graph = super(File, self).graph()
-        if self.src_graph is not None:
-            for (s, p, o) in self.src_graph:
-                graph.add((self.uri, p, o))
-        graph.add((self.uri, dcterms.title, Literal(self.title)))
-        graph.add((self.uri, dcterms.type, dcmitype.Text))
-        if self.filename.endswith('.tif'):
-            graph.add((self.uri, rdf.type, pcdmuse.PreservationMasterFile))
-        elif self.filename.endswith('.jpg'):
-            graph.add((self.uri, rdf.type, pcdmuse.IntermediateFile))
-        elif self.filename.endswith('.xml'):
-            graph.add((self.uri, rdf.type, pcdmuse.ExtractedText))
-        elif self.filename.endswith('.txt'):
-            graph.add((self.uri, rdf.type, pcdmuse.ExtractedText))
-        return graph
-
-
-nsm = namespaces.get_manager()
+# dynamically-generated class based on column names and predicates that are
+# present in the mapping
+def create_class_from_mapping(mapping):
+    cls = type('csv', (pcdm.Item,), {})
+    for column, conf in mapping.items():
+        if 'predicate' in conf:
+            pred_uri = from_n3(conf['predicate'], nsm=nsm)
+            if conf.get('uriref', False):
+                add_property = rdf.object_property(column, pred_uri)
+            else:
+                if 'datatype' in conf:
+                    datatype = from_n3(conf['datatype'], nsm=nsm)
+                else:
+                    datatype = None
+                add_property = rdf.data_property(column, pred_uri, datatype=datatype)
+            add_property(cls)
+    return cls
 
 def set_value(item, column, conf, line):
     if 'predicate' in conf:
@@ -198,7 +210,7 @@ def set_value(item, column, conf, line):
                 o = Literal(value, datatype=datatype_uri)
             else:
                 o = Literal(value)
-        item.src_graph.add((item.uri, pred_uri, o))
+        item.unmapped_triples.append((item.uri, pred_uri, o))
 
 def get_flagged_column(mapping, flag):
     cols = [ col for col in mapping if flag in mapping[col] and mapping[col][flag] ]

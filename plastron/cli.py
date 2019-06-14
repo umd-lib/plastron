@@ -1,21 +1,19 @@
 #!/usr/bin/env python3
 #-*- coding: utf-8 -*-
 
-from __future__ import print_function
-
 import argparse
-from importlib import import_module
-from pkgutil import iter_modules
-import os.path
-import sys
-import yaml
 import logging
 import logging.config
+import os
+import sys
+import yaml
 from datetime import datetime
-from plastron.pcdm import Repository
+from importlib import import_module
+from pkgutil import iter_modules
+from plastron import commands, version
 from plastron.exceptions import FailureException
 from plastron.logging import DEFAULT_LOGGING_OPTIONS
-from plastron import commands, version
+from plastron.http import Repository
 
 logger = logging.getLogger(__name__)
 now = datetime.utcnow().strftime('%Y%m%d%H%M%S')

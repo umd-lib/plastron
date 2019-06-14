@@ -1,18 +1,16 @@
 import csv
-from fractions import gcd
-from importlib import import_module
-import os.path
-import yaml
-import re
 import logging
 import logging.config
+import os
+import re
+import yaml
 from datetime import datetime
-from plastron import pcdm,util
-from plastron.exceptions import ConfigException, DataReadException, RESTAPIException, FailureException
+from fractions import gcd
+from importlib import import_module
 from time import sleep
-from plastron import namespaces
-import logging
-from plastron.util import print_header, print_footer
+from plastron.exceptions import ConfigException, DataReadException, RESTAPIException, FailureException
+from plastron.http import TransactionKeepAlive
+from plastron.util import print_header, print_footer, ItemLog
 
 logger = logging.getLogger(__name__)
 now = datetime.utcnow().strftime('%Y%m%d%H%M%S')
@@ -107,7 +105,7 @@ class Command:
             # read the log of completed items
             fieldnames = ['number', 'timestamp', 'title', 'path', 'uri']
             try:
-                completed = util.ItemLog(batch_config.mapfile, fieldnames, 'path')
+                completed = ItemLog(batch_config.mapfile, fieldnames, 'path')
             except Exception as e:
                 logger.error('Non-standard map file specified: {0}'.format(e))
                 raise FailureException()
@@ -116,7 +114,7 @@ class Command:
 
             if args.ignore is not None:
                 try:
-                    ignored = util.ItemLog(args.ignore, fieldnames, 'path')
+                    ignored = ItemLog(args.ignore, fieldnames, 'path')
                 except Exception as e:
                     logger.error('Non-standard ignore file specified: {0}'.format(e))
                     raise FailureException()
@@ -126,7 +124,7 @@ class Command:
             skipfile = os.path.join(
                 batch_config.log_dir, 'skipped.load.{0}.csv'.format(now)
                 )
-            skipped = util.ItemLog(skipfile, fieldnames, 'path')
+            skipped = ItemLog(skipfile, fieldnames, 'path')
 
             # set up interval from percent parameter and store set of items to load
             if args.percent is not None:
@@ -214,10 +212,10 @@ def percentage(n):
         raise argparse.ArgumentTypeError("Percent param must be 1-99")
     return p
 
-def load_item(fcrepo, item, args, extra=None):
+def load_item(fcrepo, batch_item, args, extra=None):
     # read data for item
     logger.info('Reading item data')
-    item.read_data()
+    item = batch_item.read_data()
 
     # open transaction
     logger.info('Opening transaction')
@@ -225,7 +223,7 @@ def load_item(fcrepo, item, args, extra=None):
 
     # create item and its components
     try:
-        keep_alive = pcdm.TransactionKeepAlive(fcrepo, 90)
+        keep_alive = TransactionKeepAlive(fcrepo, 90)
         keep_alive.start()
 
         logger.info('Creating item')

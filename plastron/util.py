@@ -94,14 +94,10 @@ class LocalFile(BinarySource):
 
     # generate SHA1 checksum on a file
     def digest(self):
-        BUF_SIZE = 65536
         sha1 = hashlib.sha1()
         with self.data() as stream:
-            while True:
-                data = stream.read(BUF_SIZE)
-                if not data:
-                    break
-                sha1.update(data)
+            for block in stream:
+                sha1.update(block)
         return 'sha1=' + sha1.hexdigest()
 
 class RepositoryFile(BinarySource):

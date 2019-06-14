@@ -2,20 +2,13 @@
 
 import logging
 import os
-import re
-import sys
 import yaml
-from rdflib import Graph, Literal, Namespace, URIRef
-from plastron import pcdm, ldp
+from rdflib import Graph
+from plastron import pcdm, rdf
+from plastron.authority import create_authority
 from plastron.exceptions import ConfigException, DataReadException
-from plastron.namespaces import bibo, dc, dcmitype, dcterms, edm, fabio, geo, pcdmuse, rdf, rdfs, owl
-from plastron.util import LocalFile
-
-def create_authority(graph, subject):
-    if (subject, rdf.type, edm.Place) in graph:
-        return Place.from_graph(graph, subject)
-    else:
-        return LabeledThing.from_graph(graph, subject)
+from plastron.namespaces import dcterms
+from plastron.pcdm import Page, get_file_object
 
 #============================================================================
 # BATCH CLASS (FOR PAGED BINARIES PLUS RDF METADATA)
@@ -76,7 +69,7 @@ class Batch():
         self.subjects = sorted(set([ uri for uri in self.master_graph.subjects() if
             str(uri).startswith('http:') or str(uri).startswith('https:') ]))
 
-        # get the master list of LabeledThing objects
+        # get the master list of authority objects
         # keyed by the urn:uuid:... URI from the master graph
         authority_subjects = set([ uri for uri in self.master_graph.subjects()
                 if str(uri).startswith('urn:uuid:')])
@@ -92,199 +85,86 @@ class Batch():
 
     def __next__(self):
         if self.count < self.length:
-            subject = self.subjects[self.count]
-            item_graph = Graph()
-            for triple in self.master_graph.triples((subject, None, None)):
-                item_graph.add(triple)
-            item = Item.from_graph(item_graph, self.all_files, self.authorities)
-            item.path = str(subject)
-            item.add_collection(self.collection)
+            item = BatchItem(self, self.subjects[self.count])
             self.count += 1
             return item
         else:
             self.logger.info('Processing complete!')
             raise StopIteration()
 
-
-#============================================================================
-# ITEM CLASS
-#============================================================================
-
-class Item(pcdm.Item):
-
-    '''Class representing a paged repository item resource'''
-
-    @classmethod
-    def from_graph(cls, graph, all_files, authorities):
-        item = cls(title=next(graph.objects(predicate=dcterms.title)))
-        props = []
-        fragments = set()
-        item_graph = Graph()
-        for (s, p, o) in graph:
-            if str(o).startswith('urn:uuid:'):
-                # the object is a labeled authority construction
-                # source RDF uses urn:uuid URIs, after load these get
-                # transformed to fragment identifiers on the main
-                # resource
-                authority = authorities[str(o)]
-                props.append((p, authority))
-                fragments.add(authority)
-            else:
-                # just add the raw triple to the item graph
-                item_graph.add((s, p, o))
-
-        item.src_graph = item_graph
-        item.all_files = all_files
-        item.fragments = list(fragments)
-        # link to the labeled authority objects using the original
-        # predicates
-        for (p, authority) in props:
-            item.linked_objects.append((p, authority))
-
-        return item
-
-    def __init__(self, title=None, files=None, parts=None):
-        super(Item, self).__init__()
-        self.src_graph = None
-        self.title = title
-        self.filepaths = files
-        self.parts = parts
-        self.sequence_attr = ('Page', 'id')
+class BatchItem:
+    def __init__(self, batch, subject):
+        self.batch = batch
+        self.subject = subject
+        self.path = str(subject)
 
     def read_data(self):
+        item_graph = Graph()
+        add_props = []
+        for (s, p, o) in self.batch.master_graph.triples((self.subject, None, None)):
+            item_graph.add((s, p, o))
+            if str(o) in self.batch.authorities:
+                # create an RDFObjectProperty for the triples with an
+                # authority object value
+                add_props.append(rdf.object_property(str(p), p, multivalue=True, embed=True))
+
+        # dynamically-generated class based on predicates that are present in
+        # the source graph
+        cls = type(str(self.subject), (pcdm.Item,), {})
+        for add_property in add_props:
+            add_property(cls)
+
+        item = cls.from_graph(item_graph)
+        item.sequence_attr = ('Page', 'id')
+
+        # set the value of the newly mapped properties to the correct
+        # authority objects
+        for prop in item.object_properties():
+            if prop.is_embedded:
+                prop.value = [ self.batch.authorities[str(v)] for v in prop.value ]
+
+        item.add_collection(self.batch.collection)
+
         files = []
         parts = {}
 
-        if self.src_graph is not None:
-            # Parse each filename in hasPart and allocate to correct location in item entry
-            for part in self.src_graph.objects(predicate=dcterms.hasPart):
-                filename = str(part)
-                # ensure exactly one path that is mapped from the basename
-                if not filename in self.all_files:
-                    raise DataReadException('File {0} not found'.format(filename))
-                elif len(self.all_files[filename]) > 1:
-                    raise DataReadException('Filename {0} is not unique'.format(f))
+        # Parse each filename in hasPart and allocate to correct location in item entry
+        for (s, p, o) in [ (s, p, o) for (s, p, o) in item.unmapped_triples if p == dcterms.hasPart ]:
+            filename = str(o)
+            # ensure exactly one path that is mapped from the basename
+            if not filename in self.batch.all_files:
+                raise DataReadException('File {0} not found'.format(filename))
+            elif len(self.batch.all_files[filename]) > 1:
+                raise DataReadException('Filename {0} is not unique'.format(f))
 
-                file_path = self.all_files[filename][0]
+            file_path = self.batch.all_files[filename][0]
 
-                normalized = filename.replace('_', '-')
-                basename, ext = os.path.splitext(normalized)
-                base_parts = basename.split('-')
+            normalized = filename.replace('_', '-')
+            basename, ext = os.path.splitext(normalized)
+            base_parts = basename.split('-')
 
-                # handle files with no sequence id
-                if len(base_parts) == 2:
-                    files.append(file_path)
-                # handle files with a sequence id
-                elif len(base_parts) == 3:
-                    page_no = str(int(base_parts[2]))
-                    if page_no not in parts:
-                        parts[page_no] = [ file_path ]
-                    else:
-                        parts[page_no].append(file_path)
+            # handle files with no sequence id
+            if len(base_parts) == 2:
+                files.append(file_path)
+            # handle files with a sequence id
+            elif len(base_parts) == 3:
+                page_no = str(int(base_parts[2]))
+                if page_no not in parts:
+                    parts[page_no] = [ file_path ]
                 else:
-                    item.logger.warning(
-                            'Filename {0} does not match a known pattern'.format(filename))
+                    parts[page_no].append(file_path)
+            else:
+                item.logger.warning(
+                        'Filename {0} does not match a known pattern'.format(filename))
 
-                # remove the dcterms:hasPart triples
-                self.src_graph.remove((None, dcterms.hasPart, part))
+        # remove the dcterms:hasPart triples
+        item.unmapped_triples = [ (s, p, o) for (s, p, o) in item.unmapped_triples if p != dcterms.hasPart ]
 
         for path in files:
-            self.add_file(File(LocalFile(path)))
+            item.add_file(get_file_object(path))
+
         # renumber the parts from 1
         for (n, key) in enumerate(sorted(parts.keys()), 1):
-            self.add_component(Page(n, parts[key], self))
+            item.add_component(Page(n, parts[key], item))
 
-    def graph(self):
-        graph = super(Item, self).graph()
-        if self.src_graph is not None:
-            for (s, p, o) in self.src_graph:
-                graph.add((self.uri, p, o))
-        return graph
-
-class LabeledThing(ldp.Resource):
-    @classmethod
-    def from_graph(cls, graph, subject):
-        label = graph.value(subject=subject, predicate=rdfs.label)
-        same_as = graph.value(subject=subject, predicate=owl.sameAs)
-        types = list(graph.objects(subject=subject, predicate=rdf.type))
-        return cls(label, same_as, types)
-
-    def __init__(self, label, same_as=None, types=[]):
-        super(LabeledThing, self).__init__()
-        self.label = label
-        self.title = label
-        self.same_as = same_as
-        self.types = types
-
-    def graph(self):
-        graph = super(LabeledThing, self).graph()
-        graph.add((self.uri, rdfs.label, Literal(self.label)))
-        for type in self.types:
-            graph.add((self.uri, rdf.type, type))
-        if self.same_as is not None:
-            graph.add((self.uri, owl.sameAs, self.same_as))
-        return graph
-
-class Place(LabeledThing):
-    @classmethod
-    def from_graph(cls, graph, subject):
-        place = super(Place, cls).from_graph(graph, subject)
-        lat = graph.value(subject=subject, predicate=geo.lat)
-        lon = graph.value(subject=subject, predicate=geo.long)
-        if lat is not None and lon is not None:
-            place.lat_long = (lat, lon)
-        return place
-
-    def graph(self):
-        graph = super(Place, self).graph()
-        if self.lat_long is not None:
-            graph.add((self.uri, geo.lat, self.lat_long[0]))
-            graph.add((self.uri, geo.long, self.lat_long[1]))
-
-        return graph
-
-#============================================================================
-# PAGE (COMPONENT) CLASS
-#============================================================================
-
-class Page(pcdm.Component):
-
-    '''Class representing one page of an item-level resource'''
-
-    def __init__(self, id, files, item):
-        super().__init__()
-        self.id = str(id)
-        self.title = "{0}, Page {1}".format(item.title, self.id)
-        self.ordered = True
-        for f in files:
-            self.add_file(File(LocalFile(f)))
-
-    def graph(self):
-        graph = super(Page, self).graph()
-        graph.add((self.uri, dcterms.title, Literal(self.title)))
-        graph.add((self.uri, rdf.type, fabio.Page))
-        graph.add((self.uri, fabio.hasSequenceIdentifier, Literal(self.id)))
-        return graph
-
-
-#============================================================================
-# FILE CLASS
-#============================================================================
-
-class File(pcdm.File):
-
-    '''Class representing file associated with an item or page resource'''
-
-    def graph(self):
-        graph = super(File, self).graph()
-        graph.add((self.uri, dcterms.title, Literal(self.title)))
-        graph.add((self.uri, dcterms.type, dcmitype.Text))
-        if self.filename.endswith('.tif'):
-            graph.add((self.uri, rdf.type, pcdmuse.PreservationMasterFile))
-        elif self.filename.endswith('.jpg'):
-            graph.add((self.uri, rdf.type, pcdmuse.IntermediateFile))
-        elif self.filename.endswith('.xml'):
-            graph.add((self.uri, rdf.type, pcdmuse.ExtractedText))
-        elif self.filename.endswith('.txt'):
-            graph.add((self.uri, rdf.type, pcdmuse.ExtractedText))
-        return graph
+        return item

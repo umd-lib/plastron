@@ -1,8 +1,9 @@
-from datetime import datetime
-from plastron.exceptions import RESTAPIException, DataReadException, FailureException
-from plastron import util
-from plastron.handlers import ndnp
 import logging
+import sys
+from datetime import datetime
+from plastron import util
+from plastron.exceptions import RESTAPIException, DataReadException, FailureException
+from plastron.models.newspaper import Page
 
 logger = logging.getLogger(__name__)
 now = datetime.utcnow().strftime('%Y%m%d%H%M%S')
@@ -73,7 +74,7 @@ def extract(fcrepo, uri):
     fcrepo.open_transaction()
     try:
         logger.info("Getting {0} from repository".format(uri))
-        page = ndnp.Page.from_repository(fcrepo, uri)
+        page = Page.from_repository(fcrepo, uri)
         logger.info("Creating annotations for page {0}".format(page.title))
         for annotation in page.textblocks():
             annotation.create_object(fcrepo)

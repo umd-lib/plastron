@@ -4,19 +4,17 @@ import logging
 from uuid import uuid4
 from rdflib import Graph, URIRef
 from datetime import datetime as dt
-from plastron import namespaces
+from plastron import rdf, namespaces
 from plastron.exceptions import RESTAPIException
 
-class Resource(object):
+class Resource(rdf.Resource):
     '''Class representing a Linked Data Platform Resource (LDPR)
     A HTTP resource whose state is represented in any way that conforms to the
     simple lifecycle patterns and conventions in section 4. Linked Data Platform
     Resources.'''
-    def __init__(self, uri=''):
-        self.uri = URIRef(uri)
-        self.linked_objects = []
-        self.fragments = []
-        self.annotations = None
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.annotations = []
         self.extra = Graph()
         self.created = False
         self.updated = False
@@ -24,19 +22,11 @@ class Resource(object):
             __name__ + '.' + self.__class__.__name__
             )
 
-    def graph(self):
-        graph = Graph()
-        graph.namespace_manager = namespaces.get_manager(graph)
-
-        for (rel, obj) in self.linked_objects:
-            graph.add((self.uri, rel, obj.uri))
-
-        for obj in self.fragments:
-            graph = graph + obj.graph()
-
-        graph = graph + self.extra
-
-        return graph
+    def __str__(self):
+        if hasattr(self, 'title') and self.title is not None:
+            return self.title
+        else:
+            return repr(self)
 
     # create repository object by POST or PUT
     def create_object(self, repository, uri=None):
@@ -46,30 +36,22 @@ class Resource(object):
             self.created = True
             return False
 
-        self.logger.info("Creating {0}...".format(self.title))
-        if uri is not None:
-            response = repository.put(uri)
-        else:
-            response = repository.post(repository.uri())
-
-        if response.status_code == 201:
+        self.logger.info(f"Creating {self}...")
+        try:
+            self.uri = repository.create(url=uri)
             self.created = True
-            self.logger.info("Created {0}".format(self.title))
-            self.uri = URIRef(
-                repository._remove_transaction_uri(response.text)
-                )
+            self.logger.info(f"Created {self}")
             self.uuid = str(self.uri).rsplit('/', 1)[-1]
             self.logger.info(
                 'URI: {0} / UUID: {1}'.format(self.uri, self.uuid)
                 )
             self.create_fragments()
-            return True
-        else:
-            self.logger.error("Failed to create {0}".format(self.title))
-            raise RESTAPIException(response)
+        except RESTAPIException as e:
+            self.logger.error(f"Failed to create {self}")
+            raise e
 
     def create_fragments(self):
-        for obj in self.fragments:
+        for obj in self.embedded_objects():
             obj.uuid = uuid4()
             obj.uri = URIRef('{0}#{1}'.format(self.uri, obj.uuid))
             obj.created = True
@@ -100,14 +82,14 @@ class Resource(object):
         query = prolog + "INSERT DATA {{{0}}}".format("\n".join(triples))
         data = query.encode('utf-8')
         headers = {'Content-Type': 'application/sparql-update'}
-        self.logger.info("Updating {0}".format(self.title))
+        self.logger.info(f"Updating {self}")
         response = repository.patch(str(patch_uri), data=data, headers=headers)
         if response.status_code == 204:
-            self.logger.info("Updated {0}".format(self.title))
+            self.logger.info(f"Updated {self}")
             self.updated = True
             return response
         else:
-            self.logger.error("Failed to update {0}".format(self.title))
+            self.logger.error(f"Failed to update {self}")
             self.logger.error(query)
             raise RESTAPIException(response)
 
@@ -116,12 +98,12 @@ class Resource(object):
         if self.create_object(repository):
             self.creation_timestamp = dt.now()
         else:
-            self.logger.debug('Object "{0}" exists. Skipping.'.format(self.title))
+            self.logger.debug(f'Object "{self}" exists. Skipping.')
 
-        for (rel, obj) in self.linked_objects:
+        for obj in self.linked_objects():
             if obj.created or obj.exists_in_repo(repository):
                 obj.created = True
-                self.logger.debug('Object "{0}" exists. Skipping.'.format(self.title))
+                self.logger.debug(f'Object "{self}" exists. Skipping.')
             else:
                 obj.recursive_create(repository)
 
@@ -129,7 +111,7 @@ class Resource(object):
     def recursive_update(self, repository):
         if not self.updated:
             self.update_object(repository)
-            for (rel, obj) in self.linked_objects:
+            for obj in self.linked_objects():
                 obj.recursive_update(repository)
 
     # check for the existence of a local object in the repository

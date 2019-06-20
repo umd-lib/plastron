@@ -7,10 +7,7 @@ https://github.com/pypa/sampleproject
 
 # Always prefer setuptools over distutils
 from setuptools import setup, find_packages
-# To use a consistent encoding
-from codecs import open
 from os import path
-from runpy import run_path
 
 import plastron
 
@@ -86,9 +83,7 @@ setup(
 
     # List additional groups of dependencies here (e.g. development
     # dependencies). Users will be able to install these using the "extras"
-    # syntax, for example:
-    #
-    #   $ pip install sampleproject[dev]
+    # syntax.
     #
     # Similar to `install_requires` above, these must be valid existing
     # projects.

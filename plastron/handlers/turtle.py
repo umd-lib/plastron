@@ -1,4 +1,4 @@
-''' A handler for loading sequenced assets from binaries & turtle metadata. '''
+""" A handler for loading sequenced assets from binaries & turtle metadata. """
 
 import logging
 import os
@@ -14,10 +14,7 @@ from plastron.pcdm import Page, get_file_object
 # BATCH CLASS (FOR PAGED BINARIES PLUS RDF METADATA)
 #============================================================================
 
-class Batch():
-
-    '''Iterator class representing a set of resources to be loaded'''
-
+class Batch:
     def __init__(self, repo, config):
         self.logger = logging.getLogger(
             __name__ + '.' + self.__class__.__name__
@@ -44,7 +41,7 @@ class Batch():
             # maps the basename to a full path
             self.logger.info(f'Walking the {config.data_dir} tree to create a file index')
             self.all_files = {}
-            file_count = 0;
+            file_count = 0
             for root, dirs, files in os.walk(config.data_dir):
                 for f in files:
                     file_count += 1
@@ -135,7 +132,7 @@ class BatchItem:
             if not filename in self.batch.all_files:
                 raise DataReadException('File {0} not found'.format(filename))
             elif len(self.batch.all_files[filename]) > 1:
-                raise DataReadException('Filename {0} is not unique'.format(f))
+                raise DataReadException('Filename {0} is not unique'.format(filename))
 
             file_path = self.batch.all_files[filename][0]
 

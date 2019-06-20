@@ -5,7 +5,7 @@ import threading
 from rdflib import Graph, URIRef
 from plastron.exceptions import RESTAPIException
 
-class Repository():
+class Repository:
     def __init__(self, config, ua_string=None):
         self.endpoint = config['REST_ENDPOINT']
         self.relpath = config['RELPATH']
@@ -55,7 +55,7 @@ class Repository():
         if self.is_reachable():
             self.logger.info("Connection successful.")
         else:
-            self.logger.warn("Unable to connect.")
+            self.logger.warning("Unable to connect.")
             raise Exception("Unable to connect")
 
     def request(self, method, url, **kwargs):
@@ -102,7 +102,9 @@ class Repository():
         else:
             raise RESTAPIException(response)
 
-    def recursive_get(self, url, traverse=[], **kwargs):
+    def recursive_get(self, url, traverse=None, **kwargs):
+        if traverse is None:
+            traverse = []
         head_response = self.head(url, **kwargs)
         if 'describedby' in head_response.links:
             target = head_response.links['describedby']['url']

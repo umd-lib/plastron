@@ -47,7 +47,7 @@ class Command:
             elif args.uris is not None:
                 delete_items(fcrepo, args.uris, args)
 
-        except RESTAPIException as e:
+        except RESTAPIException:
             logger.error(
                 "Unable to commit or rollback transaction, aborting"
                 )
@@ -95,4 +95,4 @@ def delete_items(fcrepo, uri_list, args):
         # loop's exception handler and should trigger a system exit
         logger.error("Item deletion failed: {0}".format(e))
         fcrepo.rollback_transaction()
-        logger.warn('Transaction rolled back.')
+        logger.warning('Transaction rolled back.')

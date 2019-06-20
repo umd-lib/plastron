@@ -51,10 +51,9 @@ class Command:
                     logger.debug('Ignoring {0}'.format(uri))
                     continue
 
-                is_extracted = False
                 try:
                     is_extracted = extract(fcrepo, uri)
-                except RESTAPIException as e:
+                except RESTAPIException:
                     logger.error(
                         "Unable to commit or rollback transaction, aborting"
                         )
@@ -84,10 +83,10 @@ def extract(fcrepo, uri):
         return True
 
     except (RESTAPIException, DataReadException) as e:
-        # if anything fails during item creation or commiting the transaction
+        # if anything fails during item creation or committing the transaction
         # attempt to rollback the current transaction
         # failures here will be caught by the main loop's exception handler
         # and should trigger a system exit
         logger.error("OCR extraction failed: {0}".format(e))
         fcrepo.rollback_transaction()
-        logger.warn('Transaction rolled back. Continuing load.')
+        logger.warning('Transaction rolled back. Continuing load.')

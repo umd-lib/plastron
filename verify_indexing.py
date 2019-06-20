@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-'''Indexing verification tool for fcrepo: reads items loaded from batch
+"""Indexing verification tool for fcrepo: reads items loaded from batch
    configuration file, queries the appropriate solr server, and reports 
    missing items.
    
@@ -9,14 +9,13 @@
    optional arguments:
    -h, --help               show this help message and exit
    -b BATCH, --batch BATCH  Path to batch configuration file.
-   -r REPO, --repo REPO     Path to repository configuration file.'''
+   -r REPO, --repo REPO     Path to repository configuration file."""
 
 import argparse
 import csv
 import json
 import os
 import requests
-import sys
 from urllib.parse import urlparse
 import yaml
 

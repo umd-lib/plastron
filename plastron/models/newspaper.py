@@ -1,9 +1,9 @@
-import lxml.etree as ET
+from lxml.etree import parse, XMLSyntaxError
 from rdflib import URIRef
 from plastron import pcdm, ocr, oa, rdf
 from plastron.exceptions import DataReadException
 from plastron.namespaces import bibo, carriers, dc, dcterms, ebucore, fabio, ndnp, pcdmuse, prov, sc
-from plastron.util import LocalFile, RepositoryFile
+from plastron.util import RepositoryFile
 
 @rdf.data_property('title', dcterms.title)
 @rdf.data_property('date', dc.date)
@@ -83,24 +83,24 @@ class Page(pcdm.Component):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.ordered = True
+        self.ocr = None
+        self.ocr_file = None
 
     def parse_ocr(self):
         # try to get an OCR file
         # if there isn't one, just skip it
         try:
             ocr_file = next(self.files_for('ocr'))
-        except StopIteration as e:
-            self.ocr = None
-            self.ocr_file = None
+        except StopIteration:
             return
 
         # load ALTO XML into page object, for text extraction
         try:
             with ocr_file.source.data() as stream:
-                tree = ET.parse(stream)
-        except OSError as e:
+                tree = parse(stream)
+        except OSError:
             raise DataReadException("Unable to read {0}".format(ocr_file.filename))
-        except ET.XMLSyntaxError as e:
+        except XMLSyntaxError:
             raise DataReadException("Unable to parse {0} as XML".format(ocr_file.filename))
 
         # read in resolution from issue METS data

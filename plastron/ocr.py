@@ -42,11 +42,11 @@ class Region(object):
         w = round(self.width  * xscale)
         h = round(self.height * yscale)
 
-        return (x, y, w, h)
+        return x, y, w, h
 
     def bbox(self, scale):
         (x, y, w, h) = self.xywh(scale)
-        return (x, y, x+w, y+h)
+        return x, y, x+w, y+h
 
 class TextBlock(Region):
     def lines(self):

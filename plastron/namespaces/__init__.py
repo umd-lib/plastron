@@ -1,7 +1,7 @@
 from rdflib import Namespace,Graph
 from rdflib.namespace import NamespaceManager
 
-# useful namespaces for use with RDFlib code
+# useful namespaces for use with rdflib code
 
 bibo     = Namespace('http://purl.org/ontology/bibo/')
 carriers = Namespace('http://id.loc.gov/vocabulary/carriers/')

@@ -1,17 +1,18 @@
-''' Classes for interpreting and loading metadata and files stored
-    according to the NDNP specification. '''
+""" Classes for interpreting and loading metadata and files stored
+    according to the NDNP specification. """
 
 import csv
 import logging
-import lxml.etree as ET
+import lxml
+from lxml.etree import parse, XMLSyntaxError
 import os
 from plastron import pcdm
-from plastron.exceptions import ConfigException, DataReadException
+from plastron.exceptions import DataReadException
 from plastron.namespaces import dcmitype, ndnp
 from plastron.util import LocalFile
 from plastron.models.newspaper import Article, Issue, IssueMetadata, MetadataFile, Page
 
-# alias the RDFlib Namespace
+# alias the rdflib Namespace
 ns = ndnp
 
 #============================================================================
@@ -54,9 +55,6 @@ xmlns = {
 #============================================================================
 
 class Batch:
-
-    '''iterator class representing the set of resources to be loaded'''
-
     def __init__(self, repo, config):
         self.logger = logging.getLogger(
             __name__ + '.' + self.__class__.__name__
@@ -66,10 +64,10 @@ class Batch:
         self.fieldnames = ['aggregation', 'sequence', 'uri']
 
         try:
-            tree = ET.parse(config.batch_file)
-        except OSError as e:
+            tree = parse(config.batch_file)
+        except OSError:
             raise DataReadException(f'Unable to read {config.batch_file}')
-        except ET.XMLSyntaxError as e:
+        except XMLSyntaxError:
             raise DataReadException(f'Unable to parse {config.batch_file} as XML')
 
         root = tree.getroot()
@@ -143,6 +141,7 @@ class BatchItem:
             )
 
         self.batch = batch
+        self.issue = None
         # gather metadata
         self.dir            = os.path.dirname(issue_path)
         self.path           = issue_path
@@ -151,10 +150,10 @@ class BatchItem:
 
     def read_data(self):
         try:
-            tree = ET.parse(self.path)
-        except OSError as e:
+            tree = parse(self.path)
+        except OSError:
             raise DataReadException("Unable to read {0}".format(self.path))
-        except ET.XMLSyntaxError as e:
+        except XMLSyntaxError:
             raise DataReadException(
                 "Unable to parse {0} as XML".format(self.path)
                 )
@@ -171,7 +170,7 @@ class BatchItem:
             issue.title = root.get('LABEL')
             issue.date = root.find('.//MODS:dateIssued', xmlns).text
             issue.sequence_attr = ('Page', 'number')
-        except AttributeError as e:
+        except AttributeError:
             raise DataReadException("Missing metadata in {0}".format(self.path))
 
         # optional metadata elements
@@ -202,12 +201,12 @@ class BatchItem:
 
         # iterate over the article XML and create objects for articles
         try:
-            article_tree = ET.parse(self.article_path)
-        except OSError as e:
+            article_tree = parse(self.article_path)
+        except OSError:
             raise DataReadException(
                 "Unable to read {0}".format(self.article_path)
                 )
-        except ET.XMLSyntaxError as e:
+        except XMLSyntaxError:
             raise DataReadException(
                 "Unable to parse {0} as XML".format(self.article_path)
                 )
@@ -259,7 +258,7 @@ class BatchItem:
                     mdtype = mdwrap.get('MDTYPE')
                     if mdtype == 'OTHER':
                         mdtype = mdwrap.get('OTHERMDTYPE')
-                techmd[mdtype] = t
+                    techmd[mdtype] = t
 
             use = filexml.get('USE')
             file_locator = filexml.find('METS:FLocat', xmlns)
@@ -315,7 +314,7 @@ class BatchItem:
 class METSResource(object):
     def __init__(self, xmldoc):
         self.root = xmldoc.getroot()
-        self.xpath = ET.XPathElementEvaluator(self.root, namespaces=xmlns,
+        self.xpath = lxml.etree.XPathElementEvaluator(self.root, namespaces=xmlns,
                 smart_strings = False)
 
     def dmdsec(self, id):

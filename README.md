@@ -196,7 +196,7 @@ with the `-r` or `--repo` option. These are the recognized configuration keys:
 
 | Option        | Description |
 | ------------- | ----------- |
-|`REST_ENDPOINT`|Respository root URL|
+|`REST_ENDPOINT`|Repository root URL|
 |`RELPATH`      |Path within repository to load objects to|
 |`LOG_DIR`      |Directory to write log files|
 

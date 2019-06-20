@@ -1,4 +1,4 @@
-'''handler for loading reel objects created by the ndnp handler'''
+"""handler for loading reel objects created by the ndnp handler"""
 
 import csv
 import logging
@@ -6,7 +6,7 @@ import os
 from plastron import pcdm
 from plastron.models.newspaper import Reel, Page
 
-class Batch():
+class Batch:
     def __init__(self, repo, config):
         self.logger = logging.getLogger(
             __name__ + '.' + self.__class__.__name__
@@ -33,7 +33,7 @@ class Batch():
             self.logger.info('Processing complete!')
             raise StopIteration()
 
-class BatchItem():
+class BatchItem:
     def __init__(self, batch, filename):
         self.batch = batch
         self.path = filename

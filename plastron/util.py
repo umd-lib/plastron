@@ -17,17 +17,17 @@ def parse_predicate_list(string, delimiter=','):
     return [ from_n3(p, nsm=manager) for p in string.split(delimiter) ]
 
 def print_header():
-    '''Common header formatting.'''
+    """Common header formatting."""
     title = '|     PLASTRON     |'
     bar = '+' + '='*(len(title)-2) + '+'
     spacer = '|' + ' '*(len(title)-2) + '|'
     print('\n'.join(['', bar, spacer, title, spacer, bar, '']))
 
 def print_footer():
-    '''Report success or failure and resources created.'''
+    """Report success or failure and resources created."""
     print('\nScript complete. Goodbye!\n')
 
-class ItemLog():
+class ItemLog:
     def __init__(self, filename, fieldnames, keyfield):
         self.filename = filename
         self.fieldnames = fieldnames
@@ -79,7 +79,7 @@ class BinarySource(object):
 
 class LocalFile(BinarySource):
     def __init__(self, localpath, mimetype=None):
-        super(LocalFile, self).__init__()
+        super().__init__()
         if mimetype is None:
             mimetype = mimetypes.guess_type(localpath)[0]
         self._mimetype = mimetype
@@ -102,7 +102,7 @@ class LocalFile(BinarySource):
 
 class RepositoryFile(BinarySource):
     def __init__(self, repo, file_uri):
-        super(RepositoryFile, self).__init__()
+        super().__init__()
         file_uri = URIRef(file_uri)
         head_res = repo.head(file_uri)
         if 'describedby' in head_res.links:
@@ -128,7 +128,7 @@ class RepositoryFile(BinarySource):
 
 class RemoteFile(BinarySource):
     def __init__(self, host, remotepath, mimetype=None):
-        super(RemoteFile, self).__init__()
+        super().__init__()
         self.ssh_client = None
         self.sftp_client = None
         self.host = host

@@ -1,14 +1,12 @@
 import csv
 import logging
 import os
-import sys
 import yaml
-from rdflib import Graph, Literal, Namespace, URIRef
+from rdflib import Literal, URIRef
 from rdflib.util import from_n3
-from plastron import pcdm, ldp, namespaces, rdf
+from plastron import pcdm, namespaces, rdf
 from plastron.util import LocalFile, RemoteFile
-from plastron.exceptions import ConfigException, DataReadException
-from plastron.namespaces import dcmitype, dcterms, pcdmuse
+from plastron.exceptions import ConfigException
 from collections import OrderedDict
 
 nsm = namespaces.get_manager()
@@ -31,8 +29,8 @@ def get_file_object(path, source=None):
     f = cls(source)
     return f
 
-class Batch():
-    '''Class representing the mapped and parsed CSV data'''
+class Batch:
+    """Class representing the mapped and parsed CSV data"""
     def __init__(self, repo, config):
         self.logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
 

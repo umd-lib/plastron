@@ -18,12 +18,8 @@ from plastron.http import Repository
 logger = logging.getLogger(__name__)
 now = datetime.utcnow().strftime('%Y%m%d%H%M%S')
 
-#============================================================================
-# MAIN LOOP
-#============================================================================
-
 def main():
-    '''Parse args and handle options.'''
+    """Parse args and handle options."""
 
     parser = argparse.ArgumentParser(
             prog='plastron',
@@ -111,10 +107,10 @@ def main():
     try:
         # dispatch to the selected subcommand
         command(fcrepo, args)
-    except FailureException as e:
+    except FailureException:
         # something failed, exit with non-zero status
         sys.exit(1)
-    except KeyboardInterrupt as e:
+    except KeyboardInterrupt:
         # aborted due to Ctrl+C
         sys.exit(2)
 

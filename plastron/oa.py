@@ -2,7 +2,7 @@ from rdflib import RDF
 from plastron import ldp, rdf
 from plastron.namespaces import dcterms, oa
 
-# alias the RDFlib Namespace
+# alias the rdflib Namespace
 ns = oa
 
 # Annotation resources

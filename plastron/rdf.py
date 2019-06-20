@@ -1,12 +1,15 @@
-from copy import copy
-from plastron.namespaces import rdf as ns
-from rdflib import Graph, RDF, URIRef, Literal
 import sys
+from copy import copy
+from rdflib import Graph, RDF, URIRef, Literal
+from plastron.namespaces import rdf
+
+# alias the rdflib Namespace
+ns = rdf
 
 def init_class_attr(cls, name, default):
     if name not in cls.__dict__:
         if hasattr(cls, name):
-            # there's a attribute set somewhere in the inheritence hierarchy
+            # there's a attribute set somewhere in the inheritance hierarchy
             # copy it as the basis for this class's instance of that attribute
             setattr(cls, name, copy(getattr(cls, name)))
         else:

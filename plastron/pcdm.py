@@ -1,11 +1,11 @@
-from rdflib import Graph, Literal, URIRef
+from rdflib import URIRef
 from plastron import ldp, ore, rdf
 from plastron.exceptions import RESTAPIException
 from plastron.namespaces import dcterms, dcmitype, fabio, iana, pcdm, ebucore, pcdmuse
 from plastron.util import LocalFile
 from PIL import Image
 
-# alias the RDFlib Namespace
+# alias the rdflib Namespace
 ns = pcdm
 
 #============================================================================
@@ -185,7 +185,7 @@ class File(Resource):
         else:
             raise RESTAPIException(response)
 
-    def update_object(self, repository):
+    def update_object(self, repository, patch_uri=None):
         if not repository.load_binaries:
             self.logger.info(f'Skipping update for binary {self.source.filename}')
             return True
@@ -254,7 +254,7 @@ class Collection(Resource):
 @rdf.data_property('id', fabio.hasSequenceIdentifier)
 @rdf.rdf_class(fabio.Page)
 class Page(Component):
-    '''One page of an item-level resource'''
+    """One page of an item-level resource"""
 
     def __init__(self, id, files, item):
         super().__init__()

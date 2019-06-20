@@ -1,11 +1,9 @@
-import csv
-import logging
 import logging.config
 import os
 import re
 import yaml
+from argparse import ArgumentTypeError
 from datetime import datetime
-from fractions import gcd
 from importlib import import_module
 from time import sleep
 from plastron.exceptions import ConfigException, DataReadException, RESTAPIException, FailureException
@@ -107,16 +105,16 @@ class Command:
             try:
                 completed = ItemLog(batch_config.mapfile, fieldnames, 'path')
             except Exception as e:
-                logger.error('Non-standard map file specified: {0}'.format(e))
+                logger.error(f"Non-standard map file specified: {e}")
                 raise FailureException()
 
-            logger.info('Found {0} completed items'.format(len(completed)))
+            logger.info(f"Found {len(completed)} completed items")
 
             if args.ignore is not None:
                 try:
                     ignored = ItemLog(args.ignore, fieldnames, 'path')
                 except Exception as e:
-                    logger.error('Non-standard ignore file specified: {0}'.format(e))
+                    logger.error(f"Non-standard ignore file specified: {e}")
                     raise FailureException()
             else:
                 ignored = []
@@ -126,62 +124,42 @@ class Command:
                 )
             skipped = ItemLog(skipfile, fieldnames, 'path')
 
-            # set up interval from percent parameter and store set of items to load
-            if args.percent is not None:
-                gr_common_div = gcd(100, args.percent)
-                denom = int(100 / gr_common_div)
-                numer = int(args.percent / gr_common_div)
-                logger.info('Loading {0} of every {1} items (= {2}%)'.format(
-                                numer, denom, args.percent
-                                ))
-                load_set = set()
-                for i in range(0, batch.length, denom):
-                    load_set.update(range(i, i + numer))
-                logger.info(
-                    'Items to load: {0}'.format(
-                        ', '.join([str(s + 1) for s in sorted(load_set)])
-                        ))
+            load_set = get_load_set(batch, args.percent)
 
             # create all batch objects in repository
             for n, item in enumerate(batch):
                 is_loaded = False
 
-                if args.percent is not None and n not in load_set:
-                    logger.info(
-                        'Loading {0} percent, skipping {1}'.format(args.percent, n)
-                        )
+                if n not in load_set:
+                    logger.info(f"Loading {args.percent}, skipping item {n}")
                     continue
 
                 # handle load limit parameter
                 if args.limit is not None and n >= args.limit:
-                    logger.info("Stopping after {0} item(s)".format(args.limit))
+                    logger.info(f"Stopping after {args.limit} item(s)")
                     break
                 elif item.path in completed:
                     continue
                 elif item.path in ignored:
-                    logger.debug('Ignoring {0}'.format(item.path))
+                    logger.debug(f"Ignoring {item.path}")
                     continue
 
-                logger.info(
-                    "Processing item {0}/{1}...".format(n+1, batch.length)
-                    )
+                logger.info(f"Processing item {n + 1}/{batch.length}...")
                 if args.verbose:
                     item.print_item_tree()
 
                 try:
-                    logger.info('Loading item {0}'.format(n+1))
+                    logger.info(f"Loading item {n+1}")
                     is_loaded = load_item(
                         fcrepo, item, args, extra=batch_config.extra
                         )
-                except RESTAPIException as e:
+                except RESTAPIException:
                     logger.error(
                         "Unable to commit or rollback transaction, aborting"
                         )
                     raise FailureException()
                 except DataReadException as e:
-                    logger.error(
-                        "Skipping item {0}: {1}".format(n + 1, e.message)
-                        )
+                    logger.error(f"Skipping item {n + 1}: {e.message}")
 
                 row = {'number': n + 1,
                        'path': item.path,
@@ -205,11 +183,22 @@ class Command:
         if not args.quiet:
             print_footer()
 
+def get_load_set(batch, percent=None):
+    """set up interval from percent parameter and store set of items to load"""
+    if percent is None:
+        percent = 100
+    indexes = list(range(0, batch.length, int(100/percent)))
+    if percent < 100:
+        logger.info(f"Items to load: {', '.join(indexes)}")
+    else:
+        logger.info("Loading all items")
+    return set(indexes)
+
 # custom argument type for percentage loads
 def percentage(n):
     p = int(n)
     if not p > 0 and p < 100:
-        raise argparse.ArgumentTypeError("Percent param must be 1-99")
+        raise ArgumentTypeError("Percent param must be 1-99")
     return p
 
 def load_item(fcrepo, batch_item, args, extra=None):
@@ -222,8 +211,8 @@ def load_item(fcrepo, batch_item, args, extra=None):
     fcrepo.open_transaction()
 
     # create item and its components
+    keep_alive = TransactionKeepAlive(fcrepo, 90)
     try:
-        keep_alive = TransactionKeepAlive(fcrepo, 90)
         keep_alive.start()
 
         logger.info('Creating item')
@@ -240,6 +229,8 @@ def load_item(fcrepo, batch_item, args, extra=None):
                 rdf_format = 'n3'
             elif re.search(r'\.(rdf|xml)$', extra):
                 rdf_format = 'xml'
+            else:
+                raise ConfigException("Unrecognized extra triples file format")
             item.add_extra_properties(extra, rdf_format)
 
         logger.info('Updating item and components')
@@ -258,13 +249,13 @@ def load_item(fcrepo, batch_item, args, extra=None):
         return True
 
     except (RESTAPIException, FileNotFoundError) as e:
-        # if anything fails during item creation or commiting the transaction
+        # if anything fails during item creation or committing the transaction
         # attempt to rollback the current transaction
         # failures here will be caught by the main loop's exception handler
         # and should trigger a system exit
         logger.error("Item creation failed: {0}".format(e))
         fcrepo.rollback_transaction()
-        logger.warn('Transaction rolled back. Continuing load.')
+        logger.warning('Transaction rolled back. Continuing load.')
 
     except KeyboardInterrupt as e:
         # set the stop flag on the keep-alive ping

@@ -2,6 +2,7 @@ import yaml
 from plastron import pcdm
 from plastron.exceptions import RESTAPIException, FailureException
 import logging
+
 logger = logging.getLogger(__name__)
 
 class Command:
@@ -34,7 +35,7 @@ class Command:
             logger.info('Committing transaction')
             fcrepo.commit_transaction()
 
-        except (RESTAPIException) as e:
+        except RESTAPIException as e:
             logger.error("Error in collection creation: {0}".format(e))
             raise FailureException()
 

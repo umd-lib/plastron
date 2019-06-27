@@ -131,7 +131,6 @@ class Item(Resource):
 
 @rdf.rdf_class(pcdm.Object)
 class Component(Resource):
-
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.ordered = False
@@ -251,11 +250,13 @@ class Collection(Resource):
 
         return collection
 
-@rdf.data_property('id', fabio.hasSequenceIdentifier)
+@rdf.data_property('number', fabio.hasSequenceIdentifier)
 @rdf.rdf_class(fabio.Page)
-class Page(Component):
+class Page(Resource):
     """One page of an item-level resource"""
-    pass
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.ordered = True
 
 FILE_CLASS_FOR = {
         '.tif': PreservationMasterFile,

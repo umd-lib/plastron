@@ -112,7 +112,7 @@ class BatchItem:
             add_property(cls)
 
         item = cls.from_graph(item_graph)
-        item.sequence_attr = ('Page', 'id')
+        item.sequence_attr = ('Page', 'number')
 
         # set the value of the newly mapped properties to the correct
         # authority objects
@@ -162,6 +162,9 @@ class BatchItem:
 
         # renumber the parts from 1
         for (n, key) in enumerate(sorted(parts.keys()), 1):
-            item.add_component(Page(n, parts[key], item))
+            page = Page(number=str(n), title=f"{item.title}, Page {n}")
+            for path in parts[key]:
+                page.add_file(get_file_object(path))
+            item.add_component(page)
 
         return item

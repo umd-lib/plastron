@@ -183,7 +183,7 @@ class Batch:
                             # TODO: this number only makes sense as part of the
                             # folder; should be the title of the proxy object
                             sequence_number = int(key_parts[2])
-                            page = pcdm.Page(id=sequence_number, title=f'Page {sequence_number}')
+                            page = pcdm.Page(number=sequence_number, title=f'Page {sequence_number}')
                             for entry in members[key]:
                                 source = LocalFile(entry.path)
                                 f = get_file_object(entry.name, source)

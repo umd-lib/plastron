@@ -219,18 +219,51 @@ class Repository:
     def uri(self):
         return '/'.join([p.strip('/') for p in (self.endpoint, self.relpath)])
 
+class Transaction:
+    def __init__(self, repository, keep_alive=90):
+        self.repository = repository
+        self.keep_alive = TransactionKeepAlive(repository, keep_alive)
+        self.logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
+        self.active = False
+
+    def __enter__(self):
+        self.begin()
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        # when we leave the transaction context, always
+        # set the stop flag on the keep-alive ping
+        self.keep_alive.stop()
+
+    def begin(self):
+        self.repository.open_transaction()
+        self.keep_alive.start()
+        self.active = True
+
+    def maintain(self):
+        self.repository.maintain_transaction()
+
+    def commit(self):
+        self.keep_alive.stop()
+        self.repository.commit_transaction()
+        self.active = False
+
+    def rollback(self):
+        self.keep_alive.stop()
+        self.repository.rollback_transaction()
+        self.active = False
 
 # based on https://stackoverflow.com/a/12435256/5124907
 class TransactionKeepAlive(threading.Thread):
-    def __init__(self, repository, interval):
+    def __init__(self, transaction, interval):
         super().__init__(name='TransactionKeepAlive')
-        self.repository = repository
+        self.transaction = transaction
         self.interval = interval
         self.stopped = threading.Event()
 
     def run(self):
         while not self.stopped.wait(self.interval):
-            self.repository.maintain_transaction()
+            self.transaction.maintain()
 
     def stop(self):
         self.stopped.set()

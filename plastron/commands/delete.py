@@ -1,5 +1,6 @@
 from plastron.exceptions import RESTAPIException, FailureException
 from plastron.util import get_title_string, print_header, print_footer, parse_predicate_list
+from plastron.http import Transaction
 import logging
 
 logger = logging.getLogger(__name__)
@@ -71,28 +72,23 @@ def delete_items(fcrepo, uri_list, args):
                 logger.info("Would delete {0} {1}".format(target_uri, title))
         return True
 
-    # open transaction
-    logger.info('Opening transaction')
-    fcrepo.open_transaction()
+    with Transaction(fcrepo, keep_alive=90) as txn:
+        # delete item
+        # (and its components, if a list of predicates to traverse was given)
+        try:
+            for uri in uri_list:
+                for (target_uri, graph) in get_uris_to_delete(fcrepo, uri, args):
+                    title = get_title_string(graph)
+                    fcrepo.delete(target_uri)
+                    logger.info('Deleted resource {0} {1}'.format(target_uri, title))
 
-    # delete item
-    # (and its components, if a list of predicates to traverse was given)
-    try:
-        for uri in uri_list:
-            for (target_uri, graph) in get_uris_to_delete(fcrepo, uri, args):
-                title = get_title_string(graph)
-                fcrepo.delete(target_uri)
-                logger.info('Deleted resource {0} {1}'.format(target_uri, title))
+            txn.commit()
+            return True
 
-        # commit transaction
-        logger.info('Committing transaction')
-        fcrepo.commit_transaction()
-        return True
-
-    except RESTAPIException as e:
-        # if anything fails during deletion of a set of uris, attempt to
-        # rollback the transaction. Failures here will be caught by the main
-        # loop's exception handler and should trigger a system exit
-        logger.error("Item deletion failed: {0}".format(e))
-        fcrepo.rollback_transaction()
-        logger.warning('Transaction rolled back.')
+        except RESTAPIException as e:
+            # if anything fails during deletion of a set of uris, attempt to
+            # rollback the transaction. Failures here will be caught by the main
+            # loop's exception handler and should trigger a system exit
+            logger.error("Item deletion failed: {0}".format(e))
+            txn.rollback()
+            logger.warning('Transaction rolled back.')

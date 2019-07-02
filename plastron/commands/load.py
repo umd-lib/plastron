@@ -7,7 +7,7 @@ from datetime import datetime
 from importlib import import_module
 from time import sleep
 from plastron.exceptions import ConfigException, DataReadException, RESTAPIException, FailureException
-from plastron.http import TransactionKeepAlive
+from plastron.http import Transaction
 from plastron.util import print_header, print_footer, ItemLog
 
 logger = logging.getLogger(__name__)
@@ -207,61 +207,51 @@ def load_item(fcrepo, batch_item, args, extra=None):
     item = batch_item.read_data()
 
     # open transaction
-    logger.info('Opening transaction')
-    fcrepo.open_transaction()
+    with Transaction(fcrepo, keep_alive=90) as txn:
+        # create item and its components
+        try:
+            logger.info('Creating item')
+            item.recursive_create(fcrepo)
+            logger.info('Creating ordering proxies')
+            item.create_ordering(fcrepo)
+            if not args.noannotations:
+                logger.info('Creating annotations')
+                item.create_annotations(fcrepo)
 
-    # create item and its components
-    keep_alive = TransactionKeepAlive(fcrepo, 90)
-    try:
-        keep_alive.start()
+            if extra:
+                logger.info('Adding additional triples')
+                if re.search(r'\.(ttl|n3|nt)$', extra):
+                    rdf_format = 'n3'
+                elif re.search(r'\.(rdf|xml)$', extra):
+                    rdf_format = 'xml'
+                else:
+                    raise ConfigException("Unrecognized extra triples file format")
+                item.add_extra_properties(extra, rdf_format)
 
-        logger.info('Creating item')
-        item.recursive_create(fcrepo)
-        logger.info('Creating ordering proxies')
-        item.create_ordering(fcrepo)
-        if not args.noannotations:
-            logger.info('Creating annotations')
-            item.create_annotations(fcrepo)
+            logger.info('Updating item and components')
+            item.recursive_update(fcrepo)
+            if not args.noannotations:
+                logger.info('Updating annotations')
+                item.update_annotations(fcrepo)
 
-        if extra:
-            logger.info('Adding additional triples')
-            if re.search(r'\.(ttl|n3|nt)$', extra):
-                rdf_format = 'n3'
-            elif re.search(r'\.(rdf|xml)$', extra):
-                rdf_format = 'xml'
-            else:
-                raise ConfigException("Unrecognized extra triples file format")
-            item.add_extra_properties(extra, rdf_format)
+            # commit transaction
+            txn.commit()
+            logger.info('Performing post-creation actions')
+            item.post_creation_hook()
+            return True
 
-        logger.info('Updating item and components')
-        item.recursive_update(fcrepo)
-        if not args.noannotations:
-            logger.info('Updating annotations')
-            item.update_annotations(fcrepo)
+        except (RESTAPIException, FileNotFoundError) as e:
+            # if anything fails during item creation or committing the transaction
+            # attempt to rollback the current transaction
+            # failures here will be caught by the main loop's exception handler
+            # and should trigger a system exit
+            logger.error("Item creation failed: {0}".format(e))
+            txn.rollback()
+            logger.warning('Transaction rolled back. Continuing load.')
 
-        keep_alive.stop()
-
-        # commit transaction
-        logger.info('Committing transaction')
-        fcrepo.commit_transaction()
-        logger.info('Performing post-creation actions')
-        item.post_creation_hook()
-        return True
-
-    except (RESTAPIException, FileNotFoundError) as e:
-        # if anything fails during item creation or committing the transaction
-        # attempt to rollback the current transaction
-        # failures here will be caught by the main loop's exception handler
-        # and should trigger a system exit
-        logger.error("Item creation failed: {0}".format(e))
-        fcrepo.rollback_transaction()
-        logger.warning('Transaction rolled back. Continuing load.')
-
-    except KeyboardInterrupt as e:
-        # set the stop flag on the keep-alive ping
-        keep_alive.stop()
-        logger.error("Load interrupted")
-        raise e
+        except KeyboardInterrupt as e:
+            logger.error("Load interrupted")
+            raise e
 
 class BatchConfig:
     def __init__(self, filename):

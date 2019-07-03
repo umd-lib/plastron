@@ -113,6 +113,7 @@ class Batch:
                 item = cls(**attrs)
                 item.path = key
                 item.ordered = False
+                item.sequence_attr = ('Page', 'number')
 
                 # add any members or files
                 if 'members' in key_conf:
@@ -183,7 +184,7 @@ class Batch:
                             # TODO: this number only makes sense as part of the
                             # folder; should be the title of the proxy object
                             sequence_number = int(key_parts[2])
-                            page = pcdm.Page(number=sequence_number, title=f'Page {sequence_number}')
+                            page = pcdm.Page(number=str(sequence_number), title=f'Page {sequence_number}')
                             for entry in members[key]:
                                 source = LocalFile(entry.path)
                                 f = get_file_object(entry.name, source)

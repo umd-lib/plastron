@@ -51,6 +51,11 @@ class Batch:
             raise ConfigException('Missing required HANDLER_OPTIONS in batch configuration: '
                     + ', '.join(missing_fields))
 
+        if 'RDF_TYPE' in config.handler_options:
+            self.item_rdf_type = URIRef(from_n3(config.handler_options['RDF_TYPE'], nsm=nsm))
+        else:
+            self.item_rdf_type = None
+
         # load the metadata map and metadata file
         try:
             with open(self.metadata_map, 'r') as f:
@@ -90,10 +95,11 @@ class Batch:
 
 
     def get_items(self, lines, mapping):
-        cls = create_class_from_mapping(mapping)
+        cls = create_class_from_mapping(mapping, self.item_rdf_type)
 
         key_column = get_flagged_column(mapping, 'key')
         filename_column = get_flagged_column(mapping, 'filename')
+        dirname_column = get_flagged_column(mapping, 'dirname')
 
         if key_column is not None:
             # the lines are grouped into subjects by
@@ -107,12 +113,18 @@ class Batch:
                 item = cls(**attrs)
                 item.path = key
                 item.ordered = False
+                item.sequence_attr = ('Page', 'number')
 
                 # add any members or files
                 if 'members' in key_conf:
                     # this key_column is a subject with member items
                     for component in self.get_items(sub_lines, key_conf['members']):
-                        item.add_component(component)
+                        # there may also be files that should be directly
+                        # associated with the item
+                        if isinstance(component, pcdm.File):
+                            item.add_file(component)
+                        else:
+                            item.add_component(component)
                 elif 'files' in key_conf:
                     # this key_column is a subject with file items
                     for component in self.get_items(sub_lines, key_conf['files']):
@@ -144,6 +156,43 @@ class Batch:
                             set_value(f, column, conf, line)
                         yield f
 
+        elif dirname_column is not None:
+            # this mapping describes a directory of files that should be
+            # subdivided based on filename into member objects
+            dirname_conf = mapping[dirname_column]
+            for line in lines:
+                dirname = line.get(dirname_column, None)
+                if dirname is not None:
+                    members = {}
+                    for entry in os.scandir(os.path.join(self.file_path, dirname)):
+                        base, ext = os.path.splitext(entry.name)
+                        if base not in members:
+                            members[base] = []
+                        members[base].append(entry)
+
+                    for key in members:
+                        key_parts = key.split('-')
+                        if len(key_parts) == 2:
+                            # top-level
+                            for entry in members[key]:
+                                source = LocalFile(entry.path)
+                                f = get_file_object(entry.name, source)
+                                yield f
+
+                        elif len(key_parts) == 3:
+                            # part
+                            # TODO: this number only makes sense as part of the
+                            # folder; should be the title of the proxy object
+                            sequence_number = int(key_parts[2])
+                            page = pcdm.Page(number=str(sequence_number), title=f'Page {sequence_number}')
+                            for entry in members[key]:
+                                source = LocalFile(entry.path)
+                                f = get_file_object(entry.name, source)
+                                for column, conf in mapping.items():
+                                    set_value(f, column, conf, line)
+                                page.add_file(f)
+                            yield page
+
         else:
             # each line is its own (implicit) subject
             # for an Item resource
@@ -167,7 +216,7 @@ class BatchItem:
 
 # dynamically-generated class based on column names and predicates that are
 # present in the mapping
-def create_class_from_mapping(mapping):
+def create_class_from_mapping(mapping, rdf_type=None):
     cls = type('csv', (pcdm.Item,), {})
     for column, conf in mapping.items():
         if 'predicate' in conf:
@@ -181,6 +230,11 @@ def create_class_from_mapping(mapping):
                     datatype = None
                 add_property = rdf.data_property(column, pred_uri, datatype=datatype)
             add_property(cls)
+
+    if rdf_type is not None:
+        add_type = rdf.rdf_class(rdf_type)
+        add_type(cls)
+
     return cls
 
 def set_value(item, column, conf, line):

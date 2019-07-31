@@ -130,88 +130,21 @@ class Repository:
         graph.parse(source=response.raw, format='turtle')
         return graph
 
-    def open_transaction(self, **kwargs):
-        url = os.path.join(self.endpoint, 'fcr:tx')
-        self.logger.info("Creating transaction")
-        response = self.post(url, **kwargs)
-        if response.status_code == 201:
-            self.transaction = response.headers['Location']
-            self.logger.info("Created transaction {0}".format(self.transaction))
-            return True
-        else:
-            self.logger.error("Failed to create transaction")
-            raise RESTAPIException(response)
-
-    def maintain_transaction(self, **kwargs):
-        if self.transaction is not None:
-            url = os.path.join(self.transaction, 'fcr:tx')
-            self.logger.info(
-                "Maintaining transaction {0}".format(self.transaction)
-                )
-            response = self.post(url, **kwargs)
-            if response.status_code == 204:
-                self.logger.info(
-                    "Transaction {0} is active until {1}".format(
-                        self.transaction, response.headers['Expires']
-                        )
-                    )
-                return True
-            else:
-                self.logger.error(
-                    "Failed to maintain transaction {0}".format(self.transaction)
-                    )
-                raise RESTAPIException(response)
-
-    def commit_transaction(self, **kwargs):
-        if self.transaction is not None:
-            url = os.path.join(self.transaction, 'fcr:tx/fcr:commit')
-            self.logger.info(
-                "Committing transaction {0}".format(self.transaction)
-                )
-            response = self.post(url, **kwargs)
-            if response.status_code == 204:
-                self.logger.info(
-                    "Committed transaction {0}".format(self.transaction)
-                    )
-                self.transaction = None
-                return True
-            else:
-                self.logger.error(
-                    "Failed to commit transaction {0}".format(self.transaction)
-                    )
-                raise RESTAPIException(response)
-
-    def rollback_transaction(self, **kwargs):
-        if self.transaction is not None:
-            url = os.path.join(self.transaction, 'fcr:tx/fcr:rollback')
-            self.logger.info(
-                "Rolling back transaction {0}".format(self.transaction)
-                )
-            response = self.post(url, **kwargs)
-            if response.status_code == 204:
-                self.logger.info(
-                    "Rolled back transaction {0}".format(self.transaction)
-                    )
-                self.transaction = None
-                return True
-            else:
-                self.logger.error(
-                    "Failed to roll back transaction {0}".format(self.transaction)
-                    )
-                raise RESTAPIException(response)
+    def get_transaction_endpoint(self):
+        return os.path.join(self.endpoint, 'fcr:tx')
 
     def _insert_transaction_uri(self, uri):
-        if self.transaction is None or uri.startswith(self.transaction):
+        if self.transaction is None or uri.startswith(self.transaction.uri):
             return uri
         elif uri.startswith(self.endpoint):
             relpath = uri[len(self.endpoint):]
-            return '/'.join([p.strip('/') for p in (self.transaction, relpath)])
+            return '/'.join([p.strip('/') for p in (self.transaction.uri, relpath)])
         else:
             return uri
 
     def _remove_transaction_uri(self, uri):
-        if self.transaction is not None and uri.startswith(self.transaction):
-            relpath = uri[len(self.transaction):]
+        if self.transaction is not None and uri.startswith(self.transaction.uri):
+            relpath = uri[len(self.transaction.uri):]
             return '/'.join([p.strip('/') for p in (self.endpoint, relpath)])
         else:
             return uri
@@ -219,18 +152,84 @@ class Repository:
     def uri(self):
         return '/'.join([p.strip('/') for p in (self.endpoint, self.relpath)])
 
+class Transaction:
+    def __init__(self, repository, keep_alive=90):
+        self.repository = repository
+        self.keep_alive = TransactionKeepAlive(self, keep_alive)
+        self.logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
+        self.active = False
+        self.uri = None
+
+    def __enter__(self):
+        self.begin()
+        return self
+
+    def __str__(self):
+        return self.uri
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        # when we leave the transaction context, always
+        # set the stop flag on the keep-alive ping
+        self.keep_alive.stop()
+
+    def begin(self):
+        self.logger.info('Creating transaction')
+        response = self.repository.post(self.repository.get_transaction_endpoint())
+        if response.status_code == 201:
+            self.uri = response.headers['Location']
+            self.repository.transaction = self
+            self.logger.info(f'Created transaction {self}')
+            self.keep_alive.start()
+            self.active = True
+        else:
+            self.logger.error('Failed to create transaction')
+            raise RESTAPIException(response)
+
+    def maintain(self):
+        if self.active:
+            self.logger.info(f'Maintaining transaction {self}')
+            response = self.repository.post(os.path.join(self.uri, 'fcr:tx'))
+            if response.status_code == 204:
+                self.logger.info(f'Transaction {self} is active until {response.headers["Expires"]}')
+            else:
+                self.logger.error(f'Failed to maintain transaction {self}')
+                raise RESTAPIException(response)
+
+    def commit(self):
+        if self.active:
+            self.logger.info(f'Committing transaction {self}')
+            response = self.repository.post(os.path.join(self.uri, 'fcr:tx/fcr:commit'))
+            if response.status_code == 204:
+                self.logger.info(f'Committed transaction {self}')
+                self.keep_alive.stop()
+                self.active = False
+            else:
+                self.logger.error(f'Failed to commit transaction {self}')
+                raise RESTAPIException(response)
+
+    def rollback(self):
+        if self.active:
+            self.logger.info(f'Rolling back transaction {self}')
+            response = self.repository.post(os.path.join(self.uri, 'fcr:tx/fcr:rollback'))
+            if response.status_code == 204:
+                self.logger.info(f'Rolled back transaction {self}')
+                self.keep_alive.stop()
+                self.active = False
+            else:
+                self.logger.error(f'Failed to roll back transaction {self}')
+                raise RESTAPIException(response)
 
 # based on https://stackoverflow.com/a/12435256/5124907
 class TransactionKeepAlive(threading.Thread):
-    def __init__(self, repository, interval):
+    def __init__(self, transaction, interval):
         super().__init__(name='TransactionKeepAlive')
-        self.repository = repository
+        self.transaction = transaction
         self.interval = interval
         self.stopped = threading.Event()
 
     def run(self):
         while not self.stopped.wait(self.interval):
-            self.repository.maintain_transaction()
+            self.transaction.maintain()
 
     def stop(self):
         self.stopped.set()

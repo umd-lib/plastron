@@ -1,7 +1,8 @@
+import logging
 import yaml
 from plastron import pcdm
 from plastron.exceptions import RESTAPIException, FailureException
-import logging
+from plastron.http import Transaction
 
 logger = logging.getLogger(__name__)
 
@@ -22,22 +23,17 @@ class Command:
         parser_mkcol.set_defaults(cmd_name='mkcol')
 
     def __call__(self, fcrepo, args):
-        # open transaction
-        logger.info('Opening transaction')
-        fcrepo.open_transaction()
+        with Transaction(fcrepo) as txn:
+            try:
+                collection = pcdm.Collection()
+                collection.title = args.name
+                collection.create_object(fcrepo)
+                collection.update_object(fcrepo)
+                txn.commit()
 
-        try:
-            collection = pcdm.Collection()
-            collection.title = args.name
-            collection.create_object(fcrepo)
-            collection.update_object(fcrepo)
-            # commit transaction
-            logger.info('Committing transaction')
-            fcrepo.commit_transaction()
-
-        except RESTAPIException as e:
-            logger.error("Error in collection creation: {0}".format(e))
-            raise FailureException()
+            except RESTAPIException as e:
+                logger.error(f'Error in collection creation: {e}')
+                raise FailureException()
 
         if args.batch is not None:
             with open(args.batch, 'r') as batchconfig:

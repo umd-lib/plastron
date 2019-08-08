@@ -133,8 +133,14 @@ class Repository:
     def get_transaction_endpoint(self):
         return os.path.join(self.endpoint, 'fcr:tx')
 
+    def in_transaction(self):
+        if self.transaction is None:
+            return False
+        else:
+            return self.transaction.active
+
     def _insert_transaction_uri(self, uri):
-        if self.transaction is None or uri.startswith(self.transaction.uri):
+        if not self.in_transaction() or uri.startswith(self.transaction.uri):
             return uri
         elif uri.startswith(self.endpoint):
             relpath = uri[len(self.endpoint):]
@@ -143,7 +149,7 @@ class Repository:
             return uri
 
     def _remove_transaction_uri(self, uri):
-        if self.transaction is not None and uri.startswith(self.transaction.uri):
+        if self.in_transaction() and uri.startswith(self.transaction.uri):
             relpath = uri[len(self.transaction.uri):]
             return '/'.join([p.strip('/') for p in (self.endpoint, relpath)])
         else:

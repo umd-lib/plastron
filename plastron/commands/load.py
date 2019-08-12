@@ -145,8 +145,6 @@ class Command:
                     continue
 
                 logger.info(f"Processing item {n + 1}/{batch.length}...")
-                if args.verbose:
-                    item.print_item_tree()
 
                 try:
                     logger.info(f"Loading item {n+1}")

@@ -75,3 +75,7 @@ data/*
 !config/templates/*
 !config/logging.yml
 
+# certificates
+*.key
+*.pem
+

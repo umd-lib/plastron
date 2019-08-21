@@ -78,6 +78,7 @@ setup(
             'rdflib',
             'requests',
             'setuptools',
+            'stomp.py'
             ],
     python_requires='>=3.6',
 
@@ -113,6 +114,7 @@ setup(
     entry_points={
         'console_scripts': [
             'plastron=plastron.cli:main',
+            'plastrond=plastron.daemon:main'
         ],
     },
 

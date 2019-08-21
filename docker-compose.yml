@@ -1,0 +1,15 @@
+version: "3.7"
+services:
+  plastrond:
+    image: plastrond
+    secrets:
+      - batchloader.pem
+      - batchloader.key
+      - repository.pem
+secrets:
+  batchloader.pem:
+    external: true
+  batchloader.key:
+    external: true
+  repository.pem:
+    external: true

@@ -1,4 +1,4 @@
-FROM python:3.6.2
+FROM python:3.6.2-slim
 
 RUN mkdir -p /opt/plastron
 COPY . /opt/plastron

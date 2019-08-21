@@ -1,0 +1,10 @@
+.dockerignore
+.DS_Store
+.git*
+.idea
+*.egg-info
+*.key
+*.pem
+
+dist/
+logs/

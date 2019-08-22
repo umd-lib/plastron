@@ -7,6 +7,7 @@ from stomp import ConnectionListener, Connection
 from threading import Thread
 from plastron import version
 from plastron.http import Repository
+from plastron.commands import export
 
 class Exporter:
     def __init__(self, broker, completed_queue, repository):
@@ -16,10 +17,9 @@ class Exporter:
 
     def __call__(self, job_id=None, uris=None):
         if job_id is not None and uris is not None:
-            for uri in uris:
-                print(f'GET {uri}')
-                r = self.repository.head(uri)
-                print(f'--> {r.status_code}')
+            command = export.Command()
+            args = argparse.Namespace(name=job_id, uris=uris)
+            command(self.repository, args)
 
             # TODO: determine conditions for success or failure of the job
             self.broker.send(f'/queue/{self.completed_queue}', '', headers={

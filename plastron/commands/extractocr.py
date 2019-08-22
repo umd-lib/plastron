@@ -9,16 +9,20 @@ from plastron.http import Transaction
 logger = logging.getLogger(__name__)
 now = datetime.utcnow().strftime('%Y%m%d%H%M%S')
 
-class Command:
-    def __init__(self, subparsers):
-        parser_extractocr = subparsers.add_parser('extractocr',
-                description='Create annotations from OCR data stored in the repository')
-        parser_extractocr.add_argument('--ignore', '-i',
-                            help='file listing items to ignore',
-                            action='store'
-                            )
-        parser_extractocr.set_defaults(cmd_name='extractocr')
+def configure_cli(subparsers):
+    parser = subparsers.add_parser(
+        name='extractocr',
+        description='Create annotations from OCR data stored in the repository'
+    )
+    parser.add_argument(
+        '--ignore', '-i',
+        help='file listing items to ignore',
+        action='store'
+    )
+    parser.set_defaults(cmd_name='extractocr')
 
+
+class Command:
     def __call__(self, fcrepo, args):
         fieldnames = ['uri', 'timestamp']
 

@@ -22,38 +22,44 @@ def main():
     """Parse args and handle options."""
 
     parser = argparse.ArgumentParser(
-            prog='plastron',
-            description='Batch operation tool for Fedora 4.'
-            )
+        prog='plastron',
+        description='Batch operation tool for Fedora 4.'
+    )
     parser.set_defaults(cmd_name=None)
 
     common_required = parser.add_mutually_exclusive_group(required=True)
-    common_required.add_argument('-r', '--repo',
-            help='Path to repository configuration file.',
-            action='store'
-            )
-    common_required.add_argument('-V', '--version',
-            help='Print version and exit.',
-            action='store_true'
-            )
+    common_required.add_argument(
+        '-r', '--repo',
+        help='Path to repository configuration file.',
+        action='store'
+    )
+    common_required.add_argument(
+        '-V', '--version',
+        help='Print version and exit.',
+        action='version',
+        version=version
+    )
 
-    parser.add_argument('-v', '--verbose',
-            help='increase the verbosity of the status output',
-            action='store_true'
-            )
-    parser.add_argument('-q', '--quiet',
-            help='decrease the verbosity of the status output',
-            action='store_true'
-            )
+    parser.add_argument(
+        '-v', '--verbose',
+        help='increase the verbosity of the status output',
+        action='store_true'
+    )
+    parser.add_argument(
+        '-q', '--quiet',
+        help='decrease the verbosity of the status output',
+        action='store_true'
+    )
 
     subparsers = parser.add_subparsers(title='commands')
 
     # load all defined subcommands from the plastron.commands package
-    command_for = {
-        name: import_module(commands.__name__ + '.' + name).Command(subparsers)
-        for finder, name, ispkg
-        in iter_modules(commands.__path__)
-    }
+    command_modules = {}
+    for finder, name, ispkg in iter_modules(commands.__path__):
+        module = import_module(commands.__name__ + '.' + name)
+        if hasattr(module, 'configure_cli'):
+            module.configure_cli(subparsers)
+            command_modules[name] = module
 
     # parse command line args
     args = parser.parse_args()
@@ -102,7 +108,7 @@ def main():
     logger.info('Loaded repo configuration from {0}'.format(args.repo))
 
     # get the selected subcommand
-    command = command_for[args.cmd_name]
+    command = command_modules[args.cmd_name].Command()
 
     try:
         # dispatch to the selected subcommand

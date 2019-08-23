@@ -1,22 +1,32 @@
 #!/usr/bin/env python3
 import argparse
+import logging
+import logging.config
 import signal
+import os
 import sys
 import yaml
+from datetime import datetime
 from stomp import ConnectionListener, Connection
 from threading import Thread
 from plastron import version
 from plastron.http import Repository
 from plastron.commands import export
+from plastron.logging import DEFAULT_LOGGING_OPTIONS
+
+logger = logging.getLogger(__name__)
+now = datetime.utcnow().strftime('%Y%m%d%H%M%S')
 
 class Exporter:
     def __init__(self, broker, completed_queue, repository):
         self.broker = broker
         self.completed_queue = completed_queue
         self.repository = repository
+        logger.info(f"Completed export job notifications will go to: {completed_queue}")
 
     def __call__(self, job_id=None, uris=None):
         if job_id is not None and uris is not None:
+            logger.debug(f'Starting exporter thread for job id {job_id}')
             command = export.Command()
             args = argparse.Namespace(name=job_id, uris=uris)
             command(self.repository, args)
@@ -27,18 +37,24 @@ class Exporter:
                 'ArchelonExportJobStatus': 'Ready',
                 'persistent': 'true'
             })
+            logger.debug(f'Completed exporter thread for job id {job_id}')
+            logger.info(f'Export job {job_id} complete')
 
 class Listener(ConnectionListener):
     def __init__(self, broker, completed_queue, repository):
         self.exporter = Exporter(broker, completed_queue, repository)
 
     def on_message(self, headers, body):
-        print(headers)
+        logger.debug(headers)
+        job_id = headers['ArchelonExportJobId']
+        uris = body.split('\n')
+        logger.info(f'Received message to initiate export job with id {job_id} containing {len(uris)} items')
         kwargs = {
-            'job_id': headers['ArchelonExportJobId'],
-            'uris': body.split('\n'),
+            'job_id': job_id,
+            'uris': uris
         }
         # spawn a new thread to handle this message
+        logger.debug(f'Creating exporter thread for job id {job_id}')
         Thread(target=self.exporter, kwargs=kwargs).start()
 
 def main():
@@ -58,15 +74,36 @@ def main():
     with open(args.config, 'r') as config_file:
         config = yaml.safe_load(config_file)
 
-    repo = Repository(config['REPOSITORY'], ua_string=f'plastron/{version}')
+    repo_config = config['REPOSITORY']
     broker_config = config['MESSAGE_BROKER']
+
+    logging_options = DEFAULT_LOGGING_OPTIONS
+
+    # log file configuration
+    log_dirname = repo_config.get('LOG_DIR')
+    if not os.path.isdir(log_dirname):
+        os.makedirs(log_dirname)
+    log_filename = f'plastron.daemon.{now}.log'
+    logfile = os.path.join(log_dirname, log_filename)
+    logging_options['handlers']['file']['filename'] = logfile
+
+    # configure logging
+    logging.config.dictConfig(logging_options)
+
+    logger.info(f'plastrond {version}')
+
+    repo = Repository(repo_config, ua_string=f'plastron/{version}')
 
     message_broker = tuple(broker_config['SERVER'].split(':', 2))
     conn = Connection([message_broker])
     conn.set_listener('', Listener(conn, broker_config['EXPORT_JOBS_COMPLETED_QUEUE'], repo))
     conn.start()
+
     conn.connect()
+    logger.info(f"Connected to STOMP message broker: {broker_config['SERVER']}")
+
     conn.subscribe(destination=f"/queue/{broker_config['EXPORT_JOBS_QUEUE']}", id='plastron')
+    logger.info(f"Subscribed to {broker_config['EXPORT_JOBS_QUEUE']} queue")
 
     try:
         while True:

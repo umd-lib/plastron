@@ -69,8 +69,8 @@ def main():
     )
     parser.add_argument(
         '-c', '--config',
-        help = 'Path to configuration file.',
-        action = 'store'
+        help='Path to configuration file.',
+        action='store'
     )
 
     # parse command line args

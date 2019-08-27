@@ -13,51 +13,63 @@ from plastron.util import print_header, print_footer, ItemLog
 logger = logging.getLogger(__name__)
 now = datetime.utcnow().strftime('%Y%m%d%H%M%S')
 
+def configure_cli(subparsers):
+    parser = subparsers.add_parser(
+        name='load',
+        description='Load a batch into the repository'
+    )
+    required = parser.add_argument_group('required arguments')
+    required.add_argument(
+        '-b', '--batch',
+        help='path to batch configuration file',
+        action='store',
+        required=True
+    )
+    parser.add_argument(
+        '-d', '--dryrun',
+        help='iterate over the batch without POSTing',
+        action='store_true'
+    )
+    # useful for testing when file loading is too slow
+    parser.add_argument(
+        '-n', '--nobinaries',
+        help='iterate without uploading binaries',
+        action='store_true'
+    )
+    parser.add_argument(
+        '-l', '--limit',
+        help='limit the load to a specified number of top-level objects',
+        action='store',
+        type=int,
+        default=None
+    )
+    # load an evenly-spaced percentage of the total batch
+    parser.add_argument(
+        '-%', '--percent',
+        help='load specified percentage of total items',
+        action='store',
+        type=percentage,
+        default=None
+    )
+    parser.add_argument(
+        '--noannotations',
+        help='iterate without loading annotations (e.g. OCR)',
+        action='store_true'
+    )
+    parser.add_argument(
+        '--ignore', '-i',
+        help='file listing items to ignore',
+        action='store'
+    )
+    parser.add_argument(
+        '--wait', '-w',
+        help='wait n seconds between items',
+        action='store'
+    )
+    parser.set_defaults(cmd_name='load')
+
+
 class Command:
-    def __init__(self, subparsers):
-        parser_load = subparsers.add_parser('load',
-                description='Load a batch into the repository')
-        required = parser_load.add_argument_group('required arguments')
-        required.add_argument('-b', '--batch',
-                            help='path to batch configuration file',
-                            action='store',
-                            required=True
-                            )
-        parser_load.add_argument('-d', '--dryrun',
-                            help='iterate over the batch without POSTing',
-                            action='store_true'
-                            )
-        # useful for testing when file loading is too slow
-        parser_load.add_argument('-n', '--nobinaries',
-                            help='iterate without uploading binaries',
-                            action='store_true'
-                            )
-        parser_load.add_argument('-l', '--limit',
-                            help='limit the load to a specified number of top-level objects',
-                            action='store',
-                            type=int,
-                            default=None
-                            )
-        # load an evenly-spaced percentage of the total batch
-        parser_load.add_argument('-%', '--percent',
-                            help='load specified percentage of total items',
-                            action='store',
-                            type=percentage,
-                            default=None
-                            )
-        parser_load.add_argument('--noannotations',
-                            help='iterate without loading annotations (e.g. OCR)',
-                            action='store_true'
-                            )
-        parser_load.add_argument('--ignore', '-i',
-                            help='file listing items to ignore',
-                            action='store'
-                            )
-        parser_load.add_argument('--wait', '-w',
-                            help='wait n seconds between items',
-                            action='store'
-                            )
-        parser_load.set_defaults(cmd_name='load')
 
     def __call__(self, fcrepo, args):
         if not args.quiet:

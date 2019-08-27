@@ -3,24 +3,31 @@ from plastron.util import get_title_string, parse_predicate_list
 
 logger = logging.getLogger(__name__)
 
-class Command:
-    def __init__(self, subparsers):
-        parser_list = subparsers.add_parser('list', aliases=['ls'],
-                description='List objects in the repository')
-        # long mode to print more than just the URIs (name modeled after ls -l)
-        parser_list.add_argument('-l', '--long',
-                            help='Display additional information besides the URI',
-                            action='store_true'
-                            )
-        parser_list.add_argument('-R', '--recursive',
-                            help='List additional objects found by traversing the given predicate(s)',
-                            action='store'
-                            )
-        parser_list.add_argument('uris', nargs='*',
-                            help='URIs of repository objects to list'
-                            )
-        parser_list.set_defaults(cmd_name='list')
+def configure_cli(subparsers):
+    parser = subparsers.add_parser(
+        name='list',
+        aliases=['ls'],
+        description='List objects in the repository'
+    )
+    # long mode to print more than just the URIs (name modeled after ls -l)
+    parser.add_argument(
+        '-l', '--long',
+        help='Display additional information besides the URI',
+        action='store_true'
+    )
+    parser.add_argument(
+        '-R', '--recursive',
+        help='List additional objects found by traversing the given predicate(s)',
+        action='store'
+    )
+    parser.add_argument(
+        'uris', nargs='*',
+        help='URIs of repository objects to list'
+    )
+    parser.set_defaults(cmd_name='list')
 
+
+class Command:
     def __call__(self, fcrepo, args):
         if args.recursive is not None:
             args.predicates = parse_predicate_list(args.recursive)

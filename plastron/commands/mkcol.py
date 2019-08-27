@@ -6,22 +6,27 @@ from plastron.http import Transaction
 
 logger = logging.getLogger(__name__)
 
-class Command:
-    def __init__(self, subparsers):
-        parser_mkcol = subparsers.add_parser('mkcol',
-                description='Create a PCDM Collection in the repository')
-        parser_mkcol.add_argument('-n', '--name',
-                            help='Name of the collection.',
-                            action='store',
-                            required=True
-                            )
-        # if given, will write the collection URI to it
-        parser_mkcol.add_argument('-b', '--batch',
-                            help='Path to batch configuration file.',
-                            action='store'
-                            )
-        parser_mkcol.set_defaults(cmd_name='mkcol')
+def configure_cli(subparsers):
+    parser = subparsers.add_parser(
+        name='mkcol',
+        description='Create a PCDM Collection in the repository'
+    )
+    parser.add_argument(
+        '-n', '--name',
+        help='Name of the collection.',
+        action='store',
+        required=True
+    )
+    # if given, will write the collection URI to it
+    parser.add_argument(
+        '-b', '--batch',
+        help='Path to batch configuration file.',
+        action='store'
+    )
+    parser.set_defaults(cmd_name='mkcol')
 
+
+class Command:
     def __call__(self, fcrepo, args):
         with Transaction(fcrepo) as txn:
             try:

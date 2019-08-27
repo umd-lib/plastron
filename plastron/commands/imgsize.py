@@ -6,15 +6,20 @@ Image.MAX_IMAGE_PIXELS = None
 
 logger = logging.getLogger(__name__)
 
-class Command:
-    def __init__(self, subparsers):
-        parser = subparsers.add_parser('imgsize',
-                description='Add width and height to image resources')
-        parser.add_argument('uris', nargs='*',
-                            help='URIs of repository objects to get image info'
-                            )
-        parser.set_defaults(cmd_name='imgsize')
+def configure_cli(subparsers):
+    parser = subparsers.add_parser(
+        name='imgsize',
+        description='Add width and height to image resources'
+    )
+    parser.add_argument(
+        'uris',
+        nargs='*',
+        help='URIs of repository objects to get image info'
+    )
+    parser.set_defaults(cmd_name='imgsize')
 
+
+class Command:
     def __call__(self, fcrepo, args):
         for uri in args.uris:
             source = RepositoryFile(fcrepo, uri)

@@ -5,27 +5,34 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-class Command:
-    def __init__(self, subparsers):
-        parser_delete = subparsers.add_parser('delete', aliases=['del', 'rm'],
-                description='Delete objects from the repository')
-        parser_delete.add_argument('-R', '--recursive',
-                            help='Delete additional objects found by traversing the given predicate(s)',
-                            action='store'
-                            )
-        parser_delete.add_argument('-d', '--dryrun',
-                            help='Simulate a delete without modifying the repository',
-                            action='store_true'
-                            )
-        parser_delete.add_argument('-f', '--file',
-                            help='File containing a list of URIs to delete',
-                            action='store'
-                            )
-        parser_delete.add_argument('uris', nargs='*',
-                            help='Repository URIs to be deleted.'
-                            )
-        parser_delete.set_defaults(cmd_name='delete')
+def configure_cli(subparsers):
+    parser = subparsers.add_parser(
+        name='delete',
+        aliases=['del', 'rm'],
+        description='Delete objects from the repository')
+    parser.add_argument(
+        '-R', '--recursive',
+        help='Delete additional objects found by traversing the given predicate(s)',
+        action='store'
+    )
+    parser.add_argument(
+        '-d', '--dryrun',
+        help='Simulate a delete without modifying the repository',
+        action='store_true'
+    )
+    parser.add_argument(
+        '-f', '--file',
+        help='File containing a list of URIs to delete',
+        action='store'
+    )
+    parser.add_argument(
+        'uris', nargs='*',
+        help='Repository URIs to be deleted.'
+    )
+    parser.set_defaults(cmd_name='delete')
 
+
+class Command:
     def __call__(self, fcrepo, args):
         if not args.quiet:
             print_header()

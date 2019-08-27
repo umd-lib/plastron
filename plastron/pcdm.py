@@ -8,9 +8,10 @@ from PIL import Image
 # alias the rdflib Namespace
 ns = pcdm
 
-#============================================================================
+
+# ============================================================================
 # PCDM RESOURCE (COMMON METHODS FOR ALL OBJECTS)
-#============================================================================
+# ============================================================================
 
 @rdf.object_property('components', pcdm.hasMember, multivalue=True)
 @rdf.object_property('collections', pcdm.memberOf, multivalue=True)
@@ -21,18 +22,20 @@ ns = pcdm
 @rdf.data_property('title', dcterms.title)
 class Resource(ldp.Resource):
     def ordered_components(self):
-        orig_list = [ obj for obj in self.components if obj.ordered ]
+        orig_list = [obj for obj in self.components if obj.ordered]
         if not orig_list:
             return []
         else:
             sort_key = self.sequence_attr[1]
+
             def get_key(item):
                 return int(getattr(item, sort_key))
+
             sorted_list = sorted(orig_list, key=get_key)
             return sorted_list
 
     def unordered_components(self):
-        return [ obj for obj in self.components if not obj.ordered ]
+        return [obj for obj in self.components if not obj.ordered]
 
     def add_component(self, obj):
         self.components.append(obj)
@@ -75,9 +78,9 @@ class Resource(ldp.Resource):
                 print(indent + '    ' + str(f))
 
 
-#============================================================================
+# ============================================================================
 # PCDM ITEM-OBJECT
-#============================================================================
+# ============================================================================
 
 @rdf.object_property('first', iana.first)
 @rdf.object_property('last', iana.last)
@@ -90,12 +93,12 @@ class Item(Resource):
         ordered_components = self.ordered_components()
         for component in ordered_components:
             position = " ".join([self.sequence_attr[0],
-                getattr(component, self.sequence_attr[1])])
+                                 getattr(component, self.sequence_attr[1])])
             proxy = ore.Proxy(
-                    title=f'Proxy for {position} in {self}',
-                    proxy_for=component,
-                    proxy_in=self
-                    )
+                title=f'Proxy for {position} in {self}',
+                proxy_for=component,
+                proxy_in=self
+            )
             proxies.append(proxy)
 
         for proxy in proxies:
@@ -125,9 +128,10 @@ class Item(Resource):
         for annotation in self.annotations:
             annotation.recursive_update(repository)
 
-#============================================================================
+
+# ============================================================================
 # PCDM COMPONENT-OBJECT
-#============================================================================
+# ============================================================================
 
 @rdf.rdf_class(pcdm.Object)
 class Component(Resource):
@@ -135,9 +139,10 @@ class Component(Resource):
         super().__init__(**kwargs)
         self.ordered = False
 
-#============================================================================
+
+# ============================================================================
 # PCDM FILE
-#============================================================================
+# ============================================================================
 
 @rdf.data_property('mimetype', ebucore.hasMimeType)
 @rdf.data_property('filename', ebucore.filename)
@@ -171,7 +176,7 @@ class File(Resource):
                 'Content-Type': self.source.mimetype(),
                 'Digest': self.source.digest(),
                 'Content-Disposition': f'attachment; filename="{self.source.filename}"'
-                }
+            }
             if uri is not None:
                 response = repository.put(uri, data=stream, headers=headers)
             else:
@@ -208,25 +213,30 @@ class File(Resource):
 
         return super().update_object(repository, patch_uri=target)
 
+
 @rdf.rdf_class(pcdmuse.PreservationMasterFile)
 class PreservationMasterFile(File):
     pass
+
 
 @rdf.rdf_class(pcdmuse.IntermediateFile)
 class IntermediateFile(File):
     pass
 
+
 @rdf.rdf_class(pcdmuse.ServiceFile)
 class ServiceFile(File):
     pass
+
 
 @rdf.rdf_class(pcdmuse.ExtractedText)
 class ExtractedText(File):
     pass
 
-#============================================================================
+
+# ============================================================================
 # PCDM COLLECTION OBJECT
-#============================================================================
+# ============================================================================
 
 @rdf.data_property('title', dcterms.title)
 @rdf.rdf_class(pcdm.Collection)
@@ -250,20 +260,24 @@ class Collection(Resource):
 
         return collection
 
+
 @rdf.data_property('number', fabio.hasSequenceIdentifier)
 @rdf.rdf_class(fabio.Page)
 class Page(Resource):
     """One page of an item-level resource"""
+
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.ordered = True
 
+
 FILE_CLASS_FOR = {
-        '.tif': PreservationMasterFile,
-        '.jpg': IntermediateFile,
-        '.txt': ExtractedText,
-        '.xml': ExtractedText,
-        }
+    '.tif': PreservationMasterFile,
+    '.jpg': IntermediateFile,
+    '.txt': ExtractedText,
+    '.xml': ExtractedText,
+}
+
 
 def get_file_object(path):
     extension = path[path.rfind('.'):]

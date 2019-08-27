@@ -12,11 +12,12 @@ from collections import OrderedDict
 nsm = namespaces.get_manager()
 
 FILE_CLASS_FOR = {
-        '.tif': pcdm.PreservationMasterFile,
-        '.jpg': pcdm.IntermediateFile,
-        '.txt': pcdm.ExtractedText,
-        '.xml': pcdm.ExtractedText,
-        }
+    '.tif': pcdm.PreservationMasterFile,
+    '.jpg': pcdm.IntermediateFile,
+    '.txt': pcdm.ExtractedText,
+    '.xml': pcdm.ExtractedText,
+}
+
 
 def get_file_object(path, source=None):
     extension = path[path.rfind('.'):]
@@ -29,8 +30,10 @@ def get_file_object(path, source=None):
     f = cls(source)
     return f
 
+
 class Batch:
     """Class representing the mapped and parsed CSV data"""
+
     def __init__(self, repo, config):
         self.logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
 
@@ -48,8 +51,8 @@ class Batch:
             missing_fields.append('METADATA_MAP')
 
         if missing_fields:
-            raise ConfigException('Missing required HANDLER_OPTIONS in batch configuration: '
-                    + ', '.join(missing_fields))
+            field_names = ', '.join(missing_fields)
+            raise ConfigException(f'Missing required HANDLER_OPTIONS in batch configuration: {field_names}')
 
         if 'RDF_TYPE' in config.handler_options:
             self.item_rdf_type = URIRef(from_n3(config.handler_options['RDF_TYPE'], nsm=nsm))
@@ -93,7 +96,6 @@ class Batch:
         else:
             return value
 
-
     def get_items(self, lines, mapping):
         cls = create_class_from_mapping(mapping, self.item_rdf_type)
 
@@ -109,7 +111,7 @@ class Batch:
             for key in keys:
                 # add an item for each unique key
                 sub_lines = [line for line in lines if line[key_column] == key]
-                attrs = { column: self.get_column_value(sub_lines[0], column) for column in mapping.keys() }
+                attrs = {column: self.get_column_value(sub_lines[0], column) for column in mapping.keys()}
                 item = cls(**attrs)
                 item.path = key
                 item.ordered = False
@@ -141,7 +143,7 @@ class Batch:
                     if filename_conf.get('multivalued', False):
                         filenames = filenames.split(filename_conf['separator'])
                     else:
-                        filenames = [ filenames ]
+                        filenames = [filenames]
 
                     for filename in filenames:
                         if 'host' in filename_conf:
@@ -197,7 +199,7 @@ class Batch:
             # each line is its own (implicit) subject
             # for an Item resource
             for line in lines:
-                attrs = { column: self.get_column_value(line, column) for column in mapping.keys() }
+                attrs = {column: self.get_column_value(line, column) for column in mapping.keys()}
                 item = cls(**attrs)
                 yield item
 
@@ -206,6 +208,7 @@ class Batch:
             item.add_collection(self.collection)
             yield BatchItem(item)
 
+
 class BatchItem:
     def __init__(self, item):
         self.item = item
@@ -213,6 +216,7 @@ class BatchItem:
 
     def read_data(self):
         return self.item
+
 
 # dynamically-generated class based on column names and predicates that are
 # present in the mapping
@@ -236,6 +240,7 @@ def create_class_from_mapping(mapping, rdf_type=None):
         add_type(cls)
 
     return cls
+
 
 def set_value(item, column, conf, line):
     if 'predicate' in conf:
@@ -264,8 +269,9 @@ def set_value(item, column, conf, line):
                 o = Literal(value)
         item.unmapped_triples.append((item.uri, pred_uri, o))
 
+
 def get_flagged_column(mapping, flag):
-    cols = [ col for col in mapping if flag in mapping[col] and mapping[col][flag] ]
+    cols = [col for col in mapping if flag in mapping[col] and mapping[col][flag]]
     if len(cols) > 1:
         raise ConfigException(f"Only one {flag} column per mapping level is allowed")
     elif len(cols) == 1:

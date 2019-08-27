@@ -10,20 +10,21 @@ from plastron.exceptions import ConfigException, DataReadException
 from plastron.namespaces import dcterms
 from plastron.pcdm import Page, get_file_object
 
-#============================================================================
+
+# ============================================================================
 # BATCH CLASS (FOR PAGED BINARIES PLUS RDF METADATA)
-#============================================================================
+# ============================================================================
 
 class Batch:
     def __init__(self, repo, config):
         self.logger = logging.getLogger(
             __name__ + '.' + self.__class__.__name__
-            )
+        )
 
         self.collection = pcdm.Collection.from_repository(repo, config.collection_uri)
 
         # Create data structures to accumulate process results
-        self.incomplete  = []
+        self.incomplete = []
         self.extra_files = []
 
         # Check for required metadata file
@@ -51,7 +52,7 @@ class Batch:
                         self.all_files[f].append(os.path.join(root, f))
 
             self.logger.info("Found {0} files with {1} unique filenames"
-                    .format(file_count, len(self.all_files)))
+                             .format(file_count, len(self.all_files)))
 
             # save index to file
             with open(file_index, 'w') as index:
@@ -59,19 +60,19 @@ class Batch:
 
         with open(config.batch_file, 'r') as f:
             self.logger.info(
-                    'Parsing the master metadata graph in {0}'.format(config.batch_file))
+                'Parsing the master metadata graph in {0}'.format(config.batch_file))
             self.master_graph = Graph().parse(f, format="turtle")
 
         # get subject URIs that are http: or https: URIs
-        self.subjects = sorted(set([ uri for uri in self.master_graph.subjects() if
-            str(uri).startswith('http:') or str(uri).startswith('https:') ]))
+        self.subjects = sorted(set([uri for uri in self.master_graph.subjects() if
+                                    str(uri).startswith('http:') or str(uri).startswith('https:')]))
 
         # get the master list of authority objects
         # keyed by the urn:uuid:... URI from the master graph
-        authority_subjects = set([ uri for uri in self.master_graph.subjects()
-                if str(uri).startswith('urn:uuid:')])
-        self.authorities = { str(s): create_authority(self.master_graph, s)
-                for s in authority_subjects }
+        authority_subjects = set([uri for uri in self.master_graph.subjects()
+                                  if str(uri).startswith('urn:uuid:')])
+        self.authorities = {str(s): create_authority(self.master_graph, s)
+                            for s in authority_subjects}
 
         self.length = len(self.subjects)
         self.count = 0
@@ -88,6 +89,7 @@ class Batch:
         else:
             self.logger.info('Processing complete!')
             raise StopIteration()
+
 
 class BatchItem:
     def __init__(self, batch, subject):
@@ -118,7 +120,7 @@ class BatchItem:
         # authority objects
         for prop in item.object_properties():
             if prop.is_embedded:
-                prop.value = [ self.batch.authorities[str(v)] for v in prop.value ]
+                prop.value = [self.batch.authorities[str(v)] for v in prop.value]
 
         item.add_collection(self.batch.collection)
 
@@ -126,10 +128,10 @@ class BatchItem:
         parts = {}
 
         # Parse each filename in hasPart and allocate to correct location in item entry
-        for (s, p, o) in [ (s, p, o) for (s, p, o) in item.unmapped_triples if p == dcterms.hasPart ]:
+        for (s, p, o) in [(s, p, o) for (s, p, o) in item.unmapped_triples if p == dcterms.hasPart]:
             filename = str(o)
             # ensure exactly one path that is mapped from the basename
-            if not filename in self.batch.all_files:
+            if filename not in self.batch.all_files:
                 raise DataReadException('File {0} not found'.format(filename))
             elif len(self.batch.all_files[filename]) > 1:
                 raise DataReadException('Filename {0} is not unique'.format(filename))
@@ -147,15 +149,15 @@ class BatchItem:
             elif len(base_parts) == 3:
                 page_no = str(int(base_parts[2]))
                 if page_no not in parts:
-                    parts[page_no] = [ file_path ]
+                    parts[page_no] = [file_path]
                 else:
                     parts[page_no].append(file_path)
             else:
                 item.logger.warning(
-                        'Filename {0} does not match a known pattern'.format(filename))
+                    'Filename {0} does not match a known pattern'.format(filename))
 
         # remove the dcterms:hasPart triples
-        item.unmapped_triples = [ (s, p, o) for (s, p, o) in item.unmapped_triples if p != dcterms.hasPart ]
+        item.unmapped_triples = [(s, p, o) for (s, p, o) in item.unmapped_triples if p != dcterms.hasPart]
 
         for path in files:
             item.add_file(get_file_object(path))

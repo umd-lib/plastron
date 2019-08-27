@@ -17,6 +17,7 @@ from plastron.logging import DEFAULT_LOGGING_OPTIONS
 logger = logging.getLogger(__name__)
 now = datetime.utcnow().strftime('%Y%m%d%H%M%S')
 
+
 class Exporter:
     def __init__(self, broker, completed_queue, repository):
         self.broker = broker
@@ -46,6 +47,7 @@ class Exporter:
             logger.debug(f'Completed exporter thread for job id {job_id}')
             logger.info(f'Export job {job_id} complete')
 
+
 class Listener(ConnectionListener):
     def __init__(self, destination_map):
         self.destination_map = destination_map
@@ -57,7 +59,8 @@ class Listener(ConnectionListener):
             handler = self.destination_map[destination]
             # spawn a new thread to handle this message
             logger.debug(f'Creating thread to handle message on {destination}')
-            Thread(target=handler, kwargs={ 'headers': headers, 'body': body }).start()
+            Thread(target=handler, kwargs={'headers': headers, 'body': body}).start()
+
 
 def main():
     parser = argparse.ArgumentParser(
@@ -119,6 +122,7 @@ def main():
             signal.pause()
     except KeyboardInterrupt:
         sys.exit()
+
 
 if __name__ == "__main__":
     main()

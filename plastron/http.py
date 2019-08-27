@@ -5,21 +5,22 @@ import threading
 from rdflib import Graph, URIRef
 from plastron.exceptions import RESTAPIException
 
+
 class Repository:
     def __init__(self, config, ua_string=None):
         self.endpoint = config['REST_ENDPOINT']
         self.relpath = config['RELPATH']
-        self._path_stack = [ self.relpath ]
+        self._path_stack = [self.relpath]
         self.fullpath = '/'.join(
             [p.strip('/') for p in (self.endpoint, self.relpath)]
-            )
+        )
         self.session = requests.Session()
         self.transaction = None
         self.load_binaries = True
         self.log_dir = config['LOG_DIR']
         self.logger = logging.getLogger(
             __name__ + '.' + self.__class__.__name__
-            )
+        )
         self.ua_string = ua_string
 
         if 'CLIENT_CERT' in config and 'CLIENT_KEY' in config:
@@ -40,7 +41,6 @@ class Repository:
 
     def __exit__(self, type, value, traceback):
         self.relpath = self._path_stack.pop()
-
 
     def is_reachable(self):
         response = self.head(self.fullpath)
@@ -117,8 +117,7 @@ class Repository:
             yield (self._remove_transaction_uri(url), graph)
             for (s, p, o) in graph:
                 if p in traverse:
-                    for (uri, graph) in self.recursive_get(
-                        str(o), traverse=traverse, **kwargs):
+                    for (uri, graph) in self.recursive_get(str(o), traverse=traverse, **kwargs):
                         yield (uri, graph)
 
     def get_graph(self, url):
@@ -157,6 +156,7 @@ class Repository:
 
     def uri(self):
         return '/'.join([p.strip('/') for p in (self.endpoint, self.relpath)])
+
 
 class Transaction:
     def __init__(self, repository, keep_alive=90):
@@ -225,6 +225,7 @@ class Transaction:
                 self.logger.error(f'Failed to roll back transaction {self}')
                 raise RESTAPIException(response)
 
+
 # based on https://stackoverflow.com/a/12435256/5124907
 class TransactionKeepAlive(threading.Thread):
     def __init__(self, transaction, interval):
@@ -239,4 +240,3 @@ class TransactionKeepAlive(threading.Thread):
 
     def stop(self):
         self.stopped.set()
-

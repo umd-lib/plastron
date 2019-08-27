@@ -7,11 +7,13 @@ from datetime import datetime as dt
 from plastron import rdf
 from plastron.exceptions import RESTAPIException
 
+
 class Resource(rdf.Resource):
     """Class representing a Linked Data Platform Resource (LDPR)
     A HTTP resource whose state is represented in any way that conforms to the
     simple lifecycle patterns and conventions in section 4. Linked Data Platform
     Resources."""
+
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.annotations = []
@@ -22,7 +24,7 @@ class Resource(rdf.Resource):
         self.creation_timestamp = None
         self.logger = logging.getLogger(
             __name__ + '.' + self.__class__.__name__
-            )
+        )
 
     def __str__(self):
         if hasattr(self, 'title') and self.title is not None:
@@ -46,7 +48,7 @@ class Resource(rdf.Resource):
             self.uuid = str(self.uri).rsplit('/', 1)[-1]
             self.logger.info(
                 'URI: {0} / UUID: {1}'.format(self.uri, self.uuid)
-                )
+            )
             self.create_fragments()
         except RESTAPIException as e:
             self.logger.error(f"Failed to create {self}")
@@ -64,7 +66,7 @@ class Resource(rdf.Resource):
         if not patch_uri:
             patch_uri = self.uri
         prolog = ''
-        #TODO: limit this to just the prefixes that are used in the graph
+        # TODO: limit this to just the prefixes that are used in the graph
         for (prefix, uri) in graph.namespace_manager.namespaces():
             prolog += "PREFIX {0}: {1}\n".format(prefix, uri.n3())
 
@@ -79,7 +81,7 @@ class Resource(rdf.Resource):
                 subject,
                 graph.namespace_manager.normalizeUri(p),
                 o.n3(graph.namespace_manager)
-                ))
+            ))
 
         query = prolog + "INSERT DATA {{{0}}}".format("\n".join(triples))
         data = query.encode('utf-8')
@@ -131,7 +133,7 @@ class Resource(rdf.Resource):
     def add_extra_properties(self, triples_file, rdf_format):
         self.extra.parse(
             source=triples_file, format=rdf_format, publicID=self.uri
-            )
+        )
 
     # show the object's graph, serialized as turtle
     def print_graph(self):
@@ -141,17 +143,20 @@ class Resource(rdf.Resource):
     def post_creation_hook(self):
         pass
 
+
 class RdfSource(Resource):
     """Class representing a Linked Data Platform RDF Source (LDP-RS)
     An LDPR whose state is fully represented in RDF, corresponding to an RDF
     graph. See also the term RDF Source from [rdf11-concepts]."""
     pass
 
+
 class NonRdfSource(Resource):
     """Class representing a Linked Data Platform Non-RDF Source (LDP-NR)
     An LDPR whose state is not represented in RDF. For example, these can be
     binary or text documents that do not have useful RDF representations."""
     pass
+
 
 class Container(RdfSource):
     """Class representing a Linked Data Platform Container (LDPC)
@@ -162,11 +167,13 @@ class Container(RdfSource):
     and conventions in section 5. Linked Data Platform Containers."""
     pass
 
+
 class BasicContainer(Container):
     """Class representing a Linked Data Platform Basic Container (LDP-BC)
     An LDPC that defines a simple link to its contained documents (information
     resources) [WEBARCH]."""
     pass
+
 
 class DirectContainer(Container):
     """Class representing a Linked Data Platform Direct Container (LDP-DC)
@@ -174,6 +181,7 @@ class DirectContainer(Container):
     choosing what form its membership triples take, and allows members to be any
     resources [WEBARCH], not only documents."""
     pass
+
 
 class IndirectContainer(Container):
     """Class representing a Linked Data Platform Indirect Container (LDP-IC)

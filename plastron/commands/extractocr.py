@@ -9,6 +9,7 @@ from plastron.http import Transaction
 logger = logging.getLogger(__name__)
 now = datetime.utcnow().strftime('%Y%m%d%H%M%S')
 
+
 def configure_cli(subparsers):
     parser = subparsers.add_parser(
         name='extractocr',
@@ -61,18 +62,19 @@ class Command:
                 except RESTAPIException:
                     logger.error(
                         "Unable to commit or rollback transaction, aborting"
-                        )
+                    )
                     raise FailureException()
 
                 row = {
                     'uri': uri,
                     'timestamp': str(datetime.utcnow())
-                    }
+                }
 
                 if is_extracted:
                     completed.writerow(row)
                 else:
                     skipped.writerow(row)
+
 
 def extract(fcrepo, uri):
     with Transaction(fcrepo) as txn:

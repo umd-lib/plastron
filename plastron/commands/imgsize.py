@@ -6,6 +6,7 @@ Image.MAX_IMAGE_PIXELS = None
 
 logger = logging.getLogger(__name__)
 
+
 def configure_cli(subparsers):
     parser = subparsers.add_parser(
         name='imgsize',

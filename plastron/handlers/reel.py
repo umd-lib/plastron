@@ -6,17 +6,18 @@ import os
 from plastron import pcdm
 from plastron.models.newspaper import Reel, Page
 
+
 class Batch:
     def __init__(self, repo, config):
         self.logger = logging.getLogger(
             __name__ + '.' + self.__class__.__name__
-            )
+        )
         self.repo = repo
         self.collection = pcdm.Collection.from_repository(repo, config.collection_uri)
 
         with os.scandir(config.batch_file) as files:
-            self.files = [ entry.path for entry in files if
-                    entry.name.endswith('.csv') ]
+            self.files = [entry.path for entry in files if
+                          entry.name.endswith('.csv')]
 
         self.length = len(self.files)
         self.num = 0
@@ -33,6 +34,7 @@ class Batch:
             self.logger.info('Processing complete!')
             raise StopIteration()
 
+
 class BatchItem:
     def __init__(self, batch, filename):
         self.batch = batch
@@ -40,7 +42,7 @@ class BatchItem:
 
     def read_data(self):
         id = os.path.splitext(os.path.basename(self.path))[0]
-        reel = Reel(id=id, title=f'Reel Number {id}', collections=[ self.batch.collection ])
+        reel = Reel(id=id, title=f'Reel Number {id}', collections=[self.batch.collection])
 
         with open(self.path, 'r') as f:
             reader = csv.DictReader(f)

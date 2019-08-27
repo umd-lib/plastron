@@ -64,11 +64,6 @@ def main():
     # parse command line args
     args = parser.parse_args()
 
-    # version check and exit
-    if args.version:
-        print(version)
-        sys.exit(0)
-
     # if no subcommand was selected, display the help
     if args.cmd_name is None:
         parser.print_help()

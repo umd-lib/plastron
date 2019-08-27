@@ -5,6 +5,7 @@ from plastron.exceptions import DataReadException
 from plastron.namespaces import bibo, carriers, dc, dcterms, ebucore, fabio, ndnp, pcdmuse, prov, sc
 from plastron.util import RepositoryFile
 
+
 @rdf.data_property('title', dcterms.title)
 @rdf.data_property('date', dc.date)
 @rdf.data_property('volume', bibo.volume)
@@ -15,31 +16,33 @@ class Issue(pcdm.Item):
     """Newspaper issue"""
     pass
 
+
 @rdf.object_property('derived_from', prov.wasDerivedFrom, embed=True)
 class TextblockOnPage(oa.Annotation):
     def __init__(self, textblock, page):
         super().__init__()
         self.add_body(
-                oa.TextualBody(
-                    value=textblock.text(scale=page.ocr.scale),
-                    content_type='text/plain'
-                    )
-                )
-        xywh = ','.join([ str(i) for i in textblock.xywh(page.ocr.scale) ])
+            oa.TextualBody(
+                value=textblock.text(scale=page.ocr.scale),
+                content_type='text/plain'
+            )
+        )
+        xywh = ','.join([str(i) for i in textblock.xywh(page.ocr.scale)])
         self.add_target(
-                oa.SpecificResource(
-                    source=page,
-                    selector=[oa.FragmentSelector(
-                        value=f'xywh={xywh}',
-                        conforms_to=URIRef('http://www.w3.org/TR/media-frags/')
-                        )]
-                    )
-                )
+            oa.SpecificResource(
+                source=page,
+                selector=[oa.FragmentSelector(
+                    value=f'xywh={xywh}',
+                    conforms_to=URIRef('http://www.w3.org/TR/media-frags/')
+                )]
+            )
+        )
         self.derived_from = oa.SpecificResource(
-                source=page.ocr_file,
-                selector=[oa.XPathSelector(value=f'//*[@ID="{textblock.id}"]')]
-                )
+            source=page.ocr_file,
+            selector=[oa.XPathSelector(value=f'//*[@ID="{textblock.id}"]')]
+        )
         self.motivation = sc.painting
+
 
 @rdf.data_property('title', dcterms.title)
 @rdf.rdf_class(fabio.Metadata)
@@ -54,10 +57,12 @@ class IssueMetadata(pcdm.Component):
         else:
             self.title = file.title
 
+
 @rdf.rdf_class(fabio.MetadataDocument)
 class MetadataFile(pcdm.File):
     """A binary file containing metadata in non-RDF formats (METS, MODS, etc.)"""
     pass
+
 
 @rdf.object_property('issue', pcdm.ns.memberOf)
 @rdf.data_property('number', ndnp.number)
@@ -120,6 +125,7 @@ class Page(pcdm.Component):
             if f.use == use:
                 yield f
 
+
 class File(pcdm.File):
     """Newspaper file"""
 
@@ -146,10 +152,11 @@ class File(pcdm.File):
         if file.use == 'master':
             file.width = file_graph.value(subject=file_uri, predicate=ebucore.width)
             file.height = file_graph.value(subject=file_uri, predicate=ebucore.height)
-            #TODO: how to not hardocde this?
-            file.resolution = (400,400)
+            # TODO: how to not hardocde this?
+            file.resolution = (400, 400)
 
         return file
+
 
 @rdf.object_property('issue', pcdm.ns.memberOf)
 @rdf.data_property('start_page', bibo.pageStart)
@@ -163,6 +170,7 @@ class Article(pcdm.Component):
         if pages is not None:
             self.start_page = pages[0]
             self.end_page = pages[-1]
+
 
 @rdf.data_property('id', dcterms.identifier)
 @rdf.rdf_class(carriers.hd)

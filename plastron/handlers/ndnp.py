@@ -15,32 +15,32 @@ from plastron.models.newspaper import Article, Issue, IssueMetadata, MetadataFil
 # alias the rdflib Namespace
 ns = ndnp
 
-#============================================================================
+# ============================================================================
 # METADATA MAPPING
-#============================================================================
+# ============================================================================
 
 XPATHMAP = {
     'batch': {
-        'issues':   "./{http://www.loc.gov/ndnp}issue",
-        'reels':    "./{http://www.loc.gov/ndnp}reel"
-        },
+        'issues': "./{http://www.loc.gov/ndnp}issue",
+        'reels': "./{http://www.loc.gov/ndnp}reel"
+    },
 
     'issue': {
-        'volume':   (".//{http://www.loc.gov/mods/v3}detail[@type='volume']/"
+        'volume': (".//{http://www.loc.gov/mods/v3}detail[@type='volume']/"
+                   "{http://www.loc.gov/mods/v3}number"
+                   ),
+        'issue': (".//{http://www.loc.gov/mods/v3}detail[@type='issue']/"
+                  "{http://www.loc.gov/mods/v3}number"
+                  ),
+        'edition': (".//{http://www.loc.gov/mods/v3}detail[@type='edition']/"
                     "{http://www.loc.gov/mods/v3}number"
                     ),
-        'issue':    (".//{http://www.loc.gov/mods/v3}detail[@type='issue']/"
-                    "{http://www.loc.gov/mods/v3}number"
+        'article': (".//{http://www.loc.gov/METS/}div[@TYPE='article']"
                     ),
-        'edition':  (".//{http://www.loc.gov/mods/v3}detail[@type='edition']/"
-                    "{http://www.loc.gov/mods/v3}number"
-                    ),
-        'article':  (".//{http://www.loc.gov/METS/}div[@TYPE='article']"
-                    ),
-        'areas':    (".//{http://www.loc.gov/METS/}area"
-                    ),
-        }
+        'areas': (".//{http://www.loc.gov/METS/}area"
+                  ),
     }
+}
 
 xmlns = {
     'METS': 'http://www.loc.gov/METS/',
@@ -50,15 +50,16 @@ xmlns = {
     'xlink': 'http://www.w3.org/1999/xlink',
 }
 
-#============================================================================
+
+# ============================================================================
 # NDNP BATCH CLASS
-#============================================================================
+# ============================================================================
 
 class Batch:
     def __init__(self, repo, config):
         self.logger = logging.getLogger(
             __name__ + '.' + self.__class__.__name__
-            )
+        )
         self.collection = pcdm.Collection.from_repository(repo, config.collection_uri)
 
         self.fieldnames = ['aggregation', 'sequence', 'uri']
@@ -81,14 +82,14 @@ class Batch:
             self.issues.append(
                 (os.path.join(self.basepath, i.text),
                  os.path.join(
-                    self.basepath, "Article-Level", sanitized_path)
-                    )
-                )
+                     self.basepath, "Article-Level", sanitized_path)
+                 )
+            )
 
         # set up a CSV file for each reel, skipping existing CSVs
         self.reels = set(
             [r.get('reelNumber') for r in root.findall(m['batch']['reels'])]
-            )
+        )
         self.logger.info('Batch contains {0} reels'.format(len(self.reels)))
         self.path_to_reels = os.path.join(config.log_dir, 'reels')
         if not os.path.isdir(self.path_to_reels):
@@ -98,16 +99,16 @@ class Batch:
             if not os.path.isfile(reel_csv):
                 self.logger.info(
                     "{0}. Creating reel aggregation CSV in '{1}'".format(
-                        n+1, reel_csv)
-                    )
+                        n + 1, reel_csv)
+                )
                 with open(reel_csv, 'w') as f:
                     writer = csv.DictWriter(f, fieldnames=self.fieldnames)
                     writer.writeheader()
             else:
                 self.logger.info(
                     "{0}. Reel aggregation file '{1}' exists; skipping".format(
-                        n+1, reel_csv)
-                    )
+                        n + 1, reel_csv)
+                )
 
         self.length = len(self.issues)
         self.num = 0
@@ -126,27 +127,29 @@ class Batch:
             self.logger.info('Processing complete!')
             raise StopIteration()
 
+
 # mapping from the USE attribute to a class representing that type of file
 FILE_CLASS_FOR = {
-        'master': pcdm.PreservationMasterFile,
-        'service': pcdm.IntermediateFile,
-        'derivative': pcdm.ServiceFile,
-        'ocr': pcdm.ExtractedText
-        }
+    'master': pcdm.PreservationMasterFile,
+    'service': pcdm.IntermediateFile,
+    'derivative': pcdm.ServiceFile,
+    'ocr': pcdm.ExtractedText
+}
+
 
 class BatchItem:
     def __init__(self, batch, issue_path, article_path):
         self.logger = logging.getLogger(
             __name__ + '.' + self.__class__.__name__
-            )
+        )
 
         self.batch = batch
         self.issue = None
         # gather metadata
-        self.dir            = os.path.dirname(issue_path)
-        self.path           = issue_path
-        self.article_path   = article_path
-        self.reel_csv_loc   = batch.path_to_reels
+        self.dir = os.path.dirname(issue_path)
+        self.path = issue_path
+        self.article_path = article_path
+        self.reel_csv_loc = batch.path_to_reels
 
     def read_data(self):
         try:
@@ -156,7 +159,7 @@ class BatchItem:
         except XMLSyntaxError:
             raise DataReadException(
                 "Unable to parse {0} as XML".format(self.path)
-                )
+            )
 
         issue_mets = METSResource(tree)
         root = tree.getroot()
@@ -185,11 +188,11 @@ class BatchItem:
         issue.add_related(IssueMetadata(MetadataFile(
             LocalFile(self.path),
             title='{0}, issue METS metadata'.format(issue.title)
-            )))
+        )))
         issue.add_related(IssueMetadata(MetadataFile(
             LocalFile(self.article_path),
             title='{0}, article METS metadata'.format(issue.title)
-            )))
+        )))
 
         # create a page object for each page and append to list of pages
         for page_div in issue_mets.xpath('METS:structMap//METS:div[@TYPE="np:page"]'):
@@ -205,11 +208,11 @@ class BatchItem:
         except OSError:
             raise DataReadException(
                 "Unable to read {0}".format(self.article_path)
-                )
+            )
         except XMLSyntaxError:
             raise DataReadException(
                 "Unable to parse {0} as XML".format(self.article_path)
-                )
+            )
 
         article_root = article_tree.getroot()
         for article in article_root.findall(m['article']):
@@ -219,10 +222,10 @@ class BatchItem:
                 pagenum = int(area.get('FILEID').replace('ocrFile', ''))
                 article_pagenums.add(pagenum)
             article = Article(
-                    title=article_title,
-                    issue=issue,
-                    pages=sorted(list(article_pagenums))
-                    )
+                title=article_title,
+                issue=issue,
+                pages=sorted(list(article_pagenums))
+            )
             issue.add_component(article)
 
         self.issue = issue
@@ -281,7 +284,7 @@ class BatchItem:
                 file.resolution = (
                     int(techmd['NISOIMG'].find('.//mix:XSamplingFrequency', xmlns).text),
                     int(techmd['NISOIMG'].find('.//mix:YSamplingFrequency', xmlns).text)
-                    )
+                )
             else:
                 file.width = None
                 file.height = None
@@ -300,10 +303,10 @@ class BatchItem:
                 row = {'aggregation': page.reel,
                        'sequence': page.frame,
                        'uri': page.uri
-                        }
+                       }
                 csv_path = os.path.join(
                     self.reel_csv_loc, '{0}.csv'.format(page.reel)
-                    )
+                )
                 with open(csv_path, 'r') as f:
                     fieldnames = f.readline().strip('\n').split(',')
                 with open(csv_path, 'a') as f:
@@ -311,11 +314,12 @@ class BatchItem:
                     writer.writerow(row)
         self.logger.info('Completed post-creation actions')
 
+
 class METSResource(object):
     def __init__(self, xmldoc):
         self.root = xmldoc.getroot()
         self.xpath = lxml.etree.XPathElementEvaluator(self.root, namespaces=xmlns,
-                smart_strings = False)
+                                                      smart_strings=False)
 
     def dmdsec(self, id):
         try:

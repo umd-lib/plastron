@@ -5,6 +5,7 @@ from plastron.namespaces import dcterms, oa
 # alias the rdflib Namespace
 ns = oa
 
+
 # Annotation resources
 @rdf.object_property('body', oa.hasBody, multivalue=True, embed=True)
 @rdf.object_property('target', oa.hasTarget, multivalue=True, embed=True)
@@ -12,7 +13,7 @@ ns = oa
 @rdf.rdf_class(oa.Annotation)
 class Annotation(ldp.Resource):
     def __str__(self):
-        return ' '.join([ str(body) for body in self.body ])
+        return ' '.join([str(body) for body in self.body])
 
     def add_body(self, body):
         self.body.append(body)
@@ -21,6 +22,7 @@ class Annotation(ldp.Resource):
     def add_target(self, target):
         self.target.append(target)
         target.annotation = self
+
 
 @rdf.data_property('value', RDF.value)
 @rdf.data_property('content_type', dcterms['format'])
@@ -32,16 +34,18 @@ class TextualBody(ldp.Resource):
         else:
             return self.value[:24] + '…'
 
+
 @rdf.object_property('selector', oa.hasSelector, multivalue=True, embed=True)
 @rdf.object_property('source', oa.hasSource)
 @rdf.rdf_class(oa.SpecificResource)
 class SpecificResource(ldp.Resource):
     def __str__(self):
-        return ' '.join([ str(selector) for selector in self.selector ])
+        return ' '.join([str(selector) for selector in self.selector])
 
     def add_selector(self, selector):
         self.selector.append(selector)
         selector.annotation = self
+
 
 @rdf.data_property('value', RDF.value)
 @rdf.object_property('conforms_to', dcterms.conformsTo)
@@ -49,6 +53,7 @@ class SpecificResource(ldp.Resource):
 class FragmentSelector(ldp.Resource):
     def __str__(self):
         return self.value
+
 
 @rdf.data_property('value', RDF.value)
 @rdf.rdf_class(oa.XPathSelector)

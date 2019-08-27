@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-#-*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 
 import argparse
 import logging
@@ -17,6 +17,7 @@ from plastron.http import Repository
 
 logger = logging.getLogger(__name__)
 now = datetime.utcnow().strftime('%Y%m%d%H%M%S')
+
 
 def main():
     """Parse args and handle options."""
@@ -74,7 +75,7 @@ def main():
         repo_config = yaml.safe_load(repo_config_file)
         fcrepo = Repository(
             repo_config, ua_string='plastron/{0}'.format(version)
-            )
+        )
 
     # get basic logging options
     if 'LOGGING_CONFIG' in repo_config:
@@ -114,6 +115,7 @@ def main():
     except KeyboardInterrupt:
         # aborted due to Ctrl+C
         sys.exit(2)
+
 
 if __name__ == "__main__":
     main()

@@ -6,6 +6,7 @@ from plastron.namespaces import rdf
 # alias the rdflib Namespace
 ns = rdf
 
+
 def init_class_attr(cls, name, default):
     if name not in cls.__dict__:
         if hasattr(cls, name):
@@ -14,6 +15,7 @@ def init_class_attr(cls, name, default):
             setattr(cls, name, copy(getattr(cls, name)))
         else:
             setattr(cls, name, default)
+
 
 def rdf_class(*types):
     def add_types(cls):
@@ -26,7 +28,9 @@ def rdf_class(*types):
         init_class_attr(cls, 'types', set())
         cls.types.update(types)
         return cls
+
     return add_types
+
 
 class RDFProperty(object):
     def __init__(self):
@@ -39,16 +43,18 @@ class RDFProperty(object):
         if isinstance(self.value, list):
             return self.value
         else:
-            return [ self.value ]
+            return [self.value]
 
     def triples(self, subject):
         for value in self.values():
             if value is not None:
                 yield (subject, self.uri, self.get_term(value))
 
+
 class RDFDataProperty(RDFProperty):
     def get_term(self, value):
         return Literal(value, datatype=self.datatype)
+
 
 class RDFObjectProperty(RDFProperty):
     def get_term(self, value):
@@ -66,7 +72,9 @@ def add_property_type(name, uri, prop_type):
         cls.uri_to_prop[uri] = prop_type
         cls.prop_types.append(prop_type)
         return cls
+
     return add_property
+
 
 def data_property(name, uri, multivalue=False, datatype=None):
     def add_property(cls):
@@ -76,12 +84,14 @@ def data_property(name, uri, multivalue=False, datatype=None):
             'uri': uri,
             'is_multivalued': multivalue,
             'datatype': datatype
-            })
+        })
         cls.name_to_prop[name] = prop_type
         cls.uri_to_prop[uri] = prop_type
         cls.prop_types.append(prop_type)
         return cls
+
     return add_property
+
 
 def object_property(name, uri, multivalue=False, embed=False):
     def add_property(cls):
@@ -91,12 +101,14 @@ def object_property(name, uri, multivalue=False, embed=False):
             'uri': uri,
             'is_multivalued': multivalue,
             'is_embedded': embed
-            })
+        })
         cls.name_to_prop[name] = prop_type
         cls.uri_to_prop[uri] = prop_type
         cls.prop_types.append(prop_type)
         return cls
+
     return add_property
+
 
 @rdf_class()
 class Resource(object):
@@ -150,18 +162,18 @@ class Resource(object):
             super(Resource, self).__setattr__(name, value)
 
     def properties(self):
-        return [ prop for prop in self.props.values() ]
+        return [prop for prop in self.props.values()]
 
     def data_properties(self):
-        return [ prop for prop in self.props.values() if isinstance(prop,
-            RDFDataProperty) ]
+        return [prop for prop in self.props.values() if isinstance(prop,
+                                                                   RDFDataProperty)]
 
     def object_properties(self):
-        return [ prop for prop in self.props.values() if isinstance(prop,
-            RDFObjectProperty) ]
+        return [prop for prop in self.props.values() if isinstance(prop,
+                                                                   RDFObjectProperty)]
 
     def embedded_objects(self):
-        for prop in [ prop for prop in self.object_properties() if prop.is_embedded ]:
+        for prop in [prop for prop in self.object_properties() if prop.is_embedded]:
             for v in prop.values():
                 # recursively expand embedded objects
                 if hasattr(v, 'embedded_objects'):
@@ -170,8 +182,8 @@ class Resource(object):
                 yield v
 
     def linked_objects(self):
-        for prop in [ prop for prop in self.object_properties() if not prop.is_embedded ]:
-            for v in [ v for v in prop.values() if hasattr(v, 'uri') ]:
+        for prop in [prop for prop in self.object_properties() if not prop.is_embedded]:
+            for v in [v for v in prop.values() if hasattr(v, 'uri')]:
                 yield v
 
     def graph(self, nsm=None):

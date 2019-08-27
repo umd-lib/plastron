@@ -3,6 +3,7 @@ from plastron.util import get_title_string, parse_predicate_list
 
 logger = logging.getLogger(__name__)
 
+
 def configure_cli(subparsers):
     parser = subparsers.add_parser(
         name='list',
@@ -32,8 +33,8 @@ class Command:
         if args.recursive is not None:
             args.predicates = parse_predicate_list(args.recursive)
             logger.info('Listing will traverse the following predicates: {0}'.format(
-                ', '.join([ p.n3() for p in args.predicates ]))
-                )
+                ', '.join([p.n3() for p in args.predicates]))
+            )
         else:
             args.predicates = []
 

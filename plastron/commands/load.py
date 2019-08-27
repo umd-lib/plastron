@@ -13,6 +13,7 @@ from plastron.util import print_header, print_footer, ItemLog
 logger = logging.getLogger(__name__)
 now = datetime.utcnow().strftime('%Y%m%d%H%M%S')
 
+
 def configure_cli(subparsers):
     parser = subparsers.add_parser(
         name='load',
@@ -133,7 +134,7 @@ class Command:
 
             skipfile = os.path.join(
                 batch_config.log_dir, 'skipped.load.{0}.csv'.format(now)
-                )
+            )
             skipped = ItemLog(skipfile, fieldnames, 'path')
 
             load_set = get_load_set(batch, args.percent)
@@ -159,14 +160,14 @@ class Command:
                 logger.info(f"Processing item {n + 1}/{batch.length}...")
 
                 try:
-                    logger.info(f"Loading item {n+1}")
+                    logger.info(f"Loading item {n + 1}")
                     is_loaded = load_item(
                         fcrepo, item, args, extra=batch_config.extra
-                        )
+                    )
                 except RESTAPIException:
                     logger.error(
                         "Unable to commit or rollback transaction, aborting"
-                        )
+                    )
                     raise FailureException()
                 except DataReadException as e:
                     logger.error(f"Skipping item {n + 1}: {e.message}")
@@ -174,8 +175,8 @@ class Command:
                 row = {'number': n + 1,
                        'path': item.path,
                        'timestamp': getattr(
-                            item, 'creation_timestamp', str(datetime.utcnow())
-                            ),
+                           item, 'creation_timestamp', str(datetime.utcnow())
+                       ),
                        'title': getattr(item, 'title', 'N/A'),
                        'uri': getattr(item, 'uri', 'N/A')
                        }
@@ -193,16 +194,18 @@ class Command:
         if not args.quiet:
             print_footer()
 
+
 def get_load_set(batch, percent=None):
     """set up interval from percent parameter and store set of items to load"""
     if percent is None:
         percent = 100
-    indexes = list(range(0, batch.length, int(100/percent)))
+    indexes = list(range(0, batch.length, int(100 / percent)))
     if percent < 100:
         logger.info(f"Items to load: {', '.join(indexes)}")
     else:
         logger.info("Loading all items")
     return set(indexes)
+
 
 # custom argument type for percentage loads
 def percentage(n):
@@ -210,6 +213,7 @@ def percentage(n):
     if not p > 0 and p < 100:
         raise ArgumentTypeError("Percent param must be 1-99")
     return p
+
 
 def load_item(fcrepo, batch_item, args, extra=None):
     # read data for item
@@ -263,6 +267,7 @@ def load_item(fcrepo, batch_item, args, extra=None):
             logger.error("Load interrupted")
             raise e
 
+
 class BatchConfig:
     def __init__(self, filename):
         self.filename = filename
@@ -297,5 +302,5 @@ class BatchConfig:
             missing_fields.append('HANDLER')
 
         if missing_fields:
-            raise ConfigException('Missing required batch configuration field(s): '
-                    + ', '.join(missing_fields))
+            field_names = ', '.join(missing_fields)
+            raise ConfigException(f'Missing required batch configuration field(s): {field_names}')

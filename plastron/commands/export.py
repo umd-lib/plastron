@@ -2,6 +2,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+
 def configure_cli(subparsers):
     parser = subparsers.add_parser(
         name='export',
@@ -19,6 +20,7 @@ def configure_cli(subparsers):
         help='URIs of repository objects to export'
     )
     parser.set_defaults(cmd_name='export')
+
 
 class Command:
     def __call__(self, fcrepo, args):

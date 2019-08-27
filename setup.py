@@ -71,15 +71,15 @@ setup(
     # For an analysis of "install_requires" vs pip's requirements files see:
     # https://packaging.python.org/en/latest/requirements.html
     install_requires=[
-            'lxml>3.6.0',
-            'paramiko',
-            'Pillow',
-            'PyYAML>3.12',
-            'rdflib',
-            'requests',
-            'setuptools',
-            'stomp.py'
-            ],
+        'lxml>3.6.0',
+        'paramiko',
+        'Pillow',
+        'PyYAML>3.12',
+        'rdflib',
+        'requests',
+        'setuptools',
+        'stomp.py'
+    ],
     python_requires='>=3.6',
 
     # List additional groups of dependencies here (e.g. development
@@ -88,20 +88,20 @@ setup(
     #
     # Similar to `install_requires` above, these must be valid existing
     # projects.
-    #extras_require={  # Optional
+    # extras_require={  # Optional
     #    'dev': ['check-manifest'],
     #    'test': ['coverage'],
-    #},
+    # },
 
-    #TODO: config/templates/*.yml?
+    # TODO: config/templates/*.yml?
     # If there are data files included in your packages that need to be
     # installed, specify them here.
     #
     # If using Python 2.6 or earlier, then these have to be included in
     # MANIFEST.in as well.
-    #package_data={  # Optional
+    # package_data={  # Optional
     #    'config': ['logging.yml'],
-    #},
+    # },
 
     # Although 'package_data' is the preferred approach, in some case you may
     # need to place data files outside of your packages. See:

@@ -9,23 +9,28 @@ from plastron.namespaces import dcterms, ebucore
 from rdflib import URIRef
 from rdflib.util import from_n3
 
+
 def get_title_string(graph, separator='; '):
-    return separator.join([ t for t in graph.objects(predicate=dcterms.title) ])
+    return separator.join([t for t in graph.objects(predicate=dcterms.title)])
+
 
 def parse_predicate_list(string, delimiter=','):
     manager = namespaces.get_manager()
-    return [ from_n3(p, nsm=manager) for p in string.split(delimiter) ]
+    return [from_n3(p, nsm=manager) for p in string.split(delimiter)]
+
 
 def print_header():
     """Common header formatting."""
     title = '|     PLASTRON     |'
-    bar = '+' + '='*(len(title)-2) + '+'
-    spacer = '|' + ' '*(len(title)-2) + '|'
+    bar = '+' + '=' * (len(title) - 2) + '+'
+    spacer = '|' + ' ' * (len(title) - 2) + '|'
     print('\n'.join(['', bar, spacer, title, spacer, bar, '']))
+
 
 def print_footer():
     """Report success or failure and resources created."""
     print('\nScript complete. Goodbye!\n')
+
 
 class ItemLog:
     def __init__(self, filename, fieldnames, keyfield):
@@ -73,9 +78,11 @@ class ItemLog:
         if self.fh is not None:
             self.fh.close()
 
+
 class BinarySource(object):
     def __init__(self):
         self.logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
+
 
 class LocalFile(BinarySource):
     def __init__(self, localpath, mimetype=None):
@@ -99,6 +106,7 @@ class LocalFile(BinarySource):
             for block in stream:
                 sha1.update(block)
         return 'sha1=' + sha1.hexdigest()
+
 
 class RepositoryFile(BinarySource):
     def __init__(self, repo, file_uri):
@@ -125,6 +133,7 @@ class RepositoryFile(BinarySource):
 
     def data(self):
         return self.repo.get(self.file_uri, stream=True).raw
+
 
 class RemoteFile(BinarySource):
     def __init__(self, host, remotepath, mimetype=None):

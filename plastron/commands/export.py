@@ -93,8 +93,9 @@ class Command:
         count = 0
         total = len(args.uris)
         format = args.format if args.format == 'csv' else 'ttl'
+        mode = 'w' if args.format == 'csv' else 'wb'
 
-        with open(f'export-{args.name}.{format}', 'w') as fh, tempfile.TemporaryFile(mode='w+') as tmp_datarows_file:
+        with open(f'export-{args.name}.{format}', mode) as fh, tempfile.TemporaryFile(mode='w+') as tmp_datarows_file:
             csvwriter = csv.writer(fh)
             csv_datarow_writer = csv.writer(tmp_datarows_file)
             csv_headers = ['Subject']

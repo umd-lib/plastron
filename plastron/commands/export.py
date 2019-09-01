@@ -2,6 +2,7 @@ import logging
 import csv
 import tempfile
 import numpy as np
+from rdflib import Literal
 
 logger = logging.getLogger(__name__)
 
@@ -55,6 +56,11 @@ def csv_serialize(graph, headers, csvwriter):
         subject_rows[s] = [subject_row, used_headers]
 
     for (s, p, o) in graph.triples((None, None, None)):
+        if isinstance(o, Literal):
+            if o.language != None:
+                p = f'{p}_{o.language}'
+            if o.datatype != None:
+                p = f'{p}_{o.datatype}'
         subject_row, used_headers = subject_rows[s]
         used_headers[p] = 1 if p not in used_headers else used_headers[p] + 1
         # Create a new header for the predicate, if missing or need to duplicate predicate header more times

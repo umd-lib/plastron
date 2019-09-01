@@ -57,9 +57,9 @@ def csv_serialize(graph, headers, csvwriter):
 
     for (s, p, o) in graph.triples((None, None, None)):
         if isinstance(o, Literal):
-            if o.language != None:
+            if o.language is not None:
                 p = f'{p}_{o.language}'
-            if o.datatype != None:
+            if o.datatype is not None:
                 p = f'{p}_{o.datatype}'
         subject_row, used_headers = subject_rows[s]
         used_headers[p] = 1 if p not in used_headers else used_headers[p] + 1

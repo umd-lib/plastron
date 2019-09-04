@@ -72,6 +72,7 @@ setup(
     # https://packaging.python.org/en/latest/requirements.html
     install_requires=[
         'lxml>3.6.0',
+        'numpy',
         'paramiko',
         'Pillow',
         'PyYAML>3.12',

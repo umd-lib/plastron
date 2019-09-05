@@ -89,9 +89,9 @@ class CSVSerializer:
         for (s, p, o) in graph.triples((None, None, None)):
             if isinstance(o, Literal):
                 if o.language is not None:
-                    p = f'{p}_{o.language}'
+                    p = f'{p}@{o.language}'
                 if o.datatype is not None:
-                    p = f'{p}_{o.datatype}'
+                    p = f'{p}^^{o.datatype}'
             subject_row, used_headers = subject_rows[s]
             used_headers[p] = 1 if p not in used_headers else used_headers[p] + 1
             # Create a new header for the predicate, if missing or need to duplicate predicate header more times

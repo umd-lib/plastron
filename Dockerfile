@@ -6,4 +6,4 @@ WORKDIR /opt/plastron
 RUN pip install .
 ENV PYTHONUNBUFFERED=1
 
-CMD ["plastrond", "-c", "docker-plastron.yml"]
+CMD ["plastrond", "-c", "/etc/plastrond.yml"]

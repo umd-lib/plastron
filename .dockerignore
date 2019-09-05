@@ -6,5 +6,8 @@
 *.key
 *.pem
 
+docker-compose.yml
+docker-plastron.yml
+
 dist/
 logs/

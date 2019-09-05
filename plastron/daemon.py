@@ -32,10 +32,12 @@ class Exporter:
             logger.error('Expecting an ArchelonExportJobId header')
         else:
             uris = body.split('\n')
+            export_format = headers.get('ArchelonExportJobFormat', 'text/turtle')
             logger.info(f'Received message to initiate export job with id {job_id} containing {len(uris)} items')
+            logger.info(f'Requested export format is {export_format}')
 
             command = export.Command()
-            args = argparse.Namespace(name=job_id, uris=uris)
+            args = argparse.Namespace(name=job_id, uris=uris, format=export_format)
             command(self.repository, args)
 
             # TODO: determine conditions for success or failure of the job

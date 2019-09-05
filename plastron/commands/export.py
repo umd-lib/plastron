@@ -4,6 +4,8 @@ import tempfile
 import numpy as np
 from rdflib import Literal
 
+from plastron.exceptions import ConfigException
+
 logger = logging.getLogger(__name__)
 
 
@@ -22,7 +24,7 @@ def configure_cli(subparsers):
         '-f', '--format',
         help='Export job format',
         action='store',
-        choices=['csv', 'turtle'],
+        choices=Command.SERIALIZER_CLASS_FOR.keys(),
         required=True
     )
     parser.add_argument(
@@ -40,83 +42,120 @@ def get_nth_index(list, item, n):
     return [index for index, _item in enumerate(list) if _item == item][n - 1]
 
 
-def csv_serialize(graph, headers, csvwriter):
-    """
-    Serializes the given graph as CSV data rows.
-      - One row per subject, if there are multiple subjects (HashURIs)
-      - The data rows written to the csv writer with primary subject row first, followed by HashURI subject rows
-      - Appends new predicates if missing or for repeating values of the predicate to the provided headers object.
-    """
-    subject_rows = {}
-    subjects = set(graph.subjects())
-    for s in subjects:
-        used_headers = {}  # To track the number times a predicate repeats for the given subject
-        subject_row = [None] * len(headers)
-        subject_row[0] = s
-        subject_rows[s] = [subject_row, used_headers]
+class TurtleSerializer:
+    FILE_EXTENSION = 'ttl'
 
-    for (s, p, o) in graph.triples((None, None, None)):
-        if isinstance(o, Literal):
-            if o.language is not None:
-                p = f'{p}@{o.language}'
-            if o.datatype is not None:
-                p = f'{p}^^{o.datatype}'
-        subject_row, used_headers = subject_rows[s]
-        used_headers[p] = 1 if p not in used_headers else used_headers[p] + 1
-        # Create a new header for the predicate, if missing or need to duplicate predicate header more times
-        if (p not in headers) or (headers.count(p) < used_headers[p]):
-            headers.append(p)
-        predicate_index = get_nth_index(headers, p, used_headers[p])
-        if len(subject_row) <= predicate_index:
-            subject_row.extend([None] * ((predicate_index + 1) - len(subject_row)))
-        subject_row[predicate_index] = o
+    def __init__(self, filename):
+        self.filename = filename
 
-    for subject in sorted(list(subjects)):
-        csvwriter.writerow(subject_rows[subject][0])
+    def __enter__(self):
+        self.fh = open(self.filename, 'wb')
+        return self
+
+    def write(self, graph):
+        graph.serialize(destination=self.fh, format='turtle')
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.fh.close()
 
 
-def write_csv_with_header(csvwriter, headers, datarows_file):
-    """
-    Writes the provided headers and the datarows from datarows_file with the given csvwriter
-    - Sorts the headers alphabettically
-    - Sorts the datarows to match the sorted headers order
-    """
-    np_headers = np.array(headers)
-    sort_order = np.argsort(np_headers)
-    sorted_headers = np_headers[sort_order].tolist()
-    csvwriter.writerow(sorted_headers)
-    datarows_file.flush()
-    datarows_file.seek(0)
-    for row in csv.reader(datarows_file):
-        row.extend([None] * (len(headers) - len(row)))
-        np_row = np.array(row)
-        sorted_row = np_row[sort_order].tolist()
-        csvwriter.writerow(sorted_row)
+class CSVSerializer:
+    FILE_EXTENSION = 'csv'
+
+    def __init__(self, filename):
+        self.filename = filename
+
+    def __enter__(self):
+        self.datarows_file = tempfile.TemporaryFile(mode='w+')
+        self.datarows_writer = csv.writer(self.datarows_file)
+        self.headers = ['Subject']
+        return self
+
+    def write(self, graph):
+        """
+        Serializes the given graph as CSV data rows.
+          - One row per subject, if there are multiple subjects (HashURIs)
+          - The data rows written to the csv writer with primary subject row first, followed by HashURI subject rows
+          - Appends new predicates if missing or for repeating values of the predicate to the provided headers object.
+        """
+        subject_rows = {}
+        subjects = set(graph.subjects())
+        for s in subjects:
+            used_headers = {}  # To track the number times a predicate repeats for the given subject
+            subject_row = [None] * len(self.headers)
+            subject_row[0] = s
+            subject_rows[s] = [subject_row, used_headers]
+
+        for (s, p, o) in graph.triples((None, None, None)):
+            if isinstance(o, Literal):
+                if o.language is not None:
+                    p = f'{p}@{o.language}'
+                if o.datatype is not None:
+                    p = f'{p}^^{o.datatype}'
+            subject_row, used_headers = subject_rows[s]
+            used_headers[p] = 1 if p not in used_headers else used_headers[p] + 1
+            # Create a new header for the predicate, if missing or need to duplicate predicate header more times
+            if (p not in self.headers) or (self.headers.count(p) < used_headers[p]):
+                self.headers.append(p)
+            predicate_index = get_nth_index(self.headers, p, used_headers[p])
+            if len(subject_row) <= predicate_index:
+                subject_row.extend([None] * ((predicate_index + 1) - len(subject_row)))
+            subject_row[predicate_index] = o
+
+        for subject in sorted(list(subjects)):
+            self.datarows_writer.writerow(subject_rows[subject][0])
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.write_csv_with_header()
+        self.datarows_file.close()
+
+    def write_csv_with_header(self):
+        """
+        Writes the provided headers and the datarows from datarows_file with the given csvwriter
+        - Sorts the headers alphabetically
+        - Sorts the datarows to match the sorted headers order
+        """
+        with open(self.filename, 'w') as fh:
+            writer = csv.writer(fh)
+            np_headers = np.array(self.headers)
+            sort_order = np.argsort(np_headers)
+            sorted_headers = np_headers[sort_order].tolist()
+            writer.writerow(sorted_headers)
+            self.datarows_file.flush()
+            self.datarows_file.seek(0)
+            for row in csv.reader(self.datarows_file):
+                row.extend([None] * (len(self.headers) - len(row)))
+                np_row = np.array(row)
+                sorted_row = np_row[sort_order].tolist()
+                writer.writerow(sorted_row)
 
 
 class Command:
+    SERIALIZER_CLASS_FOR = {
+        'text/turtle': TurtleSerializer,
+        'turtle': TurtleSerializer,
+        'ttl': TurtleSerializer,
+        'text/csv': CSVSerializer,
+        'csv': CSVSerializer
+    }
+
     def __call__(self, fcrepo, args):
         count = 0
         total = len(args.uris)
-        format = args.format if args.format == 'csv' else 'ttl'
-        mode = 'w' if args.format == 'csv' else 'wb'
+        try:
+            serializer_class = self.SERIALIZER_CLASS_FOR[args.format]
+        except KeyError:
+            raise ConfigException(f'Unknown format: {args.format}')
+        filename = f'export-{args.name}.{serializer_class.FILE_EXTENSION}'
 
-        with open(f'export-{args.name}.{format}', mode) as fh, tempfile.TemporaryFile(mode='w+') as tmp_datarows_file:
-            csvwriter = csv.writer(fh)
-            csv_datarow_writer = csv.writer(tmp_datarows_file)
-            csv_headers = ['Subject']
+        with serializer_class(filename) as serializer:
             for uri in args.uris:
                 r = fcrepo.head(uri)
                 if r.status_code == 200:
                     # do export
                     logger.info(f'Exporting item {count + 1}/{total}: {uri}')
                     graph = fcrepo.get_graph(uri)
-                    if format == 'csv':
-                        csv_serialize(graph, csv_headers, csv_datarow_writer)
-                    else:
-                        graph.serialize(destination=fh, format='turtle')
+                    serializer.write(graph)
                     count += 1
-            if format == 'csv':
-                write_csv_with_header(csvwriter, csv_headers, tmp_datarows_file)
 
         logger.info(f'Exported {count} of {total} items')

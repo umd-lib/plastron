@@ -19,11 +19,11 @@ now = datetime.utcnow().strftime('%Y%m%d%H%M%S')
 
 
 class Exporter:
-    def __init__(self, broker, completed_queue, repository):
+    def __init__(self, repository, broker, config):
         self.broker = broker
-        self.completed_queue = completed_queue
+        self.completed_queue = f"/queue/{config['EXPORT_JOBS_COMPLETED_QUEUE']}"
         self.repository = repository
-        logger.info(f"Completed export job notifications will go to: {completed_queue}")
+        logger.info(f"Completed export job notifications will go to: {self.completed_queue}")
 
     def __call__(self, headers, body):
         logger.debug(f'Starting exporter thread')
@@ -41,7 +41,7 @@ class Exporter:
             command(self.repository, args)
 
             # TODO: determine conditions for success or failure of the job
-            self.broker.send(f'/queue/{self.completed_queue}', '', headers={
+            self.broker.send(self.completed_queue, '', headers={
                 'ArchelonExportJobId': job_id,
                 'ArchelonExportJobStatus': 'Ready',
                 'persistent': 'true'
@@ -72,7 +72,8 @@ def main():
     parser.add_argument(
         '-c', '--config',
         help='Path to configuration file.',
-        action='store'
+        action='store',
+        required=True
     )
 
     # parse command line args
@@ -83,6 +84,7 @@ def main():
 
     repo_config = config['REPOSITORY']
     broker_config = config['MESSAGE_BROKER']
+    exporter_config = config['EXPORTER']
 
     logging_options = DEFAULT_LOGGING_OPTIONS
 
@@ -105,9 +107,9 @@ def main():
     broker = Connection([broker_server])
 
     # setup handlers for messages on specific queues
-    exporter = Exporter(broker, broker_config['EXPORT_JOBS_COMPLETED_QUEUE'], repo)
+    exporter = Exporter(repo, broker, exporter_config)
     destination_map = {
-        f"/queue/{broker_config['EXPORT_JOBS_QUEUE']}": exporter
+        f"/queue/{exporter_config['EXPORT_JOBS_QUEUE']}": exporter
     }
 
     broker.set_listener('', Listener(destination_map))

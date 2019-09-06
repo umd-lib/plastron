@@ -60,7 +60,7 @@ class Listener(ConnectionListener):
         self.destination_map = destination_map
 
     def on_message(self, headers, body):
-        logger.debug(headers)
+        logger.debug(f'Received message with headers: {headers}')
         destination = headers['destination']
         if destination in self.destination_map:
             handler = self.destination_map[destination]
@@ -79,6 +79,11 @@ def main():
         help='Path to configuration file.',
         action='store',
         required=True
+    )
+    parser.add_argument(
+        '-v', '--verbose',
+        help='increase the verbosity of the status output',
+        action='store_true'
     )
 
     # parse command line args
@@ -100,6 +105,10 @@ def main():
     log_filename = f'plastron.daemon.{now}.log'
     logfile = os.path.join(log_dirname, log_filename)
     logging_options['handlers']['file']['filename'] = logfile
+
+    # manipulate console verbosity
+    if args.verbose:
+        logging_options['handlers']['console']['level'] = 'DEBUG'
 
     # configure logging
     logging.config.dictConfig(logging_options)

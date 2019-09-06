@@ -5,14 +5,17 @@ import logging.config
 import signal
 import os
 import sys
+import tempfile
+
 import yaml
 from datetime import datetime
 from stomp import ConnectionListener, Connection
 from threading import Thread
-from plastron import version
+from plastron import pcdm, version
 from plastron.http import Repository
 from plastron.commands import export
 from plastron.logging import DEFAULT_LOGGING_OPTIONS
+from plastron.util import LocalFile
 
 logger = logging.getLogger(__name__)
 now = datetime.utcnow().strftime('%Y%m%d%H%M%S')
@@ -22,12 +25,8 @@ class Exporter:
     def __init__(self, repository, broker, config):
         self.broker = broker
         self.completed_queue = f"/queue/{config['EXPORT_JOBS_COMPLETED_QUEUE']}"
-        self.output_dir = config['OUTPUT_DIR']
-        if not os.path.isdir(self.output_dir):
-            os.makedirs(self.output_dir)
         self.repository = repository
         logger.info(f"Completed export job notifications will go to: {self.completed_queue}")
-        logger.info(f'Exported files will be written to: {self.output_dir}')
 
     def __call__(self, headers, body):
         logger.debug(f'Starting exporter thread')
@@ -41,14 +40,19 @@ class Exporter:
             logger.info(f'Requested export format is {export_format}')
 
             command = export.Command()
-            export_file = os.path.join(self.output_dir, f'{job_id}.ttl')
-            args = argparse.Namespace(uris=uris, output_file=export_file, format=export_format)
-            command(self.repository, args)
+            with tempfile.NamedTemporaryFile() as export_fh:
+                args = argparse.Namespace(uris=uris, output_file=export_fh.name, format=export_format)
+                command(self.repository, args)
+
+                file = pcdm.File(source=LocalFile(export_fh.name, mimetype=export_format))
+                with self.repository.at_path('/exports'):
+                    file.create_object(repository=self.repository)
 
             # TODO: determine conditions for success or failure of the job
             self.broker.send(self.completed_queue, '', headers={
                 'ArchelonExportJobId': job_id,
                 'ArchelonExportJobStatus': 'Ready',
+                'ArchelonExportJobDownloadUrl': file.uri,
                 'persistent': 'true'
             })
             logger.debug(f'Completed exporter thread for job id {job_id}')

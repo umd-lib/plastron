@@ -71,6 +71,7 @@ logs.*
 # non-committable application files
 config/*
 data/*
+exports/*
 !config/templates
 !config/templates/*
 !config/logging.yml

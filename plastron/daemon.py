@@ -22,8 +22,12 @@ class Exporter:
     def __init__(self, repository, broker, config):
         self.broker = broker
         self.completed_queue = f"/queue/{config['EXPORT_JOBS_COMPLETED_QUEUE']}"
+        self.output_dir = config['OUTPUT_DIR']
+        if not os.path.isdir(self.output_dir):
+            os.makedirs(self.output_dir)
         self.repository = repository
         logger.info(f"Completed export job notifications will go to: {self.completed_queue}")
+        logger.info(f'Exported files will be written to: {self.output_dir}')
 
     def __call__(self, headers, body):
         logger.debug(f'Starting exporter thread')
@@ -37,7 +41,8 @@ class Exporter:
             logger.info(f'Requested export format is {export_format}')
 
             command = export.Command()
-            args = argparse.Namespace(name=job_id, uris=uris, format=export_format)
+            export_file = os.path.join(self.output_dir, f'{job_id}.ttl')
+            args = argparse.Namespace(uris=uris, output_file=export_file, format=export_format)
             command(self.repository, args)
 
             # TODO: determine conditions for success or failure of the job

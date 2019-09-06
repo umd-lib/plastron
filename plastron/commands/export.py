@@ -1,5 +1,6 @@
 import logging
 import csv
+import os
 import tempfile
 import numpy as np
 from rdflib import Literal
@@ -15,10 +16,9 @@ def configure_cli(subparsers):
         description='Export resources from the repository'
     )
     parser.add_argument(
-        '-n', '--name',
-        help='Export job name',
+        '-o', '--output-file',
+        help='File to write export package to',
         action='store',
-        required=True
     )
     parser.add_argument(
         '-f', '--format',
@@ -146,9 +146,9 @@ class Command:
             serializer_class = self.SERIALIZER_CLASS_FOR[args.format]
         except KeyError:
             raise ConfigException(f'Unknown format: {args.format}')
-        filename = f'export-{args.name}.{serializer_class.FILE_EXTENSION}'
 
-        with serializer_class(filename) as serializer:
+        logger.debug(f'Exporting to file {args.output_file}')
+        with serializer_class(args.output_file) as serializer:
             for uri in args.uris:
                 r = fcrepo.head(uri)
                 if r.status_code == 200:

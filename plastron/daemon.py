@@ -5,25 +5,28 @@ import logging.config
 import signal
 import os
 import sys
+import tempfile
+
 import yaml
 from datetime import datetime
 from stomp import ConnectionListener, Connection
 from threading import Thread
-from plastron import version
+from plastron import pcdm, version
 from plastron.http import Repository
 from plastron.commands import export
 from plastron.logging import DEFAULT_LOGGING_OPTIONS
+from plastron.util import LocalFile
 
 logger = logging.getLogger(__name__)
 now = datetime.utcnow().strftime('%Y%m%d%H%M%S')
 
 
 class Exporter:
-    def __init__(self, broker, completed_queue, repository):
+    def __init__(self, repository, broker, config):
         self.broker = broker
-        self.completed_queue = completed_queue
+        self.completed_queue = f"/queue/{config['EXPORT_JOBS_COMPLETED_QUEUE']}"
         self.repository = repository
-        logger.info(f"Completed export job notifications will go to: {completed_queue}")
+        logger.info(f"Completed export job notifications will go to: {self.completed_queue}")
 
     def __call__(self, headers, body):
         logger.debug(f'Starting exporter thread')
@@ -37,13 +40,19 @@ class Exporter:
             logger.info(f'Requested export format is {export_format}')
 
             command = export.Command()
-            args = argparse.Namespace(name=job_id, uris=uris, format=export_format)
-            command(self.repository, args)
+            with tempfile.NamedTemporaryFile() as export_fh:
+                args = argparse.Namespace(uris=uris, output_file=export_fh.name, format=export_format)
+                command(self.repository, args)
+
+                file = pcdm.File(source=LocalFile(export_fh.name, mimetype=export_format))
+                with self.repository.at_path('/exports'):
+                    file.create_object(repository=self.repository)
 
             # TODO: determine conditions for success or failure of the job
-            self.broker.send(f'/queue/{self.completed_queue}', '', headers={
+            self.broker.send(self.completed_queue, '', headers={
                 'ArchelonExportJobId': job_id,
                 'ArchelonExportJobStatus': 'Ready',
+                'ArchelonExportJobDownloadUrl': file.uri,
                 'persistent': 'true'
             })
             logger.debug(f'Completed exporter thread for job id {job_id}')
@@ -55,7 +64,7 @@ class Listener(ConnectionListener):
         self.destination_map = destination_map
 
     def on_message(self, headers, body):
-        logger.debug(headers)
+        logger.debug(f'Received message with headers: {headers}')
         destination = headers['destination']
         if destination in self.destination_map:
             handler = self.destination_map[destination]
@@ -72,7 +81,13 @@ def main():
     parser.add_argument(
         '-c', '--config',
         help='Path to configuration file.',
-        action='store'
+        action='store',
+        required=True
+    )
+    parser.add_argument(
+        '-v', '--verbose',
+        help='increase the verbosity of the status output',
+        action='store_true'
     )
 
     # parse command line args
@@ -83,6 +98,7 @@ def main():
 
     repo_config = config['REPOSITORY']
     broker_config = config['MESSAGE_BROKER']
+    exporter_config = config['EXPORTER']
 
     logging_options = DEFAULT_LOGGING_OPTIONS
 
@@ -93,6 +109,10 @@ def main():
     log_filename = f'plastron.daemon.{now}.log'
     logfile = os.path.join(log_dirname, log_filename)
     logging_options['handlers']['file']['filename'] = logfile
+
+    # manipulate console verbosity
+    if args.verbose:
+        logging_options['handlers']['console']['level'] = 'DEBUG'
 
     # configure logging
     logging.config.dictConfig(logging_options)
@@ -105,9 +125,9 @@ def main():
     broker = Connection([broker_server])
 
     # setup handlers for messages on specific queues
-    exporter = Exporter(broker, broker_config['EXPORT_JOBS_COMPLETED_QUEUE'], repo)
+    exporter = Exporter(repo, broker, exporter_config)
     destination_map = {
-        f"/queue/{broker_config['EXPORT_JOBS_QUEUE']}": exporter
+        f"/queue/{exporter_config['EXPORT_JOBS_QUEUE']}": exporter
     }
 
     broker.set_listener('', Listener(destination_map))

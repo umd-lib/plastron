@@ -141,6 +141,27 @@ optional arguments:
                         file listing items to ignore
 ```
 
+### Export (export)
+
+```
+$ plastron export --help
+usage: plastron export [-h] [-o OUTPUT_FILE] -f
+                       {text/turtle,turtle,ttl,text/csv,csv}
+                       [uris [uris ...]]
+
+Export resources from the repository
+
+positional arguments:
+  uris                  URIs of repository objects to export
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -o OUTPUT_FILE, --output-file OUTPUT_FILE
+                        File to write export package to
+  -f {text/turtle,turtle,ttl,text/csv,csv}, --format {text/turtle,turtle,ttl,text/csv,csv}
+                        Export job format
+```
+
 ## Configuration
 
 ### Configuration Templates

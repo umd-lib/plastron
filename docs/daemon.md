@@ -58,10 +58,18 @@ Options in this section are identical to those in the [CLI configuration](cli.md
 
 This section configures the [STOMP] message broker (e.g., ActiveMQ).
 
+| Option |Description|
+|--------|-----------|
+|`SERVER`|The hostname and port of the STOMP server, e.g. `localhost:61613`|
+
+### `EXPORTER` section
+
+This section configures the exporter.
+
 | Option                      |Description|
 |-----------------------------|-----------|
-|`SERVER`                     |The hostname and port of the STOMP server, e.g. `localhost:61613`|
 |`EXPORT_JOBS_QUEUE`          |The name of the queue to subscribe to for receiving export job requests|
 |`EXPORT_JOBS_COMPLETED_QUEUE`|The name of the queue to publish to when an export job is complete|
+|`MESSAGE_STORE_DIR`          |Path to the directory to hold the message inbox and outbox|
 
 [STOMP]: https://stomp.github.io/

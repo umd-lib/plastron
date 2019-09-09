@@ -42,10 +42,38 @@ cd plastron
 pip install -e .
 ```
 
+This allows for in-place editing of Plastron's source code in the
+git repository (i.e., it is not locked away in a Python site-packages
+directory structure).
+
 ## Running
 
 * [Command-line client](docs/cli.md) ([plastron.cli](plastron/cli.py))
 * [Server](docs/daemon.md) ([plastron.daemon](plastron/daemon.py))
+
+## Architecture
+
+Plastron is designed in a modular fashion. Its major
+components are:
+
+* Fedora repository REST API client ([http.py](plastron/http.py))
+* RDF-to-Python object modeling ([rdf.py](plastron/rdf.py), [content models](plastron/models))
+* Runnable commands (e.g., batch loading, exporting) ([command modules](plastron/commands))
+* Data handlers for batch ingest formats ([handler modules](plastron/handlers))
+* Entrypoint interfaces (currently a command-line tool and
+  a daemon) ([cli.py](plastron/cli.py), [daemon.py](plastron/daemon.py))
+  
+The intent is that the runnable commands be useful units
+of work that are able to be called interchangeably from
+any of the entrypoint interfaces, or be directly included
+and called via import into other Python code.
+
+## Name
+
+> The plastron is the nearly flat part of the shell structure of a turtle,
+> what one would call the belly or ventral surface of the shell.
+
+Source: [Wikipedia](https://en.wikipedia.org/wiki/Turtle_shell#Plastron)
 
 ## License
 

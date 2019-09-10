@@ -2,16 +2,17 @@
 import argparse
 import logging
 import logging.config
-import signal
 import os
+import signal
 import sys
 import tempfile
-
 import yaml
 from datetime import datetime
 from stomp import ConnectionListener, Connection
+from stomp.exception import ConnectFailedException
 from threading import Thread
 from plastron import pcdm, version
+from plastron.exceptions import ConfigException, RESTAPIException
 from plastron.http import Repository
 from plastron.commands import export
 from plastron.logging import DEFAULT_LOGGING_OPTIONS
@@ -39,24 +40,33 @@ class Exporter:
             logger.info(f'Received message to initiate export job with id {job_id} containing {len(uris)} items')
             logger.info(f'Requested export format is {export_format}')
 
-            command = export.Command()
-            with tempfile.NamedTemporaryFile() as export_fh:
-                args = argparse.Namespace(uris=uris, output_file=export_fh.name, format=export_format)
-                command(self.repository, args)
+            try:
+                command = export.Command()
+                with tempfile.NamedTemporaryFile() as export_fh:
+                    args = argparse.Namespace(uris=uris, output_file=export_fh.name, format=export_format)
+                    command(self.repository, args)
 
-                file = pcdm.File(source=LocalFile(export_fh.name, mimetype=export_format))
-                with self.repository.at_path('/exports'):
-                    file.create_object(repository=self.repository)
+                    file = pcdm.File(source=LocalFile(export_fh.name, mimetype=export_format))
+                    with self.repository.at_path('/exports'):
+                        file.create_object(repository=self.repository)
 
-            # TODO: determine conditions for success or failure of the job
-            self.broker.send(self.completed_queue, '', headers={
-                'ArchelonExportJobId': job_id,
-                'ArchelonExportJobStatus': 'Ready',
-                'ArchelonExportJobDownloadUrl': file.uri,
-                'persistent': 'true'
-            })
-            logger.debug(f'Completed exporter thread for job id {job_id}')
-            logger.info(f'Export job {job_id} complete')
+                self.broker.send(self.completed_queue, '', headers={
+                    'ArchelonExportJobId': job_id,
+                    'ArchelonExportJobStatus': 'Ready',
+                    'ArchelonExportJobDownloadUrl': file.uri,
+                    'persistent': 'true'
+                })
+                logger.debug(f'Completed exporter thread for job id {job_id}')
+                logger.info(f'Export job {job_id} complete')
+
+            except (ConfigException, RESTAPIException) as e:
+                self.broker.send(self.completed_queue, '', headers={
+                    'ArchelonExportJobId': job_id,
+                    'ArchelonExportJobStatus': 'Failed',
+                    'ArchelonExportJobError': str(e),
+                    'persistent': 'true'
+                })
+                logger.error(f"Export job {job_id} failed: {e}")
 
 
 class Listener(ConnectionListener):
@@ -71,6 +81,8 @@ class Listener(ConnectionListener):
             # spawn a new thread to handle this message
             logger.debug(f'Creating thread to handle message on {destination}')
             Thread(target=handler, kwargs={'headers': headers, 'body': body}).start()
+        else:
+            logger.debug(f'No destination handler for {destination}')
 
 
 def main():
@@ -132,7 +144,13 @@ def main():
 
     broker.set_listener('', Listener(destination_map))
     broker.start()
-    broker.connect()
+
+    try:
+        broker.connect()
+    except ConnectFailedException:
+        logger.error(f"Connection to STOMP message broker at {broker_config['SERVER']} failed")
+        sys.exit(1)
+
     logger.info(f"Connected to STOMP message broker: {broker_config['SERVER']}")
 
     for queue in destination_map.keys():

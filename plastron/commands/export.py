@@ -153,8 +153,13 @@ class Command:
                 r = fcrepo.head(uri)
                 if r.status_code == 200:
                     # do export
+                    if 'describedby' in r.links:
+                        # the resource is a binary, get the RDF description URI
+                        rdf_uri = r.links['describedby']['url']
+                    else:
+                        rdf_uri = uri
                     logger.info(f'Exporting item {count + 1}/{total}: {uri}')
-                    graph = fcrepo.get_graph(uri)
+                    graph = fcrepo.get_graph(rdf_uri)
                     serializer.write(graph)
                     count += 1
 

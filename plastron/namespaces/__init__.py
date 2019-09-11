@@ -11,6 +11,7 @@ ebucore  = Namespace('http://www.ebu.ch/metadata/ontologies/ebucore/ebucore#')
 edm      = Namespace('http://www.europeana.eu/schemas/edm/')
 ex       = Namespace('http://www.example.org/terms/')
 fabio    = Namespace('http://purl.org/spar/fabio/')
+fedora   = Namespace('http://fedora.info/definitions/v4/repository#')
 foaf     = Namespace('http://xmlns.com/foaf/0.1/')
 geo      = Namespace('http://www.w3.org/2003/01/geo/wgs84_pos#')
 iana     = Namespace('http://www.iana.org/assignments/relation/')
@@ -25,6 +26,7 @@ prov     = Namespace('http://www.w3.org/ns/prov#')
 rdf      = Namespace('http://www.w3.org/1999/02/22-rdf-syntax-ns#')
 rdfs     = Namespace('http://www.w3.org/2000/01/rdf-schema#')
 sc       = Namespace('http://www.shared-canvas.org/ns/')
+xs       = Namespace('http://www.w3.org/2001/XMLSchema#')
 
 
 def get_manager(graph=None):
@@ -40,6 +42,7 @@ def get_manager(graph=None):
     m.bind('edm', edm)
     m.bind('ex', ex)
     m.bind('fabio', fabio)
+    m.bind('fedora', fedora)
     m.bind('foaf', foaf)
     m.bind('geo', geo)
     m.bind('iana', iana)
@@ -54,4 +57,5 @@ def get_manager(graph=None):
     m.bind('rdf', rdf)
     m.bind('rdfs', rdfs)
     m.bind('sc', sc)
+    m.bind('xs', xs)
     return m

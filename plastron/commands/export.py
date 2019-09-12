@@ -4,11 +4,11 @@ import os
 import tempfile
 import numpy as np
 from rdflib import Literal
-
+from plastron.namespaces import get_manager
 from plastron.exceptions import ConfigException
 
 logger = logging.getLogger(__name__)
-
+nsm = get_manager()
 
 def configure_cli(subparsers):
     parser = subparsers.add_parser(
@@ -87,11 +87,12 @@ class CSVSerializer:
             subject_rows[s] = [subject_row, used_headers]
 
         for (s, p, o) in graph.triples((None, None, None)):
+            p = p.n3(namespace_manager=nsm)
             if isinstance(o, Literal):
                 if o.language is not None:
                     p = f'{p}@{o.language}'
                 if o.datatype is not None:
-                    p = f'{p}^^{o.datatype}'
+                    p = f'{p}^^{o.datatype.n3(namespace_manager=nsm)}'
             subject_row, used_headers = subject_rows[s]
             used_headers[p] = 1 if p not in used_headers else used_headers[p] + 1
             # Create a new header for the predicate, if missing or need to duplicate predicate header more times

@@ -5,5 +5,6 @@ COPY . /opt/plastron
 WORKDIR /opt/plastron
 RUN pip install .
 ENV PYTHONUNBUFFERED=1
+VOLUME /var/opt/plastron
 
 CMD ["plastrond", "-c", "/etc/plastrond.yml"]

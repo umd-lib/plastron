@@ -1,7 +1,8 @@
 import logging
 import csv
-import os
 import tempfile
+from time import sleep
+
 import numpy as np
 from rdflib import Literal
 from plastron.namespaces import get_manager
@@ -35,11 +36,11 @@ def configure_cli(subparsers):
     parser.set_defaults(cmd_name='export')
 
 
-def get_nth_index(list, item, n):
+def get_nth_index(item_list, item, n):
     """
     Returns the Nth index of the specified item in the provided list
     """
-    return [index for index, _item in enumerate(list) if _item == item][n - 1]
+    return [index for index, _item in enumerate(item_list) if _item == item][n - 1]
 
 
 class TurtleSerializer:
@@ -163,5 +164,6 @@ class Command:
                     graph = fcrepo.get_graph(rdf_uri)
                     serializer.write(graph)
                     count += 1
+                    sleep(1)
 
         logger.info(f'Exported {count} of {total} items')

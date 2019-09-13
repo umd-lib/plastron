@@ -9,6 +9,8 @@ services:
       - batchloader.pem
       - batchloader.key
       - repository.pem
+    volumes:
+      - plastrond:/var/opt/plastron
 configs:
   plastrond:
     file: docker-plastron.yml
@@ -19,3 +21,5 @@ secrets:
     external: true
   repository.pem:
     external: true
+volumes:
+  plastrond:

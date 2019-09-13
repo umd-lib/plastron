@@ -10,3 +10,4 @@ MESSAGE_BROKER:
 EXPORTER:
   EXPORT_JOBS_QUEUE: exportjobs
   EXPORT_JOBS_COMPLETED_QUEUE: exportjobs.completed
+  MESSAGE_STORE_DIR: /var/opt/plastron/msg/export

@@ -92,11 +92,7 @@ class ExportListener(ConnectionListener):
         self.outbox = MessageBox(os.path.join(config['MESSAGE_STORE_DIR'], 'outbox'))
         self.executor = ThreadPoolExecutor(thread_name_prefix='ExportListener')
 
-    def on_connecting(self, host_and_port):
-        logger.info(f'Connecting to STOMP message broker at {":".join(host_and_port)}')
-
     def on_connected(self, headers, body):
-        logger.info('Connected to STOMP message broker')
         # first attempt to send anything in the outbox
         for message in self.outbox:
             job_id = message.headers['ArchelonExportJobId']
@@ -112,19 +108,9 @@ class ExportListener(ConnectionListener):
             message_id = message.headers['message-id']
             self.process_message(message_id, message.headers, message.body)
 
+        # then subscribe to the queue to receive incoming messages
         self.broker.subscribe(destination=self.queue, id='plastron')
         logger.info(f"Subscribed to {self.queue}")
-
-    def on_disconnected(self):
-        logger.warning('Disconnected from the STOMP server')
-        while not self.broker.is_connected():
-            logger.info('Attempting to reconnect')
-            try:
-                self.broker.connect(wait=True)
-            except ConnectFailedException:
-                logger.warning('Reconnection attempt failed')
-                sleep(1)
-
 
     def on_message(self, headers, body):
         if headers['destination'] == self.queue:
@@ -201,6 +187,32 @@ class ExportListener(ConnectionListener):
         # process message
         self.executor.submit(process).add_done_callback(handle_response)
 
+
+class ReconnectListener(ConnectionListener):
+    def __init__(self, broker):
+        self.broker = broker
+
+    def on_connecting(self, host_and_port):
+        logger.info(f'Connecting to STOMP message broker at {":".join(host_and_port)}')
+
+    def on_connected(self, headers, body):
+        logger.info('Connected to STOMP message broker')
+
+    def on_disconnected(self):
+        logger.warning('Disconnected from the STOMP message broker')
+        connect(self.broker)
+
+
+def connect(broker):
+    while not broker.is_connected():
+        logger.info('Attempting to connect to the STOMP message broker')
+        try:
+            broker.connect(wait=True)
+        except ConnectFailedException:
+            logger.warning('Connection attempt failed')
+            sleep(1)
+
+
 def main():
     parser = argparse.ArgumentParser(
         prog='plastron',
@@ -253,15 +265,11 @@ def main():
     broker = Connection([broker_server])
 
     # setup listeners
+    broker.set_listener('reconnect', ReconnectListener(broker))
     broker.set_listener('export', ExportListener(broker, repo, exporter_config))
 
     try:
-        broker.connect()
-    except ConnectFailedException:
-        logger.error(f"Connection to STOMP message broker at {broker_config['SERVER']} failed")
-        sys.exit(1)
-
-    try:
+        connect(broker)
         while True:
             signal.pause()
     except KeyboardInterrupt:

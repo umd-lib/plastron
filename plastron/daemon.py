@@ -86,6 +86,7 @@ class ExportListener(ConnectionListener):
     def __init__(self, broker, repository, config):
         self.broker = broker
         self.repository = repository
+        self.export_config = config['EXPORT_CONFIG']
         self.queue = '/queue/' + config['EXPORT_JOBS_QUEUE']
         self.completed_queue = '/queue/' + config['EXPORT_JOBS_COMPLETED_QUEUE']
         self.inbox = MessageBox(os.path.join(config['MESSAGE_STORE_DIR'], 'inbox'))
@@ -156,7 +157,7 @@ class ExportListener(ConnectionListener):
                 try:
                     command = export.Command()
                     with tempfile.NamedTemporaryFile() as export_fh:
-                        args = argparse.Namespace(uris=uris, output_file=export_fh.name, format=export_format)
+                        args = argparse.Namespace(uris=uris, output_file=export_fh.name, format=export_format, export_config=self.export_config)
                         command(self.repository, args)
 
                         file = pcdm.File(source=LocalFile(export_fh.name, mimetype=export_format))

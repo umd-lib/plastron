@@ -1,0 +1,42 @@
+# Used for translating CURIEs to people friendly names for CSV export/import
+# Both the key and values in the PREDICATE_MAPPINGS need to be unique
+PREDICATE_MAPPINGS:
+  edm:hasType: Resource Type
+  dcterms:title: Title
+  dc:date: Date
+  dcterms:description: Description
+  dcterms:extent: Extent
+  dcterms:bibliographicCitation: 
+  dc:subject: Subject
+  dcterms:isPartOf: Handle/link
+  dcterms:identifier: Identifier
+  dcterms:hasPart: filenames 
+  dc:language: language
+  dcterms:rightsHolder: rights holder
+  dcterms:rights: rights statement
+  dcterms:format: Format/Physical Description
+  bibo:locator: Identifier?
+  dc:coverage: location
+  dcterms:publisher: Publisher
+  fedora:createdBy: fedora:createdBy
+  fedora:lastModifiedBy: fedora:lastModifiedBy
+  fedora:created^^xs:dateTime: fedora:createDate
+  fedora:lastModified^^xs:dateTime: fedora:lastModifiedDate
+  dcterms:subject::skos:concept::rdfs:label: Subject
+  dcterms:isPartOf::dcmiType:collection::rdfs:label: Archival Collection
+  marcrel:aut::edm:Agent::rdfs:label: Author
+  bibo:recipient::edm:Agent::rdfs:label: Recipient
+  dcterms:spatial::edm:Place::rdfs:label: location
+
+# Predicates to bbe excluded in CSV export
+PREDICATE_EXCLUDES:
+  - dc:type
+  - dcterms:type
+  - pcdm:hasMember
+  - pcdm:memberOf
+  - rdf:type
+  - rdfs:label
+  - iana:first
+  - iana:last
+  - fedora:writable
+  - fedora:hasParent

@@ -2,6 +2,7 @@ import logging
 import csv
 import tempfile
 from time import sleep
+import yaml
 
 import numpy as np
 from rdflib import Literal
@@ -20,6 +21,12 @@ def configure_cli(subparsers):
         '-o', '--output-file',
         help='File to write export package to',
         action='store',
+    )
+    parser.add_argument(
+        '-c', '--export-config',
+        help='Path to export config file',
+        action='store',
+        required=True
     )
     parser.add_argument(
         '-f', '--format',
@@ -63,33 +70,7 @@ class TurtleSerializer:
 class CSVSerializer:
     FILE_EXTENSION = 'csv'
 
-    EXCLUDE_PREDICATES = ['dc:type', 'dcterms:type', 'pcdm:hasMember',
-            'pcdm:memberOf', 'rdf:type', 'rdfs:label', 'iana:first',
-            'iana:last', 'fedora:writable', 'fedora:hasParent']
-
-    PREDICATE_MAPPING = {
-        'edm:hasType': 'Resource Type',
-        'dcterms:title': 'Title',
-        'dc:date': 'Date',
-        'dcterms:description': 'Description',
-        'dcterms:extent': 'Extent',
-        'dcterms:bibliographicCitation':' ',
-        'dc:subject': 'Subject',
-        'dcterms:isPartOf':  'Handle/link',
-        'dcterms:identifier': 'Identifier',
-        'dcterms:hasPart': 'filenames ',
-        'dc:language': 'language',
-        'dcterms:rightsHolder': 'rights holder',
-        'dcterms:rights': 'rights statement',
-        'dcterms:format': 'Format/Physical Description',
-        'bibo:locator': 'Identifier?',
-        'dc:coverage': 'location',
-        'dcterms:publisher': 'Publisher',
-        'fedora:createdBy': 'fedora:createdBy',
-        'fedora:lastModifiedBy': 'fedora:lastModifiedBy',
-        'fedora:created^^xs:dateTime': 'fedora:createDate',
-        'fedora:lastModified^^xs:dateTime': 'fedora:lastModifiedDate'
-    }
+    EXPORT_CONFIG = {}
 
     def __init__(self, filename):
         self.filename = filename
@@ -99,6 +80,21 @@ class CSVSerializer:
         self.datarows_writer = csv.writer(self.datarows_file)
         self.headers = ['Subject']
         return self
+
+    def set_config(self, config):
+        self.EXPORT_CONFIG = config
+
+    def predicate_mappings(self):
+        if 'PREDICATE_MAPPINGS' in self.EXPORT_CONFIG:
+            return self.EXPORT_CONFIG['PREDICATE_MAPPINGS']
+        else:
+            return {}
+
+    def predicate_excludes(self):
+        if 'PREDICATE_EXCLUDES' in self.EXPORT_CONFIG:
+            return self.EXPORT_CONFIG['PREDICATE_EXCLUDES']
+        else:
+            return []
 
     def write(self, graph):
         """
@@ -117,18 +113,15 @@ class CSVSerializer:
 
         for (s, p, o) in graph.triples((None, None, None)):
             p = p.n3(namespace_manager=nsm)
-            if p in self.EXCLUDE_PREDICATES:
-                logger.info(f'{p} excluded')
+            if p in self.predicate_excludes():
                 continue
-            else:
-                logger.info(f'{p} not excluded')
             if isinstance(o, Literal):
                 if o.language is not None:
                     p = f'{p}@{o.language}'
                 if o.datatype is not None:
                     p = f'{p}^^{o.datatype.n3(namespace_manager=nsm)}'
             subject_row, used_headers = subject_rows[s]
-            p = self.PREDICATE_MAPPING.get(p, p)
+            p = self.predicate_mappings().get(p, p)
             used_headers[p] = 1 if p not in used_headers else used_headers[p] + 1
             # Create a new header for the predicate, if missing or need to duplicate predicate header more times
             if (p not in self.headers) or (self.headers.count(p) < used_headers[p]):
@@ -187,6 +180,10 @@ class Command:
 
         logger.debug(f'Exporting to file {args.output_file}')
         with serializer_class(args.output_file) as serializer:
+            if serializer_class == CSVSerializer: 
+                with open(args.export_config, 'r') as export_config_file:
+                    config = yaml.safe_load(export_config_file)
+                    serializer.set_config(config)
             for uri in args.uris:
                 r = fcrepo.head(uri)
                 if r.status_code == 200:

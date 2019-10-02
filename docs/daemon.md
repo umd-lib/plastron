@@ -50,6 +50,14 @@ configuration.
 See [docker-plastron.yml](../docker-plastron.yml) for an example
 of the config file.
 
+### Export Configuration
+
+The export configuration specifies configuration scuh as the predicates
+to be excluded or mapping of predicate CURIEs to human friendly names.
+
+See [docker-export-config.yml](../docker-export-config.yml) for an example
+of the export config file.
+
 ### `REPOSITORY` section
 
 Options in this section are identical to those in the [CLI configuration](cli.md).

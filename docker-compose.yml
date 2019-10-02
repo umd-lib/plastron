@@ -5,6 +5,8 @@ services:
     configs:
       - source: plastrond
         target: /etc/plastrond.yml
+      - source: export-config
+        target: /etc/export-config.yml
     secrets:
       - batchloader.pem
       - batchloader.key
@@ -14,6 +16,8 @@ services:
 configs:
   plastrond:
     file: docker-plastron.yml
+  export-config:
+    file: docker-export-config.yml
 secrets:
   batchloader.pem:
     external: true

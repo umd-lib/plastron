@@ -63,6 +63,34 @@ class TurtleSerializer:
 class CSVSerializer:
     FILE_EXTENSION = 'csv'
 
+    EXCLUDE_PREDICATES = ['dc:type', 'dcterms:type', 'pcdm:hasMember',
+            'pcdm:memberOf', 'rdf:type', 'rdfs:label', 'iana:first',
+            'iana:last', 'fedora:writable', 'fedora:hasParent']
+
+    PREDICATE_MAPPING = {
+        'edm:hasType': 'Resource Type',
+        'dcterms:title': 'Title',
+        'dc:date': 'Date',
+        'dcterms:description': 'Description',
+        'dcterms:extent': 'Extent',
+        'dcterms:bibliographicCitation':' ',
+        'dc:subject': 'Subject',
+        'dcterms:isPartOf':  'Handle/link',
+        'dcterms:identifier': 'Identifier',
+        'dcterms:hasPart': 'filenames ',
+        'dc:language': 'language',
+        'dcterms:rightsHolder': 'rights holder',
+        'dcterms:rights': 'rights statement',
+        'dcterms:format': 'Format/Physical Description',
+        'bibo:locator': 'Identifier?',
+        'dc:coverage': 'location',
+        'dcterms:publisher': 'Publisher',
+        'fedora:createdBy': 'fedora:createdBy',
+        'fedora:lastModifiedBy': 'fedora:lastModifiedBy',
+        'fedora:created^^xs:dateTime': 'fedora:createDate',
+        'fedora:lastModified^^xs:dateTime': 'fedora:lastModifiedDate'
+    }
+
     def __init__(self, filename):
         self.filename = filename
 
@@ -89,12 +117,18 @@ class CSVSerializer:
 
         for (s, p, o) in graph.triples((None, None, None)):
             p = p.n3(namespace_manager=nsm)
+            if p in self.EXCLUDE_PREDICATES:
+                logger.info(f'{p} excluded')
+                continue
+            else:
+                logger.info(f'{p} not excluded')
             if isinstance(o, Literal):
                 if o.language is not None:
                     p = f'{p}@{o.language}'
                 if o.datatype is not None:
                     p = f'{p}^^{o.datatype.n3(namespace_manager=nsm)}'
             subject_row, used_headers = subject_rows[s]
+            p = self.PREDICATE_MAPPING.get(p, p)
             used_headers[p] = 1 if p not in used_headers else used_headers[p] + 1
             # Create a new header for the predicate, if missing or need to duplicate predicate header more times
             if (p not in self.headers) or (self.headers.count(p) < used_headers[p]):
@@ -120,7 +154,9 @@ class CSVSerializer:
         with open(self.filename, 'w') as fh:
             writer = csv.writer(fh)
             np_headers = np.array(self.headers)
-            sort_order = np.argsort(np_headers)
+            sort_order = np.argsort(np_headers).tolist()
+            # Bring Subject header back to beginning
+            sort_order.insert(0, sort_order.pop(sort_order.index(0)))
             sorted_headers = np_headers[sort_order].tolist()
             writer.writerow(sorted_headers)
             self.datarows_file.flush()

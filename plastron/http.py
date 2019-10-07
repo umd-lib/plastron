@@ -5,6 +5,8 @@ import threading
 from rdflib import Graph, URIRef
 from plastron.exceptions import RESTAPIException
 
+OMIT_SERVER_MANAGED_TRIPLES = 'return=representation; omit="http://fedora.info/definitions/v4/repository#ServerManaged"'
+
 
 class Repository:
     def __init__(self, config, ua_string=None):
@@ -120,13 +122,18 @@ class Repository:
                     for (uri, graph) in self.recursive_get(str(o), traverse=traverse, **kwargs):
                         yield (uri, graph)
 
-    def get_graph(self, url):
-        response = self.get(url, headers={'Accept': 'text/turtle'}, stream=True)
+    def get_graph(self, url, include_server_managed=True):
+        headers = {
+            'Accept': 'application/n-triples'
+        }
+        if not include_server_managed:
+            headers['Prefer'] = OMIT_SERVER_MANAGED_TRIPLES
+        response = self.get(url, headers=headers, stream=True)
         if response.status_code != 200:
-            self.logger.error("Unable to get text/turtle representation of {0}".format(url))
+            self.logger.error(f"Unable to get {headers['Accept']} representation of {url}")
             raise RESTAPIException(response)
         graph = Graph()
-        graph.parse(source=response.raw, format='turtle')
+        graph.parse(source=response.raw, format='nt')
         return graph
 
     def get_transaction_endpoint(self):

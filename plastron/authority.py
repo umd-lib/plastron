@@ -11,7 +11,6 @@ def create_authority(graph, subject):
 
 @rdf.data_property('label', rdfs.label)
 @rdf.object_property('same_as', owl.sameAs)
-@rdf.object_property('types', rdf.ns.type)
 class LabeledThing(ldp.Resource):
     pass
 

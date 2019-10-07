@@ -26,7 +26,9 @@ premis   = Namespace('http://www.loc.gov/premis/rdf/v1#')
 prov     = Namespace('http://www.w3.org/ns/prov#')
 rdf      = Namespace('http://www.w3.org/1999/02/22-rdf-syntax-ns#')
 rdfs     = Namespace('http://www.w3.org/2000/01/rdf-schema#')
+rel      = Namespace('http://id.loc.gov/vocabulary/relators/')
 sc       = Namespace('http://www.shared-canvas.org/ns/')
+skos     = Namespace('http://www.w3.org/2004/02/skos/core#')
 xs       = Namespace('http://www.w3.org/2001/XMLSchema#')
 
 
@@ -58,6 +60,8 @@ def get_manager(graph=None):
     m.bind('prov', prov)
     m.bind('rdf', rdf)
     m.bind('rdfs', rdfs)
+    m.bind('rel', rel)
     m.bind('sc', sc)
+    m.bind('skos', skos)
     m.bind('xs', xs)
     return m

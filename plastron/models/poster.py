@@ -21,7 +21,19 @@ from plastron.namespaces import dcterms, dc, edm, bibo, geo
 class Poster(pcdm.Item):
     HEADER_MAP = {
         'title': 'Title',
+        'alternative': 'Alternate Title',
         'publisher': 'Publisher',
         'part_of': 'Collection',
-        'alternative': 'Alternate Title'
+        'type': 'Resource Type',
+        'date': 'Date',
+        'language': 'Language',
+        'description': 'Description',
+        'extent': 'Extent',
+        'issue': 'Issue',
+        'locator': 'Locator',
+        'place': 'Location',
+        'longitude': 'Longitude',
+        'latitude': 'Latitude',
+        'subject': 'Subject',
+        'rights': 'Rights'
     }

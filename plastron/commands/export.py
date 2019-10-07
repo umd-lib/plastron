@@ -1,7 +1,7 @@
 import logging
 from time import sleep
 
-from plastron.exceptions import ConfigException
+from plastron.exceptions import ConfigException, DataReadException
 from plastron.namespaces import get_manager
 from plastron.serializers import SERIALIZER_CLASSES
 
@@ -56,8 +56,12 @@ class Command:
                         rdf_uri = uri
                     logger.info(f'Exporting item {count + 1}/{total}: {uri}')
                     graph = fcrepo.get_graph(rdf_uri, include_server_managed=False)
-                    serializer.write(graph)
-                    count += 1
+                    try:
+                        serializer.write(graph)
+                        count += 1
+                    except DataReadException as e:
+                        # log the failure, but continue to attempt to export the rest of the URIs
+                        logger.error(f'Export of {uri} failed: {e}')
                     sleep(1)
 
         logger.info(f'Exported {count} of {total} items')

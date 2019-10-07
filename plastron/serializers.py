@@ -5,6 +5,7 @@ from urllib.parse import urlparse
 
 from rdflib import Literal
 
+from plastron.exceptions import DataReadException
 from plastron.models.letter import Letter
 from plastron.models.poster import Poster
 from plastron.namespaces import get_manager, bibo, rdf
@@ -43,7 +44,7 @@ def detect_resource_class(graph, subject):
         if rdf_type in types:
             return cls
     else:
-        raise Exception('Unable to detect resource type')
+        raise DataReadException(f'Unable to detect resource type for {subject}')
 
 
 class CSVSerializer:
@@ -127,6 +128,9 @@ class CSVSerializer:
         return columns
 
     def __exit__(self, exc_type, exc_val, exc_tb):
+        if self.headers is None:
+            logger.error("No items could be exported; skipping writing file")
+            return
         # strip out headers that aren't used in any row
         for header in self.headers:
             has_column_values = any([True for row in self.rows if header in row])

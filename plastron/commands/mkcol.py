@@ -24,22 +24,38 @@ def configure_cli(subparsers):
         help='Path to batch configuration file.',
         action='store'
     )
+    parser.add_argument(
+        '--notransactions',
+        help='run the load without using transactions',
+        action='store_true'
+    )
     parser.set_defaults(cmd_name='mkcol')
 
 
 class Command:
     def __call__(self, fcrepo, args):
-        with Transaction(fcrepo) as txn:
+        if args.notransactions:
             try:
                 collection = pcdm.Collection()
                 collection.title = args.name
                 collection.create_object(fcrepo)
                 collection.update_object(fcrepo)
-                txn.commit()
 
             except RESTAPIException as e:
                 logger.error(f'Error in collection creation: {e}')
                 raise FailureException()
+        else:
+            with Transaction(fcrepo) as txn:
+                try:
+                    collection = pcdm.Collection()
+                    collection.title = args.name
+                    collection.create_object(fcrepo)
+                    collection.update_object(fcrepo)
+                    txn.commit()
+
+                except RESTAPIException as e:
+                    logger.error(f'Error in collection creation: {e}')
+                    raise FailureException()
 
         if args.batch is not None:
             with open(args.batch, 'r') as batchconfig:

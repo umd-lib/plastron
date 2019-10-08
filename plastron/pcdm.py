@@ -29,7 +29,7 @@ class Resource(ldp.Resource):
             sort_key = self.sequence_attr[1]
 
             def get_key(item):
-                return int(getattr(item, sort_key))
+                return int(str(getattr(item, sort_key)))
 
             sorted_list = sorted(orig_list, key=get_key)
             return sorted_list
@@ -93,7 +93,7 @@ class Item(Resource):
         ordered_components = self.ordered_components()
         for component in ordered_components:
             position = " ".join([self.sequence_attr[0],
-                                 getattr(component, self.sequence_attr[1])])
+                                 str(getattr(component, self.sequence_attr[1]))])
             proxy = ore.Proxy(
                 title=f'Proxy for {position} in {self}',
                 proxy_for=component,

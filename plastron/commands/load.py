@@ -58,6 +58,11 @@ def configure_cli(subparsers):
         action='store_true'
     )
     parser.add_argument(
+        '--notransactions',
+        help='run the load without using transactions',
+        action='store_true'
+    )
+    parser.add_argument(
         '--ignore', '-i',
         help='file listing items to ignore',
         action='store'
@@ -214,58 +219,72 @@ def percentage(n):
         raise ArgumentTypeError("Percent param must be 1-99")
     return p
 
+def load_item_internal(fcrepo, item, args, extra=None):
+    logger.info('Creating item')
+    item.recursive_create(fcrepo)
+    logger.info('Creating ordering proxies')
+    item.create_ordering(fcrepo)
+    if not args.noannotations:
+        logger.info('Creating annotations')
+        item.create_annotations(fcrepo)
+
+    if extra:
+        logger.info('Adding additional triples')
+        if re.search(r'\.(ttl|n3|nt)$', extra):
+            rdf_format = 'n3'
+        elif re.search(r'\.(rdf|xml)$', extra):
+            rdf_format = 'xml'
+        else:
+            raise ConfigException("Unrecognized extra triples file format")
+        item.add_extra_properties(extra, rdf_format)
+
+    logger.info('Updating item and components')
+    item.recursive_update(fcrepo)
+    if not args.noannotations:
+        logger.info('Updating annotations')
+        item.update_annotations(fcrepo)
+
 
 def load_item(fcrepo, batch_item, args, extra=None):
     # read data for item
     logger.info('Reading item data')
     item = batch_item.read_data()
 
-    # open transaction
-    with Transaction(fcrepo, keep_alive=90) as txn:
-        # create item and its components
+    if args.notransactions:
         try:
-            logger.info('Creating item')
-            item.recursive_create(fcrepo)
-            logger.info('Creating ordering proxies')
-            item.create_ordering(fcrepo)
-            if not args.noannotations:
-                logger.info('Creating annotations')
-                item.create_annotations(fcrepo)
-
-            if extra:
-                logger.info('Adding additional triples')
-                if re.search(r'\.(ttl|n3|nt)$', extra):
-                    rdf_format = 'n3'
-                elif re.search(r'\.(rdf|xml)$', extra):
-                    rdf_format = 'xml'
-                else:
-                    raise ConfigException("Unrecognized extra triples file format")
-                item.add_extra_properties(extra, rdf_format)
-
-            logger.info('Updating item and components')
-            item.recursive_update(fcrepo)
-            if not args.noannotations:
-                logger.info('Updating annotations')
-                item.update_annotations(fcrepo)
-
-            # commit transaction
-            txn.commit()
-            logger.info('Performing post-creation actions')
-            item.post_creation_hook()
+            load_item_internal(fcrepo, item, args, extra)
             return True
-
         except (RESTAPIException, FileNotFoundError) as e:
-            # if anything fails during item creation or committing the transaction
-            # attempt to rollback the current transaction
-            # failures here will be caught by the main loop's exception handler
-            # and should trigger a system exit
             logger.error("Item creation failed: {0}".format(e))
-            txn.rollback()
-            logger.warning('Transaction rolled back. Continuing load.')
-
+            logger.warning('Continuing load.')
         except KeyboardInterrupt as e:
             logger.error("Load interrupted")
             raise e
+    else:
+        # open transaction
+        with Transaction(fcrepo, keep_alive=90) as txn:
+            # create item and its components
+            try:
+                load_item_internal(fcrepo, item, args, extra)
+
+                # commit transaction
+                txn.commit()
+                logger.info('Performing post-creation actions')
+                item.post_creation_hook()
+                return True
+
+            except (RESTAPIException, FileNotFoundError) as e:
+                # if anything fails during item creation or committing the transaction
+                # attempt to rollback the current transaction
+                # failures here will be caught by the main loop's exception handler
+                # and should trigger a system exit
+                logger.error("Item creation failed: {0}".format(e))
+                txn.rollback()
+                logger.warning('Transaction rolled back. Continuing load.')
+
+            except KeyboardInterrupt as e:
+                logger.error("Load interrupted")
+                raise e
 
 
 class BatchConfig:

@@ -100,7 +100,8 @@ class Repository:
             response = self.post(self.uri(), **kwargs)
 
         if response.status_code == 201:
-            return URIRef(self._remove_transaction_uri(response.headers['Location']))
+            created_url = response.headers['Location'] if 'Location' in response.headers else url
+            return URIRef(self._remove_transaction_uri(created_url))
         else:
             raise RESTAPIException(response)
 
@@ -133,7 +134,7 @@ class Repository:
             self.logger.error(f"Unable to get {headers['Accept']} representation of {url}")
             raise RESTAPIException(response)
         graph = Graph()
-        graph.parse(source=response.raw, format='nt')
+        graph.parse(data=response.text, format='nt')
         return graph
 
     def get_transaction_endpoint(self):

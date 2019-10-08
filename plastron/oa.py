@@ -30,7 +30,7 @@ class Annotation(ldp.Resource):
 class TextualBody(ldp.Resource):
     def __str__(self):
         if len(self.value) <= 25:
-            return self.value
+            return str(self.value)
         else:
             return self.value[:24] + '…'
 
@@ -52,11 +52,11 @@ class SpecificResource(ldp.Resource):
 @rdf.rdf_class(oa.FragmentSelector)
 class FragmentSelector(ldp.Resource):
     def __str__(self):
-        return self.value
+        return str(self.value)
 
 
 @rdf.data_property('value', RDF.value)
 @rdf.rdf_class(oa.XPathSelector)
 class XPathSelector(ldp.Resource):
     def __str__(self):
-        return self.value
+        return str(self.value)

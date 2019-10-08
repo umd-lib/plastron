@@ -28,7 +28,7 @@ class Resource(rdf.Resource):
 
     def __str__(self):
         if hasattr(self, 'title') and self.title is not None:
-            return self.title
+            return str(self.title)
         else:
             return repr(self)
 

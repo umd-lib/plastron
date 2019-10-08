@@ -163,7 +163,7 @@ class Resource(metaclass=Meta):
 
     def embedded_objects(self):
         for prop in [prop for prop in self.object_properties() if prop.is_embedded]:
-            for v in prop.values():
+            for v in prop.values:
                 # recursively expand embedded objects
                 if hasattr(v, 'embedded_objects'):
                     for vo in v.embedded_objects():
@@ -172,7 +172,7 @@ class Resource(metaclass=Meta):
 
     def linked_objects(self):
         for prop in [prop for prop in self.object_properties() if not prop.is_embedded]:
-            for v in [v for v in prop.values() if hasattr(v, 'uri')]:
+            for v in [v for v in prop.values if hasattr(v, 'uri')]:
                 yield v
 
     def graph(self, nsm=None):

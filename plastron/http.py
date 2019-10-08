@@ -100,7 +100,7 @@ class Repository:
             response = self.post(self.uri(), **kwargs)
 
         if response.status_code == 201:
-            created_url = url if url else response.headers['Location']
+            created_url = response.headers['Location'] if 'Location' in response.headers else url
             return URIRef(self._remove_transaction_uri(created_url))
         else:
             raise RESTAPIException(response)

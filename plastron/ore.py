@@ -14,5 +14,5 @@ ns = ore
 class Proxy(ldp.Resource):
     # create proxy object by putting object graph
     def create_object(self, repository, uri=None):
-        uri = '/'.join([p.strip('/') for p in (self.proxy_for.uri, self.proxy_in.uuid)])
+        uri = '/'.join([p.strip('/') for p in (self.proxy_for.values[0].uri, self.proxy_in.values[0].uuid)])
         super().create_object(repository, uri=uri)

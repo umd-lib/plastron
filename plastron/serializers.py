@@ -24,7 +24,7 @@ MODEL_MAP = {
 
 
 class TurtleSerializer:
-    def __init__(self, filename):
+    def __init__(self, filename, **kwargs):
         self.filename = filename
         self.content_type = 'text/turtle'
         self.file_extension = '.ttl'
@@ -71,17 +71,18 @@ def write_csv_file(row_info, file):
 
 
 class CSVSerializer:
-    def __init__(self, filename):
+    def __init__(self, filename, **kwargs):
         self.filename = filename
         self.content_models = {}
         self.content_type = 'text/csv'
         self.file_extension = '.csv'
+        self.public_uri_template = kwargs.get('public_uri_template', None)
 
     def __enter__(self):
         self.rows = []
         return self
 
-    SYSTEM_HEADERS = ['URI', 'CREATED', 'MODIFIED', 'INDEX']
+    SYSTEM_HEADERS = ['URI', 'PUBLIC URI', 'CREATED', 'MODIFIED', 'INDEX']
 
     def write(self, graph: Graph):
         """
@@ -105,6 +106,11 @@ class CSVSerializer:
         row['URI'] = str(main_subject)
         row['CREATED'] = str(graph.value(main_subject, fedora.created))
         row['MODIFIED'] = str(graph.value(main_subject, fedora.lastModified))
+        if self.public_uri_template is not None:
+            uri = urlparse(main_subject)
+            uuid = os.path.basename(uri.path)
+            row['PUBLIC URI'] = self.public_uri_template.format(uuid=uuid)
+
         self.content_models[resource_class]['rows'].append(row)
 
     LANGUAGE_NAMES = {

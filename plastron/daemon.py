@@ -91,6 +91,7 @@ class ExportListener(ConnectionListener):
         self.inbox = MessageBox(os.path.join(config['MESSAGE_STORE_DIR'], 'inbox'))
         self.outbox = MessageBox(os.path.join(config['MESSAGE_STORE_DIR'], 'outbox'))
         self.executor = ThreadPoolExecutor(thread_name_prefix='ExportListener')
+        self.public_uri_template = config.get('PUBLIC_URI_TEMPLATE', os.environ.get('PUBLIC_URI_TEMPLATE', None))
 
     def on_connected(self, headers, body):
         # first attempt to send anything in the outbox
@@ -157,7 +158,12 @@ class ExportListener(ConnectionListener):
                     command = export.Command()
                     with tempfile.NamedTemporaryFile() as export_fh:
                         logger.debug(f'Export temporary file name is {export_fh.name}')
-                        args = argparse.Namespace(uris=uris, output_file=export_fh.name, format=export_format)
+                        args = argparse.Namespace(
+                            uris=uris,
+                            output_file=export_fh.name,
+                            format=export_format,
+                            uri_template=self.public_uri_template
+                        )
                         result = command(self.repository, args)
 
                         job_name = headers.get('ArchelonExportJobName', job_id)

@@ -55,7 +55,7 @@ class Command:
                     else:
                         rdf_uri = uri
                     logger.info(f'Exporting item {count + 1}/{total}: {uri}')
-                    graph = fcrepo.get_graph(rdf_uri, include_server_managed=False)
+                    graph = fcrepo.get_graph(rdf_uri)
                     try:
                         serializer.write(graph)
                         count += 1

@@ -8,7 +8,7 @@ from rdflib import Literal
 from plastron.exceptions import DataReadException
 from plastron.models.letter import Letter
 from plastron.models.poster import Poster
-from plastron.namespaces import get_manager, bibo, rdf
+from plastron.namespaces import get_manager, bibo, rdf, fedora
 from plastron.rdf import RDFObjectProperty, RDFDataProperty
 
 logger = logging.getLogger(__name__)
@@ -72,11 +72,13 @@ class CSVSerializer:
             self.resource_class = detect_resource_class(graph, main_subject)
 
         self.header_map = self.resource_class.HEADER_MAP
-        self.headers = list(self.header_map.values()) + ['URI', 'INDEX']
+        self.headers = list(self.header_map.values()) + ['URI', 'CREATED', 'MODIFIED', 'INDEX']
 
         resource = self.resource_class.from_graph(graph, subject=main_subject)
         row = {k: ';'.join(v) for k, v in self.flatten(resource).items()}
-        row['URI'] = main_subject
+        row['URI'] = str(main_subject)
+        row['CREATED'] = str(graph.value(main_subject, fedora.created))
+        row['MODIFIED'] = str(graph.value(main_subject, fedora.lastModified))
         self.rows.append(row)
 
     LANGUAGE_NAMES = {

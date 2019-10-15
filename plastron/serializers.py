@@ -1,7 +1,10 @@
 import csv
 import logging
+import os
 from collections import defaultdict
+from tempfile import NamedTemporaryFile
 from urllib.parse import urlparse
+from zipfile import ZipFile
 
 from rdflib import Literal, Graph
 
@@ -21,10 +24,10 @@ MODEL_MAP = {
 
 
 class TurtleSerializer:
-    FILE_EXTENSION = 'ttl'
-
     def __init__(self, filename):
         self.filename = filename
+        self.content_type = 'text/turtle'
+        self.file_extension = '.ttl'
 
     def __enter__(self):
         self.fh = open(self.filename, 'wb')
@@ -47,15 +50,32 @@ def detect_resource_class(graph, subject):
         raise DataReadException(f'Unable to detect resource type for {subject}')
 
 
-class CSVSerializer:
-    FILE_EXTENSION = 'csv'
+def write_csv_file(row_info, file):
+    # sort and add the new headers that have language names
+    for header, new_headers in row_info['language_headers'].items():
+        header_index = row_info['headers'].index(header)
+        for i, new_header in enumerate(sorted(new_headers), start=1):
+            row_info['headers'].insert(header_index + i, new_header)
 
+    # strip out headers that aren't used in any row
+    for header in row_info['headers']:
+        has_column_values = any([True for row in row_info['rows'] if header in row])
+        if not has_column_values:
+            row_info['headers'].remove(header)
+
+    # write the CSV file
+    csv_writer = csv.DictWriter(file, row_info['headers'], extrasaction='ignore')
+    csv_writer.writeheader()
+    for row in row_info['rows']:
+        csv_writer.writerow(row)
+
+
+class CSVSerializer:
     def __init__(self, filename):
         self.filename = filename
-        self.resource_class = None
-        self.header_map = None
-        self.headers = None
-        self.language_headers = None
+        self.content_models = {}
+        self.content_type = 'text/csv'
+        self.file_extension = '.csv'
 
     def __enter__(self):
         self.rows = []
@@ -71,42 +91,45 @@ class CSVSerializer:
           - Appends new predicates if missing or for repeating values of the predicate to the provided headers object.
         """
         main_subject = set([s for s in graph.subjects() if '#' not in str(s)]).pop()
-        if self.resource_class is None:
-            self.resource_class = detect_resource_class(graph, main_subject)
-            self.header_map = self.resource_class.HEADER_MAP
-            self.headers = list(self.header_map.values()) + self.SYSTEM_HEADERS
-            self.language_headers = defaultdict(set)
+        resource_class = detect_resource_class(graph, main_subject)
+        if resource_class not in self.content_models:
+            self.content_models[resource_class] = {
+                'header_map': resource_class.HEADER_MAP,
+                'headers': list(resource_class.HEADER_MAP.values()) + self.SYSTEM_HEADERS,
+                'language_headers': defaultdict(set),
+                'rows': []
+            }
 
-        resource = self.resource_class.from_graph(graph, subject=main_subject)
-        row = {k: ';'.join(v) for k, v in self.flatten(resource).items()}
+        resource = resource_class.from_graph(graph, subject=main_subject)
+        row = {k: ';'.join(v) for k, v in self.flatten(resource, self.content_models[resource_class]).items()}
         row['URI'] = str(main_subject)
         row['CREATED'] = str(graph.value(main_subject, fedora.created))
         row['MODIFIED'] = str(graph.value(main_subject, fedora.lastModified))
-        self.rows.append(row)
+        self.content_models[resource_class]['rows'].append(row)
 
     LANGUAGE_NAMES = {
         'ja': 'Japanese',
         'ja-latn': 'Japanese (Romanized)'
     }
 
-    def flatten(self, resource: Resource, prefix=''):
-        columns = defaultdict(lambda: [])
+    def flatten(self, resource: Resource, row_info: dict, prefix=''):
+        columns = defaultdict(list)
         for name, prop in resource.props.items():
             if isinstance(prop, RDFObjectProperty) and prop.is_embedded:
                 for i, obj in enumerate(prop.values):
                     # record the list position to hash URI correlation
                     columns['INDEX'].append(f'{name}[{i}]=#{urlparse(obj.uri).fragment}')
-                    for header, value in self.flatten(obj, prefix=f'{name}.').items():
+                    for header, value in self.flatten(obj, row_info, prefix=f'{name}.').items():
                         columns[header].extend(value)
             else:
                 key = prefix + name
-                if key not in self.header_map:
+                if key not in row_info['header_map']:
                     continue
-                header = self.header_map[key]
+                header = row_info['header_map'][key]
 
                 # create additional columns (if needed) for different languages
                 if isinstance(prop, RDFDataProperty):
-                    per_language_columns = defaultdict(lambda: [])
+                    per_language_columns = defaultdict(list)
                     for value in prop.values:
                         if isinstance(value, Literal) and value.language:
                             language_code = value.language
@@ -118,7 +141,7 @@ class CSVSerializer:
                         if language_code:
                             language = self.LANGUAGE_NAMES[language_code]
                             language_header = f'{header} [{language}]'
-                            self.language_headers[header].add(language_header)
+                            row_info['language_headers'][header].add(language_header)
                             columns[language_header].append(serialization)
                         else:
                             columns[header].append(serialization)
@@ -128,28 +151,26 @@ class CSVSerializer:
         return columns
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        if self.headers is None:
+        if len(self.content_models) == 0:
             logger.error("No items could be exported; skipping writing file")
-            return
-
-        # sort and add the new headers that have language names
-        for header, new_headers in self.language_headers.items():
-            header_index = self.headers.index(header)
-            for i, new_header in enumerate(sorted(new_headers), start=1):
-                self.headers.insert(header_index + i, new_header)
-
-        # strip out headers that aren't used in any row
-        for header in self.headers:
-            has_column_values = any([True for row in self.rows if header in row])
-            if not has_column_values:
-                self.headers.remove(header)
-
-        # write the CSV file
-        with open(self.filename, 'w') as fh:
-            csv_writer = csv.DictWriter(fh, self.headers, extrasaction='ignore')
-            csv_writer.writeheader()
-            for row in self.rows:
-                csv_writer.writerow(row)
+        elif len(self.content_models) == 1:
+            # write a single CSV file
+            with open(self.filename, mode='w') as fh:
+                write_csv_file(next(iter(self.content_models.values())), file=fh)
+        else:
+            # write a ZIP file containing individual CSV files
+            with ZipFile(self.filename, mode='w') as zip_fh:
+                for resource_class, row_info in self.content_models.items():
+                    # write the CSV file
+                    tmp = NamedTemporaryFile(mode='w', encoding='utf-8', delete=False)
+                    write_csv_file(row_info, file=tmp)
+                    tmp.close()
+                    # add the CSV file to the ZIP file
+                    zip_fh.write(tmp.name, arcname=resource_class.__name__ + '.csv')
+                    os.remove(tmp.name)
+            # multi-content model CSV export actually produces ZIP files
+            self.content_type = 'application/zip'
+            self.file_extension = '.zip'
 
 
 SERIALIZER_CLASSES = {

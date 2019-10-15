@@ -2,7 +2,7 @@ import csv
 import hashlib
 import logging
 import mimetypes
-import os
+from os.path import basename, isfile
 from paramiko import SSHClient, SFTPClient
 from plastron import namespaces
 from plastron.namespaces import dcterms, ebucore
@@ -41,7 +41,7 @@ class ItemLog:
         self.fh = None
         self.writer = None
 
-        if not os.path.isfile(self.filename):
+        if not isfile(self.filename):
             with open(self.filename, 'w', 1) as fh:
                 writer = csv.DictWriter(fh, fieldnames=self.fieldnames)
                 writer.writeheader()
@@ -85,13 +85,13 @@ class BinarySource(object):
 
 
 class LocalFile(BinarySource):
-    def __init__(self, localpath, mimetype=None):
+    def __init__(self, localpath, mimetype=None, filename=None):
         super().__init__()
         if mimetype is None:
             mimetype = mimetypes.guess_type(localpath)[0]
         self._mimetype = mimetype
         self.localpath = localpath
-        self.filename = os.path.basename(localpath)
+        self.filename = filename if filename is not None else basename(localpath)
 
     def data(self):
         return open(self.localpath, 'rb')
@@ -142,7 +142,7 @@ class RemoteFile(BinarySource):
         self.sftp_client = None
         self.host = host
         self.remotepath = remotepath
-        self.filename = os.path.basename(remotepath)
+        self.filename = basename(remotepath)
         self._mimetype = mimetype
 
     def __del__(self):

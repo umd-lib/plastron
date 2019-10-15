@@ -156,13 +156,19 @@ class ExportListener(ConnectionListener):
                 try:
                     command = export.Command()
                     with tempfile.NamedTemporaryFile() as export_fh:
+                        logger.debug(f'Export temporary file name is {export_fh.name}')
                         args = argparse.Namespace(uris=uris, output_file=export_fh.name, format=export_format)
-                        command(self.repository, args)
+                        result = command(self.repository, args)
 
-                        file = pcdm.File(source=LocalFile(export_fh.name, mimetype=export_format))
+                        job_name = headers.get('ArchelonExportJobName', job_id)
+                        filename = job_name + result['file_extension']
+
+                        file = pcdm.File(LocalFile(export_fh.name, mimetype=result['content_type'], filename=filename))
                         with self.repository.at_path('/exports'):
                             file.create_object(repository=self.repository)
+                            logger.info(f'Uploaded export file to {file.uri}')
 
+                        logger.debug(f'Export temporary file size is {os.path.getsize(export_fh.name)}')
                     logger.info(f'Export job {job_id} complete')
                     return Message(
                         headers={

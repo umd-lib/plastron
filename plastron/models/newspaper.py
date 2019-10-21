@@ -14,7 +14,13 @@ from plastron.util import RepositoryFile
 @rdf.rdf_class(bibo.Issue)
 class Issue(pcdm.Item):
     """Newspaper issue"""
-    pass
+    HEADER_MAP = {
+        'title': 'Title',
+        'date': 'Date',
+        'volume': 'Volume',
+        'issue': 'Issue',
+        'edition': 'Edition'
+    }
 
 
 @rdf.object_property('derived_from', prov.wasDerivedFrom, embed=True)

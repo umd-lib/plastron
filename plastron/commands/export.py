@@ -65,3 +65,12 @@ class Command:
                     sleep(1)
 
         logger.info(f'Exported {count} of {total} items')
+        return {
+            'content_type': serializer.content_type,
+            'file_extension': serializer.file_extension,
+            'count': {
+                'total': total,
+                'exported': count,
+                'skipped': total - count
+            }
+        }

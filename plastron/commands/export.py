@@ -27,6 +27,11 @@ def configure_cli(subparsers):
         required=True
     )
     parser.add_argument(
+        '--uri-template',
+        help='Public URI template',
+        action='store'
+    )
+    parser.add_argument(
         'uris',
         nargs='*',
         help='URIs of repository objects to export'
@@ -44,7 +49,7 @@ class Command:
             raise ConfigException(f'Unknown format: {args.format}')
 
         logger.debug(f'Exporting to file {args.output_file}')
-        with serializer_class(args.output_file) as serializer:
+        with serializer_class(args.output_file, public_uri_template=args.uri_template) as serializer:
             for uri in args.uris:
                 r = fcrepo.head(uri)
                 if r.status_code == 200:

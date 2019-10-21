@@ -36,6 +36,7 @@ class Collection(LabeledThing):
 @rdf.object_property('place', dcterms.spatial, embed=True, obj_class=Place)
 @rdf.object_property('subject', dcterms.subject, embed=True, obj_class=Subject)
 @rdf.object_property('rights', dcterms.rights)
+@rdf.data_property('identifier', dcterms.identifier)
 @rdf.data_property('type', edm.hasType)
 @rdf.data_property('date', dc.date)
 @rdf.data_property('language', dc.language)
@@ -47,14 +48,6 @@ class Collection(LabeledThing):
 class Letter(pcdm.Item):
     HEADER_MAP = {
         'title': 'Title',
-        # 'related_of',
-        # 'related',
-        # 'file_of',
-        # 'files',
-        # 'collections',
-        # 'components',
-        # 'last',
-        # 'first',
         'rights_holder': 'Rights Holder',
         'extent': 'Extent',
         'bibliographic_citation': 'Bibliographic Citation',
@@ -63,16 +56,13 @@ class Letter(pcdm.Item):
         'date': 'Date',
         'type': 'Resource Type',
         'rights': 'Rights',
-        # 'subject.same_as',
         'subject.label': 'Subject',
-        # 'place.same_as',
         'place.label': 'Location',
         'place.lon': 'Longitude',
         'place.lat': 'Latitude',
-        # 'part_of.same_as',
         'part_of.label': 'Archival Collection',
-        # 'recipient.same_as',
+        'part_of.same_as': 'Handle/Link',
+        'identifier': 'Identifier',
         'recipient.label': 'Recipient',
-        # 'author.same_as',
         'author.label': 'Author'
     }

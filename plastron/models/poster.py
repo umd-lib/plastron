@@ -3,9 +3,12 @@ from plastron.namespaces import dcterms, dc, edm, bibo, geo
 
 
 @rdf.object_property('place', dcterms.spatial)
-@rdf.object_property('subject', dcterms.subject)
 @rdf.object_property('rights', dcterms.rights)
+@rdf.data_property('identifier', dc.identifier)
+@rdf.data_property('format', dc.format)
 @rdf.data_property('type', edm.hasType)
+@rdf.data_property('subject', dc.subject)
+@rdf.data_property('location', dc.coverage)
 @rdf.data_property('date', dc.date)
 @rdf.data_property('language', dc.language)
 @rdf.data_property('description', dcterms.description)
@@ -24,14 +27,15 @@ class Poster(pcdm.Item):
         'alternative': 'Alternate Title',
         'publisher': 'Publisher',
         'part_of': 'Collection',
+        'format': 'Format',
         'type': 'Resource Type',
         'date': 'Date',
         'language': 'Language',
         'description': 'Description',
         'extent': 'Extent',
         'issue': 'Issue',
-        'locator': 'Locator',
-        'place': 'Location',
+        'locator': 'Identifier/Call Number',
+        'location': 'Location',
         'longitude': 'Longitude',
         'latitude': 'Latitude',
         'subject': 'Subject',

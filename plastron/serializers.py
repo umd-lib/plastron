@@ -10,6 +10,7 @@ from rdflib import Literal, Graph
 
 from plastron.exceptions import DataReadException
 from plastron.models.letter import Letter
+from plastron.models.newspaper import Issue
 from plastron.models.poster import Poster
 from plastron.namespaces import get_manager, bibo, rdf, fedora
 from plastron.rdf import RDFObjectProperty, RDFDataProperty, Resource
@@ -19,6 +20,7 @@ nsm = get_manager()
 
 MODEL_MAP = {
     bibo.Image: Poster,
+    bibo.Issue: Issue,
     bibo.Letter: Letter
 }
 

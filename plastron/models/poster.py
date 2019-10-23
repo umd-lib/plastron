@@ -21,7 +21,7 @@ from plastron.namespaces import dcterms, dc, edm, bibo, geo
 @rdf.data_property('publisher', dc.publisher)
 @rdf.data_property('alternative', dcterms.alternative)
 @rdf.rdf_class(bibo.Image)
-class Poster(pcdm.Item):
+class Poster(pcdm.Object):
     HEADER_MAP = {
         'title': 'Title',
         'alternative': 'Alternate Title',

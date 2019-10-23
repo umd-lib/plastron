@@ -7,8 +7,8 @@ ns = oa
 
 
 # Annotation resources
-@rdf.object_property('body', oa.hasBody, multivalue=True, embed=True)
-@rdf.object_property('target', oa.hasTarget, multivalue=True, embed=True)
+@rdf.object_property('body', oa.hasBody, embed=True)
+@rdf.object_property('target', oa.hasTarget, embed=True)
 @rdf.object_property('motivation', oa.motivatedBy)
 @rdf.rdf_class(oa.Annotation)
 class Annotation(ldp.Resource):
@@ -35,7 +35,7 @@ class TextualBody(ldp.Resource):
             return self.value[:24] + '…'
 
 
-@rdf.object_property('selector', oa.hasSelector, multivalue=True, embed=True)
+@rdf.object_property('selector', oa.hasSelector, embed=True)
 @rdf.object_property('source', oa.hasSource)
 @rdf.rdf_class(oa.SpecificResource)
 class SpecificResource(ldp.Resource):

@@ -18,14 +18,15 @@ If you don't already have a Python 3 environment, or would like to install Plast
 into its own isolated environment, a very convenient way to do this is to use the
 [pyenv] Python version manager.
 
-[Installing pyenv](https://github.com/pyenv/pyenv#installation)
+See these instructions for [installing pyenv](https://github.com/pyenv/pyenv#installation),
+then run the following:
 
 ```
-# install Python 3.7.0
-pyenv install 3.7.0
+# install Python 3.6.2
+pyenv install 3.6.2
 
-# create a new virtual environment based on 3.7.0 for Plastron
-pyenv virtualenv 3.7.0 plastron
+# create a new virtual environment based on 3.6.2 for Plastron
+pyenv virtualenv 3.6.2 plastron
 
 # switch to that environment in your current shell
 pyenv shell plastron
@@ -41,241 +42,38 @@ cd plastron
 pip install -e .
 ```
 
-## Common Options
+This allows for in-place editing of Plastron's source code in the
+git repository (i.e., it is not locked away in a Python site-packages
+directory structure).
 
-```
-$ plastron --help
-usage: plastron [-h] (-r REPO | -V) [-v] [-q]
-                {ping,load,list,ls,mkcol,delete,del,rm,extractocr} ...
+## Running
 
-Batch operation tool for Fedora 4.
+* [Command-line client](docs/cli.md) ([plastron.cli](plastron/cli.py))
+* [Server](docs/daemon.md) ([plastron.daemon](plastron/daemon.py))
 
-optional arguments:
-  -h, --help            show this help message and exit
-  -r REPO, --repo REPO  Path to repository configuration file.
-  -V, --version         Print version and exit.
-  -v, --verbose         increase the verbosity of the status output
-  -q, --quiet           decrease the verbosity of the status output
+## Architecture
 
-commands:
-  {ping,load,list,ls,mkcol,delete,del,rm,extractocr}
-```
+Plastron is designed in a modular fashion. Its major
+components are:
 
-### Check version
+* Fedora repository REST API client ([http.py](plastron/http.py))
+* RDF-to-Python object modeling ([rdf.py](plastron/rdf.py), [content models](plastron/models))
+* Runnable commands (e.g., batch loading, exporting) ([command modules](plastron/commands))
+* Data handlers for batch ingest formats ([handler modules](plastron/handlers))
+* Entrypoint interfaces (currently a command-line tool and
+  a daemon) ([cli.py](plastron/cli.py), [daemon.py](plastron/daemon.py))
+  
+The intent is that the runnable commands be useful units
+of work that are able to be called interchangeably from
+any of the entrypoint interfaces, or be directly included
+and called via import into other Python code.
 
-```
-$ plastron --version
-2.1.0
-```
+## Name
 
-## Commands
+> The plastron is the nearly flat part of the shell structure of a turtle,
+> what one would call the belly or ventral surface of the shell.
 
-All commands require you to specify a repository configuration file using
-the `-r` or `--repo` option *before* the command name. For example,
-`plastron -r path/to/repo.yml ping`.
-
-### Ping (ping)
-
-```
-$ plastron ping --help
-usage: plastron ping [-h]
-
-Check connection to the repository
-
-optional arguments:
-  -h, --help  show this help message and exit
-```
-
-### Load (load)
-
-```
-$ plastron load --help
-usage: plastron load [-h] -b BATCH [-d] [-n] [-l LIMIT] [-% PERCENT]
-                     [--noannotations] [--ignore IGNORE] [--wait WAIT]
-
-Load a batch into the repository
-
-optional arguments:
-  -h, --help            show this help message and exit
-  -d, --dryrun          iterate over the batch without POSTing
-  -n, --nobinaries      iterate without uploading binaries
-  -l LIMIT, --limit LIMIT
-                        limit the load to a specified number of top-level
-                        objects
-  -% PERCENT, --percent PERCENT
-                        load specified percentage of total items
-  --noannotations       iterate without loading annotations (e.g. OCR)
-  --ignore IGNORE, -i IGNORE
-                        file listing items to ignore
-  --wait WAIT, -w WAIT  wait n seconds between items
-
-required arguments:
-  -b BATCH, --batch BATCH
-                        path to batch configuration file                    
-```
-
-### List (list, ls)
-
-```
-$ plastron list --help
-usage: plastron list [-h] [-l] [-R RECURSIVE] [uris [uris ...]]
-
-List objects in the repository
-
-positional arguments:
-  uris                  URIs of repository objects to list
-
-optional arguments:
-  -h, --help            show this help message and exit
-  -l, --long            Display additional information besides the URI
-  -R RECURSIVE, --recursive RECURSIVE
-                        List additional objects found by traversing the given
-                        predicate(s)
-```
-
-### Create Collection (mkcol)
-
-```
-$ plastron mkcol --help
-usage: plastron mkcol [-h] -n NAME [-b BATCH]
-
-Create a PCDM Collection in the repository
-
-optional arguments:
-  -h, --help            show this help message and exit
-  -n NAME, --name NAME  Name of the collection.
-  -b BATCH, --batch BATCH
-                        Path to batch configuration file.
-```
-
-### Delete (delete, del, rm)
-
-```
-$ plastron delete --help
-usage: plastron delete [-h] [-R RECURSIVE] [-d] [-f FILE] [uris [uris ...]]
-
-Delete objects from the repository
-
-positional arguments:
-  uris                  Repository URIs to be deleted.
-
-optional arguments:
-  -h, --help            show this help message and exit
-  -R RECURSIVE, --recursive RECURSIVE
-                        Delete additional objects found by traversing the
-                        given predicate(s)
-  -d, --dryrun          Simulate a delete without modifying the repository
-  -f FILE, --file FILE  File containing a list of URIs to delete
-```
-
-### Extract OCR (extractocr)
-
-```
-$ plastron extractocr --help
-usage: plastron extractocr [-h] [--ignore IGNORE]
-
-Create annotations from OCR data stored in the repository
-
-optional arguments:
-  -h, --help            show this help message and exit
-  --ignore IGNORE, -i IGNORE
-                        file listing items to ignore
-```
-
-## Configuration
-
-### Configuration Templates
-Templates for creating the configuration files can be found at [config/templates](./config/templates)
-
-### Repository Configuration
-
-The repository connection is configured in a YAML file and passed to `plastron`
-with the `-r` or `--repo` option. These are the recognized configuration keys:
-
-#### Required
-
-| Option        | Description |
-| ------------- | ----------- |
-|`REST_ENDPOINT`|Respository root URL|
-|`RELPATH`      |Path within repository to load objects to|
-|`LOG_DIR`      |Directory to write log files|
-
-#### Client Certificate Authentication
-
-| Option      | Description |
-| ----------- | ----------- |
-|`CLIENT_CERT`|PEM-encoded client SSL cert for authentication|
-|`CLIENT_KEY` |PEM-encoded client SSL key for authentication|
-
-#### Password Authentication
-
-| Option          | Description |
-| --------------- | ----------- |
-|`FEDORA_USER`    |Username for authentication|
-|`FEDORA_PASSWORD`|Password for authentication|
-
-#### Optional
-
-| Option      | Description |
-| ----------- | ----------- |
-|`SERVER_CERT`|Path to a PEM-encoded copy of the server's SSL certificate; only needed for servers using self-signed certs|
-
-### Batch Configuration
-
-#### Required
-
-| Option | Description |
-| ------ | ----------- |
-|`BATCH_FILE`|The "main" file of the batch|
-|`COLLECTION`|URI of the repository collection that the objects will be added to|
-|`HANDLER`|The handler to use|
-
-#### Optional
-
-| Option | Description | Default |
-| ------ | ----------- | ------- |
-|`ROOT_DIR`| |The directory containing the batch configuration file|
-|`DATA_DIR`|Where to find the data files for the batch; relative paths are relative to `ROOT_DIR`|`data`|
-|`LOG_DIR`|Where to write the mapfile, skipfile, and other logging info; relative paths are relative to `ROOT_DIR`|`logs`|
-|`MAPFILE`|Where to store the record of completed items in this batch; relative paths are relative to `LOG_DIR`|`mapfile.csv`|
-|`HANDLER_OPTIONS`|Any additional options required by the handler| |
-
-**Note:** The `plastron.load.*.log` files are currently written to the repository log directory, *not* to batch log directory.
-
-## Extending
-
-### Adding Commands
-
-Commands are implemented as a package in `plastron.commands.{cmd_name}` that
-contain, at a minimum, a class name `Command`. This class must have an `__init__`
-method that takes an [argparse subparsers object] and creates and configures a
-subparser to handle its specific command-line arguments. It must also have a
-`__call__` method that takes a `pcdm.Repository` object and an [argparse.Namespace]
-object, and executes the actual command.
-
-For a simple example, see the ping command, as implemented in
-[`plastron/commands/ping.py`](plastron/commands/ping.py):
-
-```python
-from plastron.exceptions import FailureException
-
-class Command:
-    def __init__(self, subparsers):
-        parser_ping = subparsers.add_parser('ping',
-                description='Check connection to the repository')
-        parser_ping.set_defaults(cmd_name='ping')
-
-    def __call__(self, fcrepo, args):
-        try:
-            fcrepo.test_connection()
-        except:
-            raise FailureException()
-```
-
-The `FailureException` is caught by the `plastron` script and causes it to exit with
-a status code of 1. Any `KeyboardInterrupt` exceptions (for instance, due to the
-user pressing <kbd>Ctrl+C</kbd>) are also caught by the `plastron` script and cause
-it to exit with a status code of 2.
+Source: [Wikipedia](https://en.wikipedia.org/wiki/Turtle_shell#Plastron)
 
 ## License
 
@@ -283,5 +81,3 @@ See the [LICENSE](LICENSE.md) file for license rights and limitations (Apache 2.
 
 [pyenv]: https://github.com/pyenv/pyenv
 [development mode]: https://packaging.python.org/tutorials/installing-packages/#installing-from-vcs
-[argparse subparsers object]: https://docs.python.org/3/library/argparse.html#sub-commands
-[argparse.Namespace]: https://docs.python.org/3/library/argparse.html#the-namespace-object

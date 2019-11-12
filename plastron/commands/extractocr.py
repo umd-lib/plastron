@@ -1,22 +1,29 @@
-from datetime import datetime
-from plastron.exceptions import RESTAPIException, DataReadException, FailureException
-from plastron import util
-from plastron.handlers import ndnp
 import logging
+import sys
+from datetime import datetime
+from plastron import util
+from plastron.exceptions import RESTAPIException, DataReadException, FailureException
+from plastron.models.newspaper import Page
+from plastron.http import Transaction
 
 logger = logging.getLogger(__name__)
 now = datetime.utcnow().strftime('%Y%m%d%H%M%S')
 
-class Command:
-    def __init__(self, subparsers):
-        parser_extractocr = subparsers.add_parser('extractocr',
-                description='Create annotations from OCR data stored in the repository')
-        parser_extractocr.add_argument('--ignore', '-i',
-                            help='file listing items to ignore',
-                            action='store'
-                            )
-        parser_extractocr.set_defaults(cmd_name='extractocr')
 
+def configure_cli(subparsers):
+    parser = subparsers.add_parser(
+        name='extractocr',
+        description='Create annotations from OCR data stored in the repository'
+    )
+    parser.add_argument(
+        '--ignore', '-i',
+        help='file listing items to ignore',
+        action='store'
+    )
+    parser.set_defaults(cmd_name='extractocr')
+
+
+class Command:
     def __call__(self, fcrepo, args):
         fieldnames = ['uri', 'timestamp']
 
@@ -50,43 +57,43 @@ class Command:
                     logger.debug('Ignoring {0}'.format(uri))
                     continue
 
-                is_extracted = False
                 try:
                     is_extracted = extract(fcrepo, uri)
-                except RESTAPIException as e:
+                except RESTAPIException:
                     logger.error(
                         "Unable to commit or rollback transaction, aborting"
-                        )
+                    )
                     raise FailureException()
 
                 row = {
                     'uri': uri,
                     'timestamp': str(datetime.utcnow())
-                    }
+                }
 
                 if is_extracted:
                     completed.writerow(row)
                 else:
                     skipped.writerow(row)
 
+
 def extract(fcrepo, uri):
-    fcrepo.open_transaction()
-    try:
-        logger.info("Getting {0} from repository".format(uri))
-        page = ndnp.Page.from_repository(fcrepo, uri)
-        logger.info("Creating annotations for page {0}".format(page.title))
-        for annotation in page.textblocks():
-            annotation.create_object(fcrepo)
-            annotation.update_object(fcrepo)
+    with Transaction(fcrepo) as txn:
+        try:
+            logger.info("Getting {0} from repository".format(uri))
+            page = Page.from_repository(fcrepo, uri)
+            logger.info("Creating annotations for page {0}".format(page.title))
+            for annotation in page.textblocks():
+                annotation.create_object(fcrepo)
+                annotation.update_object(fcrepo)
 
-        fcrepo.commit_transaction()
-        return True
+            txn.commit()
+            return True
 
-    except (RESTAPIException, DataReadException) as e:
-        # if anything fails during item creation or commiting the transaction
-        # attempt to rollback the current transaction
-        # failures here will be caught by the main loop's exception handler
-        # and should trigger a system exit
-        logger.error("OCR extraction failed: {0}".format(e))
-        fcrepo.rollback_transaction()
-        logger.warn('Transaction rolled back. Continuing load.')
+        except (RESTAPIException, DataReadException) as e:
+            # if anything fails during item creation or committing the transaction
+            # attempt to rollback the current transaction
+            # failures here will be caught by the main loop's exception handler
+            # and should trigger a system exit
+            logger.error("OCR extraction failed: {0}".format(e))
+            txn.rollback()
+            logger.warning('Transaction rolled back. Continuing load.')

@@ -2,32 +2,37 @@ import csv
 import hashlib
 import logging
 import mimetypes
-import os
+from os.path import basename, isfile
 from paramiko import SSHClient, SFTPClient
 from plastron import namespaces
 from plastron.namespaces import dcterms, ebucore
 from rdflib import URIRef
 from rdflib.util import from_n3
 
+
 def get_title_string(graph, separator='; '):
-    return separator.join([ t for t in graph.objects(predicate=dcterms.title) ])
+    return separator.join([t for t in graph.objects(predicate=dcterms.title)])
+
 
 def parse_predicate_list(string, delimiter=','):
     manager = namespaces.get_manager()
-    return [ from_n3(p, nsm=manager) for p in string.split(delimiter) ]
+    return [from_n3(p, nsm=manager) for p in string.split(delimiter)]
+
 
 def print_header():
-    '''Common header formatting.'''
+    """Common header formatting."""
     title = '|     PLASTRON     |'
-    bar = '+' + '='*(len(title)-2) + '+'
-    spacer = '|' + ' '*(len(title)-2) + '|'
+    bar = '+' + '=' * (len(title) - 2) + '+'
+    spacer = '|' + ' ' * (len(title) - 2) + '|'
     print('\n'.join(['', bar, spacer, title, spacer, bar, '']))
 
+
 def print_footer():
-    '''Report success or failure and resources created.'''
+    """Report success or failure and resources created."""
     print('\nScript complete. Goodbye!\n')
 
-class ItemLog():
+
+class ItemLog:
     def __init__(self, filename, fieldnames, keyfield):
         self.filename = filename
         self.fieldnames = fieldnames
@@ -36,7 +41,7 @@ class ItemLog():
         self.fh = None
         self.writer = None
 
-        if not os.path.isfile(self.filename):
+        if not isfile(self.filename):
             with open(self.filename, 'w', 1) as fh:
                 writer = csv.DictWriter(fh, fieldnames=self.fieldnames)
                 writer.writeheader()
@@ -73,18 +78,20 @@ class ItemLog():
         if self.fh is not None:
             self.fh.close()
 
+
 class BinarySource(object):
     def __init__(self):
         self.logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
 
+
 class LocalFile(BinarySource):
-    def __init__(self, localpath, mimetype=None):
-        super(LocalFile, self).__init__()
+    def __init__(self, localpath, mimetype=None, filename=None):
+        super().__init__()
         if mimetype is None:
             mimetype = mimetypes.guess_type(localpath)[0]
         self._mimetype = mimetype
         self.localpath = localpath
-        self.filename = os.path.basename(localpath)
+        self.filename = filename if filename is not None else basename(localpath)
 
     def data(self):
         return open(self.localpath, 'rb')
@@ -94,19 +101,16 @@ class LocalFile(BinarySource):
 
     # generate SHA1 checksum on a file
     def digest(self):
-        BUF_SIZE = 65536
         sha1 = hashlib.sha1()
         with self.data() as stream:
-            while True:
-                data = stream.read(BUF_SIZE)
-                if not data:
-                    break
-                sha1.update(data)
+            for block in stream:
+                sha1.update(block)
         return 'sha1=' + sha1.hexdigest()
+
 
 class RepositoryFile(BinarySource):
     def __init__(self, repo, file_uri):
-        super(RepositoryFile, self).__init__()
+        super().__init__()
         file_uri = URIRef(file_uri)
         head_res = repo.head(file_uri)
         if 'describedby' in head_res.links:
@@ -130,14 +134,15 @@ class RepositoryFile(BinarySource):
     def data(self):
         return self.repo.get(self.file_uri, stream=True).raw
 
+
 class RemoteFile(BinarySource):
     def __init__(self, host, remotepath, mimetype=None):
-        super(RemoteFile, self).__init__()
+        super().__init__()
         self.ssh_client = None
         self.sftp_client = None
         self.host = host
         self.remotepath = remotepath
-        self.filename = os.path.basename(remotepath)
+        self.filename = basename(remotepath)
         self._mimetype = mimetype
 
     def __del__(self):

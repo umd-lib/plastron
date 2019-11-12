@@ -1,288 +1,56 @@
-import os
-import requests
-import logging
-import threading
-from rdflib import Graph, Literal, URIRef
-from plastron import ldp, ore
+from rdflib import URIRef
+from plastron import ldp, ore, rdf
 from plastron.exceptions import RESTAPIException
-from plastron.namespaces import dcterms, iana, pcdm, rdf, ebucore
-from operator import attrgetter
+from plastron.namespaces import dcterms, dcmitype, fabio, iana, pcdm, ebucore, pcdmuse
+from plastron.util import LocalFile
 from PIL import Image
 
-# alias the RDFlib Namespace
+# alias the rdflib Namespace
 ns = pcdm
 
-#============================================================================
-# REPOSITORY (REPRESENTING AN FCREPO INSTANCE)
-#============================================================================
 
-class Repository():
-    def __init__(self, config, ua_string=None):
-        self.endpoint = config['REST_ENDPOINT']
-        self.relpath = config['RELPATH']
-        self._path_stack = [ self.relpath ]
-        self.fullpath = '/'.join(
-            [p.strip('/') for p in (self.endpoint, self.relpath)]
-            )
-        self.session = requests.Session()
-        self.transaction = None
-        self.load_binaries = True
-        self.log_dir = config['LOG_DIR']
-        self.logger = logging.getLogger(
-            __name__ + '.' + self.__class__.__name__
-            )
-        self.ua_string = ua_string
-
-        if 'CLIENT_CERT' in config and 'CLIENT_KEY' in config:
-            self.session.cert = (config['CLIENT_CERT'], config['CLIENT_KEY'])
-        elif 'FEDORA_USER' in config and 'FEDORA_PASSWORD' in config:
-            self.session.auth = (config['FEDORA_USER'], config['FEDORA_PASSWORD'])
-
-        if 'SERVER_CERT' in config:
-            self.session.verify = config['SERVER_CERT']
-
-    def at_path(self, relpath):
-        self._path_stack.append(self.relpath)
-        self.relpath = relpath
-        return self
-
-    def __enter__(self):
-        pass
-
-    def __exit__(self, type, value, traceback):
-        self.relpath = self._path_stack.pop()
-
-
-    def is_reachable(self):
-        response = self.head(self.fullpath)
-        return response.status_code == 200
-
-    def test_connection(self):
-        # test connection to fcrepo
-        self.logger.debug("fcrepo.endpoint = %s", self.endpoint)
-        self.logger.debug("fcrepo.relpath = %s", self.relpath)
-        self.logger.debug("fcrepo.fullpath = %s", self.fullpath)
-        self.logger.info("Testing connection to {0}".format(self.fullpath))
-        if self.is_reachable():
-            self.logger.info("Connection successful.")
-        else:
-            self.logger.warn("Unable to connect.")
-            raise Exception("Unable to connect")
-
-    def request(self, method, url, **kwargs):
-        target_uri = self._insert_transaction_uri(url)
-        self.logger.debug("%s %s", method, target_uri)
-        if self.ua_string is not None:
-            if 'headers' not in kwargs:
-                kwargs['headers'] = {}
-            kwargs['headers']['User-Agent'] = self.ua_string
-        response = self.session.request(method, target_uri, **kwargs)
-        self.logger.debug("%s %s", response.status_code, response.reason)
-        return response
-
-    def post(self, url, **kwargs):
-        return self.request('POST', url, **kwargs)
-
-    def put(self, url, **kwargs):
-        return self.request('PUT', url, **kwargs)
-
-    def patch(self, url, **kwargs):
-        return self.request('PATCH', url, **kwargs)
-
-    def head(self, url, **kwargs):
-        return self.request('HEAD', url, **kwargs)
-
-    def get(self, url, **kwargs):
-        return self.request('GET', url, **kwargs)
-
-    def delete(self, url, **kwargs):
-        return self.request('DELETE', url, **kwargs)
-
-    def exists(self, url, **kwargs):
-        response = self.head(url, **kwargs)
-        return response.status_code == 200
-
-    def recursive_get(self, url, traverse=[], **kwargs):
-        head_response = self.head(url, **kwargs)
-        if 'describedby' in head_response.links:
-            target = head_response.links['describedby']['url']
-        else:
-            target = url
-        response = self.get(target, headers={'Accept': 'text/turtle'}, **kwargs)
-        if response.status_code == 200:
-            graph = Graph()
-            graph.parse(data=response.text, format='n3', publicID=url)
-            yield (self._remove_transaction_uri(url), graph)
-            for (s, p, o) in graph:
-                if p in traverse:
-                    for (uri, graph) in self.recursive_get(
-                        str(o), traverse=traverse, **kwargs):
-                        yield (uri, graph)
-
-    def get_graph(self, url):
-        response = self.get(url, headers={'Accept': 'text/turtle'}, stream=True)
-        if response.status_code != 200:
-            self.logger.error("Unable to get text/turtle representation of {0}".format(url))
-            raise RESTAPIException(response)
-        graph = Graph()
-        graph.parse(source=response.raw, format='turtle')
-        return graph
-
-    def open_transaction(self, **kwargs):
-        url = os.path.join(self.endpoint, 'fcr:tx')
-        self.logger.info("Creating transaction")
-        response = self.post(url, **kwargs)
-        if response.status_code == 201:
-            self.transaction = response.headers['Location']
-            self.logger.info("Created transaction {0}".format(self.transaction))
-            return True
-        else:
-            self.logger.error("Failed to create transaction")
-            raise RESTAPIException(response)
-
-    def maintain_transaction(self, **kwargs):
-        if self.transaction is not None:
-            url = os.path.join(self.transaction, 'fcr:tx')
-            self.logger.info(
-                "Maintaining transaction {0}".format(self.transaction)
-                )
-            response = self.post(url, **kwargs)
-            if response.status_code == 204:
-                self.logger.info(
-                    "Transaction {0} is active until {1}".format(
-                        self.transaction, response.headers['Expires']
-                        )
-                    )
-                return True
-            else:
-                self.logger.error(
-                    "Failed to maintain transaction {0}".format(self.transaction)
-                    )
-                raise RESTAPIException(response)
-
-    def commit_transaction(self, **kwargs):
-        if self.transaction is not None:
-            url = os.path.join(self.transaction, 'fcr:tx/fcr:commit')
-            self.logger.info(
-                "Committing transaction {0}".format(self.transaction)
-                )
-            response = self.post(url, **kwargs)
-            if response.status_code == 204:
-                self.logger.info(
-                    "Committed transaction {0}".format(self.transaction)
-                    )
-                self.transaction = None
-                return True
-            else:
-                self.logger.error(
-                    "Failed to commit transaction {0}".format(self.transaction)
-                    )
-                raise RESTAPIException(response)
-
-    def rollback_transaction(self, **kwargs):
-        if self.transaction is not None:
-            url = os.path.join(self.transaction, 'fcr:tx/fcr:rollback')
-            self.logger.info(
-                "Rolling back transaction {0}".format(self.transaction)
-                )
-            response = self.post(url, **kwargs)
-            if response.status_code == 204:
-                self.logger.info(
-                    "Rolled back transaction {0}".format(self.transaction)
-                    )
-                self.transaction = None
-                return True
-            else:
-                self.logger.error(
-                    "Failed to roll back transaction {0}".format(self.transaction)
-                    )
-                raise RESTAPIException(response)
-
-    def _insert_transaction_uri(self, uri):
-        if self.transaction is None or uri.startswith(self.transaction):
-            return uri
-        elif uri.startswith(self.endpoint):
-            relpath = uri[len(self.endpoint):]
-            return '/'.join([p.strip('/') for p in (self.transaction, relpath)])
-        else:
-            return uri
-
-    def _remove_transaction_uri(self, uri):
-        if self.transaction is not None and uri.startswith(self.transaction):
-            relpath = uri[len(self.transaction):]
-            return '/'.join([p.strip('/') for p in (self.endpoint, relpath)])
-        else:
-            return uri
-
-    def uri(self):
-        return '/'.join([p.strip('/') for p in (self.endpoint, self.relpath)])
-
-
-# based on https://stackoverflow.com/a/12435256/5124907
-class TransactionKeepAlive(threading.Thread):
-    def __init__(self, repository, interval):
-        super(TransactionKeepAlive, self).__init__(name='TransactionKeepAlive')
-        self.repository = repository
-        self.interval = interval
-        self.stopped = threading.Event()
-
-    def run(self):
-        while not self.stopped.wait(self.interval):
-            self.repository.maintain_transaction()
-
-    def stop(self):
-        self.stopped.set()
-
-
-#============================================================================
+# ============================================================================
 # PCDM RESOURCE (COMMON METHODS FOR ALL OBJECTS)
-#============================================================================
+# ============================================================================
 
+@rdf.object_property('components', pcdm.hasMember, multivalue=True)
+@rdf.object_property('collections', pcdm.memberOf, multivalue=True)
+@rdf.object_property('files', pcdm.hasFile, multivalue=True)
+@rdf.object_property('file_of', pcdm.fileOf, multivalue=True)
+@rdf.object_property('related', pcdm.hasRelatedObject, multivalue=True)
+@rdf.object_property('related_of', pcdm.relatedObjectOf, multivalue=True)
+@rdf.data_property('title', dcterms.title)
 class Resource(ldp.Resource):
-    def __str__(self):
-        if hasattr(self, 'title'):
-            return self.title
-        else:
-            return repr(self)
-
-    def components(self):
-        return [ obj for (rel, obj) in self.linked_objects if rel == pcdm.hasMember ]
-
     def ordered_components(self):
-        orig_list = [ obj for obj in self.components() if obj.ordered ]
+        orig_list = [obj for obj in self.components if obj.ordered]
         if not orig_list:
             return []
         else:
             sort_key = self.sequence_attr[1]
-            sorted_list = sorted(orig_list, key=attrgetter(sort_key))
+
+            def get_key(item):
+                return int(str(getattr(item, sort_key)))
+
+            sorted_list = sorted(orig_list, key=get_key)
             return sorted_list
 
     def unordered_components(self):
-        return [ obj for obj in self.components() if not obj.ordered ]
-
-    def files(self):
-        return [ obj for (rel, obj) in self.linked_objects if rel == pcdm.hasFile ]
-
-    def collections(self):
-        return [ obj for (rel, obj) in self.linked_objects if rel == pcdm.memberOf ]
-
-    def related(self):
-        return [ obj for (rel, obj) in self.linked_objects if rel == pcdm.hasRelatedObject ]
+        return [obj for obj in self.components if not obj.ordered]
 
     def add_component(self, obj):
-        self.linked_objects.append((pcdm.hasMember, obj))
-        obj.linked_objects.append((pcdm.memberOf, self))
+        self.components.append(obj)
+        obj.collections.append(self)
 
     def add_file(self, obj):
-        self.linked_objects.append((pcdm.hasFile, obj))
-        obj.linked_objects.append((pcdm.fileOf, self))
+        self.files.append(obj)
+        obj.file_of.append(self)
 
     def add_collection(self, obj):
-        self.linked_objects.append((pcdm.memberOf, obj))
+        self.collections.append(obj)
 
     def add_related(self, obj):
-        self.linked_objects.append((pcdm.hasRelatedObject, obj))
-        obj.linked_objects.append((pcdm.relatedObjectOf, self))
+        self.related.append(obj)
+        obj.related_of.append(self)
 
     # show the item graph and tree of related objects
     def print_item_tree(self, indent='', label=None):
@@ -310,26 +78,14 @@ class Resource(ldp.Resource):
                 print(indent + '    ' + str(f))
 
 
-#============================================================================
+# ============================================================================
 # PCDM ITEM-OBJECT
-#============================================================================
+# ============================================================================
 
+@rdf.object_property('first', iana.first)
+@rdf.object_property('last', iana.last)
+@rdf.rdf_class(pcdm.Object)
 class Item(Resource):
-
-    def __init__(self):
-        super(Item, self).__init__()
-        self.first = None
-        self.last = None
-        self.annotations = []
-
-    def graph(self):
-        graph = super(Item, self).graph()
-        graph.add((self.uri, rdf.type, pcdm.Object))
-        if self.first is not None:
-            graph.add((self.uri, iana.first, self.first.uri))
-        if self.last is not None:
-            graph.add((self.uri, iana.last, self.last.uri))
-        return graph
 
     # iterate over each component and create ordering proxies
     def create_ordering(self, repository):
@@ -337,9 +93,13 @@ class Item(Resource):
         ordered_components = self.ordered_components()
         for component in ordered_components:
             position = " ".join([self.sequence_attr[0],
-                                getattr(component, self.sequence_attr[1])]
-                                )
-            proxies.append(ore.Proxy(position, proxy_for=component, proxy_in=self))
+                                 str(getattr(component, self.sequence_attr[1]))])
+            proxy = ore.Proxy(
+                title=f'Proxy for {position} in {self}',
+                proxy_for=component,
+                proxy_in=self
+            )
+            proxies.append(proxy)
 
         for proxy in proxies:
             proxy.create_object(repository)
@@ -368,58 +128,35 @@ class Item(Resource):
         for annotation in self.annotations:
             annotation.recursive_update(repository)
 
-#============================================================================
+
+# ============================================================================
 # PCDM COMPONENT-OBJECT
-#============================================================================
+# ============================================================================
 
+@rdf.rdf_class(pcdm.Object)
 class Component(Resource):
-
-    def __init__(self):
-        super(Component, self).__init__()
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
         self.ordered = False
 
-    def graph(self):
-        graph = super(Component, self).graph()
-        graph.add((self.uri, rdf.type, pcdm.Object))
-        return graph
 
-#============================================================================
+# ============================================================================
 # PCDM FILE
-#============================================================================
+# ============================================================================
 
+@rdf.data_property('mimetype', ebucore.hasMimeType)
+@rdf.data_property('filename', ebucore.filename)
+@rdf.data_property('width', ebucore.width)
+@rdf.data_property('height', ebucore.height)
+@rdf.object_property('dcmitype', dcterms.type)
+@rdf.rdf_class(pcdm.File)
 class File(Resource):
-    def __init__(self, source, title=None):
-        super(File, self).__init__()
+    def __init__(self, source, **kwargs):
+        super().__init__(**kwargs)
         self.source = source
         self.filename = source.filename
-        self.width = None
-        self.height = None
-        if title is not None:
-            self.title = title
-        else:
+        if self.title is None:
             self.title = self.filename
-
-    def graph(self):
-        graph = super(File, self).graph()
-        graph.add((self.uri, rdf.type, pcdm.File))
-        graph.add((self.uri, dcterms.title, Literal(self.title)))
-
-        # if this is an image file, see if we can get dimensions
-        if self.source.mimetype().startswith('image/'):
-            if self.width is None or self.height is None:
-                # use PIL
-                try:
-                    with Image.open(self.source.data()) as img:
-                        self.width = img.width
-                        self.height = img.height
-                except IOError as e:
-                    self.logger.warn(f'Cannot read image file: {e}')
-
-        if self.width is not None:
-            graph.add((self.uri, ebucore.width, Literal(self.width)))
-        if self.height is not None:
-            graph.add((self.uri, ebucore.height, Literal(self.height)))
-        return graph
 
     # upload a binary resource
     def create_object(self, repository, uri=None):
@@ -439,31 +176,70 @@ class File(Resource):
                 'Content-Type': self.source.mimetype(),
                 'Digest': self.source.digest(),
                 'Content-Disposition': f'attachment; filename="{self.source.filename}"'
-                }
+            }
             if uri is not None:
                 response = repository.put(uri, data=stream, headers=headers)
             else:
                 response = repository.post(repository.uri(), data=stream, headers=headers)
 
         if response.status_code == 201:
-            self.uri = URIRef(response.text)
+            self.uri = URIRef(response.headers['Location'])
             self.created = True
             return True
         else:
             raise RESTAPIException(response)
 
-    def update_object(self, repository):
+    def update_object(self, repository, patch_uri=None):
         if not repository.load_binaries:
             self.logger.info(f'Skipping update for binary {self.source.filename}')
             return True
-        fcr_metadata = str(self.uri) + '/fcr:metadata'
-        super(File, self).update_object(repository, patch_uri=fcr_metadata)
+
+        # if this is an image file, see if we can get dimensions
+        if self.source.mimetype().startswith('image/'):
+            if self.width is None or self.height is None:
+                # use PIL
+                try:
+                    with Image.open(self.source.data()) as img:
+                        self.width = img.width
+                        self.height = img.height
+                except IOError as e:
+                    self.logger.warn(f'Cannot read image file: {e}')
+
+        head_response = repository.head(self.uri)
+        if 'describedby' in head_response.links:
+            target = head_response.links['describedby']['url']
+        else:
+            raise Exception(f'Missing describedby Link header for {self.uri}')
+
+        return super().update_object(repository, patch_uri=target)
 
 
-#============================================================================
+@rdf.rdf_class(pcdmuse.PreservationMasterFile)
+class PreservationMasterFile(File):
+    pass
+
+
+@rdf.rdf_class(pcdmuse.IntermediateFile)
+class IntermediateFile(File):
+    pass
+
+
+@rdf.rdf_class(pcdmuse.ServiceFile)
+class ServiceFile(File):
+    pass
+
+
+@rdf.rdf_class(pcdmuse.ExtractedText)
+class ExtractedText(File):
+    pass
+
+
+# ============================================================================
 # PCDM COLLECTION OBJECT
-#============================================================================
+# ============================================================================
 
+@rdf.data_property('title', dcterms.title)
+@rdf.rdf_class(pcdm.Collection)
 class Collection(Resource):
 
     @classmethod
@@ -484,13 +260,31 @@ class Collection(Resource):
 
         return collection
 
-    def __init__(self):
-        super(Collection, self).__init__()
-        self.title = None
 
-    def graph(self):
-        graph = super(Collection, self).graph()
-        graph.add((self.uri, rdf.type, pcdm.Collection))
-        if self.title is not None:
-            graph.add((self.uri, dcterms.title, Literal(self.title)))
-        return graph
+@rdf.data_property('number', fabio.hasSequenceIdentifier)
+@rdf.rdf_class(fabio.Page)
+class Page(Resource):
+    """One page of an item-level resource"""
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.ordered = True
+
+
+FILE_CLASS_FOR = {
+    '.tif': PreservationMasterFile,
+    '.jpg': IntermediateFile,
+    '.txt': ExtractedText,
+    '.xml': ExtractedText,
+}
+
+
+def get_file_object(path):
+    extension = path[path.rfind('.'):]
+    if extension in FILE_CLASS_FOR:
+        cls = FILE_CLASS_FOR[extension]
+    else:
+        cls = File
+    f = cls(LocalFile(path))
+    f.dcmitype = dcmitype.Text
+    return f

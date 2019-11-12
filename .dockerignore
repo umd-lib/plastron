@@ -1,0 +1,13 @@
+.dockerignore
+.DS_Store
+.git*
+.idea
+*.egg-info
+*.key
+*.pem
+
+docker-compose.yml
+docker-plastron.yml
+
+dist/
+logs/

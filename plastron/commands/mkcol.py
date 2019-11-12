@@ -1,42 +1,61 @@
+import logging
 import yaml
 from plastron import pcdm
 from plastron.exceptions import RESTAPIException, FailureException
-import logging
+from plastron.http import Transaction
+
 logger = logging.getLogger(__name__)
 
+
+def configure_cli(subparsers):
+    parser = subparsers.add_parser(
+        name='mkcol',
+        description='Create a PCDM Collection in the repository'
+    )
+    parser.add_argument(
+        '-n', '--name',
+        help='Name of the collection.',
+        action='store',
+        required=True
+    )
+    # if given, will write the collection URI to it
+    parser.add_argument(
+        '-b', '--batch',
+        help='Path to batch configuration file.',
+        action='store'
+    )
+    parser.add_argument(
+        '--notransactions',
+        help='run the load without using transactions',
+        action='store_true'
+    )
+    parser.set_defaults(cmd_name='mkcol')
+
+
 class Command:
-    def __init__(self, subparsers):
-        parser_mkcol = subparsers.add_parser('mkcol',
-                description='Create a PCDM Collection in the repository')
-        parser_mkcol.add_argument('-n', '--name',
-                            help='Name of the collection.',
-                            action='store',
-                            required=True
-                            )
-        # if given, will write the collection URI to it
-        parser_mkcol.add_argument('-b', '--batch',
-                            help='Path to batch configuration file.',
-                            action='store'
-                            )
-        parser_mkcol.set_defaults(cmd_name='mkcol')
-
     def __call__(self, fcrepo, args):
-        # open transaction
-        logger.info('Opening transaction')
-        fcrepo.open_transaction()
+        if args.notransactions:
+            try:
+                collection = pcdm.Collection()
+                collection.title = args.name
+                collection.create_object(fcrepo)
+                collection.update_object(fcrepo)
 
-        try:
-            collection = pcdm.Collection()
-            collection.title = args.name
-            collection.create_object(fcrepo)
-            collection.update_object(fcrepo)
-            # commit transaction
-            logger.info('Committing transaction')
-            fcrepo.commit_transaction()
+            except RESTAPIException as e:
+                logger.error(f'Error in collection creation: {e}')
+                raise FailureException()
+        else:
+            with Transaction(fcrepo) as txn:
+                try:
+                    collection = pcdm.Collection()
+                    collection.title = args.name
+                    collection.create_object(fcrepo)
+                    collection.update_object(fcrepo)
+                    txn.commit()
 
-        except (RESTAPIException) as e:
-            logger.error("Error in collection creation: {0}".format(e))
-            raise FailureException()
+                except RESTAPIException as e:
+                    logger.error(f'Error in collection creation: {e}')
+                    raise FailureException()
 
         if args.batch is not None:
             with open(args.batch, 'r') as batchconfig:

@@ -1,6 +1,9 @@
 from lxml import etree
 
-ns = { "alto": "http://www.loc.gov/standards/alto/ns-v2#" }
+ns = {
+    "alto": "http://www.loc.gov/standards/alto/ns-v2#"
+}
+
 
 class ALTOResource(object):
     def __init__(self, xmldoc, image_resolution):
@@ -25,6 +28,7 @@ class ALTOResource(object):
     def textblock(self, id):
         return TextBlock(self.xmldoc.xpath("//alto:TextBlock[@ID=$id]", id=id, namespaces=ns)[0])
 
+
 class Region(object):
     def __init__(self, element):
         self.element = element
@@ -37,16 +41,17 @@ class Region(object):
     def xywh(self, scale):
         xscale = scale[0]
         yscale = scale[1]
-        x = round(self.hpos   * xscale)
-        y = round(self.vpos   * yscale)
-        w = round(self.width  * xscale)
+        x = round(self.hpos * xscale)
+        y = round(self.vpos * yscale)
+        w = round(self.width * xscale)
         h = round(self.height * yscale)
 
-        return (x, y, w, h)
+        return x, y, w, h
 
     def bbox(self, scale):
         (x, y, w, h) = self.xywh(scale)
-        return (x, y, x+w, y+h)
+        return x, y, x + w, y + h
+
 
 class TextBlock(Region):
     def lines(self):
@@ -54,7 +59,8 @@ class TextBlock(Region):
             yield TextLine(node)
 
     def text(self, scale=None):
-        return "\n".join([ line.text(scale) for line in self.lines() ])
+        return "\n".join([line.text(scale) for line in self.lines()])
+
 
 class TextLine(Region):
     def inlines(self):
@@ -68,15 +74,17 @@ class TextLine(Region):
                 yield Hyphen(node)
 
     def text(self, scale=None):
-        return ''.join([ inline.text(scale) for inline in self.inlines() ])
+        return ''.join([inline.text(scale) for inline in self.inlines()])
+
 
 class String(Region):
     def text(self, scale=None):
         text = self.element.get('CONTENT')
         if scale is None:
             return text
-        xywh = ','.join([ str(i) for i in self.xywh(scale) ])
+        xywh = ','.join([str(i) for i in self.xywh(scale)])
         return '{0}|{1}'.format(text, xywh)
+
 
 class Space(object):
     def __init__(self, element):
@@ -85,6 +93,7 @@ class Space(object):
 
     def text(self, scale=None):
         return ' '
+
 
 class Hyphen(object):
     def __init__(self, element):

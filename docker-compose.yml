@@ -1,0 +1,25 @@
+version: "3.7"
+services:
+  plastrond:
+    image: plastrond
+    configs:
+      - source: plastrond
+        target: /etc/plastrond.yml
+    secrets:
+      - batchloader.pem
+      - batchloader.key
+      - repository.pem
+    volumes:
+      - plastrond:/var/opt/plastron
+configs:
+  plastrond:
+    file: docker-plastron.yml
+secrets:
+  batchloader.pem:
+    external: true
+  batchloader.key:
+    external: true
+  repository.pem:
+    external: true
+volumes:
+  plastrond:

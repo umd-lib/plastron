@@ -2,12 +2,17 @@ import csv
 import hashlib
 import logging
 import mimetypes
+import sys
 from os.path import basename, isfile
 from paramiko import SSHClient, SFTPClient
 from plastron import namespaces
+from plastron.exceptions import RESTAPIException, FailureException
+from plastron.http import Transaction
 from plastron.namespaces import dcterms, ebucore
 from rdflib import URIRef
 from rdflib.util import from_n3
+
+logger = logging.getLogger(__name__)
 
 
 def get_title_string(graph, separator='; '):
@@ -17,6 +22,51 @@ def get_title_string(graph, separator='; '):
 def parse_predicate_list(string, delimiter=','):
     manager = namespaces.get_manager()
     return [from_n3(p, nsm=manager) for p in string.split(delimiter)]
+
+
+def process_resources(method, repository, uri_list=None, file=None, recursive=None, use_transaction=True):
+    if recursive is not None:
+        predicates = parse_predicate_list(recursive)
+        predicate_list = ', '.join(p.n3() for p in predicates)
+        logger.info(f"{method.__name__} will traverse the following predicates: {predicate_list}")
+    else:
+        predicates = []
+
+    if file is not None:
+        if file == '-':
+            # special filename "-" means STDIN
+            uri_list = sys.stdin
+        else:
+            with open(file) as fh:
+                uri_list = [ line.rstrip() for line in fh ]
+
+    # closure for processing the list of items
+    def process_list():
+        for uri in uri_list:
+            for target_uri, graph in repository.recursive_get(uri, traverse=predicates):
+                method(target_uri, graph)
+
+    if use_transaction:
+        try:
+            with Transaction(repository, keep_alive=90) as txn:
+                try:
+                    process_list()
+                    txn.commit()
+
+                except RESTAPIException as e:
+                    # if anything fails while processing of the list of uris, attempt to
+                    # rollback the transaction. Failures here will be caught by the main
+                    # loop's exception handler and should trigger a system exit
+                    logger.error(f'Failed: {e}')
+                    txn.rollback()
+                    logger.warning('Transaction rolled back.')
+
+        except RESTAPIException:
+            logger.error('Unable to roll back transaction, aborting')
+            raise FailureException()
+
+    else:
+        process_list()
 
 
 def print_header():

@@ -1,7 +1,5 @@
-from plastron.exceptions import RESTAPIException, FailureException
-from plastron.util import get_title_string, print_header, print_footer, parse_predicate_list
-from plastron.http import Transaction
 import logging
+from plastron.util import get_title_string, print_header, print_footer, process_resources
 
 logger = logging.getLogger(__name__)
 
@@ -38,67 +36,29 @@ class Command:
         if not args.quiet:
             print_header()
 
-        if args.recursive is not None:
-            logger.info('Recursive delete enabled')
-            args.predicates = parse_predicate_list(args.recursive)
-            logger.info('Deletion will traverse the following predicates: {0}'.format(
-                ', '.join([p.n3() for p in args.predicates]))
-            )
+        self.repository = fcrepo
+        self.repository.test_connection()
+        self.dry_run = args.dryrun
 
-        fcrepo.test_connection()
-        if args.dryrun:
+        if self.dry_run:
             logger.info('Dry run enabled, no actual deletions will take place')
 
-        try:
-            if args.file is not None:
-                with open(args.file, 'r') as uri_list:
-                    delete_items(fcrepo, uri_list, args)
-            elif args.uris is not None:
-                delete_items(fcrepo, args.uris, args)
-
-        except RESTAPIException:
-            logger.error(
-                "Unable to commit or rollback transaction, aborting"
-            )
-            raise FailureException()
+        process_resources(
+            method=self.delete_item,
+            repository=self.repository,
+            uri_list=args.uris,
+            file=args.file,
+            recursive=args.recursive,
+            use_transaction=(not args.dryrun)
+        )
 
         if not args.quiet:
             print_footer()
 
-
-def get_uris_to_delete(fcrepo, uri, args):
-    if args.recursive is not None:
-        logger.info('Constructing list of URIs to delete')
-        return fcrepo.recursive_get(uri, traverse=args.predicates)
-    else:
-        return fcrepo.recursive_get(uri, traverse=[])
-
-
-def delete_items(fcrepo, uri_list, args):
-    if args.dryrun:
-        for uri in uri_list:
-            for (target_uri, graph) in get_uris_to_delete(fcrepo, uri, args):
-                title = get_title_string(graph)
-                logger.info("Would delete {0} {1}".format(target_uri, title))
-        return True
-
-    with Transaction(fcrepo, keep_alive=90) as txn:
-        # delete item
-        # (and its components, if a list of predicates to traverse was given)
-        try:
-            for uri in uri_list:
-                for (target_uri, graph) in get_uris_to_delete(fcrepo, uri, args):
-                    title = get_title_string(graph)
-                    fcrepo.delete(target_uri)
-                    logger.info('Deleted resource {0} {1}'.format(target_uri, title))
-
-            txn.commit()
-            return True
-
-        except RESTAPIException as e:
-            # if anything fails during deletion of a set of uris, attempt to
-            # rollback the transaction. Failures here will be caught by the main
-            # loop's exception handler and should trigger a system exit
-            logger.error("Item deletion failed: {0}".format(e))
-            txn.rollback()
-            logger.warning('Transaction rolled back.')
+    def delete_item(self, target_uri, graph):
+        title = get_title_string(graph)
+        if self.dry_run:
+            logger.info(f'Would delete resource {target_uri} {title}')
+        else:
+            self.repository.delete(target_uri)
+            logger.info(f'Deleted resource {target_uri} {title}')

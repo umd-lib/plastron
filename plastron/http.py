@@ -1,4 +1,6 @@
 import os
+from collections import namedtuple
+
 import requests
 import logging
 import threading
@@ -7,6 +9,14 @@ from plastron.exceptions import RESTAPIException
 
 OMIT_SERVER_MANAGED_TRIPLES = 'return=representation; omit="http://fedora.info/definitions/v4/repository#ServerManaged"'
 
+
+# lightweight representation of a resource URI and URI of its description
+# for RDFSources, in general the uri and description_uri will be the same
+class Resource(namedtuple('Resource', ['uri', 'description_uri'])):
+    __slots__ = ()
+
+    def __str__(self):
+        return self.uri
 
 class Repository:
     def __init__(self, config, ua_string=None):
@@ -106,22 +116,23 @@ class Repository:
             raise RESTAPIException(response)
 
     def recursive_get(self, url, traverse=None, **kwargs):
-        if traverse is None:
-            traverse = []
         head_response = self.head(url, **kwargs)
         if 'describedby' in head_response.links:
             target = head_response.links['describedby']['url']
         else:
             target = url
-        response = self.get(target, headers={'Accept': 'text/turtle'}, **kwargs)
-        if response.status_code == 200:
-            graph = Graph()
-            graph.parse(data=response.text, format='n3', publicID=url)
-            yield (self._remove_transaction_uri(url), graph)
+
+        graph = self.get_graph(target)
+        resource = Resource(
+            uri=self._remove_transaction_uri(url),
+            description_uri=self._remove_transaction_uri(target)
+        )
+        yield (resource, graph)
+        if traverse is not None:
             for (s, p, o) in graph:
                 if p in traverse:
-                    for (uri, graph) in self.recursive_get(str(o), traverse=traverse, **kwargs):
-                        yield (uri, graph)
+                    for (resource, graph) in self.recursive_get(str(o), traverse=traverse, **kwargs):
+                        yield (resource, graph)
 
     def get_graph(self, url, include_server_managed=True):
         headers = {

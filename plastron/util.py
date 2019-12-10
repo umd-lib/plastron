@@ -41,30 +41,32 @@ def process_resources(method, repository, uri_list=None, file=None, recursive=No
                 uri_list = [ line.rstrip() for line in fh ]
 
     # closure for processing the list of items
-    def process_list():
+    def process_list(transaction=None):
         for uri in uri_list:
-            for target_uri, graph in repository.recursive_get(uri, traverse=predicates):
-                method(target_uri, graph)
+            for resource, graph in repository.recursive_get(uri, traverse=predicates):
+                try:
+                    method(resource, graph)
+                except RESTAPIException as e:
+                    logger.error(f'{method.__name__} failed for {resource}: {e}: {e.response.text}')
+                    if transaction is not None:
+                        # if anything fails while processing of the list of uris, attempt to
+                        # rollback the transaction. Failures here will be caught by the main
+                        # loop's exception handler and should trigger a system exit
+                        transaction.rollback()
+                        logger.warning('Transaction rolled back.')
+                        return
+                    else:
+                        logger.warning(f'Continuing {method.__name__} with next item')
+        if transaction is not None:
+            transaction.commit()
 
     if use_transaction:
         try:
             with Transaction(repository, keep_alive=90) as txn:
-                try:
-                    process_list()
-                    txn.commit()
-
-                except RESTAPIException as e:
-                    # if anything fails while processing of the list of uris, attempt to
-                    # rollback the transaction. Failures here will be caught by the main
-                    # loop's exception handler and should trigger a system exit
-                    logger.error(f'Failed: {e}')
-                    txn.rollback()
-                    logger.warning('Transaction rolled back.')
-
+                process_list(txn)
         except RESTAPIException:
             logger.error('Unable to roll back transaction, aborting')
             raise FailureException()
-
     else:
         process_list()
 

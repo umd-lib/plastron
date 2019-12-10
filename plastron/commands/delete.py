@@ -8,16 +8,23 @@ def configure_cli(subparsers):
     parser = subparsers.add_parser(
         name='delete',
         aliases=['del', 'rm'],
-        description='Delete objects from the repository')
+        description='Delete objects from the repository'
+    )
     parser.add_argument(
         '-R', '--recursive',
         help='Delete additional objects found by traversing the given predicate(s)',
         action='store'
     )
     parser.add_argument(
-        '-d', '--dryrun',
+        '-d', '--dry-run',
         help='Simulate a delete without modifying the repository',
         action='store_true'
+    )
+    parser.add_argument(
+        '--no-transactions', '--no-txn',
+        help='run the update without using transactions',
+        action='store_false',
+        dest='use_transactions'
     )
     parser.add_argument(
         '-f', '--file',
@@ -38,7 +45,7 @@ class Command:
 
         self.repository = fcrepo
         self.repository.test_connection()
-        self.dry_run = args.dryrun
+        self.dry_run = args.dry_run
 
         if self.dry_run:
             logger.info('Dry run enabled, no actual deletions will take place')
@@ -49,16 +56,16 @@ class Command:
             uri_list=args.uris,
             file=args.file,
             recursive=args.recursive,
-            use_transaction=(not args.dryrun)
+            use_transaction=args.use_transactions
         )
 
         if not args.quiet:
             print_footer()
 
-    def delete_item(self, target_uri, graph):
+    def delete_item(self, resource, graph):
         title = get_title_string(graph)
         if self.dry_run:
-            logger.info(f'Would delete resource {target_uri} {title}')
+            logger.info(f'Would delete resource {resource} {title}')
         else:
-            self.repository.delete(target_uri)
-            logger.info(f'Deleted resource {target_uri} {title}')
+            self.repository.delete(resource.uri)
+            logger.info(f'Deleted resource {resource} {title}')

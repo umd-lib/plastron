@@ -27,15 +27,16 @@ def configure_cli(subparsers):
         required=True
     )
     parser.add_argument(
-        '-d', '--dryrun',
+        '-d', '--dry-run',
         help='iterate over the batch without POSTing',
         action='store_true'
     )
     # useful for testing when file loading is too slow
     parser.add_argument(
-        '-n', '--nobinaries',
+        '-n', '--no-binaries',
         help='iterate without uploading binaries',
-        action='store_true'
+        action='store_false',
+        dest='load_binaries'
     )
     parser.add_argument(
         '-l', '--limit',
@@ -53,14 +54,16 @@ def configure_cli(subparsers):
         default=None
     )
     parser.add_argument(
-        '--noannotations',
+        '--no-annotations',
         help='iterate without loading annotations (e.g. OCR)',
-        action='store_true'
+        action='store_false',
+        dest='create_annotations'
     )
     parser.add_argument(
-        '--notransactions',
+        '--no-transactions', '--no-txn',
         help='run the load without using transactions',
-        action='store_true'
+        action='store_false',
+        dest='use_transactions'
     )
     parser.add_argument(
         '--ignore', '-i',
@@ -94,8 +97,7 @@ class Command:
         if not os.path.isdir(batch_config.log_dir):
             os.makedirs(batch_config.log_dir)
 
-        if args.nobinaries:
-            fcrepo.load_binaries = False
+        fcrepo.load_binaries = args.load_binaries
 
         # Define the data_handler function for the data being loaded
         logger.info("Initializing data handler")
@@ -103,10 +105,10 @@ class Command:
         handler = import_module('plastron.handlers.' + module_name)
         logger.info('Loaded "{0}" handler'.format(module_name))
 
-        # "--nobinaries" implies "--noannotations"
-        if args.nobinaries:
-            logger.info("Setting --nobinaries implies --noannotations")
-            args.noannotations = True
+        # "--no-binaries" implies "--no-annotations"
+        if not args.load_binaries:
+            logger.info("Setting --no-binaries implies --no-annotations")
+            args.create_annotations = False
 
         try:
             batch = handler.Batch(fcrepo, batch_config)
@@ -115,7 +117,7 @@ class Command:
             logger.error('Failed to initialize batch')
             raise FailureException(e.message)
 
-        if not args.dryrun:
+        if not args.dry_run:
             fcrepo.test_connection()
 
             # read the log of completed items
@@ -225,7 +227,7 @@ def load_item_internal(fcrepo, item, args, extra=None):
     item.recursive_create(fcrepo)
     logger.info('Creating ordering proxies')
     item.create_ordering(fcrepo)
-    if not args.noannotations:
+    if args.create_annotations:
         logger.info('Creating annotations')
         item.create_annotations(fcrepo)
 
@@ -241,7 +243,7 @@ def load_item_internal(fcrepo, item, args, extra=None):
 
     logger.info('Updating item and components')
     item.recursive_update(fcrepo)
-    if not args.noannotations:
+    if args.create_annotations:
         logger.info('Updating annotations')
         item.update_annotations(fcrepo)
 
@@ -251,17 +253,7 @@ def load_item(fcrepo, batch_item, args, extra=None):
     logger.info('Reading item data')
     item = batch_item.read_data()
 
-    if args.notransactions:
-        try:
-            load_item_internal(fcrepo, item, args, extra)
-            return True
-        except (RESTAPIException, FileNotFoundError) as e:
-            logger.error("Item creation failed: {0}".format(e))
-            logger.warning('Continuing load.')
-        except KeyboardInterrupt as e:
-            logger.error("Load interrupted")
-            raise e
-    else:
+    if args.use_transactions:
         # open transaction
         with Transaction(fcrepo, keep_alive=90) as txn:
             # create item and its components
@@ -286,6 +278,16 @@ def load_item(fcrepo, batch_item, args, extra=None):
             except KeyboardInterrupt as e:
                 logger.error("Load interrupted")
                 raise e
+    else:
+        try:
+            load_item_internal(fcrepo, item, args, extra)
+            return True
+        except (RESTAPIException, FileNotFoundError) as e:
+            logger.error("Item creation failed: {0}".format(e))
+            logger.warning('Continuing load.')
+        except KeyboardInterrupt as e:
+            logger.error("Load interrupted")
+            raise e
 
 
 class BatchConfig:

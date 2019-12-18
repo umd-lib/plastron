@@ -1,7 +1,8 @@
 import logging
 
-from plastron.exceptions import RESTAPIException
-from plastron.util import get_title_string, ResourceList, parse_predicate_list
+from email.utils import parsedate_to_datetime
+from plastron.exceptions import RESTAPIException, FailureException
+from plastron.util import get_title_string, ResourceList, parse_predicate_list, ItemLog
 
 logger = logging.getLogger(__name__)
 
@@ -34,6 +35,11 @@ def configure_cli(subparsers):
         dest='use_transactions'
     )
     parser.add_argument(
+        '--completed',
+        help='file recording the URIs of updated resources',
+        action='store'
+    )
+    parser.add_argument(
         '-f', '--file',
         help='File containing a list of URIs to update',
         action='store'
@@ -63,6 +69,19 @@ class Command:
         if self.dry_run:
             logger.info('Dry run enabled, no actual updates will take place')
 
+        if args.completed:
+            logger.info(f'Reading the completed items log from {args.completed}')
+            # read the log of completed items
+            fieldnames = ['uri', 'title', 'timestamp']
+            try:
+                self.completed = ItemLog(args.completed, fieldnames, 'uri')
+                logger.info(f'Found {len(self.completed)} completed item(s)')
+            except Exception as e:
+                logger.error(f"Non-standard map file specified: {e}")
+                raise FailureException()
+        else:
+            self.completed = []
+
         resources = ResourceList(self.repository, uri_list=args.uris, file=args.file)
 
         resources.process(
@@ -72,6 +91,9 @@ class Command:
         )
 
     def update_item(self, resource, graph):
+        if resource.uri in self.completed:
+            logger.info(f'Resource {resource.uri} has already been updated; skipping')
+            return
         headers = {'Content-Type': 'application/sparql-update'}
         title = get_title_string(graph)
         if self.dry_run:
@@ -80,5 +102,10 @@ class Command:
             response = self.repository.patch(resource.description_uri, data=self.sparql_update, headers=headers)
             if response.status_code == 204:
                 logger.info(f'Updated resource {resource} {title}')
+                self.completed.append({
+                    'uri': resource.uri,
+                    'title': title,
+                    'timestamp': parsedate_to_datetime(response.headers['date']).isoformat('T')
+                })
             else:
                 raise RESTAPIException(response)

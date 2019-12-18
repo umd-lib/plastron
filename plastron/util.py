@@ -121,6 +121,10 @@ class ItemLog:
         self.get_writer().writerow(row)
         self.item_keys.add(row[self.keyfield])
 
+    # alias for writerow(), for sequence compatibility
+    def append(self, row):
+        self.writerow(row)
+
     def __contains__(self, other):
         return other in self.item_keys
 

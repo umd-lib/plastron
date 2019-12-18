@@ -1,7 +1,7 @@
 import logging
 
 from plastron.exceptions import RESTAPIException
-from plastron.util import get_title_string, process_resources, print_header, print_footer
+from plastron.util import get_title_string, ResourceList, parse_predicate_list
 
 logger = logging.getLogger(__name__)
 
@@ -47,31 +47,29 @@ def configure_cli(subparsers):
 
 class Command:
     def __call__(self, fcrepo, args):
-        if not args.quiet:
-            print_header()
-
         self.repository = fcrepo
         self.repository.test_connection()
         self.dry_run = args.dry_run
 
         with open(args.update_file, 'r') as update_file:
             self.sparql_update = update_file.read().encode('utf-8')
-        logger.debug(f'SPARQL Update query:\n====BEGIN====\n{self.sparql_update}\n=====END=====')
+        logger.debug(
+            f'SPARQL Update query:\n'
+            f'====BEGIN====\n'
+            f'{self.sparql_update.decode()}\n'
+            f'=====END====='
+        )
 
         if self.dry_run:
             logger.info('Dry run enabled, no actual updates will take place')
 
-        process_resources(
+        resources = ResourceList(self.repository, uri_list=args.uris, file=args.file)
+
+        resources.process(
             method=self.update_item,
-            repository=self.repository,
-            uri_list=args.uris,
-            file=args.file,
-            recursive=args.recursive,
+            traverse=parse_predicate_list(args.recursive),
             use_transaction=args.use_transactions
         )
-
-        if not args.quiet:
-            print_footer()
 
     def update_item(self, resource, graph):
         headers = {'Content-Type': 'application/sparql-update'}
@@ -84,4 +82,3 @@ class Command:
                 logger.info(f'Updated resource {resource} {title}')
             else:
                 raise RESTAPIException(response)
-

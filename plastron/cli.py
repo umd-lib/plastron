@@ -108,13 +108,30 @@ def main():
 
     try:
         # dispatch to the selected subcommand
+        print_header(args)
         command(fcrepo, args)
+        print_footer(args)
     except FailureException:
         # something failed, exit with non-zero status
         sys.exit(1)
     except KeyboardInterrupt:
         # aborted due to Ctrl+C
         sys.exit(2)
+
+
+def print_header(args):
+    """Common header formatting."""
+    if not args.quiet:
+        title = '|     PLASTRON     |'
+        bar = '+' + '=' * (len(title) - 2) + '+'
+        spacer = '|' + ' ' * (len(title) - 2) + '|'
+        print('\n'.join(['', bar, spacer, title, spacer, bar, '']))
+
+
+def print_footer(args):
+    """Report success or failure and resources created."""
+    if not args.quiet:
+        print('\nScript complete. Goodbye!\n')
 
 
 if __name__ == "__main__":

@@ -20,68 +20,69 @@ def get_title_string(graph, separator='; '):
 
 
 def parse_predicate_list(string, delimiter=','):
+    if string is None:
+        return None
     manager = namespaces.get_manager()
     return [from_n3(p, nsm=manager) for p in string.split(delimiter)]
 
 
-def process_resources(method, repository, uri_list=None, file=None, recursive=None, use_transaction=True):
-    if recursive is not None:
-        predicates = parse_predicate_list(recursive)
-        predicate_list = ', '.join(p.n3() for p in predicates)
-        logger.info(f"{method.__name__} will traverse the following predicates: {predicate_list}")
-    else:
-        predicates = []
+class ResourceList:
+    def __init__(self, repository, uri_list=None, file=None):
+        self.repository = repository
+        self.uri_list = uri_list
+        self.file = file
 
-    if file is not None:
-        if file == '-':
-            # special filename "-" means STDIN
-            uri_list = sys.stdin
+    def get_uris(self):
+        if self.file is not None:
+            if self.file == '-':
+                # special filename "-" means STDIN
+                for line in sys.stdin:
+                    yield line
+            else:
+                with open(self.file) as fh:
+                    for line in fh:
+                        yield line.rstrip()
         else:
-            with open(file) as fh:
-                uri_list = [ line.rstrip() for line in fh ]
+            for uri in self.uri_list:
+                yield uri
 
-    # closure for processing the list of items
-    def process_list(transaction=None):
-        for uri in uri_list:
-            for resource, graph in repository.recursive_get(uri, traverse=predicates):
+    def get_resources(self, traverse=None):
+        for uri in self.get_uris():
+            for resource, graph in self.repository.recursive_get(uri, traverse=traverse):
+                yield resource, graph
+
+    def process(self, method, use_transaction=True, traverse=None):
+        if traverse is not None:
+            predicate_list = ', '.join(p.n3() for p in traverse)
+            logger.info(f"{method.__name__} will traverse the following predicates: {predicate_list}")
+
+        if use_transaction:
+            with Transaction(self.repository, keep_alive=90) as transaction:
+                for resource, graph in self.get_resources(traverse=traverse):
+                    try:
+                        method(resource, graph)
+                    except RESTAPIException as e:
+                        logger.error(f'{method.__name__} failed for {resource}: {e}: {e.response.text}')
+                        # if anything fails while processing of the list of uris, attempt to
+                        # rollback the transaction. Failures here will be caught by the main
+                        # loop's exception handler and should trigger a system exit
+                        try:
+                            transaction.rollback()
+                            logger.warning('Transaction rolled back.')
+                            return False
+                        except RESTAPIException:
+                            logger.error('Unable to roll back transaction, aborting')
+                            raise FailureException()
+                transaction.commit()
+                return True
+        else:
+            for resource, graph in self.get_resources(traverse=traverse):
                 try:
                     method(resource, graph)
                 except RESTAPIException as e:
                     logger.error(f'{method.__name__} failed for {resource}: {e}: {e.response.text}')
-                    if transaction is not None:
-                        # if anything fails while processing of the list of uris, attempt to
-                        # rollback the transaction. Failures here will be caught by the main
-                        # loop's exception handler and should trigger a system exit
-                        transaction.rollback()
-                        logger.warning('Transaction rolled back.')
-                        return
-                    else:
-                        logger.warning(f'Continuing {method.__name__} with next item')
-        if transaction is not None:
-            transaction.commit()
-
-    if use_transaction:
-        try:
-            with Transaction(repository, keep_alive=90) as txn:
-                process_list(txn)
-        except RESTAPIException:
-            logger.error('Unable to roll back transaction, aborting')
-            raise FailureException()
-    else:
-        process_list()
-
-
-def print_header():
-    """Common header formatting."""
-    title = '|     PLASTRON     |'
-    bar = '+' + '=' * (len(title) - 2) + '+'
-    spacer = '|' + ' ' * (len(title) - 2) + '|'
-    print('\n'.join(['', bar, spacer, title, spacer, bar, '']))
-
-
-def print_footer():
-    """Report success or failure and resources created."""
-    print('\nScript complete. Goodbye!\n')
+                    logger.warning(f'Continuing {method.__name__} with next item')
+            return True
 
 
 class ItemLog:

@@ -1,5 +1,5 @@
 import logging
-from plastron.util import get_title_string, process_resources
+from plastron.util import get_title_string, ResourceList, parse_predicate_list
 
 logger = logging.getLogger(__name__)
 
@@ -32,11 +32,14 @@ class Command:
     def __call__(self, fcrepo, args):
         self.long = args.long
 
-        process_resources(
-            method=self.list_item,
+        resources = ResourceList(
             repository=fcrepo,
-            uri_list=args.uris,
-            recursive=args.recursive,
+            uri_list=args.uris
+        )
+
+        resources.process(
+            method=self.list_item,
+            traverse=parse_predicate_list(args.recursive),
             use_transaction=False
         )
 

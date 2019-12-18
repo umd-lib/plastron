@@ -8,7 +8,7 @@ from importlib import import_module
 from time import sleep
 from plastron.exceptions import ConfigException, DataReadException, RESTAPIException, FailureException
 from plastron.http import Transaction
-from plastron.util import print_header, print_footer, ItemLog
+from plastron.util import ItemLog
 
 logger = logging.getLogger(__name__)
 now = datetime.utcnow().strftime('%Y%m%d%H%M%S')
@@ -81,9 +81,6 @@ def configure_cli(subparsers):
 class Command:
 
     def __call__(self, fcrepo, args):
-        if not args.quiet:
-            print_header()
-
         # Load batch configuration
         try:
             batch_config = BatchConfig(args.batch)
@@ -197,9 +194,6 @@ class Command:
                 if args.wait:
                     logger.info("Pausing {0} seconds".format(args.wait))
                     sleep(int(args.wait))
-
-        if not args.quiet:
-            print_footer()
 
 
 def get_load_set(batch, percent=None):

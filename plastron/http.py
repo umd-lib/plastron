@@ -18,6 +18,7 @@ class Resource(namedtuple('Resource', ['uri', 'description_uri'])):
     def __str__(self):
         return self.uri
 
+
 class Repository:
     def __init__(self, config, ua_string=None):
         self.endpoint = config['REST_ENDPOINT']

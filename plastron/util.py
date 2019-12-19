@@ -27,10 +27,22 @@ def parse_predicate_list(string, delimiter=','):
 
 
 class ResourceList:
-    def __init__(self, repository, uri_list=None, file=None):
+    def __init__(self, repository, uri_list=None, file=None, completed_file=None):
         self.repository = repository
         self.uri_list = uri_list
         self.file = file
+        if completed_file is not None:
+            logger.info(f'Reading the completed items log from {completed_file}')
+            # read the log of completed items
+            fieldnames = ['uri', 'title', 'timestamp']
+            try:
+                self.completed = ItemLog(completed_file, fieldnames, 'uri')
+                logger.info(f'Found {len(self.completed)} completed item(s)')
+            except Exception as e:
+                logger.error(f"Non-standard map file specified: {e}")
+                raise FailureException()
+        else:
+            self.completed = None
 
     def get_uris(self):
         if self.file is not None:
@@ -84,6 +96,10 @@ class ResourceList:
                     logger.warning(f'Continuing {method.__name__} with next item')
             return True
 
+    def log_completed(self, uri, title, timestamp):
+        if self.completed:
+            self.completed.writerow({'uri': uri, 'title': title, 'timestamp': timestamp})
+
 
 class ItemLog:
     def __init__(self, filename, fieldnames, keyfield):
@@ -120,10 +136,6 @@ class ItemLog:
     def writerow(self, row):
         self.get_writer().writerow(row)
         self.item_keys.add(row[self.keyfield])
-
-    # alias for writerow(), for sequence compatibility
-    def append(self, row):
-        self.writerow(row)
 
     def __contains__(self, other):
         return other in self.item_keys

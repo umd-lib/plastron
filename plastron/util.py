@@ -2,8 +2,10 @@ import csv
 import hashlib
 import logging
 import mimetypes
+import shutil
 import sys
 from os.path import basename, isfile
+from tempfile import NamedTemporaryFile
 from paramiko import SSHClient, SFTPClient
 from plastron import namespaces
 from plastron.exceptions import RESTAPIException, FailureException
@@ -31,6 +33,7 @@ class ResourceList:
         self.repository = repository
         self.uri_list = uri_list
         self.file = file
+        self.use_transaction = True
         if completed_file is not None:
             logger.info(f'Reading the completed items log from {completed_file}')
             # read the log of completed items
@@ -43,6 +46,7 @@ class ResourceList:
                 raise FailureException()
         else:
             self.completed = None
+        self.completed_buffer = None
 
     def get_uris(self):
         if self.file is not None:
@@ -64,11 +68,19 @@ class ResourceList:
                 yield resource, graph
 
     def process(self, method, use_transaction=True, traverse=None):
+        self.use_transaction = use_transaction
         if traverse is not None:
             predicate_list = ', '.join(p.n3() for p in traverse)
             logger.info(f"{method.__name__} will traverse the following predicates: {predicate_list}")
 
         if use_transaction:
+            # set up a temporary ItemLog that will be copied to the real item log upon completion of the transaction
+            self.completed_buffer = ItemLog(
+                NamedTemporaryFile().name,
+                ['uri', 'title', 'timestamp'],
+                'uri',
+                header=False
+            )
             with Transaction(self.repository, keep_alive=90) as transaction:
                 for resource, graph in self.get_resources(traverse=traverse):
                     try:
@@ -86,6 +98,7 @@ class ResourceList:
                             logger.error('Unable to roll back transaction, aborting')
                             raise FailureException()
                 transaction.commit()
+                shutil.copyfile(self.completed_buffer.filename, self.completed.filename)
                 return True
         else:
             for resource, graph in self.get_resources(traverse=traverse):
@@ -97,12 +110,16 @@ class ResourceList:
             return True
 
     def log_completed(self, uri, title, timestamp):
-        if self.completed:
-            self.completed.writerow({'uri': uri, 'title': title, 'timestamp': timestamp})
+        if self.completed is not None:
+            row = {'uri': uri, 'title': title, 'timestamp': timestamp}
+            if self.use_transaction:
+                self.completed_buffer.writerow(row)
+            else:
+                self.completed.writerow(row)
 
 
 class ItemLog:
-    def __init__(self, filename, fieldnames, keyfield):
+    def __init__(self, filename, fieldnames, keyfield, header=True):
         self.filename = filename
         self.fieldnames = fieldnames
         self.keyfield = keyfield
@@ -113,7 +130,8 @@ class ItemLog:
         if not isfile(self.filename):
             with open(self.filename, 'w', 1) as fh:
                 writer = csv.DictWriter(fh, fieldnames=self.fieldnames)
-                writer.writeheader()
+                if header:
+                    writer.writeheader()
         else:
             with open(self.filename, 'r', 1) as fh:
                 reader = csv.DictReader(fh)

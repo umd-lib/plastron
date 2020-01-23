@@ -8,18 +8,23 @@ logger = logging.getLogger(__name__)
 
 def configure_cli(subparsers):
     parser = subparsers.add_parser(
-        name='delete',
-        aliases=['del', 'rm'],
-        description='Delete objects from the repository'
+        name='update',
+        description='Update objects in the repository'
+    )
+    parser.add_argument(
+        '-u', '--update-file',
+        help='Path to SPARQL Update file to apply',
+        action='store',
+        required=True
     )
     parser.add_argument(
         '-R', '--recursive',
-        help='Delete additional objects found by traversing the given predicate(s)',
+        help='Update additional objects found by traversing the given predicate(s)',
         action='store'
     )
     parser.add_argument(
         '-d', '--dry-run',
-        help='Simulate a delete without modifying the repository',
+        help='Simulate an update without modifying the repository',
         action='store_true'
     )
     parser.add_argument(
@@ -30,19 +35,19 @@ def configure_cli(subparsers):
     )
     parser.add_argument(
         '--completed',
-        help='file recording the URIs of deleted resources',
+        help='file recording the URIs of updated resources',
         action='store'
     )
     parser.add_argument(
         '-f', '--file',
-        help='File containing a list of URIs to delete',
+        help='File containing a list of URIs to update',
         action='store'
     )
     parser.add_argument(
         'uris', nargs='*',
-        help='Repository URIs to be deleted.'
+        help='URIs of repository objects to update'
     )
-    parser.set_defaults(cmd_name='delete')
+    parser.set_defaults(cmd_name='update')
 
 
 class Command:
@@ -51,8 +56,17 @@ class Command:
         self.repository.test_connection()
         self.dry_run = args.dry_run
 
+        with open(args.update_file, 'r') as update_file:
+            self.sparql_update = update_file.read().encode('utf-8')
+        logger.debug(
+            f'SPARQL Update query:\n'
+            f'====BEGIN====\n'
+            f'{self.sparql_update.decode()}\n'
+            f'=====END====='
+        )
+
         if self.dry_run:
-            logger.info('Dry run enabled, no actual deletions will take place')
+            logger.info('Dry run enabled, no actual updates will take place')
 
         self.resources = ResourceList(
             repository=self.repository,
@@ -61,22 +75,23 @@ class Command:
             completed_file=args.completed
         )
         self.resources.process(
-            method=self.delete_item,
+            method=self.update_item,
             traverse=parse_predicate_list(args.recursive),
             use_transaction=args.use_transactions
         )
 
-    def delete_item(self, resource, graph):
+    def update_item(self, resource, graph):
         if resource.uri in self.resources.completed:
-            logger.info(f'Resource {resource.uri} has already been deleted; skipping')
+            logger.info(f'Resource {resource.uri} has already been updated; skipping')
             return
+        headers = {'Content-Type': 'application/sparql-update'}
         title = get_title_string(graph)
         if self.dry_run:
-            logger.info(f'Would delete resource {resource} {title}')
+            logger.info(f'Would update resource {resource} {title}')
         else:
-            response = self.repository.delete(resource.uri)
+            response = self.repository.patch(resource.description_uri, data=self.sparql_update, headers=headers)
             if response.status_code == 204:
-                logger.info(f'Deleted resource {resource} {title}')
+                logger.info(f'Updated resource {resource} {title}')
                 timestamp = parsedate_to_datetime(response.headers['date']).isoformat('T')
                 self.resources.log_completed(resource.uri, title, timestamp)
             else:

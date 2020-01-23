@@ -5,7 +5,8 @@
 ```
 $ plastron --help
 usage: plastron [-h] (-r REPO | -V) [-v] [-q]
-                {ping,load,list,ls,mkcol,delete,del,rm,extractocr} ...
+                {delete,del,rm,export,extractocr,imgsize,list,ls,load,mkcol,ping,update}
+                ...
 
 Batch operation tool for Fedora 4.
 
@@ -17,14 +18,13 @@ optional arguments:
   -q, --quiet           decrease the verbosity of the status output
 
 commands:
-  {ping,load,list,ls,mkcol,delete,del,rm,extractocr}
-```
+  {delete,del,rm,export,extractocr,imgsize,list,ls,load,mkcol,ping,update}```
 
 ### Check version
 
 ```
 $ plastron --version
-3.0.0-dev
+3.1.0
 ```
 
 ## Commands
@@ -50,27 +50,30 @@ optional arguments:
 ```
 $ plastron load --help
 usage: plastron load [-h] -b BATCH [-d] [-n] [-l LIMIT] [-% PERCENT]
-                     [--noannotations] [--ignore IGNORE] [--wait WAIT]
+                     [--no-annotations] [--no-transactions] [--ignore IGNORE]
+                     [--wait WAIT]
 
 Load a batch into the repository
 
 optional arguments:
   -h, --help            show this help message and exit
-  -d, --dryrun          iterate over the batch without POSTing
-  -n, --nobinaries      iterate without uploading binaries
+  -d, --dry-run         iterate over the batch without POSTing
+  -n, --no-binaries     iterate without uploading binaries
   -l LIMIT, --limit LIMIT
                         limit the load to a specified number of top-level
                         objects
   -% PERCENT, --percent PERCENT
                         load specified percentage of total items
-  --noannotations       iterate without loading annotations (e.g. OCR)
+  --no-annotations      iterate without loading annotations (e.g. OCR)
+  --no-transactions, --no-txn
+                        run the load without using transactions
   --ignore IGNORE, -i IGNORE
                         file listing items to ignore
   --wait WAIT, -w WAIT  wait n seconds between items
 
 required arguments:
   -b BATCH, --batch BATCH
-                        path to batch configuration file                    
+                        path to batch configuration file              
 ```
 
 ### List (list, ls)
@@ -96,7 +99,7 @@ optional arguments:
 
 ```
 $ plastron mkcol --help
-usage: plastron mkcol [-h] -n NAME [-b BATCH]
+usage: plastron mkcol [-h] -n NAME [-b BATCH] [--notransactions]
 
 Create a PCDM Collection in the repository
 
@@ -105,13 +108,16 @@ optional arguments:
   -n NAME, --name NAME  Name of the collection.
   -b BATCH, --batch BATCH
                         Path to batch configuration file.
+  --notransactions      run the load without using transactions
 ```
 
 ### Delete (delete, del, rm)
 
 ```
 $ plastron delete --help
-usage: plastron delete [-h] [-R RECURSIVE] [-d] [-f FILE] [uris [uris ...]]
+usage: plastron delete [-h] [-R RECURSIVE] [-d] [--no-transactions]
+                       [--completed COMPLETED] [-f FILE]
+                       [uris [uris ...]]
 
 Delete objects from the repository
 
@@ -123,9 +129,12 @@ optional arguments:
   -R RECURSIVE, --recursive RECURSIVE
                         Delete additional objects found by traversing the
                         given predicate(s)
-  -d, --dryrun          Simulate a delete without modifying the repository
-  -f FILE, --file FILE  File containing a list of URIs to delete
-```
+  -d, --dry-run         Simulate a delete without modifying the repository
+  --no-transactions, --no-txn
+                        run the update without using transactions
+  --completed COMPLETED
+                        file recording the URIs of deleted resources
+  -f FILE, --file FILE  File containing a list of URIs to delete```
 
 ### Extract OCR (extractocr)
 
@@ -160,6 +169,34 @@ optional arguments:
                         File to write export package to
   -f {text/turtle,turtle,ttl,text/csv,csv}, --format {text/turtle,turtle,ttl,text/csv,csv}
                         Export job format
+```
+
+### Update (update)
+
+```
+$ plastron update --help
+usage: plastron update [-h] -u UPDATE_FILE [-R RECURSIVE] [-d]
+                       [--no-transactions] [--completed COMPLETED] [-f FILE]
+                       [uris [uris ...]]
+
+Update objects in the repository
+
+positional arguments:
+  uris                  URIs of repository objects to update
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -u UPDATE_FILE, --update-file UPDATE_FILE
+                        Path to SPARQL Update file to apply
+  -R RECURSIVE, --recursive RECURSIVE
+                        Update additional objects found by traversing the
+                        given predicate(s)
+  -d, --dry-run         Simulate an update without modifying the repository
+  --no-transactions, --no-txn
+                        run the update without using transactions
+  --completed COMPLETED
+                        file recording the URIs of updated resources
+  -f FILE, --file FILE  File containing a list of URIs to update
 ```
 
 ## Configuration

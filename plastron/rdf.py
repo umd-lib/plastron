@@ -57,6 +57,14 @@ class RDFProperty(object):
     def __len__(self):
         return len(self.values)
 
+    def __getattr__(self, item):
+        if len(self.values) == 0:
+            return None
+        elif len(self.values) > 1:
+            raise AttributeError(f'Multiple values for attribute {item} of {self}')
+        else:
+            return getattr(self.values[0], item)
+
     def triples(self, subject):
         for value in self.values:
             if value is not None:
@@ -69,6 +77,17 @@ class RDFDataProperty(RDFProperty):
 
 
 class RDFObjectProperty(RDFProperty):
+    def __getitem__(self, item):
+        if isinstance(item, URIRef):
+            for obj in self.values:
+                if obj.uri == item:
+                    return obj
+        raise IndexError(f'Cannot find object by URI {item}')
+
+    def append_new(self, **kwargs):
+        obj = self.obj_class(**kwargs)
+        self.append(obj)
+
     def get_term(self, value):
         if hasattr(value, 'uri'):
             return URIRef(value.uri)
@@ -98,7 +117,7 @@ def data_property(name, uri, multivalue=False, datatype=None):
 class Resource(metaclass=Meta):
 
     @classmethod
-    def from_graph(cls, graph, subject=None):
+    def from_graph(cls, graph, subject=''):
         return cls(uri=subject).read(graph)
 
     def __init__(self, uri='', **kwargs):

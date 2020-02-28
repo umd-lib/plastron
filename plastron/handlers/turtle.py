@@ -113,14 +113,14 @@ class BatchItem:
         for add_property in add_props:
             add_property(cls)
 
-        item = cls.from_graph(item_graph)
+        item = cls.from_graph(item_graph, self.subject)
         item.sequence_attr = ('Page', 'number')
 
         # set the value of the newly mapped properties to the correct
         # authority objects
         for prop in item.object_properties():
             if prop.is_embedded:
-                prop.value = [self.batch.authorities[str(v)] for v in prop.value]
+                prop.values = [self.batch.authorities[str(v)] for v in prop.values]
 
         item.add_collection(self.batch.collection)
 

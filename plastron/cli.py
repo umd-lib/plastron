@@ -125,13 +125,13 @@ def print_header(args):
         title = '|     PLASTRON     |'
         bar = '+' + '=' * (len(title) - 2) + '+'
         spacer = '|' + ' ' * (len(title) - 2) + '|'
-        print('\n'.join(['', bar, spacer, title, spacer, bar, '']))
+        print('\n'.join(['', bar, spacer, title, spacer, bar, '']), file=sys.stderr)
 
 
 def print_footer(args):
     """Report success or failure and resources created."""
     if not args.quiet:
-        print('\nScript complete. Goodbye!\n')
+        print('\nScript complete. Goodbye!\n', file=sys.stderr)
 
 
 if __name__ == "__main__":

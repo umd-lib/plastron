@@ -60,6 +60,19 @@ class Resource(rdf.Resource):
             obj.uri = URIRef('{0}#{1}'.format(self.uri, obj.uuid))
             obj.created = True
 
+    def patch(self, repository, sparql_update):
+        headers = {'Content-Type': 'application/sparql-update'}
+        self.logger.info(f"Updating {self}")
+        response = repository.patch(self.uri, data=sparql_update, headers=headers)
+        if response.status_code == 204:
+            self.logger.info(f"Updated {self}")
+            self.updated = True
+            return response
+        else:
+            self.logger.error(f"Failed to update {self}")
+            self.logger.error(sparql_update)
+            raise RESTAPIException(response)
+
     # update existing repo object with SPARQL update
     def update_object(self, repository, patch_uri=None):
         graph = self.graph()

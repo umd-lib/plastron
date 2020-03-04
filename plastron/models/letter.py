@@ -45,7 +45,7 @@ class Collection(LabeledThing):
 @rdf.data_property('extent', dcterms.extent)
 @rdf.data_property('rights_holder', dcterms.rightsHolder)
 @rdf.rdf_class(bibo.Letter)
-class Letter(pcdm.Item):
+class Letter(pcdm.Object):
     HEADER_MAP = {
         'title': 'Title',
         'rights_holder': 'Rights Holder',

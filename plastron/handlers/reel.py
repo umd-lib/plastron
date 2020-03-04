@@ -42,11 +42,11 @@ class BatchItem:
 
     def read_data(self):
         id = os.path.splitext(os.path.basename(self.path))[0]
-        reel = Reel(id=id, title=f'Reel Number {id}', collections=[self.batch.collection])
+        reel = Reel(id=id, title=f'Reel Number {id}', member_of=self.batch.collection)
 
         with open(self.path, 'r') as f:
             reader = csv.DictReader(f)
             for row in reader:
-                reel.components.append(Page.from_repository(self.batch.repo, row['uri']))
+                reel.add_member(Page.from_repository(self.batch.repo, row['uri']))
 
         return reel

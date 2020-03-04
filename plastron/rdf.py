@@ -1,7 +1,9 @@
+import plastron.validation.rules
 import sys
 from copy import copy
 from rdflib import Graph, RDF, URIRef, Literal
 from plastron.namespaces import rdf
+from plastron.validation import ResourceValidationResult
 
 # alias the rdflib Namespace
 ns = rdf
@@ -39,6 +41,8 @@ class Meta(type):
 
 
 class RDFProperty(object):
+    uri = None
+
     def __init__(self):
         self.values = []
 
@@ -46,10 +50,7 @@ class RDFProperty(object):
         self.values.append(other)
 
     def __str__(self):
-        if len(self.values) > 0:
-            return str(self.values[0])
-        else:
-            return ''
+        return ' '.join(map(str, self.values))
 
     def __iter__(self):
         return iter(self.values)
@@ -65,6 +66,9 @@ class RDFProperty(object):
         else:
             return getattr(self.values[0], item)
 
+    def __getitem__(self, item):
+        return self.values[item]
+
     def triples(self, subject):
         for value in self.values:
             if value is not None:
@@ -72,11 +76,17 @@ class RDFProperty(object):
 
 
 class RDFDataProperty(RDFProperty):
-    def get_term(self, value):
-        return Literal(value, datatype=self.datatype)
+    datatype = None
+
+    @classmethod
+    def get_term(cls, value):
+        return Literal(value, datatype=cls.datatype)
 
 
 class RDFObjectProperty(RDFProperty):
+    is_embedded = False
+    obj_class = None
+
     def __getitem__(self, item):
         if isinstance(item, URIRef):
             for obj in self.values:
@@ -88,7 +98,8 @@ class RDFObjectProperty(RDFProperty):
         obj = self.obj_class(**kwargs)
         self.append(obj)
 
-    def get_term(self, value):
+    @classmethod
+    def get_term(cls, value):
         if hasattr(value, 'uri'):
             return URIRef(value.uri)
         elif isinstance(value, URIRef):
@@ -97,13 +108,12 @@ class RDFObjectProperty(RDFProperty):
             raise ValueError('Expecting a URIRef or an object with a uri attribute')
 
 
-def data_property(name, uri, multivalue=False, datatype=None):
+def data_property(name, uri, datatype=None):
     def add_property(cls):
         type_name = f'{cls.__name__}.{name}'
         prop_type = type(type_name, (RDFDataProperty,), {
             'name': name,
             'uri': uri,
-            'is_multivalued': multivalue,
             'datatype': datatype
         })
         cls.name_to_prop[name] = prop_type
@@ -115,12 +125,13 @@ def data_property(name, uri, multivalue=False, datatype=None):
 
 
 class Resource(metaclass=Meta):
-
     @classmethod
     def from_graph(cls, graph, subject=''):
         return cls(uri=subject).read(graph)
 
-    def __init__(self, uri='', **kwargs):
+    def __init__(self, uri=None, **kwargs):
+        if uri is None:
+            uri = ''
         self.uri = URIRef(uri)
         self.props = {}
         self.unmapped_triples = []
@@ -130,10 +141,6 @@ class Resource(metaclass=Meta):
             self.props[prop.name] = prop
 
         for key, value in kwargs.items():
-            # type check that multivalued fields get arrays
-            if key in self.props:
-                if self.props[key].is_multivalued and not isinstance(value, list):
-                    raise TypeError(f"Multivalued field '{key}' expects a list")
             setattr(self, key, value)
 
     def read(self, graph):
@@ -221,14 +228,25 @@ class Resource(metaclass=Meta):
     def print(self, format='turtle', file=sys.stdout, nsm=None):
         print(self.graph(nsm=nsm).serialize(format=format).decode(), file=file)
 
+    def validate(self, ruleset):
+        result = ResourceValidationResult(self)
+        for field, rules in ruleset.items():
+            for rule_name, arg in rules.items():
+                rule = getattr(plastron.validation.rules, rule_name)
+                prop = getattr(self, field)
+                if rule(prop, arg):
+                    result.passes(prop, rule, arg)
+                else:
+                    result.fails(prop, rule, arg)
+        return result
 
-def object_property(name, uri, multivalue=False, embed=False, obj_class=None):
+
+def object_property(name, uri, embed=False, obj_class=None):
     def add_property(cls):
         type_name = f'{cls.__name__}.{name}'
         prop_type = type(type_name, (RDFObjectProperty,), {
             'name': name,
             'uri': uri,
-            'is_multivalued': multivalue,
             'is_embedded': embed,
             'obj_class': obj_class
         })

@@ -105,24 +105,23 @@ class BatchItem:
             if str(o) in self.batch.authorities:
                 # create an RDFObjectProperty for the triples with an
                 # authority object value
-                add_props.append(rdf.object_property(str(p), p, multivalue=True, embed=True))
+                add_props.append(rdf.object_property(str(p), p, embed=True, obj_class=rdf.Resource))
 
         # dynamically-generated class based on predicates that are present in
         # the source graph
-        cls = type(str(self.subject), (pcdm.Item,), {})
+        cls = type(str(self.subject), (pcdm.Object,), {})
         for add_property in add_props:
             add_property(cls)
 
-        item = cls.from_graph(item_graph, self.subject)
-        item.sequence_attr = ('Page', 'number')
+        item = cls.from_graph(item_graph, subject=self.subject)
 
         # set the value of the newly mapped properties to the correct
         # authority objects
         for prop in item.object_properties():
             if prop.is_embedded:
-                prop.values = [self.batch.authorities[str(v)] for v in prop.values]
+                prop.values = [self.batch.authorities[str(v.uri)] for v in prop.values]
 
-        item.add_collection(self.batch.collection)
+        item.member_of = self.batch.collection
 
         files = []
         parts = {}
@@ -167,6 +166,8 @@ class BatchItem:
             page = Page(number=str(n), title=f"{item.title}, Page {n}")
             for path in parts[key]:
                 page.add_file(get_file_object(path))
-            item.add_component(page)
+            item.add_member(page)
+            # add ordering proxy for the page to the item
+            item.append_proxy(page, title=f'Proxy for page {n} in {item.title}')
 
         return item

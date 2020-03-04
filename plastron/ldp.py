@@ -14,8 +14,20 @@ class Resource(rdf.Resource):
     simple lifecycle patterns and conventions in section 4. Linked Data Platform
     Resources."""
 
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
+    @classmethod
+    def from_repository(cls, repo, uri):
+        graph = repo.get_graph(uri)
+        obj = cls.from_graph(graph, subject=uri)
+
+        # mark as created and updated so that the create_object and update_object
+        # methods doesn't try try to modify it
+        obj.created = True
+        obj.updated = True
+
+        return obj
+
+    def __init__(self, uri='', **kwargs):
+        super().__init__(uri=uri, **kwargs)
         self.annotations = []
         self.extra = Graph()
         self.created = False
@@ -155,6 +167,15 @@ class Resource(rdf.Resource):
     # called after creation of object in repo
     def post_creation_hook(self):
         pass
+
+    def create_annotations(self, repository):
+        with repository.at_path('annotations'):
+            for annotation in self.annotations:
+                annotation.recursive_create(repository)
+
+    def update_annotations(self, repository):
+        for annotation in self.annotations:
+            annotation.recursive_update(repository)
 
 
 class RdfSource(Resource):

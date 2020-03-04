@@ -12,7 +12,7 @@ from plastron.util import RepositoryFile
 @rdf.data_property('issue', bibo.issue)
 @rdf.data_property('edition', bibo.edition)
 @rdf.rdf_class(bibo.Issue)
-class Issue(pcdm.Item):
+class Issue(pcdm.Object):
     """Newspaper issue"""
     HEADER_MAP = {
         'title': 'Title',
@@ -50,9 +50,8 @@ class TextblockOnPage(oa.Annotation):
         self.motivation = sc.painting
 
 
-@rdf.data_property('title', dcterms.title)
 @rdf.rdf_class(fabio.Metadata)
-class IssueMetadata(pcdm.Component):
+class IssueMetadata(pcdm.Object):
     """Additional metadata about an issue"""
 
     def __init__(self, file, title=None):
@@ -74,7 +73,7 @@ class MetadataFile(pcdm.File):
 @rdf.data_property('number', ndnp.number)
 @rdf.data_property('frame', ndnp.sequence)
 @rdf.rdf_class(ndnp.Page)
-class Page(pcdm.Component):
+class Page(pcdm.Object):
     """Newspaper page"""
 
     @classmethod
@@ -168,7 +167,7 @@ class File(pcdm.File):
 @rdf.data_property('start_page', bibo.pageStart)
 @rdf.data_property('end_page', bibo.pageEnd)
 @rdf.rdf_class(bibo.Article)
-class Article(pcdm.Component):
+class Article(pcdm.Object):
     """Newspaper article"""
 
     def __init__(self, pages=None, **kwargs):
@@ -180,7 +179,7 @@ class Article(pcdm.Component):
 
 @rdf.data_property('id', dcterms.identifier)
 @rdf.rdf_class(carriers.hd)
-class Reel(pcdm.Item):
+class Reel(pcdm.Object):
     """NDNP reel is an ordered sequence of frames"""
 
     def __init__(self, **kwargs):

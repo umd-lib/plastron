@@ -1,11 +1,12 @@
 import csv
 import logging
 import re
+import plastron.models
 from collections import defaultdict
-from importlib import import_module
 from operator import attrgetter
-from rdflib import URIRef, Graph
-
+from plastron.rdf import RDFDataProperty
+from plastron.serializers import CSVSerializer
+from rdflib import URIRef, Graph, Literal
 
 logger = logging.getLogger(__name__)
 
@@ -34,6 +35,9 @@ def configure_cli(subparsers):
 
 
 def build_lookup_index(item, index_string):
+    if index_string is None:
+        return {}
+
     # build a lookup index for embedded object properties
     index = defaultdict(dict)
     pattern = r'([\w]+)\[(\d+)\]'
@@ -53,15 +57,56 @@ def build_sparql_update(delete_graph, insert_graph):
     return sparql_update
 
 
+def build_fields(fieldnames, property_attrs):
+    fields = defaultdict(list)
+    # group typed and language-tagged columns by their property attribute
+    for header in fieldnames:
+        if '[' in header:
+            # this field has a language tag
+            # header format is "Header Label [Language Name]"
+            m = re.search(r'^([^[]+)\s+\[(.+)\]$', header)
+            attrs = property_attrs[m[1]]
+            lang_code = CSVSerializer.LANGUAGE_CODES[m[2]]
+            fields[attrs].append({
+                'header': header,
+                'lang_code': lang_code,
+                'datatype': None
+            })
+        elif '{' in header:
+            # this field has a datatype
+            # header format is "Header Label {Datatype Name}
+            m = re.search(r'^([^{]+)\s+{(.+)}$', header)
+            attrs = property_attrs[m[1]]
+            datatype_uri = CSVSerializer.DATATYPE_URIS[m[2]]
+            fields[attrs].append({
+                'header': header,
+                'lang_code': None,
+                'datatype': datatype_uri
+            })
+        else:
+            # no language tag
+            # make sure we skip the system columns
+            if header not in CSVSerializer.SYSTEM_HEADERS:
+                attrs = property_attrs[header]
+                fields[attrs].append({
+                    'header': header,
+                    'lang_code': None,
+                    'datatype': None
+                })
+    return fields
+
+
 class Command:
     def __call__(self, repo, args):
-        module_name, class_name = args.model.rsplit('.', 2)
-        model_class = getattr(import_module('plastron.models.' + module_name), class_name)
+        model_class = getattr(plastron.models, args.model)
+        csv_filename = args.filename[0]
 
         property_attrs = {header: attrs for attrs, header in model_class.HEADER_MAP.items()}
 
-        with open(args.filename[0]) as file:
+        with open(csv_filename) as file:
             csv_file = csv.DictReader(file)
+            fields = build_fields(csv_file.fieldnames, property_attrs)
+
             row_count = 0
             updated_count = 0
             unchanged_count = 0
@@ -75,30 +120,34 @@ class Command:
                 # read the object from the repo
                 item = model_class.from_graph(repo.get_graph(uri, False), uri)
 
-                index = build_lookup_index(item, row['INDEX'])
+                index = build_lookup_index(item, row.get('INDEX'))
 
                 delete_graph = Graph()
                 insert_graph = Graph()
-                for header, attrs in property_attrs.items():
+                for attrs, columns in fields.items():
                     prop = attrgetter(attrs)(item)
-                    old_values = [str(v) for v in prop.values]
-                    new_values = [v for v in row[header].split('|') if len(v.strip()) > 0]
+                    new_values = []
+                    for column in columns:
+                        header = column['header']
+                        language_code = column['lang_code']
+                        datatype = column['datatype']
+                        values = [v for v in row[header].split('|') if len(v.strip()) > 0]
+
+                        if isinstance(prop, RDFDataProperty):
+                            new_values.extend(Literal(v, lang=language_code, datatype=datatype) for v in values)
+                        else:
+                            new_values = [URIRef(v) for v in values]
 
                     # construct a SPARQL update by diffing for deletions and insertions
                     if '.' not in attrs:
-                        subject = uri
                         # simple, non-embedded values
+                        # update the property and get the sets of values deleted and inserted
+                        deleted_values, inserted_values = prop.update(new_values)
 
-                        # take the set differences to find deleted and inserted values
-                        old_values_set = set(old_values)
-                        new_values_set = set(new_values)
-                        for deleted_value in old_values_set - new_values_set:
-                            delete_graph.add((subject, prop.uri, prop.get_term(deleted_value)))
-                        for inserted_value in new_values_set - old_values_set:
-                            insert_graph.add((subject, prop.uri, prop.get_term(inserted_value)))
-
-                        # and update in-memory, too
-                        prop.values = new_values
+                        for deleted_value in deleted_values:
+                            delete_graph.add((uri, prop.uri, prop.get_term(deleted_value)))
+                        for inserted_value in inserted_values:
+                            insert_graph.add((uri, prop.uri, prop.get_term(inserted_value)))
 
                     else:
                         # complex, embedded values
@@ -112,7 +161,7 @@ class Command:
                                 # get the embedded object
                                 obj = index[first_attr][i]
                                 # TODO: deal with additional new values that don't correspond to old
-                                old_value = str(getattr(obj, next_attr).values[0])
+                                old_value = getattr(obj, next_attr).values[0]
                                 if new_value != old_value:
                                     setattr(obj, next_attr, new_value)
                                     delete_graph.add((obj.uri, prop.uri, prop.get_term(old_value)))

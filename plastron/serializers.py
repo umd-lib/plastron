@@ -6,7 +6,7 @@ from tempfile import NamedTemporaryFile
 from urllib.parse import urlparse
 from zipfile import ZipFile
 
-from rdflib import Literal, Graph
+from rdflib import Literal, Graph, URIRef
 
 from plastron.exceptions import DataReadException
 from plastron.models.letter import Letter
@@ -53,8 +53,8 @@ def detect_resource_class(graph, subject):
 
 
 def write_csv_file(row_info, file):
-    # sort and add the new headers that have language names
-    for header, new_headers in row_info['language_headers'].items():
+    # sort and add the new headers that have language names or datatypes
+    for header, new_headers in row_info['extra_headers'].items():
         header_index = row_info['headers'].index(header)
         for i, new_header in enumerate(sorted(new_headers), start=1):
             row_info['headers'].insert(header_index + i, new_header)
@@ -89,9 +89,6 @@ class CSVSerializer:
     def write(self, graph: Graph):
         """
         Serializes the given graph as CSV data rows.
-          - One row per subject, if there are multiple subjects (HashURIs)
-          - The data rows written to the csv writer with primary subject row first, followed by HashURI subject rows
-          - Appends new predicates if missing or for repeating values of the predicate to the provided headers object.
         """
         main_subject = set([s for s in graph.subjects() if '#' not in str(s)]).pop()
         resource_class = detect_resource_class(graph, main_subject)
@@ -99,7 +96,7 @@ class CSVSerializer:
             self.content_models[resource_class] = {
                 'header_map': resource_class.HEADER_MAP,
                 'headers': list(resource_class.HEADER_MAP.values()) + self.SYSTEM_HEADERS,
-                'language_headers': defaultdict(set),
+                'extra_headers': defaultdict(set),
                 'rows': []
             }
 
@@ -119,6 +116,12 @@ class CSVSerializer:
         'ja': 'Japanese',
         'ja-latn': 'Japanese (Romanized)'
     }
+    LANGUAGE_CODES = {name: code for code, name in LANGUAGE_NAMES.items()}
+
+    DATATYPE_NAMES = {
+        URIRef('http://id.loc.gov/datatypes/edtf'): 'EDTF'
+    }
+    DATATYPE_URIS = {name: uri for uri, name in DATATYPE_NAMES.items()}
 
     def flatten(self, resource: Resource, row_info: dict, prefix=''):
         columns = defaultdict(list)
@@ -135,27 +138,37 @@ class CSVSerializer:
                     continue
                 header = row_info['header_map'][key]
 
-                # create additional columns (if needed) for different languages
+                # create additional columns (if needed) for different languages and datatypes
                 if isinstance(prop, RDFDataProperty):
-                    per_language_columns = defaultdict(list)
-                    for value in prop.values:
-                        if isinstance(value, Literal) and value.language:
-                            language_code = value.language
-                        else:
-                            language_code = ''
-                        per_language_columns[language_code].append(value)
-                    for language_code, values in per_language_columns.items():
+
+                    # ensure we only have literals here
+                    literals = [v for v in prop.values if isinstance(v, Literal)]
+
+                    languages = set(v.language for v in literals if v.language)
+                    datatypes = set(v.datatype for v in literals if v.datatype)
+
+                    for language in languages:
+                        language_header = f'{header} [{self.LANGUAGE_NAMES[language]}]'
+                        values = [v for v in prop.values if v.language == language]
                         serialization = '|'.join(values)
-                        if language_code:
-                            language = self.LANGUAGE_NAMES[language_code]
-                            language_header = f'{header} [{language}]'
-                            row_info['language_headers'][header].add(language_header)
-                            columns[language_header].append(serialization)
-                        else:
-                            columns[header].append(serialization)
+                        columns[language_header].append(serialization)
+                        row_info['extra_headers'][header].add(language_header)
+                    for datatype in datatypes:
+                        datatype_header = f'{header} {{{self.DATATYPE_NAMES[datatype]}}}'
+                        values = [v for v in prop.values if v.datatype == datatype]
+                        serialization = '|'.join(values)
+                        columns[datatype_header].append(serialization)
+                        row_info['extra_headers'][header].add(datatype_header)
+
+                    # get the other values; literals without language or datatype, or URIRefs that snuck in
+                    values = [v for v in prop.values
+                              if not isinstance(v, Literal) or (not v.language and not v.datatype)]
+                    if len(values) > 0:
+                        columns[header].append('|'.join(values))
                 else:
                     serialization = '|'.join(prop.values)
                     columns[header].append(serialization)
+
         return columns
 
     def __exit__(self, exc_type, exc_val, exc_tb):

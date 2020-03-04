@@ -49,6 +49,16 @@ class RDFProperty(object):
     def append(self, other):
         self.values.append(other)
 
+    def update(self, new_values):
+        # take the set differences to find deleted and inserted values
+        old_values_set = set(self.values)
+        new_values_set = set(new_values)
+        self.values = new_values
+        deleted_values = old_values_set - new_values_set
+        inserted_values = new_values_set - old_values_set
+        # return the sets so the caller could construct a SPARQL update
+        return deleted_values, inserted_values
+
     def __str__(self):
         return ' '.join(map(str, self.values))
 
@@ -76,11 +86,9 @@ class RDFProperty(object):
 
 
 class RDFDataProperty(RDFProperty):
-    datatype = None
-
     @classmethod
     def get_term(cls, value):
-        return Literal(value, datatype=cls.datatype)
+        return value if isinstance(value, Literal) else Literal(value)
 
 
 class RDFObjectProperty(RDFProperty):
@@ -108,13 +116,12 @@ class RDFObjectProperty(RDFProperty):
             raise ValueError('Expecting a URIRef or an object with a uri attribute')
 
 
-def data_property(name, uri, datatype=None):
+def data_property(name, uri):
     def add_property(cls):
         type_name = f'{cls.__name__}.{name}'
         prop_type = type(type_name, (RDFDataProperty,), {
             'name': name,
-            'uri': uri,
-            'datatype': datatype
+            'uri': uri
         })
         cls.name_to_prop[name] = prop_type
         cls.uri_to_prop[uri] = prop_type

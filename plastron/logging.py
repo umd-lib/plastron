@@ -1,3 +1,6 @@
+import json
+import logging
+
 DEFAULT_LOGGING_OPTIONS = {
     'version': 1,
     'formatters': {
@@ -38,7 +41,32 @@ DEFAULT_LOGGING_OPTIONS = {
         }
     },
     'root': {
-        'level': 'DEBUG',
-        'handlers': ['console', 'file']
+        'level': 'DEBUG'
     }
 }
+
+
+STATUS_LOGGER = logging.getLogger('#status')
+
+
+class STOMPHandler(logging.Handler):
+    def __init__(self, level=logging.NOTSET, broker=None, destination=None):
+        super().__init__(level)
+        self.destination = destination
+        self.broker = broker
+
+    def emit(self, record):
+        # if no broker is set, just be silent
+        if self.broker is not None and self.destination is not None:
+            body = str(record.msg)
+            headers = {'content-type': getattr(record.msg, 'content_type', 'text/plain')}
+            self.broker.send(self.destination, headers=headers, body=body)
+
+
+class JSONLogMessage:
+    def __init__(self, data):
+        self.data = data
+        self.content_type = 'application/json'
+
+    def __str__(self):
+        return json.dumps(self.data)

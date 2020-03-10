@@ -22,7 +22,7 @@ class Aggregation(ldp.Resource):
         if len(self.first) == 0:
             self.first = proxy
         else:
-            last = self.last[0]
+            last = self.last.values[0]
             # update the current last item to point to the new item
             last.next = proxy
             proxy.prev = last

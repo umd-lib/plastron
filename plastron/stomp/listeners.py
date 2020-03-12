@@ -3,7 +3,7 @@ import os
 
 from concurrent.futures import ThreadPoolExecutor
 from importlib import import_module
-from plastron.stomp import MessageBox, Message
+from plastron.stomp import MessageBox, PlastronCommandMessage, PlastronMessage
 from stomp.listener import ConnectionListener
 
 logger = logging.getLogger(__name__)
@@ -17,22 +17,21 @@ class CommandListener(ConnectionListener):
         self.completed_queue = self.broker.destinations['COMPLETED_JOBS']
         self.inbox = MessageBox(os.path.join(self.broker.message_store_dir, 'inbox'))
         self.outbox = MessageBox(os.path.join(self.broker.message_store_dir, 'outbox'))
-        self.executor = ThreadPoolExecutor(thread_name_prefix='CommandListener')
+        self.executor = ThreadPoolExecutor(thread_name_prefix=__name__)
         self.public_uri_template = self.broker.public_uri_template
 
     def on_connected(self, headers, body):
         # first attempt to send anything in the outbox
-        for message in self.outbox:
-            job_id = message.headers['ArchelonExportJobId']
-            logger.info(f"Found response message for job {job_id} in outbox")
+        for message in self.outbox(PlastronMessage):
+            logger.info(f"Found response message for job {message.job_id} in outbox")
             # send the job completed message
             self.broker.connection.send(self.completed_queue, headers=message.headers, body=message.body)
-            logger.info(f'Sent response message for job {job_id}')
+            logger.info(f'Sent response message for job {message.job_id}')
             # remove the message from the outbox now that sending has completed
-            self.outbox.remove(job_id)
+            self.outbox.remove(message.job_id)
 
         # then process anything in the inbox
-        for message in self.inbox:
+        for message in self.inbox(PlastronCommandMessage):
             self.dispatch(message)
 
         # then subscribe to the queue to receive incoming messages
@@ -41,20 +40,18 @@ class CommandListener(ConnectionListener):
 
     def dispatch(self, message):
         # determine which command to load to process it
-        command_name = message.headers['PlastronCommand']
-        command_module = import_module('plastron.commands.' + command_name)
+        command_module = import_module('plastron.commands.' + message.command)
         # TODO: cache the command modules
         # TODO: check that process_message exists in the command module
-        command_module.process_message(self, message.headers['message-id'], message.headers, message.body)
+        command_module.process_message(self, message)
 
     def on_message(self, headers, body):
         if headers['destination'] == self.queue:
             logger.debug(f'Received message on {self.queue} with headers: {headers}')
 
             # save the message in the inbox until we can process it
-            message_id = headers['message-id']
-            message = Message(headers=headers, body=body)
-            self.inbox.add(message_id, message)
+            message = PlastronCommandMessage(headers=headers, body=body)
+            self.inbox.add(message.id, message)
 
             # and then process the message
             self.dispatch(message)

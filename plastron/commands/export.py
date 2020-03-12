@@ -1,8 +1,9 @@
-from datetime import datetime
+import json
 import logging
 import os
 
 from argparse import Namespace
+from datetime import datetime
 from tempfile import NamedTemporaryFile
 from time import sleep
 
@@ -112,17 +113,16 @@ class Command:
         }
 
 
-def process_message(listener, message_id, headers, body):
+def process_message(listener, message):
 
     # define the processor for this message
     def process():
-        job_id = headers.get('ArchelonExportJobId', None)
-        if job_id is None:
-            logger.error('Expecting an ArchelonExportJobId header')
+        if message.job_id is None:
+            logger.error('Expecting a PlastronJobId header')
         else:
-            uris = body.split('\n')
-            export_format = headers.get('ArchelonExportJobFormat', 'text/turtle')
-            logger.info(f'Received message to initiate export job with id {job_id} containing {len(uris)} items')
+            uris = message.body.split('\n')
+            export_format = message.args.get('format', 'text/turtle')
+            logger.info(f'Received message to initiate export job {message.job_id} containing {len(uris)} items')
             logger.info(f'Requested export format is {export_format}')
 
             try:
@@ -137,52 +137,36 @@ def process_message(listener, message_id, headers, body):
                     )
                     result = command(listener.repository, args)
 
-                    job_name = headers.get('ArchelonExportJobName', job_id)
+                    job_name = message.args.get('name', message.job_id)
                     filename = job_name + result['file_extension']
 
                     file = pcdm.File(LocalFile(export_fh.name, mimetype=result['content_type'], filename=filename))
                     with listener.repository.at_path('/exports'):
                         file.create_object(repository=listener.repository)
+                        result['download_uri'] = file.uri
                         logger.info(f'Uploaded export file to {file.uri}')
 
                     logger.debug(f'Export temporary file size is {os.path.getsize(export_fh.name)}')
-                logger.info(f'Export job {job_id} complete')
+                logger.info(f'Export job {message.job_id} complete')
                 return Message(
                     headers={
-                        'ArchelonExportJobId': job_id,
-                        'ArchelonExportJobStatus': 'Ready',
-                        'ArchelonExportJobDownloadUrl': file.uri,
+                        'PlastronJobId': message.job_id,
+                        'PlastronJobStatus': 'Ready',
                         'persistent': 'true'
-                    }
+                    },
+                    body=json.dumps(result)
                 )
 
             except (ConfigException, RESTAPIException) as e:
-                logger.error(f"Export job {job_id} failed: {e}")
+                logger.error(f"Export job {message.job_id} failed: {e}")
                 return Message(
                     headers={
-                        'ArchelonExportJobId': job_id,
-                        'ArchelonExportJobStatus': 'Failed',
-                        'ArchelonExportJobError': str(e),
+                        'PlastronJobId': message.job_id,
+                        'PlastronJobStatus': 'Failed',
+                        'PlastronJobError': str(e),
                         'persistent': 'true'
                     }
                 )
 
-    # define the response handler for this message
-    def handle_response(future):
-        response = future.result()
-
-        # save a copy of the response message in the outbox
-        job_id = response.headers['ArchelonExportJobId']
-        listener.outbox.add(job_id, response)
-
-        # remove the message from the inbox now that processing has completed
-        listener.inbox.remove(message_id)
-
-        # send the job completed message
-        listener.broker.send(listener.completed_queue, headers=response.headers, body=response.body)
-
-        # remove the message from the outbox now that sending has completed
-        listener.outbox.remove(job_id)
-
     # process message
-    listener.executor.submit(process).add_done_callback(handle_response)
+    listener.executor.submit(process).add_done_callback(listener.get_response_handler(message.id))

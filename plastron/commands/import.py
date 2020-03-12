@@ -1,9 +1,13 @@
 import csv
 import logging
 import re
+from datetime import datetime
+
 import plastron.models
 from collections import defaultdict
 from operator import attrgetter
+
+from plastron.logging import STATUS_LOGGER, JSONLogMessage
 from plastron.rdf import RDFDataProperty
 from plastron.serializers import CSVSerializer
 from rdflib import URIRef, Graph, Literal
@@ -98,6 +102,7 @@ def build_fields(fieldnames, property_attrs):
 
 class Command:
     def __call__(self, repo, args):
+        start_time = datetime.now().timestamp()
         model_class = getattr(plastron.models, args.model)
         csv_filename = args.filename[0]
 
@@ -110,6 +115,7 @@ class Command:
             row_count = 0
             updated_count = 0
             unchanged_count = 0
+            errors = 0
             for row_number, row in enumerate(csv_file, 1):
                 if args.limit is not None and row_number > args.limit:
                     logger.info(f'Stopping after {args.limit} rows')
@@ -185,7 +191,21 @@ class Command:
                     unchanged_count += 1
                     logger.info(f'No changes found for "{item}" ({uri})')
 
-                # TODO: emit status info
+                # update the status
+                now = datetime.now().timestamp()
+                STATUS_LOGGER.info(JSONLogMessage({
+                    'time': {
+                        'started': start_time,
+                        'now': now,
+                        'elapsed': now - start_time
+                    },
+                    'count': {
+                        'total': row_count,
+                        'updated': updated_count,
+                        'unchanged': unchanged_count,
+                        'errors': errors
+                    }
+                }))
 
             logger.info(f'{unchanged_count} of {row_count} items remained unchanged')
             logger.info(f'Updated {updated_count} of {row_count} items')

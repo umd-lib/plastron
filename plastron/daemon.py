@@ -5,20 +5,18 @@ import logging.config
 import os
 import signal
 import sys
-import tempfile
 from concurrent.futures import ThreadPoolExecutor
+from datetime import datetime
+from importlib import import_module
 from time import sleep
 
 import yaml
-from datetime import datetime
-from stomp import ConnectionListener, Connection
+from stomp import Connection, ConnectionListener
 from stomp.exception import ConnectFailedException
-from plastron import pcdm, version
-from plastron.exceptions import ConfigException, RESTAPIException
+
+from plastron import version
 from plastron.http import Repository
-from plastron.commands import export
-from plastron.logging import DEFAULT_LOGGING_OPTIONS
-from plastron.util import LocalFile
+from plastron.logging import DEFAULT_LOGGING_OPTIONS, STOMPHandler, STATUS_LOGGER
 
 logger = logging.getLogger(__name__)
 now = datetime.utcnow().strftime('%Y%m%d%H%M%S')
@@ -82,36 +80,43 @@ class MessageBox:
             raise StopIteration
 
 
-class ExportListener(ConnectionListener):
-    def __init__(self, broker, repository, config):
+class CommandListener(ConnectionListener):
+    def __init__(self, broker, repository):
         self.broker = broker
         self.repository = repository
-        self.queue = '/queue/' + config['EXPORT_JOBS_QUEUE']
-        self.completed_queue = '/queue/' + config['EXPORT_JOBS_COMPLETED_QUEUE']
-        self.inbox = MessageBox(os.path.join(config['MESSAGE_STORE_DIR'], 'inbox'))
-        self.outbox = MessageBox(os.path.join(config['MESSAGE_STORE_DIR'], 'outbox'))
-        self.executor = ThreadPoolExecutor(thread_name_prefix='ExportListener')
-        self.public_uri_template = config.get('PUBLIC_URI_TEMPLATE', os.environ.get('PUBLIC_URI_TEMPLATE', None))
+        self.queue = self.broker.destinations['JOBS_QUEUE']
+        self.completed_queue = self.broker.destinations['COMPLETED_JOBS_QUEUE']
+        self.inbox = MessageBox(os.path.join(self.broker.message_store_dir, 'inbox'))
+        self.outbox = MessageBox(os.path.join(self.broker.message_store_dir, 'outbox'))
+        self.executor = ThreadPoolExecutor(thread_name_prefix='CommandListener')
+        self.public_uri_template = self.broker.public_uri_template
 
     def on_connected(self, headers, body):
         # first attempt to send anything in the outbox
         for message in self.outbox:
             job_id = message.headers['ArchelonExportJobId']
-            logger.info(f"Found response message for job id {job_id} in outbox")
+            logger.info(f"Found response message for job {job_id} in outbox")
             # send the job completed message
-            self.broker.send(self.completed_queue, headers=message.headers, body=message.body)
-            logger.info(f'Sent response message for job id {job_id}')
+            self.broker.connection.send(self.completed_queue, headers=message.headers, body=message.body)
+            logger.info(f'Sent response message for job {job_id}')
             # remove the message from the outbox now that sending has completed
             self.outbox.remove(job_id)
 
         # then process anything in the inbox
         for message in self.inbox:
-            message_id = message.headers['message-id']
-            self.process_message(message_id, message.headers, message.body)
+            self.dispatch(message)
 
         # then subscribe to the queue to receive incoming messages
-        self.broker.subscribe(destination=self.queue, id='plastron')
+        self.broker.connection.subscribe(destination=self.queue, id='plastron')
         logger.info(f"Subscribed to {self.queue}")
+
+    def dispatch(self, message):
+        # determine which command to load to process it
+        command_name = message.headers['PlastronCommand']
+        command_module = import_module('plastron.commands.' + command_name)
+        # TODO: cache the command modules
+        # TODO: check that process_message exists in the command module
+        command_module.process_message(self, message.headers['message-id'], message.headers, message.body)
 
     def on_message(self, headers, body):
         if headers['destination'] == self.queue:
@@ -122,82 +127,8 @@ class ExportListener(ConnectionListener):
             message = Message(headers=headers, body=body)
             self.inbox.add(message_id, message)
 
-            self.process_message(message_id, headers, body)
-
-    def process_message(self, message_id, headers, body):
-
-        # define the response handler for this message
-        def handle_response(future):
-            response = future.result()
-
-            # save a copy of the response message in the outbox
-            job_id = response.headers['ArchelonExportJobId']
-            self.outbox.add(job_id, response)
-
-            # remove the message from the inbox now that processing has completed
-            self.inbox.remove(message_id)
-
-            # send the job completed message
-            self.broker.send(self.completed_queue, headers=response.headers, body=response.body)
-
-            # remove the message from the outbox now that sending has completed
-            self.outbox.remove(job_id)
-
-        # define the processor for this message
-        def process():
-            job_id = headers.get('ArchelonExportJobId', None)
-            if job_id is None:
-                logger.error('Expecting an ArchelonExportJobId header')
-            else:
-                uris = body.split('\n')
-                export_format = headers.get('ArchelonExportJobFormat', 'text/turtle')
-                logger.info(f'Received message to initiate export job with id {job_id} containing {len(uris)} items')
-                logger.info(f'Requested export format is {export_format}')
-
-                try:
-                    command = export.Command()
-                    with tempfile.NamedTemporaryFile() as export_fh:
-                        logger.debug(f'Export temporary file name is {export_fh.name}')
-                        args = argparse.Namespace(
-                            uris=uris,
-                            output_file=export_fh.name,
-                            format=export_format,
-                            uri_template=self.public_uri_template
-                        )
-                        result = command(self.repository, args)
-
-                        job_name = headers.get('ArchelonExportJobName', job_id)
-                        filename = job_name + result['file_extension']
-
-                        file = pcdm.File(LocalFile(export_fh.name, mimetype=result['content_type'], filename=filename))
-                        with self.repository.at_path('/exports'):
-                            file.create_object(repository=self.repository)
-                            logger.info(f'Uploaded export file to {file.uri}')
-
-                        logger.debug(f'Export temporary file size is {os.path.getsize(export_fh.name)}')
-                    logger.info(f'Export job {job_id} complete')
-                    return Message(
-                        headers={
-                            'ArchelonExportJobId': job_id,
-                            'ArchelonExportJobStatus': 'Ready',
-                            'ArchelonExportJobDownloadUrl': file.uri,
-                            'persistent': 'true'
-                        }
-                    )
-
-                except (ConfigException, RESTAPIException) as e:
-                    logger.error(f"Export job {job_id} failed: {e}")
-                    return Message(
-                        headers={
-                            'ArchelonExportJobId': job_id,
-                            'ArchelonExportJobStatus': 'Failed',
-                            'ArchelonExportJobError': str(e),
-                            'persistent': 'true'
-                        }
-                    )
-
-        # process message
-        self.executor.submit(process).add_done_callback(handle_response)
+            # and then process the message
+            self.dispatch(message)
 
 
 class ReconnectListener(ConnectionListener):
@@ -212,17 +143,28 @@ class ReconnectListener(ConnectionListener):
 
     def on_disconnected(self):
         logger.warning('Disconnected from the STOMP message broker')
-        connect(self.broker)
+        self.broker.connect()
 
 
-def connect(broker):
-    while not broker.is_connected():
-        logger.info('Attempting to connect to the STOMP message broker')
-        try:
-            broker.connect(wait=True)
-        except ConnectFailedException:
-            logger.warning('Connection attempt failed')
-            sleep(1)
+
+
+class Broker:
+    def __init__(self, config):
+        # set up STOMP client
+        broker_server = tuple(config['SERVER'].split(':', 2))
+        self.connection = Connection([broker_server])
+        self.destinations = config['DESTINATIONS']
+        self.message_store_dir = config['MESSAGE_STORE_DIR']
+        self.public_uri_template = config.get('PUBLIC_URI_TEMPLATE', os.environ.get('PUBLIC_URI_TEMPLATE', None))
+        
+    def connect(self):
+        while not self.connection.is_connected():
+            logger.info('Attempting to connect to the STOMP message broker')
+            try:
+                self.connection.connect(wait=True)
+            except ConnectFailedException:
+                logger.warning('Connection attempt failed')
+                sleep(1)
 
 
 def main():
@@ -250,7 +192,6 @@ def main():
 
     repo_config = config['REPOSITORY']
     broker_config = config['MESSAGE_BROKER']
-    exporter_config = config['EXPORTER']
 
     logging_options = DEFAULT_LOGGING_OPTIONS
 
@@ -269,19 +210,23 @@ def main():
     # configure logging
     logging.config.dictConfig(logging_options)
 
+    # configure STOMP message broker
+    broker = Broker(broker_config)
+
+    # set up status logging to STOMP
+    stomp_handler = STOMPHandler(connection=broker.connection, destination=broker.destinations['JOB_STATUS'])
+    STATUS_LOGGER.addHandler(stomp_handler)
+
     logger.info(f'plastrond {version}')
 
     repo = Repository(repo_config, ua_string=f'plastron/{version}')
 
-    broker_server = tuple(broker_config['SERVER'].split(':', 2))
-    broker = Connection([broker_server])
-
     # setup listeners
-    broker.set_listener('reconnect', ReconnectListener(broker))
-    broker.set_listener('export', ExportListener(broker, repo, exporter_config))
+    broker.connection.set_listener('reconnect', ReconnectListener(broker))
+    broker.connection.set_listener('export', CommandListener(broker, repo))
 
     try:
-        connect(broker)
+        broker.connect()
         while True:
             signal.pause()
     except KeyboardInterrupt:

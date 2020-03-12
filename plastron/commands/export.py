@@ -7,7 +7,7 @@ from tempfile import NamedTemporaryFile
 from time import sleep
 
 from plastron import pcdm
-from plastron.daemon import Message
+from plastron.stomp import Message
 from plastron.exceptions import ConfigException, DataReadException, RESTAPIException
 from plastron.logging import JSONLogMessage, STATUS_LOGGER
 from plastron.namespaces import get_manager

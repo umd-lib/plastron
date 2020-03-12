@@ -1,9 +1,9 @@
 HANDLER:         correspondence
 COLLECTION:      http://localhost:8080/rest/pcdm/my-collection-uri
 LOG_CONFIG:      /absolute/path/to/log/config.yml
-LOG_LOCATION:    /absolute/path/to/log/dir
-ROOT:  		     /absolute/path/to/batch/directory
-MAPFILE:         mapfile.csv   # relative to LOG_LOCATION
+LOG_DIR:         /absolute/path/to/log/dir
+ROOT:  		       /absolute/path/to/batch/directory
+MAPFILE:         mapfile.csv   # relative to LOG_DIR
 BATCH_INDEX:     index.csv     # relative to ROOT / will write if not found
 METADATA_FILE:   metadata.ttl  # relative to ROOT
 METADATA_PATH:   metadata/     # relative to ROOT

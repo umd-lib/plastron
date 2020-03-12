@@ -50,17 +50,17 @@ STATUS_LOGGER = logging.getLogger('#status')
 
 
 class STOMPHandler(logging.Handler):
-    def __init__(self, level=logging.NOTSET, broker=None, destination=None):
+    def __init__(self, level=logging.NOTSET, connection=None, destination=None):
         super().__init__(level)
         self.destination = destination
-        self.broker = broker
+        self.connection = connection
 
     def emit(self, record):
         # if no broker is set, just be silent
-        if self.broker is not None and self.destination is not None:
+        if self.connection is not None and self.destination is not None:
             body = str(record.msg)
             headers = {'content-type': getattr(record.msg, 'content_type', 'text/plain')}
-            self.broker.send(self.destination, headers=headers, body=body)
+            self.connection.send(self.destination, headers=headers, body=body)
 
 
 class JSONLogMessage:

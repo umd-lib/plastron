@@ -81,15 +81,15 @@ class MessageBox:
 
 
 class CommandListener(ConnectionListener):
-    def __init__(self, broker, repository, config):
+    def __init__(self, broker, repository):
         self.broker = broker
         self.repository = repository
-        self.queue = '/queue/' + config['JOBS_QUEUE']
-        self.completed_queue = '/queue/' + config['COMPLETED_JOBS_QUEUE']
-        self.inbox = MessageBox(os.path.join(config['MESSAGE_STORE_DIR'], 'inbox'))
-        self.outbox = MessageBox(os.path.join(config['MESSAGE_STORE_DIR'], 'outbox'))
+        self.queue = self.broker.destinations['JOBS_QUEUE']
+        self.completed_queue = self.broker.destinations['COMPLETED_JOBS_QUEUE']
+        self.inbox = MessageBox(os.path.join(self.broker.message_store_dir, 'inbox'))
+        self.outbox = MessageBox(os.path.join(self.broker.message_store_dir, 'outbox'))
         self.executor = ThreadPoolExecutor(thread_name_prefix='CommandListener')
-        self.public_uri_template = config.get('PUBLIC_URI_TEMPLATE', os.environ.get('PUBLIC_URI_TEMPLATE', None))
+        self.public_uri_template = self.broker.public_uri_template
 
     def on_connected(self, headers, body):
         # first attempt to send anything in the outbox
@@ -97,7 +97,7 @@ class CommandListener(ConnectionListener):
             job_id = message.headers['ArchelonExportJobId']
             logger.info(f"Found response message for job {job_id} in outbox")
             # send the job completed message
-            self.broker.send(self.completed_queue, headers=message.headers, body=message.body)
+            self.broker.connection.send(self.completed_queue, headers=message.headers, body=message.body)
             logger.info(f'Sent response message for job {job_id}')
             # remove the message from the outbox now that sending has completed
             self.outbox.remove(job_id)
@@ -107,7 +107,7 @@ class CommandListener(ConnectionListener):
             self.dispatch(message)
 
         # then subscribe to the queue to receive incoming messages
-        self.broker.subscribe(destination=self.queue, id='plastron')
+        self.broker.connection.subscribe(destination=self.queue, id='plastron')
         logger.info(f"Subscribed to {self.queue}")
 
     def dispatch(self, message):
@@ -143,17 +143,28 @@ class ReconnectListener(ConnectionListener):
 
     def on_disconnected(self):
         logger.warning('Disconnected from the STOMP message broker')
-        connect(self.broker)
+        self.broker.connect()
 
 
-def connect(broker):
-    while not broker.is_connected():
-        logger.info('Attempting to connect to the STOMP message broker')
-        try:
-            broker.connect(wait=True)
-        except ConnectFailedException:
-            logger.warning('Connection attempt failed')
-            sleep(1)
+
+
+class Broker:
+    def __init__(self, config):
+        # set up STOMP client
+        broker_server = tuple(config['SERVER'].split(':', 2))
+        self.connection = Connection([broker_server])
+        self.destinations = config['DESTINATIONS']
+        self.message_store_dir = config['MESSAGE_STORE_DIR']
+        self.public_uri_template = config.get('PUBLIC_URI_TEMPLATE', os.environ.get('PUBLIC_URI_TEMPLATE', None))
+        
+    def connect(self):
+        while not self.connection.is_connected():
+            logger.info('Attempting to connect to the STOMP message broker')
+            try:
+                self.connection.connect(wait=True)
+            except ConnectFailedException:
+                logger.warning('Connection attempt failed')
+                sleep(1)
 
 
 def main():
@@ -181,7 +192,6 @@ def main():
 
     repo_config = config['REPOSITORY']
     broker_config = config['MESSAGE_BROKER']
-    exporter_config = config['EXPORTER']
 
     logging_options = DEFAULT_LOGGING_OPTIONS
 
@@ -200,12 +210,11 @@ def main():
     # configure logging
     logging.config.dictConfig(logging_options)
 
-    # set up STOMP client
-    broker_server = tuple(broker_config['SERVER'].split(':', 2))
-    broker = Connection([broker_server])
+    # configure STOMP message broker
+    broker = Broker(broker_config)
 
     # set up status logging to STOMP
-    stomp_handler = STOMPHandler(level=logging.INFO, broker=broker, destination='/topic/plastron.jobs.status')
+    stomp_handler = STOMPHandler(connection=broker.connection, destination=broker.destinations['JOB_STATUS'])
     STATUS_LOGGER.addHandler(stomp_handler)
 
     logger.info(f'plastrond {version}')
@@ -213,11 +222,11 @@ def main():
     repo = Repository(repo_config, ua_string=f'plastron/{version}')
 
     # setup listeners
-    broker.set_listener('reconnect', ReconnectListener(broker))
-    broker.set_listener('export', CommandListener(broker, repo, exporter_config))
+    broker.connection.set_listener('reconnect', ReconnectListener(broker))
+    broker.connection.set_listener('export', CommandListener(broker, repo))
 
     try:
-        connect(broker)
+        broker.connect()
         while True:
             signal.pause()
     except KeyboardInterrupt:

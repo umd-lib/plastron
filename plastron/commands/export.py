@@ -151,7 +151,7 @@ def process_message(listener, message):
                 return Message(
                     headers={
                         'PlastronJobId': message.job_id,
-                        'PlastronJobStatus': 'Ready',
+                        'PlastronJobStatus': 'Done',
                         'persistent': 'true'
                     },
                     body=json.dumps(result)

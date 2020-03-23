@@ -7,7 +7,7 @@ import plastron.models
 from collections import defaultdict
 from operator import attrgetter
 
-from plastron.logging import STATUS_LOGGER, JSONLogMessage
+from plastron.exceptions import FailureException
 from plastron.rdf import RDFDataProperty
 from plastron.serializers import CSVSerializer
 from rdflib import URIRef, Graph, Literal
@@ -101,9 +101,21 @@ def build_fields(fieldnames, property_attrs):
 
 
 class Command:
-    def __call__(self, repo, args):
+    def __init__(self):
+        self.result = None
+
+    def __call__(self, *args, **kwargs):
+        for status in self.execute(*args, **kwargs):
+            pass
+
+    def execute(self, repo, args):
         start_time = datetime.now().timestamp()
-        model_class = getattr(plastron.models, args.model)
+        try:
+            model_class = getattr(plastron.models, args.model)
+        except AttributeError:
+            logger.error(f'Unknown model: {args.model}')
+            raise FailureException()
+
         csv_filename = args.filename[0]
 
         property_attrs = {header: attrs for attrs, header in model_class.HEADER_MAP.items()}
@@ -193,7 +205,7 @@ class Command:
 
                 # update the status
                 now = datetime.now().timestamp()
-                STATUS_LOGGER.info(JSONLogMessage({
+                yield {
                     'time': {
                         'started': start_time,
                         'now': now,
@@ -205,7 +217,15 @@ class Command:
                         'unchanged': unchanged_count,
                         'errors': errors
                     }
-                }))
+                }
 
-            logger.info(f'{unchanged_count} of {row_count} items remained unchanged')
-            logger.info(f'Updated {updated_count} of {row_count} items')
+        logger.info(f'{unchanged_count} of {row_count} items remained unchanged')
+        logger.info(f'Updated {updated_count} of {row_count} items')
+        self.result = {
+            'count': {
+                'total': row_count,
+                'updated': updated_count,
+                'unchanged': unchanged_count,
+                'errors': errors
+            }
+        }

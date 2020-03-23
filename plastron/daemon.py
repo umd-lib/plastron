@@ -10,7 +10,7 @@ import yaml
 from datetime import datetime
 from plastron import version
 from plastron.http import Repository
-from plastron.logging import DEFAULT_LOGGING_OPTIONS, STOMPHandler, STATUS_LOGGER
+from plastron.logging import DEFAULT_LOGGING_OPTIONS
 from plastron.stomp import Broker
 from plastron.stomp.listeners import ReconnectListener, CommandListener
 
@@ -63,10 +63,6 @@ def main():
 
     # configure STOMP message broker
     broker = Broker(broker_config)
-
-    # set up status logging to STOMP
-    stomp_handler = STOMPHandler(connection=broker.connection, destination=broker.destinations['JOB_STATUS'])
-    STATUS_LOGGER.addHandler(stomp_handler)
 
     logger.info(f'plastrond {version}')
 

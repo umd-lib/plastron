@@ -9,8 +9,7 @@ from time import sleep
 
 from plastron import pcdm
 from plastron.stomp import Message
-from plastron.exceptions import ConfigException, DataReadException, RESTAPIException
-from plastron.logging import JSONLogMessage, STATUS_LOGGER
+from plastron.exceptions import FailureException, DataReadException, RESTAPIException
 from plastron.namespaces import get_manager
 from plastron.serializers import SERIALIZER_CLASSES
 from plastron.util import LocalFile
@@ -50,7 +49,14 @@ def configure_cli(subparsers):
 
 
 class Command:
-    def __call__(self, fcrepo, args):
+    def __init__(self):
+        self.result = None
+
+    def __call__(self, *args, **kwargs):
+        for result in self.execute(*args, **kwargs):
+            pass
+
+    def execute(self, fcrepo, args):
         start_time = datetime.now().timestamp()
         count = 0
         errors = 0
@@ -58,7 +64,8 @@ class Command:
         try:
             serializer_class = SERIALIZER_CLASSES[args.format]
         except KeyError:
-            raise ConfigException(f'Unknown format: {args.format}')
+            logger.error(f'Unknown format: {args.format}')
+            raise FailureException()
 
         logger.debug(f'Exporting to file {args.output_file}')
         with serializer_class(args.output_file, public_uri_template=args.uri_template) as serializer:
@@ -88,7 +95,7 @@ class Command:
 
                 # update the status
                 now = datetime.now().timestamp()
-                STATUS_LOGGER.info(JSONLogMessage({
+                yield {
                     'time': {
                         'started': start_time,
                         'now': now,
@@ -99,10 +106,10 @@ class Command:
                         'exported': count,
                         'errors': errors
                     }
-                }))
+                }
 
         logger.info(f'Exported {count} of {total} items')
-        return {
+        self.result = {
             'content_type': serializer.content_type,
             'file_extension': serializer.file_extension,
             'count': {
@@ -135,15 +142,27 @@ def process_message(listener, message):
                         format=export_format,
                         uri_template=listener.public_uri_template
                     )
-                    result = command(listener.repository, args)
+
+                    for status in command.execute(listener.repository, args):
+                        listener.broker.connection.send(
+                            '/topic/plastron.jobs.status',
+                            headers={
+                                'PlastronJobId': message.job_id
+                            },
+                            body=json.dumps(status)
+                        )
 
                     job_name = message.args.get('name', message.job_id)
-                    filename = job_name + result['file_extension']
+                    filename = job_name + command.result['file_extension']
 
-                    file = pcdm.File(LocalFile(export_fh.name, mimetype=result['content_type'], filename=filename))
+                    file = pcdm.File(LocalFile(
+                        export_fh.name,
+                        mimetype=command.result['content_type'],
+                        filename=filename
+                    ))
                     with listener.repository.at_path('/exports'):
                         file.create_object(repository=listener.repository)
-                        result['download_uri'] = file.uri
+                        command.result['download_uri'] = file.uri
                         logger.info(f'Uploaded export file to {file.uri}')
 
                     logger.debug(f'Export temporary file size is {os.path.getsize(export_fh.name)}')
@@ -154,10 +173,10 @@ def process_message(listener, message):
                         'PlastronJobStatus': 'Done',
                         'persistent': 'true'
                     },
-                    body=json.dumps(result)
+                    body=json.dumps(command.result)
                 )
 
-            except (ConfigException, RESTAPIException) as e:
+            except (FailureException, RESTAPIException) as e:
                 logger.error(f"Export job {message.job_id} failed: {e}")
                 return Message(
                     headers={

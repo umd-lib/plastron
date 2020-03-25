@@ -10,4 +10,4 @@ MESSAGE_BROKER:
   MESSAGE_STORE_DIR: /var/opt/plastron/msg/export
   DESTINATIONS:
     JOBS: /queue/plastron.jobs
-    JOBS_COMPLETED: /queue/plastron.jobs.completed
+    COMPLETED_JOBS: /queue/plastron.jobs.completed

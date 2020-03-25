@@ -19,6 +19,7 @@ optional arguments:
 
 commands:
   {delete,del,rm,export,extractocr,imgsize,list,ls,load,mkcol,ping,update}```
+```
 
 ### Check version
 
@@ -73,7 +74,7 @@ optional arguments:
 
 required arguments:
   -b BATCH, --batch BATCH
-                        path to batch configuration file              
+                        path to batch configuration file
 ```
 
 ### List (list, ls)
@@ -135,6 +136,7 @@ optional arguments:
   --completed COMPLETED
                         file recording the URIs of deleted resources
   -f FILE, --file FILE  File containing a list of URIs to delete```
+```
 
 ### Extract OCR (extractocr)
 
@@ -202,6 +204,7 @@ optional arguments:
 ## Configuration
 
 ### Configuration Templates
+
 Templates for creating the configuration files can be found at [config/templates](../config/templates)
 
 ### Repository Configuration

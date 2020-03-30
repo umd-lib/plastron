@@ -15,6 +15,7 @@ ns = pcdm
 @rdf.object_property('related', pcdm.hasRelatedObject)
 @rdf.object_property('related_of', pcdm.relatedObjectOf)
 @rdf.data_property('title', dcterms.title)
+@rdf.rdf_class(pcdm.Object)
 class Object(ore.Aggregation):
     def add_member(self, obj):
         self.members.append(obj)

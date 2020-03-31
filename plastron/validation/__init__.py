@@ -19,10 +19,10 @@ class ResourceValidationResult:
         for prop, status, rule, expected in self.outcomes:
             if status != 'passed':
                 continue
-            yield prop.name, status, rule.__name__, expected
+            yield prop.name, status, rule.__name__, getattr(expected, '__name__', expected)
 
     def failed(self):
         for prop, status, rule, expected in self.outcomes:
             if status != 'failed':
                 continue
-            yield prop.name, status, rule.__name__, expected
+            yield prop.name, status, rule.__name__, getattr(expected, '__name__', expected)

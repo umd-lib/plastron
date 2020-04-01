@@ -6,7 +6,7 @@ import re
 from collections import defaultdict
 from datetime import datetime
 from operator import attrgetter
-from plastron.exceptions import FailureException, NoValidationRulesetException
+from plastron.exceptions import FailureException, NoValidationRulesetException, DataReadException
 from plastron.rdf import RDFDataProperty
 from plastron.serializers import CSVSerializer
 from rdflib import URIRef, Graph, Literal
@@ -156,12 +156,18 @@ class Command:
             updated_count = 0
             unchanged_count = 0
             invalid_count = 0
-            errors = 0
+            error_count = 0
             for row_number, row in enumerate(csv_file, 1):
+                line_reference = f'{csv_filename}:{row_number + 1}'
                 if args.limit is not None and row_number > args.limit:
                     logger.info(f'Stopping after {args.limit} rows')
                     break
-                logger.debug(f'Processing {csv_filename}:{row_number + 1}')
+                logger.debug(f'Processing {line_reference}')
+                if any(v is None for v in row.values()):
+                    error_count += 1
+                    logger.warning(f'Line {line_reference} has the wrong number of columns; skipping')
+                    continue
+
                 uri = URIRef(row['URI'])
                 row_count += 1
 
@@ -253,19 +259,20 @@ class Command:
                         'total': row_count,
                         'updated': updated_count,
                         'unchanged': unchanged_count,
-                        'errors': errors
+                        'errors': error_count
                     }
                 }
 
         logger.info(f'{unchanged_count} of {row_count} items remained unchanged')
         logger.info(f'Updated {updated_count} of {row_count} items')
         logger.info(f'Found {invalid_count} invalid items')
+        logger.info(f'Found {error_count} errors')
         self.result = {
             'count': {
                 'total': row_count,
                 'updated': updated_count,
                 'unchanged': unchanged_count,
                 'invalid': invalid_count,
-                'errors': errors
+                'errors': error_count
             }
         }

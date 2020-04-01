@@ -115,14 +115,14 @@ def validate(item):
         logger.info(f'"{item}" is valid')
         for outcome in result.passed():
             logger.debug(f'  ✓ {outcome}')
-        return True
     else:
         logger.warning(f'{item} is invalid')
         for outcome in result.failed():
             logger.warning(f'  ✗ {outcome}')
         for outcome in result.passed():
             logger.debug(f'  ✓ {outcome}')
-        return False
+
+    return result
 
 
 class Command:
@@ -156,7 +156,9 @@ class Command:
             updated_count = 0
             unchanged_count = 0
             invalid_count = 0
+            valid_count = 0
             error_count = 0
+            reports = []
             for row_number, row in enumerate(csv_file, 1):
                 line_reference = f'{csv_filename}:{row_number + 1}'
                 if args.limit is not None and row_number > args.limit:
@@ -165,7 +167,13 @@ class Command:
                 logger.debug(f'Processing {line_reference}')
                 if any(v is None for v in row.values()):
                     error_count += 1
-                    logger.warning(f'Line {line_reference} has the wrong number of columns; skipping')
+                    error_msg = f'Line {line_reference} has the wrong number of columns'
+                    reports.append({
+                        'line': line_reference,
+                        'is_valid': False,
+                        'error': error_msg
+                    })
+                    logger.warning(f'Skipping: {error_msg}')
                     continue
 
                 uri = URIRef(row['URI'])
@@ -231,7 +239,18 @@ class Command:
                         delete_graph.remove(statement)
                         insert_graph.remove(statement)
 
-                if not validate(item):
+                report = validate(item)
+                reports.append({
+                    'line': line_reference,
+                    'is_valid': report.is_valid(),
+                    'passed': [ outcome for outcome in report.passed() ],
+                    'failed': [ outcome for outcome in report.failed() ]
+                })
+
+                if report.is_valid():
+                    valid_count += 1
+                else:
+                    # skip invalid items
                     invalid_count += 1
                     logger.warning(f'Skipping "{item}"')
                     continue
@@ -263,10 +282,13 @@ class Command:
                         'total': row_count,
                         'updated': updated_count,
                         'unchanged': unchanged_count,
+                        'valid': valid_count,
+                        'invalid': invalid_count,
                         'errors': error_count
                     }
                 }
 
+        logger.info(f'Found {valid_count} valid items')
         logger.info(f'Found {invalid_count} invalid items')
         logger.info(f'Found {error_count} errors')
         if not args.validate_only:
@@ -277,7 +299,9 @@ class Command:
                 'total': row_count,
                 'updated': updated_count,
                 'unchanged': unchanged_count,
+                'valid': valid_count,
                 'invalid': invalid_count,
                 'errors': error_count
-            }
+            },
+            'validation': reports
         }

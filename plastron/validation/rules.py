@@ -1,26 +1,23 @@
 import re
+
 from functools import lru_cache
-
-from plastron.namespaces import rdf, rdfs
 from rdflib import Graph
-
-
-vocab_cache = {}
+from typing import Callable
 
 
 def non_empty(values):
     return [v for v in values if len(v.strip()) > 0]
 
 
-def required(prop):
-    return min_len(prop, 1)
+def required(prop, *args):
+    return min_values(prop, 1)
 
 
-def min_len(prop, length):
+def min_values(prop, length):
     return len(prop) >= length
 
 
-def max_len(prop, length):
+def max_values(prop, length):
     return len(prop) <= length
 
 
@@ -44,3 +41,7 @@ def from_vocabulary(prop, vocab_uri):
 
 def value_pattern(prop, pattern):
     return not any(True for v in prop.values if not re.search(pattern, v))
+
+
+def function(prop, func: Callable):
+    return not any(True for v in prop.values if not func(v))

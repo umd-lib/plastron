@@ -1,13 +1,12 @@
 import csv
 import logging
-import re
-from datetime import datetime
-
 import plastron.models
-from collections import defaultdict
-from operator import attrgetter
+import re
 
-from plastron.exceptions import FailureException
+from collections import defaultdict
+from datetime import datetime
+from operator import attrgetter
+from plastron.exceptions import FailureException, NoValidationRulesetException, DataReadException
 from plastron.rdf import RDFDataProperty
 from plastron.serializers import CSVSerializer
 from rdflib import URIRef, Graph, Literal
@@ -30,6 +29,11 @@ def configure_cli(subparsers):
         help='limit the number of rows to read from the import file',
         type=int,
         action='store'
+    )
+    parser.add_argument(
+        '--validate-only',
+        help='only validate, do not do the actual import',
+        action='store_true'
     )
     parser.add_argument(
         'filename', nargs=1,
@@ -100,12 +104,33 @@ def build_fields(fieldnames, property_attrs):
     return fields
 
 
+def validate(item):
+    try:
+        result = item.validate()
+    except NoValidationRulesetException as e:
+        logger.error(f'Unable to run validation: {e.message}')
+        raise FailureException()
+
+    if result.is_valid():
+        logger.info(f'"{item}" is valid')
+        for outcome in result.passed():
+            logger.debug(f'  ✓ {outcome}')
+        return True
+    else:
+        logger.warning(f'{item} is invalid')
+        for outcome in result.failed():
+            logger.warning(f'  ✗ {outcome}')
+        for outcome in result.passed():
+            logger.debug(f'  ✓ {outcome}')
+        return False
+
+
 class Command:
     def __init__(self):
         self.result = None
 
     def __call__(self, *args, **kwargs):
-        for status in self.execute(*args, **kwargs):
+        for _ in self.execute(*args, **kwargs):
             pass
 
     def execute(self, repo, args):
@@ -118,6 +143,9 @@ class Command:
 
         csv_filename = args.filename[0]
 
+        if args.validate_only:
+            logger.info('Validation-only mode, skipping imports')
+
         property_attrs = {header: attrs for attrs, header in model_class.HEADER_MAP.items()}
 
         with open(csv_filename) as file:
@@ -127,13 +155,21 @@ class Command:
             row_count = 0
             updated_count = 0
             unchanged_count = 0
-            errors = 0
+            invalid_count = 0
+            error_count = 0
             for row_number, row in enumerate(csv_file, 1):
+                line_reference = f'{csv_filename}:{row_number + 1}'
                 if args.limit is not None and row_number > args.limit:
                     logger.info(f'Stopping after {args.limit} rows')
                     break
-                logger.debug(f'Processing {args.filename[0]}:{row_number + 1}')
+                logger.debug(f'Processing {line_reference}')
+                if any(v is None for v in row.values()):
+                    error_count += 1
+                    logger.warning(f'Line {line_reference} has the wrong number of columns; skipping')
+                    continue
+
                 uri = URIRef(row['URI'])
+                row_count += 1
 
                 # read the object from the repo
                 item = model_class.from_graph(repo.get_graph(uri, False), uri)
@@ -191,7 +227,15 @@ class Command:
                         delete_graph.remove(statement)
                         insert_graph.remove(statement)
 
-                row_count += 1
+                if not validate(item):
+                    invalid_count += 1
+                    logger.warning(f'Skipping "{item}"')
+                    continue
+
+                if args.validate_only:
+                    # validation-only mode
+                    continue
+
                 # construct the SPARQL Update query if there are any deletions or insertions
                 if len(delete_graph) > 0 or len(insert_graph) > 0:
                     logger.info(f'Sending update for {item}')
@@ -215,17 +259,20 @@ class Command:
                         'total': row_count,
                         'updated': updated_count,
                         'unchanged': unchanged_count,
-                        'errors': errors
+                        'errors': error_count
                     }
                 }
 
         logger.info(f'{unchanged_count} of {row_count} items remained unchanged')
         logger.info(f'Updated {updated_count} of {row_count} items')
+        logger.info(f'Found {invalid_count} invalid items')
+        logger.info(f'Found {error_count} errors')
         self.result = {
             'count': {
                 'total': row_count,
                 'updated': updated_count,
                 'unchanged': unchanged_count,
-                'errors': errors
+                'invalid': invalid_count,
+                'errors': error_count
             }
         }

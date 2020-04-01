@@ -21,6 +21,24 @@ class Issue(pcdm.Object):
         'issue': 'Issue',
         'edition': 'Edition'
     }
+    VALIDATION_RULESET = {
+        'title': {
+            'exactly': 1
+        },
+        'date': {
+            'exactly': 1,
+            'value_pattern': '^\d\d\d\d-\d\d-\d\d$'
+        },
+        'volume': {
+            'exactly': 1
+        },
+        'issue': {
+            'exactly': 1
+        },
+        'edition': {
+            'exactly': 1
+        }
+    }
 
 
 @rdf.object_property('derived_from', prov.wasDerivedFrom, embed=True)

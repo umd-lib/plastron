@@ -1,15 +1,21 @@
 import csv
+import io
+import json
 import logging
+from argparse import Namespace
+
 import plastron.models
 import re
 
 from collections import defaultdict
 from datetime import datetime
 from operator import attrgetter
-from plastron.exceptions import FailureException, NoValidationRulesetException
+from plastron.exceptions import FailureException, NoValidationRulesetException, RESTAPIException
 from plastron.rdf import RDFDataProperty
 from plastron.serializers import CSVSerializer
 from rdflib import URIRef, Graph, Literal
+
+from plastron.stomp import Message
 
 logger = logging.getLogger(__name__)
 
@@ -115,14 +121,14 @@ def validate(item):
         logger.info(f'"{item}" is valid')
         for outcome in result.passed():
             logger.debug(f'  ✓ {outcome}')
-        return True
     else:
         logger.warning(f'{item} is invalid')
         for outcome in result.failed():
             logger.warning(f'  ✗ {outcome}')
         for outcome in result.passed():
             logger.debug(f'  ✓ {outcome}')
-        return False
+
+    return result
 
 
 class Command:
@@ -133,7 +139,7 @@ class Command:
         for _ in self.execute(*args, **kwargs):
             pass
 
-    def execute(self, repo, args):
+    def execute(self, repo, args, file=None):
         start_time = datetime.now().timestamp()
         try:
             model_class = getattr(plastron.models, args.model)
@@ -141,132 +147,163 @@ class Command:
             logger.error(f'Unknown model: {args.model}')
             raise FailureException()
 
-        csv_filename = args.filename[0]
+        if file is None:
+            csv_filename = args.filename[0]
+            fh = open(csv_filename)
+        else:
+            # using the diamond "<>" to represent STDIN/message body
+            csv_filename = '<>'
+            fh = file
 
         if args.validate_only:
             logger.info('Validation-only mode, skipping imports')
 
         property_attrs = {header: attrs for attrs, header in model_class.HEADER_MAP.items()}
 
-        with open(csv_filename) as file:
-            csv_file = csv.DictReader(file)
-            fields = build_fields(csv_file.fieldnames, property_attrs)
+        csv_file = csv.DictReader(fh)
+        fields = build_fields(csv_file.fieldnames, property_attrs)
 
-            row_count = 0
-            updated_count = 0
-            unchanged_count = 0
-            invalid_count = 0
-            error_count = 0
-            for row_number, row in enumerate(csv_file, 1):
-                line_reference = f'{csv_filename}:{row_number + 1}'
-                if args.limit is not None and row_number > args.limit:
-                    logger.info(f'Stopping after {args.limit} rows')
-                    break
-                logger.debug(f'Processing {line_reference}')
-                if any(v is None for v in row.values()):
-                    error_count += 1
-                    logger.warning(f'Line {line_reference} has the wrong number of columns; skipping')
-                    continue
+        row_count = 0
+        updated_count = 0
+        unchanged_count = 0
+        invalid_count = 0
+        valid_count = 0
+        error_count = 0
+        reports = []
+        for row_number, row in enumerate(csv_file, 1):
+            line_reference = f'{csv_filename}:{row_number + 1}'
+            if args.limit is not None and row_number > args.limit:
+                logger.info(f'Stopping after {args.limit} rows')
+                break
+            logger.debug(f'Processing {line_reference}')
+            if any(v is None for v in row.values()):
+                error_count += 1
+                error_msg = f'Line {line_reference} has the wrong number of columns'
+                reports.append({
+                    'line': line_reference,
+                    'is_valid': False,
+                    'error': error_msg
+                })
+                logger.warning(f'Skipping: {error_msg}')
+                continue
 
-                uri = URIRef(row['URI'])
-                row_count += 1
+            uri = URIRef(row['URI'])
+            row_count += 1
 
-                if args.validate_only:
-                    # create an empty object to validate without fetching from the repo
-                    item = model_class(uri=uri)
-                else:
-                    # read the object from the repo
-                    item = model_class.from_graph(repo.get_graph(uri, False), uri)
+            if args.validate_only:
+                # create an empty object to validate without fetching from the repo
+                item = model_class(uri=uri)
+            else:
+                # read the object from the repo
+                item = model_class.from_graph(repo.get_graph(uri, False), uri)
 
-                index = build_lookup_index(item, row.get('INDEX'))
+            index = build_lookup_index(item, row.get('INDEX'))
 
-                delete_graph = Graph()
-                insert_graph = Graph()
-                for attrs, columns in fields.items():
-                    prop = attrgetter(attrs)(item)
-                    new_values = []
-                    for column in columns:
-                        header = column['header']
-                        language_code = column['lang_code']
-                        datatype = column['datatype']
-                        values = [v for v in row[header].split('|') if len(v.strip()) > 0]
+            delete_graph = Graph()
+            insert_graph = Graph()
+            for attrs, columns in fields.items():
+                prop = attrgetter(attrs)(item)
+                new_values = []
+                for column in columns:
+                    header = column['header']
+                    language_code = column['lang_code']
+                    datatype = column['datatype']
+                    values = [v for v in row[header].split('|') if len(v.strip()) > 0]
 
-                        if isinstance(prop, RDFDataProperty):
-                            new_values.extend(Literal(v, lang=language_code, datatype=datatype) for v in values)
-                        else:
-                            new_values = [URIRef(v) for v in values]
-
-                    # construct a SPARQL update by diffing for deletions and insertions
-                    if '.' not in attrs:
-                        # simple, non-embedded values
-                        # update the property and get the sets of values deleted and inserted
-                        deleted_values, inserted_values = prop.update(new_values)
-
-                        for deleted_value in deleted_values:
-                            delete_graph.add((uri, prop.uri, prop.get_term(deleted_value)))
-                        for inserted_value in inserted_values:
-                            insert_graph.add((uri, prop.uri, prop.get_term(inserted_value)))
-
+                    if isinstance(prop, RDFDataProperty):
+                        new_values.extend(Literal(v, lang=language_code, datatype=datatype) for v in values)
                     else:
-                        # complex, embedded values
-                        # if the first portion of the dotted attr notation is a key in the index,
-                        # then this column has a different subject than the main uri
-                        # correlate positions and urirefs
-                        # XXX: for now, assuming only 2 levels of chaining
-                        first_attr, next_attr = attrs.split('.', 2)
-                        if first_attr in index:
-                            for i, new_value in enumerate(new_values):
-                                # get the embedded object
-                                obj = index[first_attr][i]
-                                # TODO: deal with additional new values that don't correspond to old
-                                old_value = getattr(obj, next_attr).values[0]
-                                if new_value != old_value:
-                                    setattr(obj, next_attr, new_value)
-                                    delete_graph.add((obj.uri, prop.uri, prop.get_term(old_value)))
-                                    insert_graph.add((obj.uri, prop.uri, prop.get_term(new_value)))
+                        new_values = [URIRef(v) for v in values]
 
-                # do a pass to remove statements that are both deleted and then re-inserted
-                for statement in delete_graph:
-                    if statement in insert_graph:
-                        delete_graph.remove(statement)
-                        insert_graph.remove(statement)
+                # construct a SPARQL update by diffing for deletions and insertions
+                if '.' not in attrs:
+                    # simple, non-embedded values
+                    # update the property and get the sets of values deleted and inserted
+                    deleted_values, inserted_values = prop.update(new_values)
 
-                if not validate(item):
-                    invalid_count += 1
-                    logger.warning(f'Skipping "{item}"')
-                    continue
+                    for deleted_value in deleted_values:
+                        delete_graph.add((uri, prop.uri, prop.get_term(deleted_value)))
+                    for inserted_value in inserted_values:
+                        insert_graph.add((uri, prop.uri, prop.get_term(inserted_value)))
 
-                if args.validate_only:
-                    # validation-only mode
-                    continue
-
-                # construct the SPARQL Update query if there are any deletions or insertions
-                if len(delete_graph) > 0 or len(insert_graph) > 0:
-                    logger.info(f'Sending update for {item}')
-                    sparql_update = build_sparql_update(delete_graph, insert_graph)
-                    logger.debug(sparql_update)
-                    item.patch(repo, sparql_update)
-                    updated_count += 1
                 else:
-                    unchanged_count += 1
-                    logger.info(f'No changes found for "{item}" ({uri})')
+                    # complex, embedded values
+                    # if the first portion of the dotted attr notation is a key in the index,
+                    # then this column has a different subject than the main uri
+                    # correlate positions and urirefs
+                    # XXX: for now, assuming only 2 levels of chaining
+                    first_attr, next_attr = attrs.split('.', 2)
+                    if first_attr in index:
+                        for i, new_value in enumerate(new_values):
+                            # get the embedded object
+                            obj = index[first_attr][i]
+                            # TODO: deal with additional new values that don't correspond to old
+                            old_value = getattr(obj, next_attr).values[0]
+                            if new_value != old_value:
+                                setattr(obj, next_attr, new_value)
+                                delete_graph.add((obj.uri, prop.uri, prop.get_term(old_value)))
+                                insert_graph.add((obj.uri, prop.uri, prop.get_term(new_value)))
 
-                # update the status
-                now = datetime.now().timestamp()
-                yield {
-                    'time': {
-                        'started': start_time,
-                        'now': now,
-                        'elapsed': now - start_time
-                    },
-                    'count': {
-                        'total': row_count,
-                        'updated': updated_count,
-                        'unchanged': unchanged_count,
-                        'errors': error_count
-                    }
+            # do a pass to remove statements that are both deleted and then re-inserted
+            for statement in delete_graph:
+                if statement in insert_graph:
+                    delete_graph.remove(statement)
+                    insert_graph.remove(statement)
+
+            report = validate(item)
+            reports.append({
+                'line': line_reference,
+                'is_valid': report.is_valid(),
+                'passed': [ outcome for outcome in report.passed() ],
+                'failed': [ outcome for outcome in report.failed() ]
+            })
+
+            if report.is_valid():
+                valid_count += 1
+            else:
+                # skip invalid items
+                invalid_count += 1
+                logger.warning(f'Skipping "{item}"')
+                continue
+
+            if args.validate_only:
+                # validation-only mode
+                continue
+
+            # construct the SPARQL Update query if there are any deletions or insertions
+            if len(delete_graph) > 0 or len(insert_graph) > 0:
+                logger.info(f'Sending update for {item}')
+                sparql_update = build_sparql_update(delete_graph, insert_graph)
+                logger.debug(sparql_update)
+                item.patch(repo, sparql_update)
+                updated_count += 1
+            else:
+                unchanged_count += 1
+                logger.info(f'No changes found for "{item}" ({uri})')
+
+            # update the status
+            now = datetime.now().timestamp()
+            yield {
+                'time': {
+                    'started': start_time,
+                    'now': now,
+                    'elapsed': now - start_time
+                },
+                'count': {
+                    'total': row_count,
+                    'updated': updated_count,
+                    'unchanged': unchanged_count,
+                    'valid': valid_count,
+                    'invalid': invalid_count,
+                    'errors': error_count
                 }
+            }
 
+        # close the file handle we opened
+        if file is None:
+            fh.close()
+
+        logger.info(f'Found {valid_count} valid items')
         logger.info(f'Found {invalid_count} invalid items')
         logger.info(f'Found {error_count} errors')
         if not args.validate_only:
@@ -277,7 +314,61 @@ class Command:
                 'total': row_count,
                 'updated': updated_count,
                 'unchanged': unchanged_count,
+                'valid': valid_count,
                 'invalid': invalid_count,
                 'errors': error_count
-            }
+            },
+            'validation': reports
         }
+
+
+def process_message(listener, message):
+
+    # define the processor for this message
+    def process():
+        if message.job_id is None:
+            logger.error('Expecting a PlastronJobId header')
+        else:
+            logger.info(f'Received message to initiate import job {message.job_id}')
+
+            try:
+                command = Command()
+                args = Namespace(
+                    model=message.args.get('model'),
+                    limit=message.args.get('limit', None),
+                    validate_only=message.args.get('validate-only', False)
+                )
+
+                for status in command.execute(listener.repository, args, file=io.StringIO(message.body)):
+                    listener.broker.connection.send(
+                        '/topic/plastron.jobs.status',
+                        headers={
+                            'PlastronJobId': message.job_id
+                        },
+                        body=json.dumps(status)
+                    )
+
+                logger.info(f'Import job {message.job_id} complete')
+
+                return Message(
+                    headers={
+                        'PlastronJobId': message.job_id,
+                        'PlastronJobStatus': 'Done',
+                        'persistent': 'true'
+                    },
+                    body=json.dumps(command.result)
+                )
+
+            except (FailureException, RESTAPIException) as e:
+                logger.error(f"Export job {message.job_id} failed: {e}")
+                return Message(
+                    headers={
+                        'PlastronJobId': message.job_id,
+                        'PlastronJobStatus': 'Failed',
+                        'PlastronJobError': str(e),
+                        'persistent': 'true'
+                    }
+                )
+
+    # process message
+    listener.executor.submit(process).add_done_callback(listener.get_response_handler(message.id))

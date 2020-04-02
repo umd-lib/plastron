@@ -2,20 +2,20 @@ import csv
 import io
 import json
 import logging
-from argparse import Namespace
-
 import plastron.models
 import re
-
+from argparse import FileType, Namespace
 from collections import defaultdict
 from datetime import datetime
 from operator import attrgetter
+from plastron import rdf
 from plastron.exceptions import FailureException, NoValidationRulesetException, RESTAPIException
 from plastron.rdf import RDFDataProperty
 from plastron.serializers import CSVSerializer
-from rdflib import URIRef, Graph, Literal
-
 from plastron.stomp import Message
+from rdflib import URIRef, Graph, Literal
+from uuid import uuid4
+
 
 logger = logging.getLogger(__name__)
 
@@ -28,6 +28,7 @@ def configure_cli(subparsers):
     parser.add_argument(
         '-m', '--model',
         help='data model to use',
+        required=True,
         action='store'
     )
     parser.add_argument(
@@ -42,18 +43,27 @@ def configure_cli(subparsers):
         action='store_true'
     )
     parser.add_argument(
-        'filename', nargs=1,
-        help='name of the file to import from'
+        '--make-template',
+        help='create a CSV template for the given model',
+        dest='template_file',
+        type=FileType('w'),
+        action='store'
+    )
+    parser.add_argument(
+        'import_file', nargs='?',
+        help='name of the file to import from',
+        type=FileType('r'),
+        action='store'
     )
     parser.set_defaults(cmd_name='import')
 
 
 def build_lookup_index(item, index_string):
+    index = defaultdict(dict)
     if index_string is None:
-        return {}
+        return index
 
     # build a lookup index for embedded object properties
-    index = defaultdict(dict)
     pattern = r'([\w]+)\[(\d+)\]'
     for entry in index_string.split(';'):
         key, uriref = entry.split('=')
@@ -69,6 +79,14 @@ def build_sparql_update(delete_graph, insert_graph):
     inserts = insert_graph.serialize(format='nt').decode('utf-8').strip()
     sparql_update = f"DELETE {{ {deletes} }} INSERT {{ {inserts} }} WHERE {{}}"
     return sparql_update
+
+
+def get_property_type(model_class: rdf.Resource, attrs):
+    if '.' in attrs:
+        first, rest = attrs.split('.', 2)
+        return get_property_type(model_class.name_to_prop[first].obj_class, rest)
+    else:
+        return model_class.name_to_prop[attrs]
 
 
 def build_fields(fieldnames, property_attrs):
@@ -98,7 +116,7 @@ def build_fields(fieldnames, property_attrs):
                 'datatype': datatype_uri
             })
         else:
-            # no language tag
+            # no language tag or datatype
             # make sure we skip the system columns
             if header not in CSVSerializer.SYSTEM_HEADERS:
                 attrs = property_attrs[header]
@@ -139,7 +157,7 @@ class Command:
         for _ in self.execute(*args, **kwargs):
             pass
 
-    def execute(self, repo, args, file=None):
+    def execute(self, repo, args):
         start_time = datetime.now().timestamp()
         try:
             model_class = getattr(plastron.models, args.model)
@@ -147,20 +165,25 @@ class Command:
             logger.error(f'Unknown model: {args.model}')
             raise FailureException()
 
-        if file is None:
-            csv_filename = args.filename[0]
-            fh = open(csv_filename)
-        else:
-            # using the diamond "<>" to represent STDIN/message body
-            csv_filename = '<>'
-            fh = file
+        if args.template_file is not None:
+            if not hasattr(model_class, 'HEADER_MAP'):
+                logger.error(f'{model_class.__name__} has no HEADER_MAP, cannot create template')
+                raise FailureException()
+            logger.info(f'Writing template for the {model_class.__name__} model to {args.template_file.name}')
+            writer = csv.writer(args.template_file)
+            writer.writerow(model_class.HEADER_MAP.values())
+            return
+
+        if args.import_file is None:
+            logger.info('No import file given')
+            return
 
         if args.validate_only:
             logger.info('Validation-only mode, skipping imports')
 
         property_attrs = {header: attrs for attrs, header in model_class.HEADER_MAP.items()}
 
-        csv_file = csv.DictReader(fh)
+        csv_file = csv.DictReader(args.import_file)
         fields = build_fields(csv_file.fieldnames, property_attrs)
 
         row_count = 0
@@ -171,7 +194,7 @@ class Command:
         error_count = 0
         reports = []
         for row_number, row in enumerate(csv_file, 1):
-            line_reference = f'{csv_filename}:{row_number + 1}'
+            line_reference = f"{getattr(args.import_file, 'name', '<>')}:{row_number + 1}"
             if args.limit is not None and row_number > args.limit:
                 logger.info(f'Stopping after {args.limit} rows')
                 break
@@ -187,15 +210,25 @@ class Command:
                 logger.warning(f'Skipping: {error_msg}')
                 continue
 
-            uri = URIRef(row['URI'])
             row_count += 1
+            if 'URI' not in row or row['URI'].strip() == '':
+                # no URI in the CSV means we will create a new object
+                logger.info(f'No URI found for {line_reference}, creating new object')
+                uri = None
+            else:
+                uri = URIRef(row['URI'])
 
             if args.validate_only:
                 # create an empty object to validate without fetching from the repo
                 item = model_class(uri=uri)
             else:
-                # read the object from the repo
-                item = model_class.from_graph(repo.get_graph(uri, False), uri)
+                if uri is not None:
+                    # read the object from the repo
+                    item = model_class.from_graph(repo.get_graph(uri, False), uri)
+                else:
+                    # create a new object in the repo
+                    item = model_class()
+                    item.create_object(repo)
 
             index = build_lookup_index(item, row.get('INDEX'))
 
@@ -203,6 +236,7 @@ class Command:
             insert_graph = Graph()
             for attrs, columns in fields.items():
                 prop = attrgetter(attrs)(item)
+                prop_type = get_property_type(item.__class__, attrs)
                 new_values = []
                 for column in columns:
                     header = column['header']
@@ -210,7 +244,7 @@ class Command:
                     datatype = column['datatype']
                     values = [v for v in row[header].split('|') if len(v.strip()) > 0]
 
-                    if isinstance(prop, RDFDataProperty):
+                    if issubclass(prop_type, RDFDataProperty):
                         new_values.extend(Literal(v, lang=language_code, datatype=datatype) for v in values)
                     else:
                         new_values = [URIRef(v) for v in values]
@@ -222,9 +256,9 @@ class Command:
                     deleted_values, inserted_values = prop.update(new_values)
 
                     for deleted_value in deleted_values:
-                        delete_graph.add((uri, prop.uri, prop.get_term(deleted_value)))
+                        delete_graph.add((item.uri, prop.uri, prop.get_term(deleted_value)))
                     for inserted_value in inserted_values:
-                        insert_graph.add((uri, prop.uri, prop.get_term(inserted_value)))
+                        insert_graph.add((item.uri, prop.uri, prop.get_term(inserted_value)))
 
                 else:
                     # complex, embedded values
@@ -237,12 +271,33 @@ class Command:
                         for i, new_value in enumerate(new_values):
                             # get the embedded object
                             obj = index[first_attr][i]
-                            # TODO: deal with additional new values that don't correspond to old
-                            old_value = getattr(obj, next_attr).values[0]
+                            try:
+                                old_value = getattr(obj, next_attr).values[0]
+                            except IndexError:
+                                old_value = None
                             if new_value != old_value:
                                 setattr(obj, next_attr, new_value)
-                                delete_graph.add((obj.uri, prop.uri, prop.get_term(old_value)))
+                                if old_value is not None:
+                                    delete_graph.add((obj.uri, prop.uri, prop.get_term(old_value)))
                                 insert_graph.add((obj.uri, prop.uri, prop.get_term(new_value)))
+                    else:
+                        # add new hash objects that are not in the index
+                        prop_type = item.name_to_prop[first_attr]
+                        for i, new_value in enumerate(new_values):
+                            # we can assume that for any properties with dotted notation,
+                            # all attributes except for the last one are object properties
+                            if prop_type.obj_class is not None:
+                                # create a new object
+                                # TODO: remove hardcoded UUID fragment minting
+                                obj = prop_type.obj_class(uri=f'{item.uri}#{uuid4()}')
+                                # add the new object to the index
+                                index[first_attr][0] = obj
+                                setattr(obj, next_attr, new_value)
+                                next_attr_prop = obj.name_to_prop[next_attr]
+                                # add that object to the main item
+                                getattr(item, first_attr).append(obj)
+                                insert_graph.add((item.uri, prop_type.uri, obj.uri))
+                                insert_graph.add((obj.uri, next_attr_prop.uri, next_attr_prop.get_term(new_value)))
 
             # do a pass to remove statements that are both deleted and then re-inserted
             for statement in delete_graph:
@@ -254,8 +309,8 @@ class Command:
             reports.append({
                 'line': line_reference,
                 'is_valid': report.is_valid(),
-                'passed': [ outcome for outcome in report.passed() ],
-                'failed': [ outcome for outcome in report.failed() ]
+                'passed': [outcome for outcome in report.passed()],
+                'failed': [outcome for outcome in report.failed()]
             })
 
             if report.is_valid():
@@ -299,10 +354,6 @@ class Command:
                 }
             }
 
-        # close the file handle we opened
-        if file is None:
-            fh.close()
-
         logger.info(f'Found {valid_count} valid items')
         logger.info(f'Found {invalid_count} invalid items')
         logger.info(f'Found {error_count} errors')
@@ -336,10 +387,12 @@ def process_message(listener, message):
                 args = Namespace(
                     model=message.args.get('model'),
                     limit=message.args.get('limit', None),
-                    validate_only=message.args.get('validate-only', False)
+                    validate_only=message.args.get('validate-only', False),
+                    import_file=io.StringIO(message.body),
+                    template_file=None
                 )
 
-                for status in command.execute(listener.repository, args, file=io.StringIO(message.body)):
+                for status in command.execute(listener.repository, args):
                     listener.broker.connection.send(
                         '/topic/plastron.jobs.status',
                         headers={

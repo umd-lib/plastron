@@ -6,7 +6,7 @@ import re
 from collections import defaultdict
 from datetime import datetime
 from operator import attrgetter
-from plastron.exceptions import FailureException, NoValidationRulesetException, DataReadException
+from plastron.exceptions import FailureException, NoValidationRulesetException
 from plastron.rdf import RDFDataProperty
 from plastron.serializers import CSVSerializer
 from rdflib import URIRef, Graph, Literal
@@ -171,8 +171,12 @@ class Command:
                 uri = URIRef(row['URI'])
                 row_count += 1
 
-                # read the object from the repo
-                item = model_class.from_graph(repo.get_graph(uri, False), uri)
+                if args.validate_only:
+                    # create an empty object to validate without fetching from the repo
+                    item = model_class(uri=uri)
+                else:
+                    # read the object from the repo
+                    item = model_class.from_graph(repo.get_graph(uri, False), uri)
 
                 index = build_lookup_index(item, row.get('INDEX'))
 
@@ -263,10 +267,11 @@ class Command:
                     }
                 }
 
-        logger.info(f'{unchanged_count} of {row_count} items remained unchanged')
-        logger.info(f'Updated {updated_count} of {row_count} items')
         logger.info(f'Found {invalid_count} invalid items')
         logger.info(f'Found {error_count} errors')
+        if not args.validate_only:
+            logger.info(f'{unchanged_count} of {row_count} items remained unchanged')
+            logger.info(f'Updated {updated_count} of {row_count} items')
         self.result = {
             'count': {
                 'total': row_count,

@@ -10,6 +10,7 @@ from datetime import datetime
 from operator import attrgetter
 from plastron import rdf
 from plastron.exceptions import FailureException, NoValidationRulesetException, RESTAPIException
+from plastron.http import Transaction
 from plastron.rdf import RDFDataProperty
 from plastron.serializers import CSVSerializer
 from plastron.stomp import Message
@@ -224,11 +225,10 @@ class Command:
             else:
                 if uri is not None:
                     # read the object from the repo
-                    item = model_class.from_graph(repo.get_graph(uri, False), uri)
+                    item = model_class.from_repository(repo, uri, include_server_managed=False)
                 else:
-                    # create a new object in the repo
+                    # create a new object (will create in the repo later)
                     item = model_class()
-                    item.create_object(repo)
 
             index = build_lookup_index(item, row.get('INDEX'))
 
@@ -330,8 +330,20 @@ class Command:
                 logger.info(f'Sending update for {item}')
                 sparql_update = build_sparql_update(delete_graph, insert_graph)
                 logger.debug(sparql_update)
-                item.patch(repo, sparql_update)
-                updated_count += 1
+                with Transaction(repo) as txn:
+                    try:
+                        if not item.created:
+                            # create new item in the repo
+                            item.create_object(repo)
+                        # do the actual update
+                        item.patch(repo, sparql_update)
+                        txn.commit()
+                        updated_count += 1
+                    except RESTAPIException as e:
+                        error_count += 1
+                        logger.error(f'{item} import failed: {e}')
+                        txn.rollback()
+                        logger.warning(f'Rolled back transaction {txn}')
             else:
                 unchanged_count += 1
                 logger.info(f'No changes found for "{item}" ({uri})')

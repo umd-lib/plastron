@@ -72,7 +72,7 @@ setup(
     # https://packaging.python.org/en/latest/requirements.html
     install_requires=[
         'edtf',
-        'iso639'
+        'iso639',
         'lxml>3.6.0',
         'numpy',
         'paramiko',

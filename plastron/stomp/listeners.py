@@ -15,6 +15,7 @@ class CommandListener(ConnectionListener):
         self.repository = repository
         self.queue = self.broker.destinations['JOBS']
         self.completed_queue = self.broker.destinations['COMPLETED_JOBS']
+        self.status_topic = self.broker.destinations['JOB_STATUS']
         self.inbox = MessageBox(os.path.join(self.broker.message_store_dir, 'inbox'))
         self.outbox = MessageBox(os.path.join(self.broker.message_store_dir, 'outbox'))
         self.executor = ThreadPoolExecutor(thread_name_prefix=__name__)

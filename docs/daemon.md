@@ -71,6 +71,7 @@ This sub-section configures the queues and topics used.
 | Option         |Description|
 |----------------|-----------|
 |`JOBS`          |Name of the queue to subscribe to for receiving job requests|
+|`JOB_STATUS`    |Name of the topic to publish status updates to for running jobs|
 |`JOBS_COMPLETED`|Name of the queue to publish to when a job is complete|
 
 ## STOMP Message Headers

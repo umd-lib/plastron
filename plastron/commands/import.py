@@ -394,7 +394,7 @@ def process_message(listener, message):
 
                 for status in command.execute(listener.repository, args):
                     listener.broker.connection.send(
-                        '/topic/plastron.jobs.status',
+                        listener.status_topic,
                         headers={
                             'PlastronJobId': message.job_id
                         },

@@ -27,7 +27,7 @@ class Issue(pcdm.Object):
         },
         'date': {
             'exactly': 1,
-            'value_pattern': '^\d\d\d\d-\d\d-\d\d$'
+            'value_pattern': r'^\d\d\d\d-\d\d-\d\d$'
         },
         'volume': {
             'exactly': 1

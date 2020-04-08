@@ -15,8 +15,8 @@ class Resource(rdf.Resource):
     Resources."""
 
     @classmethod
-    def from_repository(cls, repo, uri):
-        graph = repo.get_graph(uri)
+    def from_repository(cls, repo, uri, include_server_managed=True):
+        graph = repo.get_graph(uri, include_server_managed=include_server_managed)
         obj = cls.from_graph(graph, subject=uri)
 
         # mark as created and updated so that the create_object and update_object

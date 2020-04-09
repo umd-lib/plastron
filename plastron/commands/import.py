@@ -73,13 +73,6 @@ def build_lookup_index(item, index_string):
     return index
 
 
-def build_sparql_update(delete_graph, insert_graph):
-    deletes = delete_graph.serialize(format='nt').decode('utf-8').strip()
-    inserts = insert_graph.serialize(format='nt').decode('utf-8').strip()
-    sparql_update = f"DELETE {{ {deletes} }} INSERT {{ {inserts} }} WHERE {{}}"
-    return sparql_update
-
-
 def get_property_type(model_class: rdf.Resource, attrs):
     if '.' in attrs:
         first, rest = attrs.split('.', 2)
@@ -346,10 +339,10 @@ class Command:
 
             # construct the SPARQL Update query if there are any deletions or insertions
             if len(delete_graph) > 0 or len(insert_graph) > 0:
-                logger.info(f'Sending update for {item}')
-                sparql_update = build_sparql_update(delete_graph, insert_graph)
-                logger.debug(sparql_update)
                 with Transaction(repo) as txn:
+                    logger.info(f'Sending update for {item}')
+                    sparql_update = repo.build_sparql_update(delete_graph, insert_graph)
+                    logger.debug(sparql_update)
                     try:
                         if not item.created:
                             # create new item in the repo

@@ -1,11 +1,10 @@
-import os
-from collections import namedtuple
-
-import requests
 import logging
+import os
+import requests
 import threading
-from rdflib import Graph, URIRef
+from collections import namedtuple
 from plastron.exceptions import RESTAPIException
+from rdflib import Graph, URIRef
 
 OMIT_SERVER_MANAGED_TRIPLES = 'return=representation; omit="http://fedora.info/definitions/v4/repository#ServerManaged"'
 
@@ -149,6 +148,16 @@ class Repository:
         graph.parse(data=response.text, format='nt')
         return graph
 
+    def build_sparql_update(self, delete_graph, insert_graph):
+        # go through each graph and update subjects with transaction IDs
+        self._update_subjects_within_transaction(delete_graph)
+        self._update_subjects_within_transaction(insert_graph)
+
+        deletes = delete_graph.serialize(format='nt').decode('utf-8').strip()
+        inserts = insert_graph.serialize(format='nt').decode('utf-8').strip()
+        sparql_update = f"DELETE {{ {deletes} }} INSERT {{ {inserts} }} WHERE {{}}"
+        return sparql_update
+
     def get_transaction_endpoint(self):
         return os.path.join(self.endpoint, 'fcr:tx')
 
@@ -157,6 +166,13 @@ class Repository:
             return False
         else:
             return self.transaction.active
+
+    def _update_subjects_within_transaction(self, graph):
+        if self.in_transaction():
+            for s, p, o in graph:
+                s_txn = URIRef(self._insert_transaction_uri(str(s)))
+                graph.remove((s, p, o))
+                graph.add((s_txn, p, o))
 
     def _insert_transaction_uri(self, uri):
         if not self.in_transaction() or uri.startswith(self.transaction.uri):

@@ -73,8 +73,8 @@ def write_csv_file(row_info, file):
 
 
 class CSVSerializer:
-    def __init__(self, filename, **kwargs):
-        self.filename = filename
+    def __init__(self, file, **kwargs):
+        self.file = file
         self.content_models = {}
         self.content_type = 'text/csv'
         self.file_extension = '.csv'
@@ -176,11 +176,10 @@ class CSVSerializer:
             logger.error("No items could be exported; skipping writing file")
         elif len(self.content_models) == 1:
             # write a single CSV file
-            with open(self.filename, mode='w') as fh:
-                write_csv_file(next(iter(self.content_models.values())), file=fh)
+            write_csv_file(next(iter(self.content_models.values())), file=self.file)
         else:
             # write a ZIP file containing individual CSV files
-            with ZipFile(self.filename, mode='w') as zip_fh:
+            with ZipFile(self.file) as zip_fh:
                 for resource_class, row_info in self.content_models.items():
                     # write the CSV file
                     tmp = NamedTemporaryFile(mode='w', encoding='utf-8', delete=False)

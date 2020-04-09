@@ -1,18 +1,13 @@
-import json
 import logging
-import os
-
-from argparse import Namespace
+from argparse import Namespace, FileType
 from datetime import datetime
-from tempfile import NamedTemporaryFile
-from time import sleep
-
 from plastron import pcdm
-from plastron.stomp import Message
-from plastron.exceptions import FailureException, DataReadException, RESTAPIException
+from plastron.exceptions import FailureException, DataReadException
 from plastron.namespaces import get_manager
 from plastron.serializers import SERIALIZER_CLASSES
 from plastron.util import LocalFile
+from tempfile import NamedTemporaryFile
+from time import sleep
 
 logger = logging.getLogger(__name__)
 nsm = get_manager()
@@ -26,7 +21,18 @@ def configure_cli(subparsers):
     parser.add_argument(
         '-o', '--output-file',
         help='File to write export package to',
+        type=FileType('w'),
         action='store',
+    )
+    parser.add_argument(
+        '--upload-to',
+        dest='upload_path',
+        action='store'
+    )
+    parser.add_argument(
+        '--upload-name',
+        dest='upload_filename',
+        action='store'
     )
     parser.add_argument(
         '-f', '--format',
@@ -48,12 +54,28 @@ def configure_cli(subparsers):
     parser.set_defaults(cmd_name='export')
 
 
+def parse_message(message):
+    uris = message.body.split('\n')
+    export_format = message.args.get('format', 'text/turtle')
+    logger.info(f'Received message to initiate export job {message.job_id} containing {len(uris)} items')
+    logger.info(f'Requested export format is {export_format}')
+
+    return Namespace(
+        uris=uris,
+        output_file=None,
+        upload_path='/exports',
+        upload_filename=message.args.get('name', message.job_id),
+        format=export_format,
+        uri_template=message.args.get('uri-template')
+    )
+
+
 class Command:
     def __init__(self):
         self.result = None
 
     def __call__(self, *args, **kwargs):
-        for result in self.execute(*args, **kwargs):
+        for _ in self.execute(*args, **kwargs):
             pass
 
     def execute(self, fcrepo, args):
@@ -67,7 +89,10 @@ class Command:
             logger.error(f'Unknown format: {args.format}')
             raise FailureException()
 
-        logger.debug(f'Exporting to file {args.output_file}')
+        if args.output_file is None:
+            args.output_file = NamedTemporaryFile(mode='w+')
+
+        logger.debug(f'Exporting to file {args.output_file.name}')
         with serializer_class(args.output_file, public_uri_template=args.uri_template) as serializer:
             for uri in args.uris:
                 r = fcrepo.head(uri)
@@ -109,83 +134,30 @@ class Command:
                 }
 
         logger.info(f'Exported {count} of {total} items')
+
+        if args.upload_path is not None:
+            # upload to the repo if requested
+            filename = args.upload_filename + serializer.file_extension
+            # rewind to the beginning of the file
+            args.output_file.seek(0)
+
+            file = pcdm.File(LocalFile(
+                args.output_file.name,
+                mimetype=serializer.content_type,
+                filename=filename
+            ))
+            with fcrepo.at_path(args.upload_path):
+                file.create_object(repository=fcrepo)
+                download_uri = file.uri
+                logger.info(f'Uploaded export file to {file.uri}')
+
         self.result = {
             'content_type': serializer.content_type,
             'file_extension': serializer.file_extension,
+            'download_uri': download_uri,
             'count': {
                 'total': total,
                 'exported': count,
                 'errors': errors
             }
         }
-
-
-def process_message(listener, message):
-
-    # define the processor for this message
-    def process():
-        if message.job_id is None:
-            logger.error('Expecting a PlastronJobId header')
-        else:
-            uris = message.body.split('\n')
-            export_format = message.args.get('format', 'text/turtle')
-            logger.info(f'Received message to initiate export job {message.job_id} containing {len(uris)} items')
-            logger.info(f'Requested export format is {export_format}')
-
-            try:
-                command = Command()
-                with NamedTemporaryFile() as export_fh:
-                    logger.debug(f'Export temporary file name is {export_fh.name}')
-                    args = Namespace(
-                        uris=uris,
-                        output_file=export_fh.name,
-                        format=export_format,
-                        uri_template=listener.public_uri_template
-                    )
-
-                    for status in command.execute(listener.repository, args):
-                        listener.broker.connection.send(
-                            listener.status_topic,
-                            headers={
-                                'PlastronJobId': message.job_id
-                            },
-                            body=json.dumps(status)
-                        )
-
-                    job_name = message.args.get('name', message.job_id)
-                    filename = job_name + command.result['file_extension']
-
-                    file = pcdm.File(LocalFile(
-                        export_fh.name,
-                        mimetype=command.result['content_type'],
-                        filename=filename
-                    ))
-                    with listener.repository.at_path('/exports'):
-                        file.create_object(repository=listener.repository)
-                        command.result['download_uri'] = file.uri
-                        logger.info(f'Uploaded export file to {file.uri}')
-
-                    logger.debug(f'Export temporary file size is {os.path.getsize(export_fh.name)}')
-                logger.info(f'Export job {message.job_id} complete')
-                return Message(
-                    headers={
-                        'PlastronJobId': message.job_id,
-                        'PlastronJobStatus': 'Done',
-                        'persistent': 'true'
-                    },
-                    body=json.dumps(command.result)
-                )
-
-            except (FailureException, RESTAPIException) as e:
-                logger.error(f"Export job {message.job_id} failed: {e}")
-                return Message(
-                    headers={
-                        'PlastronJobId': message.job_id,
-                        'PlastronJobStatus': 'Failed',
-                        'PlastronJobError': str(e),
-                        'persistent': 'true'
-                    }
-                )
-
-    # process message
-    listener.executor.submit(process).add_done_callback(listener.get_response_handler(message.id))

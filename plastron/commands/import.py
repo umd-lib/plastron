@@ -185,6 +185,17 @@ class Command:
         property_attrs = {header: attrs for attrs, header in model_class.HEADER_MAP.items()}
 
         csv_file = csv.DictReader(args.import_file)
+
+        if args.import_file.seekable():
+            # get the row count of the file
+            total_count = sum(1 for _ in csv_file)
+            # rewind the file and re-create the CSV reader
+            args.import_file.seek(0)
+            csv_file = csv.DictReader(args.import_file)
+        else:
+            # file is not seekable, so we can't get a row count in advance
+            total_count = None
+
         fields = build_fields(csv_file.fieldnames, property_attrs)
 
         row_count = 0
@@ -200,6 +211,7 @@ class Command:
                 logger.info(f'Stopping after {args.limit} rows')
                 break
             logger.debug(f'Processing {line_reference}')
+            row_count += 1
             if any(v is None for v in row.values()):
                 error_count += 1
                 error_msg = f'Line {line_reference} has the wrong number of columns'
@@ -211,7 +223,6 @@ class Command:
                 logger.warning(f'Skipping: {error_msg}')
                 continue
 
-            row_count += 1
             if 'URI' not in row or row['URI'].strip() == '':
                 # no URI in the CSV means we will create a new object
                 logger.info(f'No URI found for {line_reference}, creating new object')
@@ -357,7 +368,7 @@ class Command:
                     'elapsed': now - start_time
                 },
                 'count': {
-                    'total': row_count,
+                    'total': total_count,
                     'updated': updated_count,
                     'unchanged': unchanged_count,
                     'valid': valid_count,
@@ -366,15 +377,21 @@ class Command:
                 }
             }
 
+        if total_count is None:
+            # if we weren't able to get the total count before,
+            # use the final row count as the total count for the
+            # job completion message
+            total_count = row_count
+
         logger.info(f'Found {valid_count} valid items')
         logger.info(f'Found {invalid_count} invalid items')
         logger.info(f'Found {error_count} errors')
         if not args.validate_only:
-            logger.info(f'{unchanged_count} of {row_count} items remained unchanged')
-            logger.info(f'Updated {updated_count} of {row_count} items')
+            logger.info(f'{unchanged_count} of {total_count} items remained unchanged')
+            logger.info(f'Updated {updated_count} of {total_count} items')
         self.result = {
             'count': {
-                'total': row_count,
+                'total': total_count,
                 'updated': updated_count,
                 'unchanged': unchanged_count,
                 'valid': valid_count,

@@ -158,6 +158,7 @@ optional arguments:
 $ plastron export --help
 usage: plastron export [-h] [-o OUTPUT_FILE] -f
                        {text/turtle,turtle,ttl,text/csv,csv}
+                       [--uri-template URI_TEMPLATE]
                        [uris [uris ...]]
 
 Export resources from the repository
@@ -171,6 +172,8 @@ optional arguments:
                         File to write export package to
   -f {text/turtle,turtle,ttl,text/csv,csv}, --format {text/turtle,turtle,ttl,text/csv,csv}
                         Export job format
+  --uri-template URI_TEMPLATE
+                        Public URI template
 ```
 
 ### Update (update)
@@ -199,6 +202,30 @@ optional arguments:
   --completed COMPLETED
                         file recording the URIs of updated resources
   -f FILE, --file FILE  File containing a list of URIs to update
+```
+
+### Import (import)
+
+```
+$ plastron import --help
+usage: plastron import [-h] -m MODEL [-l LIMIT] [--validate-only]
+                       [--make-template TEMPLATE_FILE]
+                       [import_file]
+
+Import data to the repository
+
+positional arguments:
+  import_file           name of the file to import from
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -m MODEL, --model MODEL
+                        data model to use
+  -l LIMIT, --limit LIMIT
+                        limit the number of rows to read from the import file
+  --validate-only       only validate, do not do the actual import
+  --make-template TEMPLATE_FILE
+                        create a CSV template for the given model
 ```
 
 ## Configuration

@@ -18,13 +18,14 @@ def configure_cli(subparsers):
         name='export',
         description='Export resources from the repository'
     )
-    parser.add_argument(
+    file_or_upload = parser.add_mutually_exclusive_group()
+    file_or_upload.add_argument(
         '-o', '--output-file',
         help='File to write export package to',
         type=FileType('w'),
         action='store',
     )
-    parser.add_argument(
+    file_or_upload.add_argument(
         '--upload-to',
         dest='upload_path',
         action='store'
@@ -136,6 +137,8 @@ class Command:
         logger.info(f'Exported {count} of {total} items')
 
         if args.upload_path is not None:
+            if args.upload_filename is None:
+                args.upload_filename = 'export_' + datetime.utcnow().strftime('%Y%m%d%H%M%S')
             # upload to the repo if requested
             filename = args.upload_filename + serializer.file_extension
             # rewind to the beginning of the file

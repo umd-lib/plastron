@@ -156,7 +156,8 @@ optional arguments:
 
 ```
 $ plastron export --help
-usage: plastron export [-h] [-o OUTPUT_FILE] -f
+usage: plastron export [-h] [-o OUTPUT_FILE | --upload-to UPLOAD_PATH]
+                       [--upload-name UPLOAD_FILENAME] -f
                        {text/turtle,turtle,ttl,text/csv,csv}
                        [--uri-template URI_TEMPLATE]
                        [uris [uris ...]]
@@ -170,6 +171,11 @@ optional arguments:
   -h, --help            show this help message and exit
   -o OUTPUT_FILE, --output-file OUTPUT_FILE
                         File to write export package to
+  --upload-to UPLOAD_PATH
+                        Repository path to POST the export file to
+  --upload-name UPLOAD_FILENAME
+                        Used to create the download filename for the uploaded
+                        export file in the repository
   -f {text/turtle,turtle,ttl,text/csv,csv}, --format {text/turtle,turtle,ttl,text/csv,csv}
                         Export job format
   --uri-template URI_TEMPLATE

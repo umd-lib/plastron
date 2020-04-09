@@ -27,11 +27,13 @@ def configure_cli(subparsers):
     )
     file_or_upload.add_argument(
         '--upload-to',
+        help='Repository path to POST the export file to',
         dest='upload_path',
         action='store'
     )
     parser.add_argument(
         '--upload-name',
+        help='Used to create the download filename for the uploaded export file in the repository',
         dest='upload_filename',
         action='store'
     )
@@ -136,6 +138,7 @@ class Command:
 
         logger.info(f'Exported {count} of {total} items')
 
+        download_uri = None
         if args.upload_path is not None:
             if args.upload_filename is None:
                 args.upload_filename = 'export_' + datetime.utcnow().strftime('%Y%m%d%H%M%S')

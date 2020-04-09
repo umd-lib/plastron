@@ -84,4 +84,7 @@ received on the `JOBS` destination:
 
 Additional arguments for a command are sent in headers with the form `PlastronArg-{name}`.
 
+See the [messages documentation](messages.md) for details on the headers and bodies
+of the messages the Plastron Daemon emits.
+
 [STOMP]: https://stomp.github.io/

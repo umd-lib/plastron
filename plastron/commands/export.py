@@ -139,23 +139,26 @@ class Command:
         logger.info(f'Exported {count} of {total} items')
 
         download_uri = None
+        # upload to the repo if requested
         if args.upload_path is not None:
-            if args.upload_filename is None:
-                args.upload_filename = 'export_' + datetime.utcnow().strftime('%Y%m%d%H%M%S')
-            # upload to the repo if requested
-            filename = args.upload_filename + serializer.file_extension
-            # rewind to the beginning of the file
-            args.output_file.seek(0)
+            if count == 0:
+                logger.warning('No items exported, skipping upload to repository')
+            else:
+                if args.upload_filename is None:
+                    args.upload_filename = 'export_' + datetime.utcnow().strftime('%Y%m%d%H%M%S')
+                filename = args.upload_filename + serializer.file_extension
+                # rewind to the beginning of the file
+                args.output_file.seek(0)
 
-            file = pcdm.File(LocalFile(
-                args.output_file.name,
-                mimetype=serializer.content_type,
-                filename=filename
-            ))
-            with fcrepo.at_path(args.upload_path):
-                file.create_object(repository=fcrepo)
-                download_uri = file.uri
-                logger.info(f'Uploaded export file to {file.uri}')
+                file = pcdm.File(LocalFile(
+                    args.output_file.name,
+                    mimetype=serializer.content_type,
+                    filename=filename
+                ))
+                with fcrepo.at_path(args.upload_path):
+                    file.create_object(repository=fcrepo)
+                    download_uri = file.uri
+                    logger.info(f'Uploaded export file to {file.uri}')
 
         self.result = {
             'content_type': serializer.content_type,

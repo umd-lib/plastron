@@ -1,9 +1,10 @@
+import json
 import logging
 import os
-
 from concurrent.futures import ThreadPoolExecutor
 from importlib import import_module
-from plastron.stomp import MessageBox, PlastronCommandMessage, PlastronMessage
+from plastron.exceptions import FailureException, RESTAPIException
+from plastron.stomp import MessageBox, PlastronCommandMessage, PlastronMessage, Message
 from stomp.listener import ConnectionListener
 
 logger = logging.getLogger(__name__)
@@ -33,18 +34,11 @@ class CommandListener(ConnectionListener):
 
         # then process anything in the inbox
         for message in self.inbox(PlastronCommandMessage):
-            self.dispatch(message)
+            self.process_message(message)
 
         # then subscribe to the queue to receive incoming messages
         self.broker.connection.subscribe(destination=self.queue, id='plastron')
         logger.info(f"Subscribed to {self.queue}")
-
-    def dispatch(self, message):
-        # determine which command to load to process it
-        command_module = import_module('plastron.commands.' + message.command)
-        # TODO: cache the command modules
-        # TODO: check that process_message exists in the command module
-        command_module.process_message(self, message)
 
     def on_message(self, headers, body):
         if headers['destination'] == self.queue:
@@ -55,7 +49,58 @@ class CommandListener(ConnectionListener):
             self.inbox.add(message.id, message)
 
             # and then process the message
-            self.dispatch(message)
+            self.process_message(message)
+
+    def process_message(self, message):
+        # determine which command to load to process the message
+        command_module = import_module('plastron.commands.' + message.command)
+        # TODO: cache the command modules
+        # TODO: check that the command module supports message processing
+
+        # define the processor for this message
+        def process():
+            try:
+                if message.job_id is None:
+                    raise FailureException('Expecting a PlastronJobId header')
+
+                logger.info(f'Received message to initiate job {message.job_id}')
+
+                args = command_module.parse_message(message)
+                command = command_module.Command()
+
+                for status in command.execute(self.repository, args):
+                    self.broker.connection.send(
+                        self.status_topic,
+                        headers={
+                            'PlastronJobId': message.job_id
+                        },
+                        body=json.dumps(status)
+                    )
+
+                logger.info(f'Job {message.job_id} complete')
+
+                return Message(
+                    headers={
+                        'PlastronJobId': message.job_id,
+                        'PlastronJobStatus': 'Done',
+                        'persistent': 'true'
+                    },
+                    body=json.dumps(command.result)
+                )
+
+            except (FailureException, RESTAPIException) as e:
+                logger.error(f"Export job {message.job_id} failed: {e}")
+                return Message(
+                    headers={
+                        'PlastronJobId': message.job_id,
+                        'PlastronJobStatus': 'Failed',
+                        'PlastronJobError': str(e),
+                        'persistent': 'true'
+                    }
+                )
+
+        # process message
+        self.executor.submit(process).add_done_callback(self.get_response_handler(message.id))
 
     def get_response_handler(self, message_id):
         # define the response handler for this message

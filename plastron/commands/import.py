@@ -1,6 +1,5 @@
 import csv
 import io
-import json
 import logging
 import plastron.models
 import re
@@ -13,7 +12,6 @@ from plastron.exceptions import FailureException, NoValidationRulesetException, 
 from plastron.http import Transaction
 from plastron.rdf import RDFDataProperty
 from plastron.serializers import CSVSerializer
-from plastron.stomp import Message
 from rdflib import URIRef, Graph, Literal
 from uuid import uuid4
 
@@ -148,6 +146,16 @@ def validate(item):
             logger.debug(f'  ✓ {outcome}')
 
     return result
+
+
+def parse_message(message):
+    return Namespace(
+        model=message.args.get('model'),
+        limit=message.args.get('limit', None),
+        validate_only=message.args.get('validate-only', False),
+        import_file=io.StringIO(message.body),
+        template_file=None
+    )
 
 
 class Command:
@@ -400,57 +408,3 @@ class Command:
             },
             'validation': reports
         }
-
-
-def process_message(listener, message):
-
-    # define the processor for this message
-    def process():
-        if message.job_id is None:
-            logger.error('Expecting a PlastronJobId header')
-        else:
-            logger.info(f'Received message to initiate import job {message.job_id}')
-
-            try:
-                command = Command()
-                args = Namespace(
-                    model=message.args.get('model'),
-                    limit=message.args.get('limit', None),
-                    validate_only=message.args.get('validate-only', False),
-                    import_file=io.StringIO(message.body),
-                    template_file=None
-                )
-
-                for status in command.execute(listener.repository, args):
-                    listener.broker.connection.send(
-                        listener.status_topic,
-                        headers={
-                            'PlastronJobId': message.job_id
-                        },
-                        body=json.dumps(status)
-                    )
-
-                logger.info(f'Import job {message.job_id} complete')
-
-                return Message(
-                    headers={
-                        'PlastronJobId': message.job_id,
-                        'PlastronJobStatus': 'Done',
-                        'persistent': 'true'
-                    },
-                    body=json.dumps(command.result)
-                )
-
-            except (FailureException, RESTAPIException) as e:
-                logger.error(f"Export job {message.job_id} failed: {e}")
-                return Message(
-                    headers={
-                        'PlastronJobId': message.job_id,
-                        'PlastronJobStatus': 'Failed',
-                        'PlastronJobError': str(e),
-                        'persistent': 'true'
-                    }
-                )
-
-    # process message
-    listener.executor.submit(process).add_done_callback(listener.get_response_handler(message.id))

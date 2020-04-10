@@ -26,20 +26,25 @@ MODEL_MAP = {
 
 
 class TurtleSerializer:
-    def __init__(self, filename, **kwargs):
-        self.filename = filename
+    def __init__(self, file, **kwargs):
+        self.file = file
         self.content_type = 'text/turtle'
         self.file_extension = '.ttl'
 
     def __enter__(self):
-        self.fh = open(self.filename, 'wb')
         return self
 
-    def write(self, graph):
-        graph.serialize(destination=self.fh, format='turtle')
+    def write(self, graph: Graph):
+        graph.namespace_manager = nsm
+        if 'b' not in self.file.mode:
+            # re-open in binary mode
+            with open(self.file.fileno(), mode='wb', closefd=False) as fh:
+                graph.serialize(destination=fh, format='turtle')
+        else:
+            graph.serialize(destination=self.file, format='turtle')
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        self.fh.close()
+        pass
 
 
 def detect_resource_class(graph, subject):

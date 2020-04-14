@@ -340,14 +340,18 @@ class Command:
             # construct the SPARQL Update query if there are any deletions or insertions
             if len(delete_graph) > 0 or len(insert_graph) > 0:
                 with Transaction(repo) as txn:
-                    logger.info(f'Sending update for {item}')
-                    sparql_update = repo.build_sparql_update(delete_graph, insert_graph)
-                    logger.debug(sparql_update)
                     try:
                         if not item.created:
                             # create new item in the repo
+                            logger.debug('Creating a new item')
                             item.create_object(repo)
+                            # add RDF classes to the insert graph
+                            for type in item.rdf_types:
+                                insert_graph.add((item.uri, rdf.ns.type, type))
                         # do the actual update
+                        logger.info(f'Sending update for {item}')
+                        sparql_update = repo.build_sparql_update(delete_graph, insert_graph)
+                        logger.debug(sparql_update)
                         item.patch(repo, sparql_update)
                         txn.commit()
                         updated_count += 1

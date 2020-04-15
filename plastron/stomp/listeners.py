@@ -89,11 +89,11 @@ class CommandListener(ConnectionListener):
                 )
 
             except (FailureException, RESTAPIException) as e:
-                logger.error(f"Export job {message.job_id} failed: {e}")
+                logger.error(f"Job {message.job_id} failed: {e}")
                 return Message(
                     headers={
                         'PlastronJobId': message.job_id,
-                        'PlastronJobStatus': 'Failed',
+                        'PlastronJobStatus': 'Error',
                         'PlastronJobError': str(e),
                         'persistent': 'true'
                     }

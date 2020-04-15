@@ -8,7 +8,7 @@ from collections import defaultdict
 from datetime import datetime
 from operator import attrgetter
 from plastron import rdf
-from plastron.exceptions import FailureException, NoValidationRulesetException, RESTAPIException
+from plastron.exceptions import DataReadException, NoValidationRulesetException, RESTAPIException, FailureException
 from plastron.http import Transaction
 from plastron.rdf import RDFDataProperty
 from plastron.serializers import CSVSerializer
@@ -89,7 +89,11 @@ def build_fields(fieldnames, property_attrs):
             # this field has a language tag
             # header format is "Header Label [Language Name]"
             m = re.search(r'^([^[]+)\s+\[(.+)\]$', header)
+            if m[1] not in property_attrs:
+                raise DataReadException(f'Unrecognized header "{header}" in import file.')
             attrs = property_attrs[m[1]]
+            if m[2] not in CSVSerializer.LANGUAGE_CODES:
+                raise DataReadException(f'Unrecognized language "{m[2]}" in "{header}" in import file.')
             lang_code = CSVSerializer.LANGUAGE_CODES[m[2]]
             fields[attrs].append({
                 'header': header,
@@ -100,7 +104,11 @@ def build_fields(fieldnames, property_attrs):
             # this field has a datatype
             # header format is "Header Label {Datatype Name}
             m = re.search(r'^([^{]+)\s+{(.+)}$', header)
+            if m[1] not in property_attrs:
+                raise DataReadException(f'Unrecognized header "{header}" in import file.')
             attrs = property_attrs[m[1]]
+            if m[2] not in CSVSerializer.DATATYPE_URIS:
+                raise DataReadException(f'Unrecognized datatype "{m[2]}" in "{header}" in import file.')
             datatype_uri = CSVSerializer.DATATYPE_URIS[m[2]]
             fields[attrs].append({
                 'header': header,
@@ -111,6 +119,8 @@ def build_fields(fieldnames, property_attrs):
             # no language tag or datatype
             # make sure we skip the system columns
             if header not in CSVSerializer.SYSTEM_HEADERS:
+                if header not in property_attrs:
+                    raise DataReadException(f'Unrecognized header "{header}" in import file.')
                 attrs = property_attrs[header]
                 fields[attrs].append({
                     'header': header,
@@ -197,7 +207,11 @@ class Command:
             # file is not seekable, so we can't get a row count in advance
             total_count = None
 
-        fields = build_fields(csv_file.fieldnames, property_attrs)
+        try:
+            fields = build_fields(csv_file.fieldnames, property_attrs)
+        except DataReadException as e:
+            logger.error(str(e))
+            raise FailureException(e.message)
 
         row_count = 0
         updated_count = 0

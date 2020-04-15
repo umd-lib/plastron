@@ -116,6 +116,7 @@ class CommandListener(ConnectionListener):
 
             # send the job completed message
             self.broker.connection.send(self.completed_queue, headers=response.headers, body=response.body)
+            logger.debug(f'Response message sent to {self.completed_queue} with headers: {response.headers}')
 
             # remove the message from the outbox now that sending has completed
             self.outbox.remove(job_id)

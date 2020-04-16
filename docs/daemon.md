@@ -83,6 +83,12 @@ received on the `JOBS` destination:
 * `PlastronJobId`
 
 Additional arguments for a command are sent in headers with the form `PlastronArg-{name}`.
+Many of these are specific to the command, but there is one with standard behavior across
+all commands:
+
+| Header                   | Description |
+|--------------------------|-------------|
+|`PlastronArg-on-behalf-of`|Username to delegate repository operations to|
 
 See the [messages documentation](messages.md) for details on the headers and bodies
 of the messages the Plastron Daemon emits.

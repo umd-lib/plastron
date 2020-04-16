@@ -53,6 +53,7 @@ def main():
     )
     parser.add_argument(
         '--on-behalf-of',
+        help='delegate repository operations to this username',
         dest='delegated_user',
         action='store'
     )

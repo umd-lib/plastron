@@ -4,8 +4,8 @@
 
 ```
 $ plastron --help
-usage: plastron [-h] (-r REPO | -V) [-v] [-q]
-                {delete,del,rm,export,extractocr,imgsize,list,ls,load,mkcol,ping,update}
+usage: plastron [-h] (-r REPO | -V) [-v] [-q] [--on-behalf-of DELEGATED_USER]
+                {delete,del,rm,export,extractocr,imgsize,import,list,ls,load,mkcol,ping,update}
                 ...
 
 Batch operation tool for Fedora 4.
@@ -16,9 +16,11 @@ optional arguments:
   -V, --version         Print version and exit.
   -v, --verbose         increase the verbosity of the status output
   -q, --quiet           decrease the verbosity of the status output
+  --on-behalf-of DELEGATED_USER
+                        delegate repository operations to this username
 
 commands:
-  {delete,del,rm,export,extractocr,imgsize,list,ls,load,mkcol,ping,update}```
+  {delete,del,rm,export,extractocr,imgsize,import,list,ls,load,mkcol,ping,update}
 ```
 
 ### Check version

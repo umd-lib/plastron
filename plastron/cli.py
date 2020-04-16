@@ -51,6 +51,11 @@ def main():
         help='decrease the verbosity of the status output',
         action='store_true'
     )
+    parser.add_argument(
+        '--on-behalf-of',
+        dest='delegated_user',
+        action='store'
+    )
 
     subparsers = parser.add_subparsers(title='commands')
 
@@ -74,7 +79,7 @@ def main():
     with open(args.repo, 'r') as repo_config_file:
         repo_config = yaml.safe_load(repo_config_file)
         fcrepo = Repository(
-            repo_config, ua_string='plastron/{0}'.format(version)
+            repo_config, ua_string=f'plastron/{version}', on_behalf_of=args.delegated_user
         )
 
     # get basic logging options
@@ -101,14 +106,15 @@ def main():
     # configure logging
     logging.config.dictConfig(logging_options)
 
-    logger.info('Loaded repo configuration from {0}'.format(args.repo))
-
     # get the selected subcommand
     command = command_modules[args.cmd_name].Command()
 
     try:
         # dispatch to the selected subcommand
         print_header(args)
+        logger.info(f'Loaded repo configuration from {args.repo}')
+        if args.delegated_user is not None:
+            logger.info(f'Running repository operations on behalf of {args.delegated_user}')
         command(fcrepo, args)
         print_footer(args)
     except FailureException:

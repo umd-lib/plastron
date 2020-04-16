@@ -19,7 +19,7 @@ class Resource(namedtuple('Resource', ['uri', 'description_uri'])):
 
 
 class Repository:
-    def __init__(self, config, ua_string=None):
+    def __init__(self, config, ua_string=None, on_behalf_of=None):
         self.endpoint = config['REST_ENDPOINT']
         self.relpath = config['RELPATH']
         self._path_stack = [self.relpath]
@@ -34,6 +34,7 @@ class Repository:
             __name__ + '.' + self.__class__.__name__
         )
         self.ua_string = ua_string
+        self.delegated_user = on_behalf_of
 
         if 'CLIENT_CERT' in config and 'CLIENT_KEY' in config:
             self.session.cert = (config['CLIENT_CERT'], config['CLIENT_KEY'])
@@ -70,14 +71,16 @@ class Repository:
             self.logger.warning("Unable to connect.")
             raise Exception("Unable to connect")
 
-    def request(self, method, url, **kwargs):
+    def request(self, method, url, headers=None, **kwargs):
+        if headers is None:
+            headers = {}
         target_uri = self._insert_transaction_uri(url)
         self.logger.debug("%s %s", method, target_uri)
         if self.ua_string is not None:
-            if 'headers' not in kwargs:
-                kwargs['headers'] = {}
-            kwargs['headers']['User-Agent'] = self.ua_string
-        response = self.session.request(method, target_uri, **kwargs)
+            headers['User-Agent'] = self.ua_string
+        if self.delegated_user is not None:
+            headers['On-Behalf-Of'] = self.delegated_user
+        response = self.session.request(method, target_uri, headers=headers, **kwargs)
         self.logger.debug("%s %s", response.status_code, response.reason)
         return response
 

@@ -3,7 +3,9 @@ import logging
 import os
 from concurrent.futures import ThreadPoolExecutor
 from importlib import import_module
+from plastron import version
 from plastron.exceptions import FailureException, RESTAPIException
+from plastron.http import Repository
 from plastron.stomp import MessageBox, PlastronCommandMessage, PlastronMessage, Message
 from stomp.listener import ConnectionListener
 
@@ -11,9 +13,9 @@ logger = logging.getLogger(__name__)
 
 
 class CommandListener(ConnectionListener):
-    def __init__(self, broker, repository):
+    def __init__(self, broker, repo_config):
         self.broker = broker
-        self.repository = repository
+        self.repo_config = repo_config
         self.queue = self.broker.destinations['JOBS']
         self.completed_queue = self.broker.destinations['COMPLETED_JOBS']
         self.status_topic = self.broker.destinations['JOB_STATUS']
@@ -57,6 +59,8 @@ class CommandListener(ConnectionListener):
         # TODO: cache the command modules
         # TODO: check that the command module supports message processing
 
+        repo = Repository(self.repo_config, ua_string=f'plastron/{version}', on_behalf_of=message.args.get('on-behalf-of'))
+
         # define the processor for this message
         def process():
             try:
@@ -64,11 +68,13 @@ class CommandListener(ConnectionListener):
                     raise FailureException('Expecting a PlastronJobId header')
 
                 logger.info(f'Received message to initiate job {message.job_id}')
+                if repo.delegated_user is not None:
+                    logger.info(f'Running repository operations on behalf of {repo.delegated_user}')
 
                 args = command_module.parse_message(message)
                 command = command_module.Command()
 
-                for status in command.execute(self.repository, args):
+                for status in command.execute(repo, args):
                     self.broker.connection.send(
                         self.status_topic,
                         headers={

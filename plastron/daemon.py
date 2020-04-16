@@ -66,11 +66,9 @@ def main():
 
     logger.info(f'plastrond {version}')
 
-    repo = Repository(repo_config, ua_string=f'plastron/{version}')
-
     # setup listeners
     broker.connection.set_listener('reconnect', ReconnectListener(broker))
-    broker.connection.set_listener('export', CommandListener(broker, repo))
+    broker.connection.set_listener('command', CommandListener(broker, repo_config))
 
     try:
         broker.connect()

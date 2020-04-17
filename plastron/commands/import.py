@@ -1,16 +1,19 @@
 import csv
 import io
 import logging
+
+from rdflib.util import from_n3
+
 import plastron.models
 import re
 from argparse import FileType, Namespace
 from collections import defaultdict
 from datetime import datetime
 from operator import attrgetter
-from plastron import rdf
+from plastron import rdf, namespaces
 from plastron.exceptions import DataReadException, NoValidationRulesetException, RESTAPIException, FailureException
 from plastron.http import Transaction
-from plastron.namespaces import umdaccess, pcdm
+from plastron.namespaces import pcdm
 from plastron.rdf import RDFDataProperty
 from plastron.serializers import CSVSerializer
 from rdflib import URIRef, Graph, Literal
@@ -52,7 +55,6 @@ def configure_cli(subparsers):
     parser.add_argument(
         '--access',
         help='specify the access class to apply to new items',
-        choices=['Public', 'Campus'],
         action='store'
     )
     parser.add_argument(
@@ -375,12 +377,13 @@ class Command:
                             item.create_object(repo)
                             # add RDF classes to the insert graph
                             for type in item.rdf_types:
-                                insert_graph.add((item.uri, rdf.ns.type, type))
+                                insert_graph.add((URIRef(''), rdf.ns.type, type))
                             # add the access class
                             if args.access is not None:
-                                insert_graph.add((item.uri, rdf.ns.type, getattr(umdaccess, args.access)))
+                                manager = namespaces.get_manager()
+                                insert_graph.add((URIRef(''), rdf.ns.type, from_n3(args.access, nsm=manager)))
                             if args.member_of is not None:
-                                insert_graph.add((item.uri, pcdm.memberOf, URIRef(args.member_of)))
+                                insert_graph.add((URIRef(''), pcdm.memberOf, URIRef(args.member_of)))
                         # do the actual update
                         logger.info(f'Sending update for {item}')
                         sparql_update = repo.build_sparql_update(delete_graph, insert_graph)

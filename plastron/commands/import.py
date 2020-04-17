@@ -1,16 +1,13 @@
 import csv
 import io
 import logging
-
-from rdflib.util import from_n3
-
 import plastron.models
 import re
-from argparse import FileType, Namespace
+from argparse import FileType, Namespace, ArgumentTypeError
 from collections import defaultdict
 from datetime import datetime
 from operator import attrgetter
-from plastron import rdf, namespaces
+from plastron import rdf
 from plastron.exceptions import DataReadException, NoValidationRulesetException, RESTAPIException, FailureException
 from plastron.http import Transaction
 from plastron.namespaces import pcdm
@@ -19,6 +16,7 @@ from plastron.serializers import CSVSerializer
 from rdflib import URIRef, Graph, Literal
 from uuid import uuid4
 
+from plastron.util import uri_or_curie
 
 logger = logging.getLogger(__name__)
 
@@ -55,6 +53,7 @@ def configure_cli(subparsers):
     parser.add_argument(
         '--access',
         help='specify the access class to apply to new items',
+        type=uri_or_curie,
         action='store'
     )
     parser.add_argument(
@@ -166,13 +165,21 @@ def validate(item):
 
 
 def parse_message(message):
+    access = message.args.get('access')
+    if access is not None:
+        try:
+            access_uri = uri_or_curie(access)
+        except ArgumentTypeError as e:
+            raise FailureException(f'PlastronArg-access {e}')
+    else:
+        access_uri = None
     return Namespace(
         model=message.args.get('model'),
         limit=message.args.get('limit', None),
         validate_only=message.args.get('validate-only', False),
         import_file=io.StringIO(message.body),
         template_file=None,
-        access=message.args.get('access'),
+        access=access_uri,
         member_of=message.args.get('member-of')
     )
 
@@ -380,8 +387,7 @@ class Command:
                                 insert_graph.add((URIRef(''), rdf.ns.type, type))
                             # add the access class
                             if args.access is not None:
-                                manager = namespaces.get_manager()
-                                insert_graph.add((URIRef(''), rdf.ns.type, from_n3(args.access, nsm=manager)))
+                                insert_graph.add((URIRef(''), rdf.ns.type, args.access))
                             if args.member_of is not None:
                                 insert_graph.add((URIRef(''), pcdm.memberOf, URIRef(args.member_of)))
                         # do the actual update

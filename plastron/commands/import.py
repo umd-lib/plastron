@@ -234,6 +234,8 @@ class Command:
         valid_count = 0
         error_count = 0
         reports = []
+        updated_uris = []
+        created_uris = []
         for row_number, row in enumerate(csv_file, 1):
             line_reference = f"{getattr(args.import_file, 'name', '<>')}:{row_number + 1}"
             if args.limit is not None and row_number > args.limit:
@@ -369,7 +371,8 @@ class Command:
             if len(delete_graph) > 0 or len(insert_graph) > 0:
                 with Transaction(repo) as txn:
                     try:
-                        if not item.created:
+                        is_new = not item.created
+                        if is_new:
                             # create new item in the repo
                             logger.debug('Creating a new item')
                             item.create_object(repo)
@@ -388,6 +391,10 @@ class Command:
                         item.patch(repo, sparql_update)
                         txn.commit()
                         updated_count += 1
+                        if is_new:
+                            created_uris.append(item.uri)
+                        else:
+                            updated_uris.append(item.uri)
                     except RESTAPIException as e:
                         error_count += 1
                         logger.error(f'{item} import failed: {e}')
@@ -436,5 +443,9 @@ class Command:
                 'invalid': invalid_count,
                 'errors': error_count
             },
-            'validation': reports
+            'validation': reports,
+            'uris': {
+                'created': created_uris,
+                'updated': updated_uris
+            }
         }

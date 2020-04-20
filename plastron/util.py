@@ -4,6 +4,7 @@ import logging
 import mimetypes
 import shutil
 import sys
+from argparse import ArgumentTypeError
 from os.path import basename, isfile
 from tempfile import NamedTemporaryFile
 from paramiko import SSHClient, SFTPClient
@@ -26,6 +27,16 @@ def parse_predicate_list(string, delimiter=','):
         return None
     manager = namespaces.get_manager()
     return [from_n3(p, nsm=manager) for p in string.split(delimiter)]
+
+
+def uri_or_curie(arg):
+    try:
+        term = from_n3(arg, nsm=namespaces.get_manager())
+    except KeyError:
+        raise ArgumentTypeError(f'"{arg[:arg.index(":") + 1]}" is not a known prefix')
+    if not isinstance(term, URIRef):
+        raise ArgumentTypeError('must be a URI or CURIE')
+    return term
 
 
 class ResourceList:

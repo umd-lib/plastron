@@ -89,7 +89,7 @@ class CSVSerializer:
         self.rows = []
         return self
 
-    SYSTEM_HEADERS = ['URI', 'PUBLIC URI', 'CREATED', 'MODIFIED', 'INDEX']
+    SYSTEM_HEADERS = ['URI', 'PUBLIC URI', 'CREATED', 'MODIFIED', 'INDEX', 'FILES']
 
     def write(self, graph: Graph):
         """

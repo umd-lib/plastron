@@ -237,7 +237,7 @@ class Command:
                 raise FailureException()
             logger.info(f'Writing template for the {model_class.__name__} model to {args.template_file.name}')
             writer = csv.writer(args.template_file)
-            writer.writerow(model_class.HEADER_MAP.values())
+            writer.writerow(list(model_class.HEADER_MAP.values()) + ['FILES'])
             return
 
         if args.import_file is None:

@@ -5,7 +5,7 @@ from plastron import pcdm
 from plastron.exceptions import FailureException, DataReadException
 from plastron.namespaces import get_manager
 from plastron.serializers import SERIALIZER_CLASSES
-from plastron.util import LocalFile
+from plastron.files import LocalFile
 from tempfile import NamedTemporaryFile
 from time import sleep
 

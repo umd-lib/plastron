@@ -9,7 +9,7 @@ from os.path import basename, isfile
 from tempfile import NamedTemporaryFile
 from paramiko import SSHClient, SFTPClient
 from plastron import namespaces
-from plastron.exceptions import RESTAPIException, FailureException
+from plastron.exceptions import RESTAPIException, FailureException, BinarySourceNotFoundError
 from plastron.http import Transaction
 from plastron.namespaces import dcterms, ebucore
 from rdflib import URIRef
@@ -192,7 +192,10 @@ class LocalFile(BinarySource):
         self.filename = filename if filename is not None else basename(localpath)
 
     def data(self):
-        return open(self.localpath, 'rb')
+        try:
+            return open(self.localpath, 'rb')
+        except FileNotFoundError as e:
+            raise BinarySourceNotFoundError(str(e)) from e
 
     def mimetype(self):
         return self._mimetype
@@ -211,6 +214,12 @@ class RepositoryFile(BinarySource):
         super().__init__()
         file_uri = URIRef(file_uri)
         head_res = repo.head(file_uri)
+
+        if head_res.status_code == 404:
+            raise BinarySourceNotFoundError(f'{head_res.status_code} {head_res.reason}: {file_uri}')
+        if head_res.status_code != 200:
+            raise RESTAPIException(head_res)
+
         if 'describedby' in head_res.links:
             rdf_uri = head_res.links['describedby']['url']
             file_graph = repo.get_graph(rdf_uri)
@@ -267,7 +276,10 @@ class RemoteFile(BinarySource):
         return stdout.readline().rstrip('\n')
 
     def data(self):
-        return self.sftp().open(self.remotepath, mode='rb')
+        try:
+            return self.sftp().open(self.remotepath, mode='rb')
+        except IOError as e:
+            raise BinarySourceNotFoundError(str(e)) from e
 
     def mimetype(self):
         if self._mimetype is None:

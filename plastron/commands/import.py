@@ -10,7 +10,7 @@ from datetime import datetime
 from operator import attrgetter
 from plastron import rdf
 from plastron.exceptions import DataReadException, NoValidationRulesetException, RESTAPIException, FailureException, \
-    ConfigException
+    ConfigException, BinarySourceNotFoundError
 from plastron.http import Transaction
 from plastron.namespaces import pcdm
 from plastron.pcdm import File, Page
@@ -444,7 +444,7 @@ class Command:
                         else:
                             updated_uris.append(item.uri)
 
-                    except (RESTAPIException, ConfigException) as e:
+                    except (RESTAPIException, ConfigException, BinarySourceNotFoundError) as e:
                         error_count += 1
                         logger.error(f'{item} import failed: {e}')
                         txn.rollback()

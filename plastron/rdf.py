@@ -133,6 +133,23 @@ def data_property(name, uri):
     return add_property
 
 
+def object_property(name, uri, embed=False, obj_class=None):
+    def add_property(cls):
+        type_name = f'{cls.__name__}.{name}'
+        prop_type = type(type_name, (RDFObjectProperty,), {
+            'name': name,
+            'uri': uri,
+            'is_embedded': embed,
+            'obj_class': obj_class
+        })
+        cls.name_to_prop[name] = prop_type
+        cls.uri_to_prop[uri] = prop_type
+        cls.prop_types.append(prop_type)
+        return cls
+    return add_property
+
+
+@object_property('rdf_type', rdf.type)
 class Resource(metaclass=Meta):
     @classmethod
     def from_graph(cls, graph, subject=''):
@@ -148,6 +165,9 @@ class Resource(metaclass=Meta):
         for prop_type in self.prop_types:
             prop = prop_type()
             self.props[prop.name] = prop
+
+        for rdf_type in self.rdf_types:
+            self.rdf_type.append(rdf_type)
 
         for key, value in kwargs.items():
             setattr(self, key, value)
@@ -213,8 +233,6 @@ class Resource(metaclass=Meta):
     def graph(self, nsm=None):
         subject = URIRef(self.uri)
         graph = Graph(namespace_manager=nsm)
-        for rdf_type in self.rdf_types:
-            graph.add((subject, RDF.type, rdf_type))
 
         for prop in self.properties():
             for (s, p, o) in prop.triples(self.uri):
@@ -253,19 +271,3 @@ class Resource(metaclass=Meta):
                 else:
                     result.fails(prop, rule, arg)
         return result
-
-
-def object_property(name, uri, embed=False, obj_class=None):
-    def add_property(cls):
-        type_name = f'{cls.__name__}.{name}'
-        prop_type = type(type_name, (RDFObjectProperty,), {
-            'name': name,
-            'uri': uri,
-            'is_embedded': embed,
-            'obj_class': obj_class
-        })
-        cls.name_to_prop[name] = prop_type
-        cls.uri_to_prop[uri] = prop_type
-        cls.prop_types.append(prop_type)
-        return cls
-    return add_property

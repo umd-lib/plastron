@@ -1,6 +1,7 @@
 import csv
 import io
 import logging
+import os
 import plastron.models
 import re
 from argparse import FileType, Namespace, ArgumentTypeError
@@ -8,15 +9,17 @@ from collections import defaultdict
 from datetime import datetime
 from operator import attrgetter
 from plastron import rdf
-from plastron.exceptions import DataReadException, NoValidationRulesetException, RESTAPIException, FailureException
+from plastron.exceptions import DataReadException, NoValidationRulesetException, RESTAPIException, FailureException, \
+    ConfigException, BinarySourceNotFoundError
 from plastron.http import Transaction
 from plastron.namespaces import pcdm
+from plastron.pcdm import File, Page
 from plastron.rdf import RDFDataProperty
 from plastron.serializers import CSVSerializer
+from plastron.util import uri_or_curie, LocalFile
 from rdflib import URIRef, Graph, Literal
 from uuid import uuid4
 
-from plastron.util import uri_or_curie
 
 logger = logging.getLogger(__name__)
 
@@ -59,6 +62,11 @@ def configure_cli(subparsers):
     parser.add_argument(
         '--member-of',
         help='URI of the object that new items are PCDM members of',
+        action='store'
+    )
+    parser.add_argument(
+        '--binaries-location',
+        help='file path to read new binaries from',
         action='store'
     )
     parser.add_argument(
@@ -164,6 +172,28 @@ def validate(item):
     return result
 
 
+def add_files(item, filenames, base_location, access=None):
+    if base_location is None:
+        raise ConfigException('Must specify a binaries-location')
+
+    for n, filename in enumerate(filenames, 1):
+        path = os.path.join(base_location, filename)
+        # create a LocalFile BinarySource for each filename
+        source = LocalFile(localpath=path)
+        file = File(source, title=filename)
+        # create page objects and add a file for each
+        page = Page(title=f'Page {n}', number=n)
+        page.add_file(file)
+        # add to the item
+        item.add_member(page)
+        proxy = item.append_proxy(page, title=page.title)
+        # add the access class to the page resources
+        if access is not None:
+            file.rdf_type.append(access)
+            page.rdf_type.append(access)
+            proxy.rdf_type.append(access)
+
+
 def parse_message(message):
     access = message.args.get('access')
     if access is not None:
@@ -180,7 +210,8 @@ def parse_message(message):
         import_file=io.StringIO(message.body),
         template_file=None,
         access=access_uri,
-        member_of=message.args.get('member-of')
+        member_of=message.args.get('member-of'),
+        binaries_location=message.args.get('binaries-location')
     )
 
 
@@ -206,7 +237,7 @@ class Command:
                 raise FailureException()
             logger.info(f'Writing template for the {model_class.__name__} model to {args.template_file.name}')
             writer = csv.writer(args.template_file)
-            writer.writerow(model_class.HEADER_MAP.values())
+            writer.writerow(list(model_class.HEADER_MAP.values()) + ['FILES'])
             return
 
         if args.import_file is None:
@@ -382,29 +413,38 @@ class Command:
                     try:
                         is_new = not item.created
                         if is_new:
+                            # if an item is new, don't construct a SPARQL Update query
+                            # instead, just create and update normally
                             # create new item in the repo
                             logger.debug('Creating a new item')
-                            item.create_object(repo)
-                            # add RDF classes to the insert graph
-                            for type in item.rdf_types:
-                                insert_graph.add((URIRef(''), rdf.ns.type, type))
                             # add the access class
                             if args.access is not None:
-                                insert_graph.add((URIRef(''), rdf.ns.type, args.access))
+                                item.rdf_type.append(args.access)
+                            # add the collection membership
                             if args.member_of is not None:
-                                insert_graph.add((URIRef(''), pcdm.memberOf, URIRef(args.member_of)))
-                        # do the actual update
-                        logger.info(f'Sending update for {item}')
-                        sparql_update = repo.build_sparql_update(delete_graph, insert_graph)
-                        logger.debug(sparql_update)
-                        item.patch(repo, sparql_update)
+                                item.member_of = URIRef(args.member_of)
+
+                            if 'FILES' in row and row['FILES'].strip() != '':
+                                add_files(item, row['FILES'].split(';'), args.binaries_location, args.access)
+
+                            item.recursive_create(repo)
+                            item.recursive_update(repo)
+
+                        else:
+                            # do a PATCH update of an existing item
+                            logger.info(f'Sending update for {item}')
+                            sparql_update = repo.build_sparql_update(delete_graph, insert_graph)
+                            logger.debug(sparql_update)
+                            item.patch(repo, sparql_update)
+
                         txn.commit()
                         updated_count += 1
                         if is_new:
                             created_uris.append(item.uri)
                         else:
                             updated_uris.append(item.uri)
-                    except RESTAPIException as e:
+
+                    except (RESTAPIException, ConfigException, BinarySourceNotFoundError) as e:
                         error_count += 1
                         logger.error(f'{item} import failed: {e}')
                         txn.rollback()

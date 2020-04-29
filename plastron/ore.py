@@ -28,11 +28,12 @@ class Aggregation(ldp.Resource):
             proxy.prev = last
         # new item is always the last in the list
         self.last = proxy
+        return proxy
 
     def append_proxy(self, proxy_for, title=None):
         if title is None:
             title = f'Proxy for {proxy_for} in {self}'
-        self.append(Proxy(
+        return self.append(Proxy(
             title=title,
             proxy_for=proxy_for,
             proxy_in=self

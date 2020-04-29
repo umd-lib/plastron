@@ -36,6 +36,7 @@ def is_valid_iso639_code(value):
 @rdf.object_property('subject', dcterms.subject, embed=True, obj_class=LabeledThing)
 @rdf.data_property('language', dc.language)
 @rdf.object_property('rights_holder', dcterms.rightsHolder, embed=True, obj_class=LabeledThing)
+@rdf.data_property('bibliographic_citation', dcterms.bibliographicCitation)
 class Item(pcdm.Object):
     HEADER_MAP = {
         'object_type': 'Object Type',
@@ -57,7 +58,8 @@ class Item(pcdm.Object):
         'extent': 'Extent',
         'subject.label': 'Subject',
         'language': 'Language',
-        'rights_holder.label': 'Rights Holder'
+        'rights_holder.label': 'Rights Holder',
+        'bibliographic_citation': 'Collection Information'
     }
     VALIDATION_RULESET = {
         'object_type': {
@@ -93,5 +95,8 @@ class Item(pcdm.Object):
         'language': {
             'function': is_valid_iso639_code
         },
-        'rights_holder': {}
+        'rights_holder': {},
+        'bibliographic_citation': {
+            'max_values': 1
+        }
     }

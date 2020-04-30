@@ -55,7 +55,7 @@ def configure_cli(subparsers):
     )
     parser.add_argument(
         '--access',
-        help='specify the access class to apply to new items',
+        help='URI or CURIE of the access class to apply to new items',
         type=uri_or_curie,
         action='store'
     )
@@ -66,7 +66,7 @@ def configure_cli(subparsers):
     )
     parser.add_argument(
         '--binaries-location',
-        help='file path to read new binaries from',
+        help='where to find binaries; either a path to a directory or a "zip:<path to zipfile>" URI',
         action='store'
     )
     parser.add_argument(

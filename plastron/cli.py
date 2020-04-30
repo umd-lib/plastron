@@ -118,8 +118,9 @@ def main():
             logger.info(f'Running repository operations on behalf of {args.delegated_user}')
         command(fcrepo, args)
         print_footer(args)
-    except FailureException:
+    except FailureException as e:
         # something failed, exit with non-zero status
+        logger.error(str(e))
         sys.exit(1)
     except KeyboardInterrupt:
         # aborted due to Ctrl+C

@@ -11,12 +11,12 @@ from operator import attrgetter
 from plastron import rdf
 from plastron.exceptions import DataReadException, NoValidationRulesetException, RESTAPIException, FailureException, \
     ConfigException, BinarySourceNotFoundError
+from plastron.files import LocalFile, ZipFile
 from plastron.http import Transaction
-from plastron.namespaces import pcdm
 from plastron.pcdm import File, Page
 from plastron.rdf import RDFDataProperty
 from plastron.serializers import CSVSerializer
-from plastron.util import uri_or_curie, LocalFile
+from plastron.util import uri_or_curie
 from rdflib import URIRef, Graph, Literal
 from uuid import uuid4
 
@@ -55,7 +55,7 @@ def configure_cli(subparsers):
     )
     parser.add_argument(
         '--access',
-        help='specify the access class to apply to new items',
+        help='URI or CURIE of the access class to apply to new items',
         type=uri_or_curie,
         action='store'
     )
@@ -66,7 +66,7 @@ def configure_cli(subparsers):
     )
     parser.add_argument(
         '--binaries-location',
-        help='file path to read new binaries from',
+        help='where to find binaries; either a path to a directory or a "zip:<path to zipfile>" URI',
         action='store'
     )
     parser.add_argument(
@@ -172,15 +172,20 @@ def validate(item):
     return result
 
 
+def get_source(base_location, path):
+    if base_location.startswith('zip:'):
+        return ZipFile(base_location[4:], path)
+    else:
+        # with no URI prefix, assume a local file path
+        return LocalFile(localpath=os.path.join(base_location, path))
+
+
 def add_files(item, filenames, base_location, access=None):
     if base_location is None:
         raise ConfigException('Must specify a binaries-location')
 
     for n, filename in enumerate(filenames, 1):
-        path = os.path.join(base_location, filename)
-        # create a LocalFile BinarySource for each filename
-        source = LocalFile(localpath=path)
-        file = File(source, title=filename)
+        file = File(get_source(base_location, filename), title=filename)
         # create page objects and add a file for each
         page = Page(title=f'Page {n}', number=n)
         page.add_file(file)

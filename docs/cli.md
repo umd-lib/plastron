@@ -217,7 +217,9 @@ optional arguments:
 ```
 $ plastron import --help
 usage: plastron import [-h] -m MODEL [-l LIMIT] [--validate-only]
-                       [--make-template TEMPLATE_FILE]
+                       [--make-template TEMPLATE_FILE] [--access ACCESS]
+                       [--member-of MEMBER_OF]
+                       [--binaries-location BINARIES_LOCATION]
                        [import_file]
 
 Import data to the repository
@@ -234,6 +236,12 @@ optional arguments:
   --validate-only       only validate, do not do the actual import
   --make-template TEMPLATE_FILE
                         create a CSV template for the given model
+  --access ACCESS       URI or CURIE of the access class to apply to new items
+  --member-of MEMBER_OF
+                        URI of the object that new items are PCDM members of
+  --binaries-location BINARIES_LOCATION
+                        where to find binaries; either a path to a directory
+                        or a "zip:<path to zipfile>" URI
 ```
 
 ## Configuration

@@ -3,7 +3,7 @@ from rdflib import URIRef
 from plastron import pcdm, ocr, oa, rdf
 from plastron.exceptions import DataReadException
 from plastron.namespaces import bibo, carriers, dc, dcterms, ebucore, fabio, ndnp, pcdmuse, prov, sc
-from plastron.util import RepositoryFile
+from plastron.files import RepositoryFile
 
 
 @rdf.data_property('title', dcterms.title)

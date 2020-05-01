@@ -5,7 +5,7 @@ import yaml
 from rdflib import Literal, URIRef
 from rdflib.util import from_n3
 from plastron import pcdm, namespaces, rdf
-from plastron.util import LocalFile, RemoteFile
+from plastron.files import LocalFile, RemoteFile
 from plastron.exceptions import ConfigException
 from collections import OrderedDict
 

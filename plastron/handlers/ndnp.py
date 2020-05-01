@@ -9,7 +9,7 @@ import os
 from plastron import pcdm
 from plastron.exceptions import DataReadException
 from plastron.namespaces import dcmitype, ndnp
-from plastron.util import LocalFile
+from plastron.files import LocalFile
 from plastron.models.newspaper import Article, Issue, IssueMetadata, MetadataFile, Page
 
 # alias the rdflib Namespace

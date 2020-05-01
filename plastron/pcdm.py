@@ -2,7 +2,7 @@ from rdflib import URIRef
 from plastron import ldp, ore, rdf
 from plastron.exceptions import RESTAPIException
 from plastron.namespaces import dcterms, dcmitype, ebucore, fabio, pcdm, pcdmuse
-from plastron.util import LocalFile
+from plastron.files import LocalFile
 from PIL import Image
 
 # alias the rdflib Namespace

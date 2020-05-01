@@ -1,5 +1,5 @@
 from PIL import Image
-from plastron.util import RepositoryFile
+from plastron.files import RepositoryFile
 import logging
 
 Image.MAX_IMAGE_PIXELS = None

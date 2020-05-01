@@ -82,7 +82,15 @@ def build_lookup_index(item, index_string):
         m = re.search(pattern, key)
         attr = m[1]
         i = int(m[2])
-        index[attr][i] = getattr(item, attr)[URIRef(item.uri + uriref)]
+        prop = getattr(item, attr)
+        try:
+            index[attr][i] = prop[URIRef(item.uri + uriref)]
+        except IndexError:
+            # need to create an object with that URI
+            obj = prop.obj_class(uri=URIRef(item.uri + uriref))
+            # TODO: what if i > 0?
+            prop.values.append(obj)
+            index[attr][i] = obj
     return index
 
 
@@ -144,11 +152,7 @@ def build_fields(fieldnames, property_attrs):
 
 
 def validate(item):
-    try:
-        result = item.validate()
-    except NoValidationRulesetException as e:
-        logger.error(f'Unable to run validation: {e.message}')
-        raise FailureException()
+    result = item.validate()
 
     if result.is_valid():
         logger.info(f'"{item}" is valid')
@@ -356,7 +360,11 @@ class Command:
                     delete_graph.remove(statement)
                     insert_graph.remove(statement)
 
-            report = validate(item)
+            try:
+                report = validate(item)
+            except NoValidationRulesetException as e:
+                raise FailureException(f'Unable to run validation: {e}') from e
+
             reports.append({
                 'line': line_reference,
                 'is_valid': report.is_valid(),

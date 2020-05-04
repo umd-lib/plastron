@@ -11,7 +11,7 @@ from operator import attrgetter
 from plastron import rdf
 from plastron.exceptions import DataReadException, NoValidationRulesetException, RESTAPIException, FailureException, \
     ConfigException, BinarySourceNotFoundError
-from plastron.files import LocalFile, ZipFile
+from plastron.files import LocalFile, RemoteFile, ZipFile
 from plastron.http import Transaction
 from plastron.pcdm import File, Page
 from plastron.rdf import RDFDataProperty
@@ -175,6 +175,8 @@ def validate(item):
 def get_source(base_location, path):
     if base_location.startswith('zip:'):
         return ZipFile(base_location[4:], path)
+    elif base_location.startswith('sftp:'):
+        return RemoteFile(os.path.join(base_location, path))
     else:
         # with no URI prefix, assume a local file path
         return LocalFile(localpath=os.path.join(base_location, path))

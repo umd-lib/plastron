@@ -4,9 +4,11 @@ import mimetypes
 import zipfile
 from os.path import basename
 from paramiko import SSHClient, SFTPClient
+from paramiko.config import SSH_PORT
 from plastron.exceptions import BinarySourceNotFoundError, RESTAPIException
 from plastron.namespaces import dcterms, ebucore
 from rdflib import URIRef
+from urllib.parse import urlsplit
 
 
 class BinarySource(object):
@@ -81,17 +83,26 @@ class RepositoryFile(BinarySource):
 
 
 class RemoteFile(BinarySource):
-    def __init__(self, host, remotepath, mimetype=None):
+    """
+    A binary source retrievable by SFTP.
+    """
+    def __init__(self, location, mimetype=None):
+        """
+        :param location: the SFTP URI to the binary source, "sftp://user@example.com/path/to/file"
+        :param mimetype: MIME type of the file. If not given, will attempt to detect by calling
+            the "file" utility over an SSH connection.
+        """
         super().__init__()
         self.ssh_client = None
         self.sftp_client = None
-        self.host = host
-        self.remotepath = remotepath
-        self.filename = basename(remotepath)
+        self.sftp_uri = urlsplit(location)
+        self.filename = basename(self.sftp_uri.path)
         self._mimetype = mimetype
 
     def __del__(self):
-        # cleanup the SFTP and SSH clients
+        """
+        Cleanup the SFTP and SSH clients.
+        """
         if self.sftp_client is not None:
             self.sftp_client.close()
         if self.ssh_client is not None:
@@ -101,7 +112,11 @@ class RemoteFile(BinarySource):
         if self.ssh_client is None:
             self.ssh_client = SSHClient()
             self.ssh_client.load_system_host_keys()
-            self.ssh_client.connect(self.host)
+            self.ssh_client.connect(
+                hostname=self.sftp_uri.hostname,
+                username=self.sftp_uri.username,
+                port=self.sftp_uri.port or SSH_PORT
+            )
         return self.ssh_client
 
     def sftp(self):
@@ -115,17 +130,17 @@ class RemoteFile(BinarySource):
 
     def data(self):
         try:
-            return self.sftp().open(self.remotepath, mode='rb')
+            return self.sftp().open(self.sftp_uri.path, mode='rb')
         except IOError as e:
             raise BinarySourceNotFoundError(str(e)) from e
 
     def mimetype(self):
         if self._mimetype is None:
-            self._mimetype = self.ssh_exec(f'file --mime-type -F "" "{self.remotepath}"').split()[1]
+            self._mimetype = self.ssh_exec(f'file --mime-type -F "" "{self.sftp_uri.path}"').split()[1]
         return self._mimetype
 
     def digest(self):
-        sha1sum = self.ssh_exec(f'sha1sum "{self.remotepath}"').split()[0]
+        sha1sum = self.ssh_exec(f'sha1sum "{self.sftp_uri.path}"').split()[0]
         return 'sha1=' + sha1sum
 
 

@@ -80,3 +80,8 @@ exports/*
 *.key
 *.pem
 
+# PyCharm IDE work directory
+.idea/
+
+# virtualenv directory
+venv/

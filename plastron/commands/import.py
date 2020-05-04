@@ -72,7 +72,7 @@ def configure_cli(subparsers):
     parser.add_argument(
         'import_file', nargs='?',
         help='name of the file to import from',
-        type=FileType('r'),
+        type=FileType('r', encoding='utf-8-sig'),
         action='store'
     )
     parser.set_defaults(cmd_name='import')
@@ -201,6 +201,7 @@ def add_files(item, filenames, base_location, access=None):
 
 def parse_message(message):
     access = message.args.get('access')
+    message.body = message.body.encode('utf-8').decode('utf-8-sig')
     if access is not None:
         try:
             access_uri = uri_or_curie(access)

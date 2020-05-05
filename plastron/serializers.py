@@ -124,7 +124,8 @@ class CSVSerializer:
     LANGUAGE_CODES = {name: code for code, name in LANGUAGE_NAMES.items()}
 
     DATATYPE_NAMES = {
-        URIRef('http://id.loc.gov/datatypes/edtf'): 'EDTF'
+        URIRef('http://id.loc.gov/datatypes/edtf'): 'EDTF',
+        URIRef('http://www.w3.org/2001/XMLSchema#date'): 'Date'
     }
     DATATYPE_URIS = {name: uri for uri, name in DATATYPE_NAMES.items()}
 
@@ -153,13 +154,15 @@ class CSVSerializer:
                     datatypes = set(v.datatype for v in literals if v.datatype)
 
                     for language in languages:
-                        language_header = f'{header} [{self.LANGUAGE_NAMES[language]}]'
+                        language_label = self.LANGUAGE_NAMES.get(language, language)
+                        language_header = f'{header} [{language_label}]'
                         values = [v for v in prop.values if v.language == language]
                         serialization = '|'.join(values)
                         columns[language_header].append(serialization)
                         row_info['extra_headers'][header].add(language_header)
                     for datatype in datatypes:
-                        datatype_header = f'{header} {{{self.DATATYPE_NAMES[datatype]}}}'
+                        datatype_label = self.DATATYPE_NAMES.get(datatype, datatype.n3(nsm))
+                        datatype_header = f'{header} {{{datatype_label}}}'
                         values = [v for v in prop.values if v.datatype == datatype]
                         serialization = '|'.join(values)
                         columns[datatype_header].append(serialization)

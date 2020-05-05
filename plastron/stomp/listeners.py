@@ -8,6 +8,7 @@ from plastron.exceptions import FailureException, RESTAPIException
 from plastron.http import Repository
 from plastron.stomp import MessageBox, PlastronCommandMessage, PlastronMessage, Message
 from stomp.listener import ConnectionListener
+from plastron.stomp.inbox_watcher import InboxWatcher
 
 logger = logging.getLogger(__name__)
 
@@ -23,6 +24,7 @@ class CommandListener(ConnectionListener):
         self.outbox = MessageBox(os.path.join(self.broker.message_store_dir, 'outbox'))
         self.executor = ThreadPoolExecutor(thread_name_prefix=__name__)
         self.public_uri_template = self.broker.public_uri_template
+        self.inbox_watcher = None
 
     def on_connected(self, headers, body):
         # first attempt to send anything in the outbox
@@ -42,16 +44,20 @@ class CommandListener(ConnectionListener):
         self.broker.connection.subscribe(destination=self.queue, id='plastron')
         logger.info(f"Subscribed to {self.queue}")
 
+        self.inbox_watcher = InboxWatcher(self, self.inbox)
+        self.inbox_watcher.start()
+
     def on_message(self, headers, body):
+        # Note: Processing will occur via the InboxWatcher, which will
+        # respond to the inbox placing a file in the inbox message directory
+        # containing the message
+
         if headers['destination'] == self.queue:
             logger.debug(f'Received message on {self.queue} with headers: {headers}')
 
             # save the message in the inbox until we can process it
             message = PlastronCommandMessage(headers=headers, body=body)
             self.inbox.add(message.id, message)
-
-            # and then process the message
-            self.process_message(message)
 
     def process_message(self, message):
         # determine which command to load to process the message
@@ -128,6 +134,10 @@ class CommandListener(ConnectionListener):
             self.outbox.remove(job_id)
 
         return response_handler
+
+    def on_disconnected(self):
+        if self.inbox_watcher:
+            self.inbox_watcher.stop()
 
 
 class ReconnectListener(ConnectionListener):

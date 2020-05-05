@@ -82,7 +82,8 @@ setup(
         'rdflib',
         'requests',
         'setuptools',
-        'stomp.py'
+        'stomp.py',
+        'watchdog>=0.10.2'
     ],
     python_requires='>=3.6',
 

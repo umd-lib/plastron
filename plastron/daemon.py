@@ -67,8 +67,10 @@ def main():
     logger.info(f'plastrond {version}')
 
     # setup listeners
-    broker.connection.set_listener('reconnect', ReconnectListener(broker))
+    # Order of listeners is important -- ReconnectListener should be the
+    # last listener
     broker.connection.set_listener('command', CommandListener(broker, repo_config))
+    broker.connection.set_listener('reconnect', ReconnectListener(broker))
 
     try:
         broker.connect()

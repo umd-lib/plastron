@@ -240,8 +240,9 @@ optional arguments:
   --member-of MEMBER_OF
                         URI of the object that new items are PCDM members of
   --binaries-location BINARIES_LOCATION
-                        where to find binaries; either a path to a directory
-                        or a "zip:<path to zipfile>" URI
+                        where to find binaries; either a path to a directory,
+                        a "zip:<path to zipfile>" URI, or an SFTP URI in the
+                        form "sftp://<user>@<host>/<path to dir>"
 ```
 
 ## Configuration

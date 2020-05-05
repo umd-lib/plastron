@@ -11,7 +11,7 @@ from operator import attrgetter
 from plastron import rdf
 from plastron.exceptions import DataReadException, NoValidationRulesetException, RESTAPIException, FailureException, \
     ConfigException, BinarySourceNotFoundError
-from plastron.files import LocalFile, ZipFile
+from plastron.files import LocalFile, RemoteFile, ZipFile
 from plastron.http import Transaction
 from plastron.pcdm import File, Page
 from plastron.rdf import RDFDataProperty
@@ -66,7 +66,11 @@ def configure_cli(subparsers):
     )
     parser.add_argument(
         '--binaries-location',
-        help='where to find binaries; either a path to a directory or a "zip:<path to zipfile>" URI',
+        help=(
+            'where to find binaries; either a path to a directory, '
+            'a "zip:<path to zipfile>" URI, or an SFTP URI in the form '
+            '"sftp://<user>@<host>/<path to dir>"'
+        ),
         action='store'
     )
     parser.add_argument(
@@ -173,8 +177,20 @@ def validate(item):
 
 
 def get_source(base_location, path):
+    """
+    Get an appropriate BinarySource based on the type of base_location.
+
+    :param base_location: The following forms are recognized:
+        "zip:<path to zipfile>"
+        "sftp:<user>@<host>/<path to dir>"
+        "<local dir path>"
+    :param path:
+    :return:
+    """
     if base_location.startswith('zip:'):
         return ZipFile(base_location[4:], path)
+    elif base_location.startswith('sftp:'):
+        return RemoteFile(os.path.join(base_location, path))
     else:
         # with no URI prefix, assume a local file path
         return LocalFile(localpath=os.path.join(base_location, path))

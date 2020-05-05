@@ -1,10 +1,12 @@
 from edtf import parse_edtf
 from iso639 import is_valid639_1, is_valid639_2
-from pyparsing import ParseException
-
 from plastron import pcdm, rdf
 from plastron.authority import LabeledThing
 from plastron.namespaces import dc, dcterms, edm
+from pyparsing import ParseException
+from rdflib import Namespace
+
+umdtype = Namespace('http://vocab.lib.umd.edu/datatype#')
 
 
 def is_edtf_formatted(value):
@@ -37,6 +39,7 @@ def is_valid_iso639_code(value):
 @rdf.data_property('language', dc.language)
 @rdf.object_property('rights_holder', dcterms.rightsHolder, embed=True, obj_class=LabeledThing)
 @rdf.data_property('bibliographic_citation', dcterms.bibliographicCitation)
+@rdf.data_property('accession_number', dcterms.identifier, datatype=umdtype.accessionNumber)
 class Item(pcdm.Object):
     HEADER_MAP = {
         'object_type': 'Object Type',
@@ -59,7 +62,8 @@ class Item(pcdm.Object):
         'subject.label': 'Subject',
         'language': 'Language',
         'rights_holder.label': 'Rights Holder',
-        'bibliographic_citation': 'Collection Information'
+        'bibliographic_citation': 'Collection Information',
+        'accession_number': 'Accession Number'
     }
     VALIDATION_RULESET = {
         'object_type': {
@@ -97,6 +101,9 @@ class Item(pcdm.Object):
         },
         'rights_holder': {},
         'bibliographic_citation': {
+            'max_values': 1
+        },
+        'accession_number': {
             'max_values': 1
         }
     }

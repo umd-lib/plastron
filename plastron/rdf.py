@@ -1,11 +1,11 @@
+
 import plastron.validation.rules
 import sys
 from copy import copy
-from rdflib import Graph, RDF, URIRef, Literal
-
 from plastron.exceptions import NoValidationRulesetException
 from plastron.namespaces import rdf
 from plastron.validation import ResourceValidationResult
+from rdflib import Graph, URIRef, Literal
 
 # alias the rdflib Namespace
 ns = rdf
@@ -84,13 +84,13 @@ class RDFProperty(object):
     def triples(self, subject):
         for value in self.values:
             if value is not None:
-                yield (subject, self.uri, self.get_term(value))
+                yield subject, self.uri, self.get_term(value)
 
 
 class RDFDataProperty(RDFProperty):
     @classmethod
     def get_term(cls, value):
-        return value if isinstance(value, Literal) else Literal(value)
+        return value if isinstance(value, Literal) else Literal(value, datatype=cls.datatype)
 
 
 class RDFObjectProperty(RDFProperty):
@@ -118,15 +118,16 @@ class RDFObjectProperty(RDFProperty):
             raise ValueError('Expecting a URIRef or an object with a uri attribute')
 
 
-def data_property(name, uri):
+def data_property(name, uri, datatype=None):
     def add_property(cls):
         type_name = f'{cls.__name__}.{name}'
         prop_type = type(type_name, (RDFDataProperty,), {
             'name': name,
-            'uri': uri
+            'uri': uri,
+            'datatype': datatype
         })
         cls.name_to_prop[name] = prop_type
-        cls.uri_to_prop[uri] = prop_type
+        cls.uri_to_prop[uri, datatype] = prop_type
         cls.prop_types.append(prop_type)
         return cls
 
@@ -143,7 +144,8 @@ def object_property(name, uri, embed=False, obj_class=None):
             'obj_class': obj_class
         })
         cls.name_to_prop[name] = prop_type
-        cls.uri_to_prop[uri] = prop_type
+        # object properties never have datatypes
+        cls.uri_to_prop[uri, None] = prop_type
         cls.prop_types.append(prop_type)
         return cls
     return add_property
@@ -174,8 +176,9 @@ class Resource(metaclass=Meta):
 
     def read(self, graph):
         for (s, p, o) in graph.triples((self.uri, None, None)):
-            if p in self.uri_to_prop:
-                prop_type = self.uri_to_prop[p]
+            datatype = o.datatype if isinstance(o, Literal) else None
+            if (p, datatype) in self.uri_to_prop:
+                prop_type = self.uri_to_prop[p, datatype]
                 if issubclass(prop_type, RDFObjectProperty) and prop_type.obj_class is not None:
                     obj = prop_type.obj_class(uri=o)
                     # recursively read embedded objects whose triples should be part of the same graph

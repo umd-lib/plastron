@@ -333,6 +333,10 @@ class Command:
                     values = [v for v in row[header].split('|') if len(v.strip()) > 0]
 
                     if issubclass(prop_type, RDFDataProperty):
+                        if datatype is None:
+                            # default to the property's defined datatype
+                            # if it was not specified in the column header
+                            datatype = prop_type.datatype
                         new_values.extend(Literal(v, lang=language_code, datatype=datatype) for v in values)
                     else:
                         new_values = [URIRef(v) for v in values]

@@ -1,1 +1,1 @@
-version = '3.2.0rc2'
+version = '3.2.0rc3'

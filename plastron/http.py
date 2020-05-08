@@ -119,31 +119,36 @@ class Repository:
             raise RESTAPIException(response)
 
     def recursive_get(self, url, traverse=None, **kwargs):
-        head_response = self.head(url, **kwargs)
-        if 'describedby' in head_response.links:
-            target = head_response.links['describedby']['url']
-        else:
-            target = url
-
+        target = self.get_description_uri(url)
         graph = self.get_graph(target)
         resource = Resource(
             uri=self._remove_transaction_uri(url),
             description_uri=self._remove_transaction_uri(target)
         )
-        yield (resource, graph)
+        yield resource, graph
         if traverse is not None:
             for (s, p, o) in graph:
                 if p in traverse:
                     for (resource, graph) in self.recursive_get(str(o), traverse=traverse, **kwargs):
-                        yield (resource, graph)
+                        yield resource, graph
+
+    def get_description_uri(self, uri, **kwargs):
+        response = self.head(uri, **kwargs)
+        if response.status_code != 200:
+            raise RESTAPIException(response)
+        if 'describedby' in response.links:
+            return response.links['describedby']['url']
+        else:
+            return uri
 
     def get_graph(self, url, include_server_managed=True):
+        description_uri = self.get_description_uri(url)
         headers = {
             'Accept': 'application/n-triples'
         }
         if not include_server_managed:
             headers['Prefer'] = OMIT_SERVER_MANAGED_TRIPLES
-        response = self.get(url, headers=headers, stream=True)
+        response = self.get(description_uri, headers=headers, stream=True)
         if response.status_code != 200:
             self.logger.error(f"Unable to get {headers['Accept']} representation of {url}")
             raise RESTAPIException(response)

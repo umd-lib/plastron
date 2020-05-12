@@ -2,8 +2,9 @@ import logging
 from argparse import Namespace, FileType
 from datetime import datetime
 from plastron import pcdm
-from plastron.exceptions import FailureException, DataReadException
+from plastron.exceptions import FailureException, DataReadException, RESTAPIException
 from plastron.namespaces import get_manager
+from plastron.pcdm import Object
 from plastron.serializers import SERIALIZER_CLASSES
 from plastron.files import LocalFile
 from tempfile import NamedTemporaryFile
@@ -73,6 +74,22 @@ def parse_message(message):
     )
 
 
+def format_size(size):
+    if size < 1024:
+        return size, 'B'
+    size /= 1024
+    if size < 1024:
+        return size, 'KB'
+    size /= 1024
+    if size < 1024:
+        return size, 'MB'
+    size /= 1024
+    if size < 2014:
+        return size, 'GB'
+    size /= 2014
+    return size, 'TB'
+
+
 class Command:
     def __init__(self):
         self.result = None
@@ -98,27 +115,25 @@ class Command:
         logger.debug(f'Exporting to file {args.output_file.name}')
         with serializer_class(args.output_file, public_uri_template=args.uri_template) as serializer:
             for uri in args.uris:
-                r = fcrepo.head(uri)
-                if r.status_code == 200:
-                    # do export
-                    if 'describedby' in r.links:
-                        # the resource is a binary, get the RDF description URI
-                        rdf_uri = r.links['describedby']['url']
-                    else:
-                        rdf_uri = uri
+                try:
                     logger.info(f'Exporting item {count + 1}/{total}: {uri}')
-                    graph = fcrepo.get_graph(rdf_uri)
+                    obj = Object.from_repository(fcrepo, uri=uri)
+                    binaries = list(obj.gather_files(fcrepo))
+                    total_size = sum(int(file.size[0]) for file in binaries)
+                    size, unit = format_size(total_size)
+                    logger.info(f'Total size of binaries: {round(size, 2)} {unit}')
+
                     try:
-                        serializer.write(graph)
+                        serializer.write(obj.graph(), files=binaries)
                         count += 1
                     except DataReadException as e:
                         # log the failure, but continue to attempt to export the rest of the URIs
                         logger.error(f'Export of {uri} failed: {e}')
                         errors += 1
                     sleep(1)
-                else:
+                except RESTAPIException as e:
                     # log the failure, but continue to attempt to export the rest of the URIs
-                    logger.error(f'Unable to retrieve {uri}')
+                    logger.error(f'Unable to retrieve {uri}: {e}')
                     errors += 1
 
                 # update the status

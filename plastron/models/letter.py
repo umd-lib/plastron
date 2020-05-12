@@ -1,6 +1,7 @@
 from plastron import rdf, pcdm
 from plastron.authority import LabeledThing
 from plastron.namespaces import bibo, dc, dcmitype, dcterms, edm, geo, rel, skos
+from plastron.validation import is_edtf_formatted
 
 
 @rdf.rdf_class(edm.Agent)
@@ -92,7 +93,8 @@ class Letter(pcdm.Object):
             'exactly': 1
         },
         'date': {
-            'exactly': 1
+            'exactly': 1,
+            'function': is_edtf_formatted
         },
         'language': {
             'exactly': 1

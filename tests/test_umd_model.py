@@ -16,6 +16,7 @@ item = Item.from_graph(
 dcterms = Namespace('http://purl.org/dc/terms/')
 umdtype = Namespace('http://vocab.lib.umd.edu/datatype#')
 
+
 def test_identifier_distinct_from_accession_number():
     assert len(item.identifier) == 1
     assert item.identifier[0] == Literal('foo')
@@ -26,4 +27,3 @@ def test_identifier_distinct_from_accession_number():
     graph = item.graph()
     assert (URIRef(base_uri), dcterms.identifier, Literal('foo')) in graph
     assert (URIRef(base_uri), dcterms.identifier, Literal('1212XN1', datatype=umdtype.accessionNumber)) in graph
-

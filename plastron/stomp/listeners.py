@@ -65,7 +65,11 @@ class CommandListener(ConnectionListener):
         # TODO: cache the command modules
         # TODO: check that the command module supports message processing
 
-        repo = Repository(self.repo_config, ua_string=f'plastron/{version}', on_behalf_of=message.args.get('on-behalf-of'))
+        repo = Repository(
+            config=self.repo_config,
+            ua_string=f'plastron/{version}',
+            on_behalf_of=message.args.get('on-behalf-of')
+        )
 
         # define the processor for this message
         def process():

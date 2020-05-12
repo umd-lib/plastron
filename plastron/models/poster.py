@@ -42,20 +42,22 @@ class Poster(pcdm.Object):
         'rights': 'Rights'
     }
     VALIDATION_RULESET = {
-        'place': {
-            'exactly': 1
+        'title': {
+            'min_values': 1
         },
+        'alternative': {
+            'min_values': 1
+        },
+        # "place" is not currently exported
+        'place': {},
         'rights': {
             'exactly': 1
         },
-        'identifier': {
-            'exactly': 1
-        },
-        'format': {
-            'exactly': 1
-        },
+        # "identifier" is not currently exported
+        'identifier': {},
+        'format': {},
         'type': {
-            'exactly': 1
+            'min_values': 1
         },
         'subject': {
             'exactly': 1
@@ -69,9 +71,7 @@ class Poster(pcdm.Object):
         'language': {
             'exactly': 1
         },
-        'description': {
-            'exactly': 1
-        },
+        'description': {},
         'extent': {
             'exactly': 1
         },
@@ -88,12 +88,9 @@ class Poster(pcdm.Object):
             'exactly': 1
         },
         'part_of': {
-            'exactly': 1
+            'min_values': 1
         },
         'publisher': {
-            'exactly': 1
-        },
-        'alternative': {
-            'exactly': 1
+            'min_values': 1
         }
     }

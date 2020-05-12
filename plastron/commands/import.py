@@ -273,15 +273,26 @@ class Command:
 
         csv_file = csv.DictReader(args.import_file)
 
+        count = {
+            'total': None,
+            'rows': 0,
+            'errors': 0,
+            'valid': 0,
+            'invalid': 0,
+            'created': 0,
+            'updated': 0,
+            'unchanged': 0
+        }
+
         if args.import_file.seekable():
             # get the row count of the file
-            total_count = sum(1 for _ in csv_file)
+            count['total'] = sum(1 for _ in csv_file)
             # rewind the file and re-create the CSV reader
             args.import_file.seek(0)
             csv_file = csv.DictReader(args.import_file)
         else:
             # file is not seekable, so we can't get a row count in advance
-            total_count = None
+            count['total'] = None
 
         try:
             fields = build_fields(csv_file.fieldnames, property_attrs)
@@ -289,12 +300,6 @@ class Command:
             logger.error(str(e))
             raise FailureException(e.message)
 
-        row_count = 0
-        updated_count = 0
-        unchanged_count = 0
-        invalid_count = 0
-        valid_count = 0
-        error_count = 0
         reports = []
         updated_uris = []
         created_uris = []
@@ -304,9 +309,9 @@ class Command:
                 logger.info(f'Stopping after {args.limit} rows')
                 break
             logger.debug(f'Processing {line_reference}')
-            row_count += 1
+            count['rows'] += 1
             if any(v is None for v in row.values()):
-                error_count += 1
+                count['errors'] += 1
                 error_msg = f'Line {line_reference} has the wrong number of columns'
                 reports.append({
                     'line': line_reference,
@@ -422,10 +427,10 @@ class Command:
             })
 
             if report.is_valid():
-                valid_count += 1
+                count['valid'] += 1
             else:
                 # skip invalid items
-                invalid_count += 1
+                count['invalid'] += 1
                 logger.warning(f'Skipping "{item}"')
                 continue
 
@@ -456,6 +461,8 @@ class Command:
                             item.recursive_create(repo)
                             item.recursive_update(repo)
 
+                            count['created'] += 1
+
                         else:
                             # do a PATCH update of an existing item
                             logger.info(f'Sending update for {item}')
@@ -463,20 +470,21 @@ class Command:
                             logger.debug(sparql_update)
                             item.patch(repo, sparql_update)
 
+                            count['updated'] += 1
+
                         txn.commit()
-                        updated_count += 1
                         if is_new:
                             created_uris.append(item.uri)
                         else:
                             updated_uris.append(item.uri)
 
                     except (RESTAPIException, ConfigException, BinarySourceNotFoundError) as e:
-                        error_count += 1
+                        count['errors'] += 1
                         logger.error(f'{item} import failed: {e}')
                         txn.rollback()
                         logger.warning(f'Rolled back transaction {txn}')
             else:
-                unchanged_count += 1
+                count['unchanged'] += 1
                 logger.info(f'No changes found for "{item}" ({uri})')
 
             # update the status
@@ -487,37 +495,24 @@ class Command:
                     'now': now,
                     'elapsed': now - start_time
                 },
-                'count': {
-                    'total': total_count,
-                    'updated': updated_count,
-                    'unchanged': unchanged_count,
-                    'valid': valid_count,
-                    'invalid': invalid_count,
-                    'errors': error_count
-                }
+                'count': count,
             }
 
-        if total_count is None:
+        if count['total'] is None:
             # if we weren't able to get the total count before,
             # use the final row count as the total count for the
             # job completion message
-            total_count = row_count
+            count['total'] = count['rows']
 
-        logger.info(f'Found {valid_count} valid items')
-        logger.info(f'Found {invalid_count} invalid items')
-        logger.info(f'Found {error_count} errors')
+        logger.info(f"Found {count['valid']} valid items")
+        logger.info(f"Found {count['invalid']} invalid items")
+        logger.info(f"Found {count['error']} errors")
         if not args.validate_only:
-            logger.info(f'{unchanged_count} of {total_count} items remained unchanged')
-            logger.info(f'Updated {updated_count} of {total_count} items')
+            logger.info(f"{count['unchanged']} of {count['total']} items remained unchanged")
+            logger.info(f"Created {count['created']} of {count['total']} items")
+            logger.info(f"Updated {count['updated']} of {count['total']} items")
         self.result = {
-            'count': {
-                'total': total_count,
-                'updated': updated_count,
-                'unchanged': unchanged_count,
-                'valid': valid_count,
-                'invalid': invalid_count,
-                'errors': error_count
-            },
+            'count': count,
             'validation': reports,
             'uris': {
                 'created': created_uris,

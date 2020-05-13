@@ -1,5 +1,6 @@
 from plastron import pcdm, rdf
 from plastron.namespaces import dcterms, dc, edm, bibo, geo
+from plastron.validation import is_edtf_formatted
 
 
 @rdf.object_property('place', dcterms.spatial)
@@ -66,7 +67,8 @@ class Poster(pcdm.Object):
             'min_values': 1
         },
         'date': {
-            'exactly': 1
+            'exactly': 1,
+            'function': is_edtf_formatted
         },
         'language': {
             'exactly': 1

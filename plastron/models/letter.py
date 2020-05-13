@@ -78,10 +78,10 @@ class Letter(pcdm.Object):
             'exactly': 1
         },
         'place': {
-            'exactly': 1
+            'min_values': 1
         },
         'subject': {
-            'exactly': 1
+            'min_values': 1
         },
         'rights': {
             'exactly': 1

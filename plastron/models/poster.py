@@ -61,7 +61,7 @@ class Poster(pcdm.Object):
             'min_values': 1
         },
         'subject': {
-            'exactly': 1
+            'min_values': 1
         },
         'location': {
             'min_values': 1

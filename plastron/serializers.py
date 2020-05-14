@@ -56,13 +56,16 @@ class TurtleSerializer:
     def __enter__(self):
         return self
 
-    def write(self, graph: Graph):
+    def write(self, graph: Graph, _files=None):
         graph.namespace_manager = nsm
         with ensure_binary_mode(self.file) as export_file:
             graph.serialize(destination=export_file, format='turtle')
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
+    def finish(self):
         pass
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.finish()
 
 
 def detect_resource_class(graph, subject):

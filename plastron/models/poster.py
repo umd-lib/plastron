@@ -1,5 +1,6 @@
 from plastron import pcdm, rdf
 from plastron.namespaces import dcterms, dc, edm, bibo, geo
+from plastron.validation import is_edtf_formatted
 
 
 @rdf.object_property('place', dcterms.spatial)
@@ -21,7 +22,7 @@ from plastron.namespaces import dcterms, dc, edm, bibo, geo
 @rdf.data_property('publisher', dc.publisher)
 @rdf.data_property('alternative', dcterms.alternative)
 @rdf.rdf_class(bibo.Image)
-class Poster(pcdm.Item):
+class Poster(pcdm.Object):
     HEADER_MAP = {
         'title': 'Title',
         'alternative': 'Alternate Title',
@@ -40,4 +41,58 @@ class Poster(pcdm.Item):
         'latitude': 'Latitude',
         'subject': 'Subject',
         'rights': 'Rights'
+    }
+    VALIDATION_RULESET = {
+        'title': {
+            'min_values': 1
+        },
+        'alternative': {
+            'min_values': 1
+        },
+        # "place" is not currently exported
+        'place': {},
+        'rights': {
+            'exactly': 1
+        },
+        # "identifier" is not currently exported
+        'identifier': {},
+        'format': {},
+        'type': {
+            'min_values': 1
+        },
+        'subject': {
+            'min_values': 1
+        },
+        'location': {
+            'min_values': 1
+        },
+        'date': {
+            'exactly': 1,
+            'function': is_edtf_formatted
+        },
+        'language': {
+            'exactly': 1
+        },
+        'description': {},
+        'extent': {
+            'exactly': 1
+        },
+        'issue': {
+            'exactly': 1
+        },
+        'locator': {
+            'exactly': 1
+        },
+        'latitude': {
+            'exactly': 1
+        },
+        'longitude': {
+            'exactly': 1
+        },
+        'part_of': {
+            'min_values': 1
+        },
+        'publisher': {
+            'min_values': 1
+        }
     }

@@ -71,10 +71,13 @@ setup(
     # For an analysis of "install_requires" vs pip's requirements files see:
     # https://packaging.python.org/en/latest/requirements.html
     install_requires=[
+        'edtf',
+        'iso639',
         'lxml>3.6.0',
         'numpy',
         'paramiko',
         'Pillow>=6.2.0',
+        'pyparsing',
         'PyYAML>3.12',
         'rdflib',
         'requests',

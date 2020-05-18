@@ -60,7 +60,9 @@ class Batch:
         self.logger = logging.getLogger(
             __name__ + '.' + self.__class__.__name__
         )
-        self.collection = pcdm.Collection.from_repository(repo, config.collection_uri)
+        graph = repo.get_graph(config.collection_uri, include_server_managed=False)
+        self.collection = pcdm.Collection.from_graph(graph, config.collection_uri)
+        self.collection.created = True
 
         self.fieldnames = ['aggregation', 'sequence', 'uri']
 
@@ -165,8 +167,7 @@ class BatchItem:
         root = tree.getroot()
         m = XPATHMAP['issue']
 
-        issue = Issue()
-        issue.add_collection(self.batch.collection)
+        issue = Issue(member_of=self.batch.collection)
 
         # get required metadata elements
         try:
@@ -196,8 +197,12 @@ class BatchItem:
 
         # create a page object for each page and append to list of pages
         for page_div in issue_mets.xpath('METS:structMap//METS:div[@TYPE="np:page"]'):
+            # create a page and add to the list of members
             page = self.create_page(issue_mets, page_div, issue)
-            issue.add_component(page)
+            issue.add_member(page)
+
+            # create a proxy for the page in this issue and add it to the aggregation
+            issue.append_proxy(page, title=f'Proxy for page {page.number} in {issue.title}')
 
             # add OCR text blocks as annotations
             issue.annotations.extend(page.textblocks())
@@ -226,7 +231,7 @@ class BatchItem:
                 issue=issue,
                 pages=sorted(list(article_pagenums))
             )
-            issue.add_component(article)
+            issue.add_member(article)
 
         self.issue = issue
         return issue

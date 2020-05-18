@@ -1,3 +1,6 @@
+import json
+import logging
+
 DEFAULT_LOGGING_OPTIONS = {
     'version': 1,
     'formatters': {
@@ -38,7 +41,18 @@ DEFAULT_LOGGING_OPTIONS = {
         }
     },
     'root': {
-        'level': 'DEBUG',
-        'handlers': ['console', 'file']
+        'level': 'DEBUG'
     }
 }
+
+
+class STOMPHandler(logging.Handler):
+    def __init__(self, level=logging.NOTSET, connection=None, destination=None):
+        super().__init__(level)
+        self.destination = destination
+        self.connection = connection
+
+    def emit(self, record):
+        # if no broker is set, just be silent
+        if self.connection is not None and self.destination is not None:
+            self.connection.send(self.destination, headers=record.msg.headers, body=record.msg.body)

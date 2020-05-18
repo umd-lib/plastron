@@ -1,3 +1,6 @@
+iso639
+pyparsing
+edtf
 setuptools==39.0.1
 rdflib==4.2.1
 requests>=2.20.0

@@ -126,7 +126,7 @@ class Batch:
                         if isinstance(component, pcdm.File):
                             item.add_file(component)
                         else:
-                            item.add_component(component)
+                            item.add_member(component)
                 elif 'files' in key_conf:
                     # this key_column is a subject with file items
                     for component in self.get_items(sub_lines, key_conf['files']):
@@ -205,7 +205,7 @@ class Batch:
 
     def __iter__(self):
         for item in self.get_items(self.rows, self.mapping):
-            item.add_collection(self.collection)
+            item.member_of = self.collection
             yield BatchItem(item)
 
 

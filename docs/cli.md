@@ -4,8 +4,8 @@
 
 ```
 $ plastron --help
-usage: plastron [-h] (-r REPO | -V) [-v] [-q]
-                {delete,del,rm,export,extractocr,imgsize,list,ls,load,mkcol,ping,update}
+usage: plastron [-h] (-r REPO | -V) [-v] [-q] [--on-behalf-of DELEGATED_USER]
+                {delete,del,rm,export,extractocr,imgsize,import,list,ls,load,mkcol,ping,update}
                 ...
 
 Batch operation tool for Fedora 4.
@@ -16,15 +16,18 @@ optional arguments:
   -V, --version         Print version and exit.
   -v, --verbose         increase the verbosity of the status output
   -q, --quiet           decrease the verbosity of the status output
+  --on-behalf-of DELEGATED_USER
+                        delegate repository operations to this username
 
 commands:
-  {delete,del,rm,export,extractocr,imgsize,list,ls,load,mkcol,ping,update}```
+  {delete,del,rm,export,extractocr,imgsize,import,list,ls,load,mkcol,ping,update}
+```
 
 ### Check version
 
 ```
 $ plastron --version
-3.1.0
+3.2.0rc2
 ```
 
 ## Commands
@@ -73,7 +76,7 @@ optional arguments:
 
 required arguments:
   -b BATCH, --batch BATCH
-                        path to batch configuration file              
+                        path to batch configuration file
 ```
 
 ### List (list, ls)
@@ -135,6 +138,7 @@ optional arguments:
   --completed COMPLETED
                         file recording the URIs of deleted resources
   -f FILE, --file FILE  File containing a list of URIs to delete```
+```
 
 ### Extract OCR (extractocr)
 
@@ -154,8 +158,10 @@ optional arguments:
 
 ```
 $ plastron export --help
-usage: plastron export [-h] [-o OUTPUT_FILE] -f
+usage: plastron export [-h] [-o OUTPUT_FILE | --upload-to UPLOAD_PATH]
+                       [--upload-name UPLOAD_FILENAME] -f
                        {text/turtle,turtle,ttl,text/csv,csv}
+                       [--uri-template URI_TEMPLATE]
                        [uris [uris ...]]
 
 Export resources from the repository
@@ -167,8 +173,15 @@ optional arguments:
   -h, --help            show this help message and exit
   -o OUTPUT_FILE, --output-file OUTPUT_FILE
                         File to write export package to
+  --upload-to UPLOAD_PATH
+                        Repository path to POST the export file to
+  --upload-name UPLOAD_FILENAME
+                        Used to create the download filename for the uploaded
+                        export file in the repository
   -f {text/turtle,turtle,ttl,text/csv,csv}, --format {text/turtle,turtle,ttl,text/csv,csv}
                         Export job format
+  --uri-template URI_TEMPLATE
+                        Public URI template
 ```
 
 ### Update (update)
@@ -199,9 +212,34 @@ optional arguments:
   -f FILE, --file FILE  File containing a list of URIs to update
 ```
 
+### Import (import)
+
+```
+$ plastron import --help
+usage: plastron import [-h] -m MODEL [-l LIMIT] [--validate-only]
+                       [--make-template TEMPLATE_FILE]
+                       [import_file]
+
+Import data to the repository
+
+positional arguments:
+  import_file           name of the file to import from
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -m MODEL, --model MODEL
+                        data model to use
+  -l LIMIT, --limit LIMIT
+                        limit the number of rows to read from the import file
+  --validate-only       only validate, do not do the actual import
+  --make-template TEMPLATE_FILE
+                        create a CSV template for the given model
+```
+
 ## Configuration
 
 ### Configuration Templates
+
 Templates for creating the configuration files can be found at [config/templates](../config/templates)
 
 ### Repository Configuration

@@ -1,11 +1,10 @@
-import os
-from collections import namedtuple
-
-import requests
 import logging
+import os
+import requests
 import threading
-from rdflib import Graph, URIRef
+from collections import namedtuple
 from plastron.exceptions import RESTAPIException
+from rdflib import Graph, URIRef
 
 OMIT_SERVER_MANAGED_TRIPLES = 'return=representation; omit="http://fedora.info/definitions/v4/repository#ServerManaged"'
 
@@ -20,7 +19,7 @@ class Resource(namedtuple('Resource', ['uri', 'description_uri'])):
 
 
 class Repository:
-    def __init__(self, config, ua_string=None):
+    def __init__(self, config, ua_string=None, on_behalf_of=None):
         self.endpoint = config['REST_ENDPOINT']
         self.relpath = config['RELPATH']
         self._path_stack = [self.relpath]
@@ -35,6 +34,7 @@ class Repository:
             __name__ + '.' + self.__class__.__name__
         )
         self.ua_string = ua_string
+        self.delegated_user = on_behalf_of
 
         if 'CLIENT_CERT' in config and 'CLIENT_KEY' in config:
             self.session.cert = (config['CLIENT_CERT'], config['CLIENT_KEY'])
@@ -71,14 +71,16 @@ class Repository:
             self.logger.warning("Unable to connect.")
             raise Exception("Unable to connect")
 
-    def request(self, method, url, **kwargs):
+    def request(self, method, url, headers=None, **kwargs):
+        if headers is None:
+            headers = {}
         target_uri = self._insert_transaction_uri(url)
         self.logger.debug("%s %s", method, target_uri)
         if self.ua_string is not None:
-            if 'headers' not in kwargs:
-                kwargs['headers'] = {}
-            kwargs['headers']['User-Agent'] = self.ua_string
-        response = self.session.request(method, target_uri, **kwargs)
+            headers['User-Agent'] = self.ua_string
+        if self.delegated_user is not None:
+            headers['On-Behalf-Of'] = self.delegated_user
+        response = self.session.request(method, target_uri, headers=headers, **kwargs)
         self.logger.debug("%s %s", response.status_code, response.reason)
         return response
 
@@ -149,6 +151,16 @@ class Repository:
         graph.parse(data=response.text, format='nt')
         return graph
 
+    def build_sparql_update(self, delete_graph, insert_graph):
+        # go through each graph and update subjects with transaction IDs
+        self._update_subjects_within_transaction(delete_graph)
+        self._update_subjects_within_transaction(insert_graph)
+
+        deletes = delete_graph.serialize(format='nt').decode('utf-8').strip()
+        inserts = insert_graph.serialize(format='nt').decode('utf-8').strip()
+        sparql_update = f"DELETE {{ {deletes} }} INSERT {{ {inserts} }} WHERE {{}}"
+        return sparql_update
+
     def get_transaction_endpoint(self):
         return os.path.join(self.endpoint, 'fcr:tx')
 
@@ -157,6 +169,13 @@ class Repository:
             return False
         else:
             return self.transaction.active
+
+    def _update_subjects_within_transaction(self, graph):
+        if self.in_transaction():
+            for s, p, o in graph:
+                s_txn = URIRef(self._insert_transaction_uri(str(s)))
+                graph.remove((s, p, o))
+                graph.add((s_txn, p, o))
 
     def _insert_transaction_uri(self, uri):
         if not self.in_transaction() or uri.startswith(self.transaction.uri):

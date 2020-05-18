@@ -58,18 +58,39 @@ Options in this section are identical to those in the [CLI configuration](cli.md
 
 This section configures the [STOMP] message broker (e.g., ActiveMQ).
 
-| Option |Description|
-|--------|-----------|
-|`SERVER`|The hostname and port of the STOMP server, e.g. `localhost:61613`|
+| Option            |Description|
+|-------------------|-----------|
+|`SERVER`           |Hostname and port of the STOMP server, e.g. `localhost:61613`|
+|`MESSAGE_STORE_DIR`|Path to the directory to hold the message inbox and outbox|
+|`DESTINATIONS`     |Sub-section containing queue and topic names|
 
-### `EXPORTER` section
+#### `DESTINATIONS` sub-section
 
-This section configures the exporter.
+This sub-section configures the queues and topics used.
 
-| Option                      |Description|
-|-----------------------------|-----------|
-|`EXPORT_JOBS_QUEUE`          |The name of the queue to subscribe to for receiving export job requests|
-|`EXPORT_JOBS_COMPLETED_QUEUE`|The name of the queue to publish to when an export job is complete|
-|`MESSAGE_STORE_DIR`          |Path to the directory to hold the message inbox and outbox|
+| Option         |Description|
+|----------------|-----------|
+|`JOBS`          |Name of the queue to subscribe to for receiving job requests|
+|`JOB_STATUS`    |Name of the topic to publish status updates to for running jobs|
+|`JOBS_COMPLETED`|Name of the queue to publish to when a job is complete|
+
+## STOMP Message Headers
+
+The Plastron Daemon expects the following headers to be present in messages
+received on the `JOBS` destination:
+
+* `PlastronCommand`
+* `PlastronJobId`
+
+Additional arguments for a command are sent in headers with the form `PlastronArg-{name}`.
+Many of these are specific to the command, but there is one with standard behavior across
+all commands:
+
+| Header                   | Description |
+|--------------------------|-------------|
+|`PlastronArg-on-behalf-of`|Username to delegate repository operations to|
+
+See the [messages documentation](messages.md) for details on the headers and bodies
+of the messages the Plastron Daemon emits.
 
 [STOMP]: https://stomp.github.io/

@@ -2,18 +2,16 @@ import csv
 import logging
 import os
 from collections import defaultdict
+from contextlib import contextmanager
+from plastron.exceptions import DataReadException
+from plastron.models import Issue, Letter, Poster
+from plastron.namespaces import get_manager, bibo, rdf, fedora
+from plastron.rdf import RDFObjectProperty, RDFDataProperty, Resource
+from rdflib import Literal, Graph, URIRef
 from tempfile import NamedTemporaryFile
 from urllib.parse import urlparse
 from zipfile import ZipFile
 
-from rdflib import Literal, Graph, URIRef
-
-from plastron.exceptions import DataReadException
-from plastron.models.letter import Letter
-from plastron.models.newspaper import Issue
-from plastron.models.poster import Poster
-from plastron.namespaces import get_manager, bibo, rdf, fedora
-from plastron.rdf import RDFObjectProperty, RDFDataProperty, Resource
 
 logger = logging.getLogger(__name__)
 nsm = get_manager()
@@ -25,8 +23,32 @@ MODEL_MAP = {
 }
 
 
+@contextmanager
+def ensure_binary_mode(file):
+    if 'b' not in file.mode:
+        # re-open in binary mode
+        fh = open(file.fileno(), mode=file.mode + 'b', closefd=False)
+        yield fh
+        fh.close()
+    else:
+        # file is already in binary mode
+        yield file
+
+
+@contextmanager
+def ensure_text_mode(file):
+    if 'b' in file.mode:
+        # re-open in text mode
+        fh = open(file.fileno(), mode=file.mode.replace('b', ''), closefd=False)
+        yield fh
+        fh.close()
+    else:
+        # file is already in text mode
+        yield file
+
+
 class TurtleSerializer:
-    def __init__(self, file, **kwargs):
+    def __init__(self, file):
         self.file = file
         self.content_type = 'text/turtle'
         self.file_extension = '.ttl'
@@ -36,12 +58,8 @@ class TurtleSerializer:
 
     def write(self, graph: Graph):
         graph.namespace_manager = nsm
-        if 'b' not in self.file.mode:
-            # re-open in binary mode
-            with open(self.file.fileno(), mode='wb', closefd=False) as fh:
-                graph.serialize(destination=fh, format='turtle')
-        else:
-            graph.serialize(destination=self.file, format='turtle')
+        with ensure_binary_mode(self.file) as export_file:
+            graph.serialize(destination=export_file, format='turtle')
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         pass
@@ -71,13 +89,18 @@ def write_csv_file(row_info, file):
             row_info['headers'].remove(header)
 
     # write the CSV file
-    csv_writer = csv.DictWriter(file, row_info['headers'], extrasaction='ignore')
-    csv_writer.writeheader()
-    for row in row_info['rows']:
-        csv_writer.writerow(row)
+    # file must be opened in text mode, otherwise csv complains
+    # about wanting str and not bytes
+    with ensure_text_mode(file) as csv_file:
+        csv_writer = csv.DictWriter(csv_file, row_info['headers'], extrasaction='ignore')
+        csv_writer.writeheader()
+        for row in row_info['rows']:
+            csv_writer.writerow(row)
 
 
 class CSVSerializer:
+    SYSTEM_HEADERS = ['URI', 'PUBLIC URI', 'CREATED', 'MODIFIED', 'INDEX', 'FILES']
+
     def __init__(self, file, **kwargs):
         self.file = file
         self.content_models = {}
@@ -89,7 +112,8 @@ class CSVSerializer:
         self.rows = []
         return self
 
-    SYSTEM_HEADERS = ['URI', 'PUBLIC URI', 'CREATED', 'MODIFIED', 'INDEX', 'FILES']
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.finish()
 
     def write(self, graph: Graph):
         """
@@ -124,7 +148,8 @@ class CSVSerializer:
     LANGUAGE_CODES = {name: code for code, name in LANGUAGE_NAMES.items()}
 
     DATATYPE_NAMES = {
-        URIRef('http://id.loc.gov/datatypes/edtf'): 'EDTF'
+        URIRef('http://id.loc.gov/datatypes/edtf'): 'EDTF',
+        URIRef('http://www.w3.org/2001/XMLSchema#date'): 'Date'
     }
     DATATYPE_URIS = {name: uri for uri, name in DATATYPE_NAMES.items()}
 
@@ -153,13 +178,15 @@ class CSVSerializer:
                     datatypes = set(v.datatype for v in literals if v.datatype)
 
                     for language in languages:
-                        language_header = f'{header} [{self.LANGUAGE_NAMES[language]}]'
+                        language_label = self.LANGUAGE_NAMES.get(language, language)
+                        language_header = f'{header} [{language_label}]'
                         values = [v for v in prop.values if v.language == language]
                         serialization = '|'.join(values)
                         columns[language_header].append(serialization)
                         row_info['extra_headers'][header].add(language_header)
                     for datatype in datatypes:
-                        datatype_header = f'{header} {{{self.DATATYPE_NAMES[datatype]}}}'
+                        datatype_label = self.DATATYPE_NAMES.get(datatype, datatype.n3(nsm))
+                        datatype_header = f'{header} {{{datatype_label}}}'
                         values = [v for v in prop.values if v.datatype == datatype]
                         serialization = '|'.join(values)
                         columns[datatype_header].append(serialization)
@@ -176,7 +203,10 @@ class CSVSerializer:
 
         return columns
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
+    def finish(self):
+        """
+        Writes the actual CSV or ZIP file.
+        """
         if len(self.content_models) == 0:
             logger.error("No items could be exported; skipping writing file")
         elif len(self.content_models) == 1:
@@ -184,15 +214,16 @@ class CSVSerializer:
             write_csv_file(next(iter(self.content_models.values())), file=self.file)
         else:
             # write a ZIP file containing individual CSV files
-            with ZipFile(self.file) as zip_fh:
-                for resource_class, row_info in self.content_models.items():
-                    # write the CSV file
-                    tmp = NamedTemporaryFile(mode='w', encoding='utf-8', delete=False)
-                    write_csv_file(row_info, file=tmp)
-                    tmp.close()
-                    # add the CSV file to the ZIP file
-                    zip_fh.write(tmp.name, arcname=resource_class.__name__ + '.csv')
-                    os.remove(tmp.name)
+            with ensure_binary_mode(self.file) as export_file:
+                with ZipFile(export_file, mode='w') as zip_fh:
+                    for resource_class, row_info in self.content_models.items():
+                        with NamedTemporaryFile(mode='w') as tmp:
+                            # write CSV file
+                            write_csv_file(row_info, tmp)
+                            # ensure contents are written to disk
+                            tmp.flush()
+                            # add CSV to ZIP file
+                            zip_fh.write(filename=tmp.name, arcname=resource_class.__name__ + '.csv')
             # multi-content model CSV export actually produces ZIP files
             self.content_type = 'application/zip'
             self.file_extension = '.zip'

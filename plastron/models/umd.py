@@ -1,24 +1,11 @@
-from edtf import parse_edtf
-from iso639 import is_valid639_1, is_valid639_2
 from plastron import pcdm, rdf
 from plastron.authority import LabeledThing
 from plastron.namespaces import dc, dcterms, edm
-from pyparsing import ParseException
+from plastron.validation import is_edtf_formatted, is_valid_iso639_code
 from rdflib import Namespace
 
+
 umdtype = Namespace('http://vocab.lib.umd.edu/datatype#')
-
-
-def is_edtf_formatted(value):
-    try:
-        parse_edtf(value)
-        return True
-    except ParseException:
-        return False
-
-
-def is_valid_iso639_code(value):
-    return is_valid639_1(value) or is_valid639_2(value)
 
 
 @rdf.object_property('object_type', dcterms.type)

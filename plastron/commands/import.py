@@ -13,14 +13,17 @@ from plastron.exceptions import DataReadException, NoValidationRulesetException,
     ConfigException, BinarySourceNotFoundError
 from plastron.files import LocalFile, RemoteFile, ZipFile
 from plastron.http import Transaction
+from plastron.namespaces import get_manager, pcdm
 from plastron.pcdm import File, Page
 from plastron.rdf import RDFDataProperty
 from plastron.serializers import CSVSerializer
 from plastron.util import uri_or_curie
 from rdflib import URIRef, Graph, Literal
+from rdflib.util import from_n3
 from uuid import uuid4
 
 
+nsm = get_manager()
 logger = logging.getLogger(__name__)
 
 
@@ -94,7 +97,15 @@ def build_lookup_index(item, index_string):
         m = re.search(pattern, key)
         attr = m[1]
         i = int(m[2])
-        index[attr][i] = getattr(item, attr)[URIRef(item.uri + uriref)]
+        prop = getattr(item, attr)
+        try:
+            index[attr][i] = prop[URIRef(item.uri + uriref)]
+        except IndexError:
+            # need to create an object with that URI
+            obj = prop.obj_class(uri=URIRef(item.uri + uriref))
+            # TODO: what if i > 0?
+            prop.values.append(obj)
+            index[attr][i] = obj
     return index
 
 
@@ -112,14 +123,15 @@ def build_fields(fieldnames, property_attrs):
     for header in fieldnames:
         if '[' in header:
             # this field has a language tag
-            # header format is "Header Label [Language Name]"
-            m = re.search(r'^([^[]+)\s+\[(.+)\]$', header)
-            if m[1] not in property_attrs:
-                raise DataReadException(f'Unrecognized header "{header}" in import file.')
-            attrs = property_attrs[m[1]]
-            if m[2] not in CSVSerializer.LANGUAGE_CODES:
-                raise DataReadException(f'Unrecognized language "{m[2]}" in "{header}" in import file.')
-            lang_code = CSVSerializer.LANGUAGE_CODES[m[2]]
+            # header format is "Header Label [Language Label]"
+            header_label, language_label = re.search(r'^([^[]+)\s+\[(.+)\]$', header).groups()
+            try:
+                attrs = property_attrs[header_label]
+            except KeyError as e:
+                raise DataReadException(f'Unknown header "{header}" in import file.') from e
+            # if the language label isn't a name in the LANGUAGE_CODES table,
+            # assume that it is itself a language code
+            lang_code = CSVSerializer.LANGUAGE_CODES.get(language_label, language_label)
             fields[attrs].append({
                 'header': header,
                 'lang_code': lang_code,
@@ -127,14 +139,21 @@ def build_fields(fieldnames, property_attrs):
             })
         elif '{' in header:
             # this field has a datatype
-            # header format is "Header Label {Datatype Name}
-            m = re.search(r'^([^{]+)\s+{(.+)}$', header)
-            if m[1] not in property_attrs:
-                raise DataReadException(f'Unrecognized header "{header}" in import file.')
-            attrs = property_attrs[m[1]]
-            if m[2] not in CSVSerializer.DATATYPE_URIS:
-                raise DataReadException(f'Unrecognized datatype "{m[2]}" in "{header}" in import file.')
-            datatype_uri = CSVSerializer.DATATYPE_URIS[m[2]]
+            # header format is "Header Label {Datatype Label}
+            header_label, datatype_label = re.search(r'^([^{]+)\s+{(.+)}$', header).groups()
+            try:
+                attrs = property_attrs[header_label]
+            except KeyError as e:
+                raise DataReadException(f'Unknown header "{header}" in import file.') from e
+            # the datatype label should either be a key in the lookup table,
+            # or an n3-abbreviated URI of a datatype
+            try:
+                datatype_uri = CSVSerializer.DATATYPE_URIS.get(datatype_label, from_n3(datatype_label, nsm=nsm))
+                if not isinstance(datatype_uri, URIRef):
+                    raise DataReadException(f'Unknown datatype "{datatype_label}" in "{header}" in import file.')
+            except KeyError as e:
+                raise DataReadException(f'Unknown datatype "{datatype_label}" in "{header}" in import file.') from e
+
             fields[attrs].append({
                 'header': header,
                 'lang_code': None,
@@ -156,11 +175,7 @@ def build_fields(fieldnames, property_attrs):
 
 
 def validate(item):
-    try:
-        result = item.validate()
-    except NoValidationRulesetException as e:
-        logger.error(f'Unable to run validation: {e.message}')
-        raise FailureException()
+    result = item.validate()
 
     if result.is_valid():
         logger.info(f'"{item}" is valid')
@@ -418,7 +433,11 @@ class Command:
                     delete_graph.remove(statement)
                     insert_graph.remove(statement)
 
-            report = validate(item)
+            try:
+                report = validate(item)
+            except NoValidationRulesetException as e:
+                raise FailureException(f'Unable to run validation: {e}') from e
+
             reports.append({
                 'line': line_reference,
                 'is_valid': report.is_valid(),

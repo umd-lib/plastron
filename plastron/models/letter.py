@@ -1,6 +1,7 @@
 from plastron import rdf, pcdm
 from plastron.authority import LabeledThing
 from plastron.namespaces import bibo, dc, dcmitype, dcterms, edm, geo, rel, skos
+from plastron.validation import is_edtf_formatted
 
 
 @rdf.rdf_class(edm.Agent)
@@ -65,4 +66,49 @@ class Letter(pcdm.Object):
         'identifier': 'Identifier',
         'recipient.label': 'Recipient',
         'author.label': 'Author'
+    }
+    VALIDATION_RULESET = {
+        'author': {
+            'min_values': 1
+        },
+        'recipient': {
+            'min_values': 1
+        },
+        'part_of': {
+            'exactly': 1
+        },
+        'place': {
+            'min_values': 1
+        },
+        'subject': {
+            'min_values': 1
+        },
+        'rights': {
+            'exactly': 1
+        },
+        'identifier': {
+            'min_values': 1
+        },
+        'type': {
+            'exactly': 1
+        },
+        'date': {
+            'exactly': 1,
+            'function': is_edtf_formatted
+        },
+        'language': {
+            'exactly': 1
+        },
+        'description': {
+            'exactly': 1
+        },
+        'bibliographic_citation': {
+            'exactly': 1
+        },
+        'extent': {
+            'exactly': 1
+        },
+        'rights_holder': {
+            'exactly': 1
+        },
     }

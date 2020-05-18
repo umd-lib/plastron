@@ -30,7 +30,7 @@ rel       = Namespace('http://id.loc.gov/vocabulary/relators/')
 sc        = Namespace('http://www.shared-canvas.org/ns/')
 skos      = Namespace('http://www.w3.org/2004/02/skos/core#')
 umdaccess = Namespace('http://vocab.lib.umd.edu/access#')
-xs        = Namespace('http://www.w3.org/2001/XMLSchema#')
+xsd       = Namespace('http://www.w3.org/2001/XMLSchema#')
 
 
 def get_manager(graph=None):
@@ -65,5 +65,5 @@ def get_manager(graph=None):
     m.bind('sc', sc)
     m.bind('skos', skos)
     m.bind('umdaccess', umdaccess)
-    m.bind('xs', xs)
+    m.bind('xsd', xsd)
     return m

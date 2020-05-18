@@ -27,7 +27,7 @@ commands:
 
 ```
 $ plastron --version
-3.1.0
+3.2.0rc2
 ```
 
 ## Commands

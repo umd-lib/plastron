@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 
 class CommandListener(ConnectionListener):
-    def __init__(self, broker, repo_config):
+    def __init__(self, broker, repo_config, command_config):
         self.broker = broker
         self.repo_config = repo_config
         self.queue = self.broker.destinations['JOBS']
@@ -25,6 +25,7 @@ class CommandListener(ConnectionListener):
         self.executor = ThreadPoolExecutor(thread_name_prefix=__name__)
         self.public_uri_template = self.broker.public_uri_template
         self.inbox_watcher = None
+        self.command_config = command_config
 
     def on_connected(self, headers, body):
         # first attempt to send anything in the outbox
@@ -81,8 +82,11 @@ class CommandListener(ConnectionListener):
                 if repo.delegated_user is not None:
                     logger.info(f'Running repository operations on behalf of {repo.delegated_user}')
 
-                args = command_module.parse_message(message)
-                command = command_module.Command()
+                # get the configuration options for this command
+                config = self.command_config.get(message.command.upper(), {})
+
+                command = command_module.Command(config)
+                args = command.parse_message(message)
 
                 for status in command.execute(repo, args):
                     self.broker.connection.send(

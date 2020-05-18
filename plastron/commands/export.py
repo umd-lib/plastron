@@ -1,4 +1,5 @@
 import logging
+import os
 from argparse import Namespace, FileType
 from datetime import datetime
 from distutils.util import strtobool
@@ -71,30 +72,6 @@ def configure_cli(subparsers):
     parser.set_defaults(cmd_name='export')
 
 
-def parse_message(message):
-    uris = message.body.split('\n')
-    export_format = message.args.get('format', 'text/turtle')
-    logger.info(f'Received message to initiate export job {message.job_id} containing {len(uris)} items')
-    logger.info(f'Requested export format is {export_format}')
-    upload_filename = message.args.get('name', message.job_id)
-    export_binaries = bool(strtobool(message.args.get('export-binaries', 'false')))
-    if export_binaries:
-        binaries_file = open(message.args.get('binaries-file', upload_filename + '_binaries.zip'), mode='wb')
-    else:
-        binaries_file = None
-
-    return Namespace(
-        uris=uris,
-        output_file=None,
-        upload_path='/exports',
-        upload_filename=upload_filename,
-        format=export_format,
-        uri_template=message.args.get('uri-template'),
-        export_binaries=export_binaries,
-        binaries_file=binaries_file
-    )
-
-
 def format_size(size):
     if size < 1024:
         return size, 'B'
@@ -112,12 +89,38 @@ def format_size(size):
 
 
 class Command:
-    def __init__(self):
+    def __init__(self, config):
+        self.binaries_dir = config.get('BINARIES_DIR', os.path.curdir)
+        self.exports_collection = config.get('COLLECTION', '/exports')
         self.result = None
 
     def __call__(self, *args, **kwargs):
         for _ in self.execute(*args, **kwargs):
             pass
+
+    def parse_message(self, message):
+        uris = message.body.split('\n')
+        export_format = message.args.get('format', 'text/turtle')
+        logger.info(f'Received message to initiate export job {message.job_id} containing {len(uris)} items')
+        logger.info(f'Requested export format is {export_format}')
+        upload_filename = message.args.get('name', message.job_id)
+        export_binaries = bool(strtobool(message.args.get('export-binaries', 'false')))
+        if export_binaries:
+            binaries_filename = os.path.join(self.binaries_dir, upload_filename + '_binaries.zip')
+            binaries_file = open(binaries_filename, mode='wb')
+        else:
+            binaries_file = None
+
+        return Namespace(
+            uris=uris,
+            output_file=None,
+            upload_path=self.exports_collection,
+            upload_filename=upload_filename,
+            format=export_format,
+            uri_template=message.args.get('uri-template'),
+            export_binaries=export_binaries,
+            binaries_file=binaries_file
+        )
 
     def execute(self, fcrepo, args):
         start_time = datetime.now().timestamp()

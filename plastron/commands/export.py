@@ -136,8 +136,12 @@ class Command:
         if args.output_file is None:
             args.output_file = NamedTemporaryFile(mode='w+')
 
-        if args.export_binaries and args.binaries_file is None:
-            raise FailureException('Option --export-binaries requires --binaries-file [filename]')
+        if args.export_binaries:
+            if args.binaries_file is None:
+                raise FailureException('Option --export-binaries requires --binaries-file [filename]')
+            binaries_zip = ZipFile(args.binaries_file, mode='w')
+        else:
+            binaries_zip = None
 
         logger.debug(f'Exporting to file {args.output_file.name}')
         serializer = serializer_class(args.output_file, public_uri_template=args.uri_template)
@@ -156,16 +160,15 @@ class Command:
 
                 serializer.write(obj.graph(), files=binaries)
 
-                if args.export_binaries:
-                    with ZipFile(args.binaries_file, mode='a') as zip_file:
-                        for file in binaries:
-                            response = fcrepo.head(file.uri)
-                            modified = parsedate(response.headers['Last-Modified'])
-                            info = ZipInfo(filename=str(file.filename), date_time=modified[:6])
-                            logger.info(f'Adding {info.filename} to zip file')
-                            with zip_file.open(info, mode='w') as binary:
-                                for chunk in file.source.data():
-                                    binary.write(chunk)
+                if binaries is not None:
+                    for file in binaries:
+                        response = fcrepo.head(file.uri)
+                        modified = parsedate(response.headers['Last-Modified'])
+                        info = ZipInfo(filename=str(file.filename), date_time=modified[:6])
+                        logger.info(f'Adding {info.filename} to zip file')
+                        with binaries_zip.open(info, mode='w') as binary:
+                            for chunk in file.source.data():
+                                binary.write(chunk)
                 count += 1
 
             except DataReadException as e:

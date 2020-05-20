@@ -1,13 +1,17 @@
 import logging
+import os
 from argparse import Namespace, FileType
 from datetime import datetime
+from distutils.util import strtobool
+from email.utils import parsedate
 from plastron import pcdm
-from plastron.exceptions import FailureException, DataReadException
+from plastron.exceptions import FailureException, DataReadException, RESTAPIException
 from plastron.namespaces import get_manager
+from plastron.pcdm import Object
 from plastron.serializers import SERIALIZER_CLASSES
 from plastron.files import LocalFile
 from tempfile import NamedTemporaryFile
-from time import sleep
+from zipfile import ZipFile, ZipInfo
 
 logger = logging.getLogger(__name__)
 nsm = get_manager()
@@ -50,6 +54,17 @@ def configure_cli(subparsers):
         action='store'
     )
     parser.add_argument(
+        '--export-binaries',
+        help='Export binaries in addition to the metadata. Requires --binaries-file to be present',
+        action='store_true'
+    )
+    parser.add_argument(
+        '--binaries-file',
+        help='File to write exported binaries to',
+        type=FileType('wb'),
+        action='store'
+    )
+    parser.add_argument(
         'uris',
         nargs='*',
         help='URIs of repository objects to export'
@@ -57,29 +72,55 @@ def configure_cli(subparsers):
     parser.set_defaults(cmd_name='export')
 
 
-def parse_message(message):
-    uris = message.body.split('\n')
-    export_format = message.args.get('format', 'text/turtle')
-    logger.info(f'Received message to initiate export job {message.job_id} containing {len(uris)} items')
-    logger.info(f'Requested export format is {export_format}')
-
-    return Namespace(
-        uris=uris,
-        output_file=None,
-        upload_path='/exports',
-        upload_filename=message.args.get('name', message.job_id),
-        format=export_format,
-        uri_template=message.args.get('uri-template')
-    )
+def format_size(size):
+    if size < 1024:
+        return size, 'B'
+    size /= 1024
+    if size < 1024:
+        return size, 'KB'
+    size /= 1024
+    if size < 1024:
+        return size, 'MB'
+    size /= 1024
+    if size < 2014:
+        return size, 'GB'
+    size /= 2014
+    return size, 'TB'
 
 
 class Command:
-    def __init__(self):
+    def __init__(self, config):
+        self.binaries_dir = config.get('BINARIES_DIR', os.path.curdir)
+        self.exports_collection = config.get('COLLECTION', '/exports')
         self.result = None
 
     def __call__(self, *args, **kwargs):
         for _ in self.execute(*args, **kwargs):
             pass
+
+    def parse_message(self, message):
+        uris = message.body.split('\n')
+        export_format = message.args.get('format', 'text/turtle')
+        logger.info(f'Received message to initiate export job {message.job_id} containing {len(uris)} items')
+        logger.info(f'Requested export format is {export_format}')
+        upload_filename = message.args.get('name', message.job_id)
+        export_binaries = bool(strtobool(message.args.get('export-binaries', 'false')))
+        if export_binaries:
+            binaries_filename = os.path.join(self.binaries_dir, upload_filename + '_binaries.zip')
+            binaries_file = open(binaries_filename, mode='wb')
+        else:
+            binaries_file = None
+
+        return Namespace(
+            uris=uris,
+            output_file=None,
+            upload_path=self.exports_collection,
+            upload_filename=upload_filename,
+            format=export_format,
+            uri_template=message.args.get('uri-template'),
+            export_binaries=export_binaries,
+            binaries_file=binaries_file
+        )
 
     def execute(self, fcrepo, args):
         start_time = datetime.now().timestamp()
@@ -95,46 +136,66 @@ class Command:
         if args.output_file is None:
             args.output_file = NamedTemporaryFile(mode='w+')
 
-        logger.debug(f'Exporting to file {args.output_file.name}')
-        with serializer_class(args.output_file, public_uri_template=args.uri_template) as serializer:
-            for uri in args.uris:
-                r = fcrepo.head(uri)
-                if r.status_code == 200:
-                    # do export
-                    if 'describedby' in r.links:
-                        # the resource is a binary, get the RDF description URI
-                        rdf_uri = r.links['describedby']['url']
-                    else:
-                        rdf_uri = uri
-                    logger.info(f'Exporting item {count + 1}/{total}: {uri}')
-                    graph = fcrepo.get_graph(rdf_uri)
-                    try:
-                        serializer.write(graph)
-                        count += 1
-                    except DataReadException as e:
-                        # log the failure, but continue to attempt to export the rest of the URIs
-                        logger.error(f'Export of {uri} failed: {e}')
-                        errors += 1
-                    sleep(1)
-                else:
-                    # log the failure, but continue to attempt to export the rest of the URIs
-                    logger.error(f'Unable to retrieve {uri}')
-                    errors += 1
+        if args.export_binaries:
+            if args.binaries_file is None:
+                raise FailureException('Option --export-binaries requires --binaries-file [filename]')
+            binaries_zip = ZipFile(args.binaries_file, mode='w')
+        else:
+            binaries_zip = None
 
-                # update the status
-                now = datetime.now().timestamp()
-                yield {
-                    'time': {
-                        'started': start_time,
-                        'now': now,
-                        'elapsed': now - start_time
-                    },
-                    'count': {
-                        'total': total,
-                        'exported': count,
-                        'errors': errors
-                    }
+        logger.debug(f'Exporting to file {args.output_file.name}')
+        serializer = serializer_class(args.output_file, public_uri_template=args.uri_template)
+        for uri in args.uris:
+            try:
+                logger.info(f'Exporting item {count + 1}/{total}: {uri}')
+                obj = Object.from_repository(fcrepo, uri=uri)
+                if args.export_binaries:
+                    logger.info(f'Gathering binaries for {uri}')
+                    binaries = list(obj.gather_files(fcrepo))
+                    total_size = sum(int(file.size[0]) for file in binaries)
+                    size, unit = format_size(total_size)
+                    logger.info(f'Total size of binaries: {round(size, 2)} {unit}')
+                else:
+                    binaries = None
+
+                serializer.write(obj.graph(), files=binaries)
+
+                if binaries is not None:
+                    for file in binaries:
+                        response = fcrepo.head(file.uri)
+                        modified = parsedate(response.headers['Last-Modified'])
+                        info = ZipInfo(filename=str(file.filename), date_time=modified[:6])
+                        logger.info(f'Adding {info.filename} to zip file')
+                        with binaries_zip.open(info, mode='w') as binary:
+                            for chunk in file.source.data():
+                                binary.write(chunk)
+                count += 1
+
+            except DataReadException as e:
+                # log the failure, but continue to attempt to export the rest of the URIs
+                logger.error(f'Export of {uri} failed: {e}')
+                errors += 1
+            except RESTAPIException as e:
+                # log the failure, but continue to attempt to export the rest of the URIs
+                logger.error(f'Unable to retrieve {uri}: {e}')
+                errors += 1
+
+            # update the status
+            now = datetime.now().timestamp()
+            yield {
+                'time': {
+                    'started': start_time,
+                    'now': now,
+                    'elapsed': now - start_time
+                },
+                'count': {
+                    'total': total,
+                    'exported': count,
+                    'errors': errors
                 }
+            }
+
+        serializer.finish()
 
         logger.info(f'Exported {count} of {total} items')
 

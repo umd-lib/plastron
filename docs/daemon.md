@@ -74,6 +74,19 @@ This sub-section configures the queues and topics used.
 |`JOB_STATUS`    |Name of the topic to publish status updates to for running jobs|
 |`JOBS_COMPLETED`|Name of the queue to publish to when a job is complete|
 
+### `COMMANDS` section
+
+This section configures options for specific commands.
+
+#### `EXPORT` sub-section
+
+Options for the export command.
+
+| Option       |Description|
+|--------------|-----------|
+|`BINARIES_DIR`|Directory to store exported binaries ZIP packages|
+|`COLLECTION`  |Repository collection to store metadata exports|
+
 ## STOMP Message Headers
 
 The Plastron Daemon expects the following headers to be present in messages

@@ -1,7 +1,5 @@
-
 import plastron.validation.rules
 import sys
-from copy import copy
 from plastron.exceptions import NoValidationRulesetException
 from plastron.namespaces import rdf
 from plastron.validation import ResourceValidationResult
@@ -9,15 +7,6 @@ from rdflib import Graph, URIRef, Literal
 
 # alias the rdflib Namespace
 ns = rdf
-
-
-def init_class_attr(cls, name, default):
-    if hasattr(cls, name):
-        # there's a attribute set somewhere in the inheritance hierarchy
-        # copy it as the basis for this class's instance of that attribute
-        setattr(cls, name, copy(getattr(cls, name)))
-    else:
-        setattr(cls, name, default)
 
 
 def rdf_class(*types):
@@ -33,23 +22,30 @@ class Meta(type):
     def __new__(mcs, name, bases, dct):
         cls = super().__new__(mcs, name, bases, dct)
         # name and URI to property type class lookups
-        init_class_attr(cls, 'name_to_prop', {})
-        init_class_attr(cls, 'uri_to_prop', {})
+        cls.name_to_prop = {}
+        cls.uri_to_prop = {}
         # list of property type classes for this class
-        init_class_attr(cls, 'prop_types', [])
+        cls.prop_types = []
         # RDF types
-        init_class_attr(cls, 'rdf_types', set())
+        cls.rdf_types = set()
+        # copy values from all base classes
+        for base in bases:
+            cls.name_to_prop.update(base.name_to_prop)
+            cls.uri_to_prop.update(base.uri_to_prop)
+            cls.prop_types.extend(base.prop_types)
+            cls.rdf_types.update(base.rdf_types)
         return cls
 
 
-class RDFProperty(object):
+class RDFProperty:
     uri = None
 
     def __init__(self):
         self.values = []
 
     def append(self, other):
-        self.values.append(other)
+        if other not in self.values:
+            self.values.append(other)
 
     def update(self, new_values):
         # take the set differences to find deleted and inserted values
@@ -102,7 +98,10 @@ class RDFObjectProperty(RDFProperty):
             for obj in self.values:
                 if obj.uri == item:
                     return obj
-        raise IndexError(f'Cannot find object by URI {item}')
+            else:
+                raise IndexError(f'Cannot find object by URI {item}')
+        else:
+            return super().__getitem__(item)
 
     def append_new(self, **kwargs):
         obj = self.obj_class(**kwargs)
@@ -120,6 +119,26 @@ class RDFObjectProperty(RDFProperty):
 
 def data_property(name, uri, datatype=None):
     def add_property(cls):
+        cls.add_data_property(name, uri, datatype)
+        return cls
+    return add_property
+
+
+def object_property(name, uri, embed=False, obj_class=None):
+    def add_property(cls):
+        cls.add_object_property(name, uri, embed, obj_class)
+        return cls
+    return add_property
+
+
+@object_property('rdf_type', rdf.type)
+class Resource(metaclass=Meta):
+    @classmethod
+    def from_graph(cls, graph, subject=''):
+        return cls(uri=subject).read(graph)
+
+    @classmethod
+    def add_data_property(cls, name, uri, datatype=None):
         type_name = f'{cls.__name__}.{name}'
         prop_type = type(type_name, (RDFDataProperty,), {
             'name': name,
@@ -129,13 +148,9 @@ def data_property(name, uri, datatype=None):
         cls.name_to_prop[name] = prop_type
         cls.uri_to_prop[uri, datatype] = prop_type
         cls.prop_types.append(prop_type)
-        return cls
 
-    return add_property
-
-
-def object_property(name, uri, embed=False, obj_class=None):
-    def add_property(cls):
+    @classmethod
+    def add_object_property(cls, name, uri, embed=False, obj_class=None):
         type_name = f'{cls.__name__}.{name}'
         prop_type = type(type_name, (RDFObjectProperty,), {
             'name': name,
@@ -147,15 +162,6 @@ def object_property(name, uri, embed=False, obj_class=None):
         # object properties never have datatypes
         cls.uri_to_prop[uri, None] = prop_type
         cls.prop_types.append(prop_type)
-        return cls
-    return add_property
-
-
-@object_property('rdf_type', rdf.type)
-class Resource(metaclass=Meta):
-    @classmethod
-    def from_graph(cls, graph, subject=''):
-        return cls(uri=subject).read(graph)
 
     def __init__(self, uri=None, **kwargs):
         if uri is None:
@@ -179,6 +185,13 @@ class Resource(metaclass=Meta):
             datatype = o.datatype if isinstance(o, Literal) else None
             if (p, datatype) in self.uri_to_prop:
                 prop_type = self.uri_to_prop[p, datatype]
+            elif (p, None) in self.uri_to_prop:
+                # fall back to a untyped property
+                prop_type = self.uri_to_prop[p, None]
+            else:
+                prop_type = None
+
+            if prop_type is not None:
                 if issubclass(prop_type, RDFObjectProperty) and prop_type.obj_class is not None:
                     obj = prop_type.obj_class(uri=o)
                     # recursively read embedded objects whose triples should be part of the same graph

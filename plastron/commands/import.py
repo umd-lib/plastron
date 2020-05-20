@@ -13,7 +13,7 @@ from plastron.exceptions import DataReadException, NoValidationRulesetException,
     ConfigException, BinarySourceNotFoundError
 from plastron.files import LocalFile, RemoteFile, ZipFile
 from plastron.http import Transaction
-from plastron.namespaces import get_manager, pcdm
+from plastron.namespaces import get_manager
 from plastron.pcdm import File, Page
 from plastron.rdf import RDFDataProperty
 from plastron.serializers import CSVSerializer
@@ -230,35 +230,35 @@ def add_files(item, filenames, base_location, access=None):
             proxy.rdf_type.append(access)
 
 
-def parse_message(message):
-    access = message.args.get('access')
-    message.body = message.body.encode('utf-8').decode('utf-8-sig')
-    if access is not None:
-        try:
-            access_uri = uri_or_curie(access)
-        except ArgumentTypeError as e:
-            raise FailureException(f'PlastronArg-access {e}')
-    else:
-        access_uri = None
-    return Namespace(
-        model=message.args.get('model'),
-        limit=message.args.get('limit', None),
-        validate_only=message.args.get('validate-only', False),
-        import_file=io.StringIO(message.body),
-        template_file=None,
-        access=access_uri,
-        member_of=message.args.get('member-of'),
-        binaries_location=message.args.get('binaries-location')
-    )
-
-
 class Command:
-    def __init__(self):
+    def __init__(self, _config):
         self.result = None
 
     def __call__(self, *args, **kwargs):
         for _ in self.execute(*args, **kwargs):
             pass
+
+    @staticmethod
+    def parse_message(message):
+        access = message.args.get('access')
+        message.body = message.body.encode('utf-8').decode('utf-8-sig')
+        if access is not None:
+            try:
+                access_uri = uri_or_curie(access)
+            except ArgumentTypeError as e:
+                raise FailureException(f'PlastronArg-access {e}')
+        else:
+            access_uri = None
+        return Namespace(
+            model=message.args.get('model'),
+            limit=message.args.get('limit', None),
+            validate_only=message.args.get('validate-only', False),
+            import_file=io.StringIO(message.body),
+            template_file=None,
+            access=access_uri,
+            member_of=message.args.get('member-of'),
+            binaries_location=message.args.get('binaries-location')
+        )
 
     def execute(self, repo, args):
         start_time = datetime.now().timestamp()

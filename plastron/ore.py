@@ -1,12 +1,11 @@
 from plastron import ldp, rdf
+from plastron.http import Repository
 from plastron.namespaces import dcterms, iana, ore
 
 # alias the rdflib Namespace
 ns = ore
 
 
-@rdf.object_property('prev', iana.prev)
-@rdf.object_property('next', iana.next)
 @rdf.object_property('proxy_for', ore.proxyFor)
 @rdf.object_property('proxy_in', ore.proxyIn)
 @rdf.data_property('title', dcterms.title)
@@ -15,9 +14,19 @@ class Proxy(ldp.Resource):
     pass
 
 
-@rdf.object_property('first', iana.first)
-@rdf.object_property('last', iana.last)
+# add these after the class definition, so Proxy can refer to itself
+Proxy.add_object_property('prev', iana.prev, obj_class=Proxy)
+Proxy.add_object_property('next', iana.next, obj_class=Proxy)
+
+
+@rdf.object_property('first', iana.first, obj_class=Proxy)
+@rdf.object_property('last', iana.last, obj_class=Proxy)
 class Aggregation(ldp.Resource):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.first = []
+        self.last = []
+
     def append(self, proxy):
         if len(self.first) == 0:
             self.first = proxy
@@ -39,26 +48,53 @@ class Aggregation(ldp.Resource):
             proxy_in=self
         ))
 
-    def __iter__(self):
-        if len(self.first) == 0:
-            # no members of the aggregation
-            self.next = None
-        else:
-            self.next = self.first.values[0]
-        return self
+    def load_proxies(self, repository: Repository):
+        """
+        Returns an AggregationIterator over the resources in this aggregation,
+        fully filled in with data from the given repository.
+        """
+        return AggregationIterator(self, repository)
 
-    def __next__(self):
-        if self.next is None:
-            raise StopIteration()
-        current = self.next
-        try:
-            self.next = current.next.values[0]
-        except IndexError:
-            # we have reached the last item of the aggregation
-            # set next to None so the iterator will stop on the next iteration
-            self.next = None
-        return current
+    def __iter__(self):
+        """
+        Returns an AggregationIterator over the resources in this aggregation,
+        without any further calls to a repository.
+        """
+        return AggregationIterator(self)
 
     def create_proxies(self, repository):
         for proxy in self:
             proxy.create_object(repository)
+
+
+class AggregationIterator:
+    """
+    Iterator over the resources in an aggregation. If a repository is
+    specified, then before each resource is returned, its metadata is
+    retrieved from that repository.
+    """
+    def __init__(self, aggregation: Aggregation, repository: Repository = None):
+        self.aggregation = aggregation
+        self.repository = repository
+        if len(self.aggregation.first) == 0:
+            # no members of the aggregation
+            self.next_proxy = None
+        else:
+            self.next_proxy = self.aggregation.first.values[0]
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        if self.next_proxy is None:
+            raise StopIteration()
+        current_proxy = self.next_proxy
+        if self.repository is not None:
+            current_proxy.load(self.repository)
+        try:
+            self.next_proxy = current_proxy.next.values[0]
+        except IndexError:
+            # we have reached the last item of the aggregation
+            # set next to None so the iterator will stop on the next iteration
+            self.next_proxy = None
+        return current_proxy

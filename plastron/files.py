@@ -3,10 +3,10 @@ import logging
 import mimetypes
 import zipfile
 from os.path import basename
-from paramiko import SSHClient, SFTPClient
-from paramiko.config import SSH_PORT
+from paramiko import SFTPClient
 from plastron.exceptions import BinarySourceNotFoundError, RESTAPIException
 from plastron.namespaces import dcterms, ebucore
+from plastron.util import get_ssh_client
 from rdflib import URIRef
 from urllib.parse import urlsplit
 
@@ -110,13 +110,7 @@ class RemoteFile(BinarySource):
 
     def ssh(self):
         if self.ssh_client is None:
-            self.ssh_client = SSHClient()
-            self.ssh_client.load_system_host_keys()
-            self.ssh_client.connect(
-                hostname=self.sftp_uri.hostname,
-                username=self.sftp_uri.username,
-                port=self.sftp_uri.port or SSH_PORT
-            )
+            self.ssh_client = get_ssh_client(self.sftp_uri)
         return self.ssh_client
 
     def sftp(self):

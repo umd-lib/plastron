@@ -4,14 +4,18 @@ from argparse import Namespace, FileType
 from datetime import datetime
 from distutils.util import strtobool
 from email.utils import parsedate
+from paramiko import SFTPClient
 from plastron import pcdm
 from plastron.exceptions import FailureException, DataReadException, RESTAPIException
+from plastron.files import LocalFile
 from plastron.namespaces import get_manager
 from plastron.pcdm import Object
 from plastron.serializers import SERIALIZER_CLASSES
-from plastron.files import LocalFile
+from plastron.util import get_ssh_client
 from tempfile import NamedTemporaryFile
+from urllib.parse import urlsplit
 from zipfile import ZipFile, ZipInfo
+
 
 logger = logging.getLogger(__name__)
 nsm = get_manager()
@@ -90,7 +94,7 @@ def format_size(size):
 
 class Command:
     def __init__(self, config):
-        self.binaries_dir = config.get('BINARIES_DIR', os.path.curdir)
+        self.binaries_dest = config.get('BINARIES_DEST', os.path.curdir)
         self.exports_collection = config.get('COLLECTION', '/exports')
         self.result = None
 
@@ -106,8 +110,18 @@ class Command:
         upload_filename = message.args.get('name', message.job_id)
         export_binaries = bool(strtobool(message.args.get('export-binaries', 'false')))
         if export_binaries:
-            binaries_filename = os.path.join(self.binaries_dir, upload_filename + '_binaries.zip')
-            binaries_file = open(binaries_filename, mode='wb')
+            binaries_filename = upload_filename + '_binaries.zip'
+            logger.info(f'Binaries will be saved to {os.path.join(self.binaries_dest, binaries_filename)}')
+            if self.binaries_dest.startswith('sftp:'):
+                # remote (SFTP) destination
+                sftp_uri = urlsplit(self.binaries_dest)
+                ssh_client = get_ssh_client(sftp_uri)
+                sftp_client = SFTPClient.from_transport(ssh_client.get_transport())
+                binaries_file = sftp_client.open(os.path.join(sftp_uri.path, binaries_filename), mode='wb')
+            else:
+                # assume a local directory
+                binaries_filename = os.path.join(self.binaries_dest, binaries_filename)
+                binaries_file = open(binaries_filename, mode='wb')
         else:
             binaries_file = None
 

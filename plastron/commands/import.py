@@ -5,9 +5,10 @@ import os
 import plastron.models
 import re
 from argparse import FileType, Namespace, ArgumentTypeError
-from collections import defaultdict
+from collections import OrderedDict, defaultdict
 from datetime import datetime
 from operator import attrgetter
+from os.path import basename, splitext
 from plastron import rdf
 from plastron.exceptions import DataReadException, NoValidationRulesetException, RESTAPIException, FailureException, \
     ConfigException, BinarySourceNotFoundError
@@ -211,27 +212,43 @@ def get_source(base_location, path):
         return LocalFile(localpath=os.path.join(base_location, path))
 
 
-def add_files(item, filenames, base_location, access=None):
+def build_file_groups(filenames_string):
+    file_groups = OrderedDict()
+    for filename in filenames_string.split(';'):
+        root, ext = splitext(basename(filename))
+        if root not in file_groups:
+            file_groups[root] = []
+        file_groups[root].append(filename)
+    logger.debug(f'Found {len(file_groups.keys())} unique file basename(s)')
+    return file_groups
+
+
+def add_files(item, file_groups, base_location, access=None):
     if base_location is None:
         raise ConfigException('Must specify a binaries-location')
 
-    for n, filename in enumerate(filenames, 1):
-        file = File(get_source(base_location, filename), title=filename)
-        # create page objects and add a file for each
+    logger.debug(f'Creating {len(file_groups.keys())} page(s)')
+
+    for n, filenames in enumerate(file_groups.values(), 1):
+        # create a page object for each rootname
         page = Page(title=f'Page {n}', number=n)
-        page.add_file(file)
         # add to the item
         item.add_member(page)
         proxy = item.append_proxy(page, title=page.title)
         # add the access class to the page resources
         if access is not None:
-            file.rdf_type.append(access)
             page.rdf_type.append(access)
             proxy.rdf_type.append(access)
+        # add the files that are part of this page
+        for filename in filenames:
+            file = File(get_source(base_location, filename), title=filename)
+            page.add_file(file)
+            if access is not None:
+                file.rdf_type.append(access)
 
 
 class Command:
-    def __init__(self, _config):
+    def __init__(self, _config=None):
         self.result = None
 
     def __call__(self, *args, **kwargs):
@@ -475,7 +492,13 @@ class Command:
                                 item.member_of = URIRef(args.member_of)
 
                             if 'FILES' in row and row['FILES'].strip() != '':
-                                add_files(item, row['FILES'].split(';'), args.binaries_location, args.access)
+                                logger.debug('Adding pages and files to new item')
+                                add_files(
+                                    item,
+                                    build_file_groups(row['FILES']),
+                                    base_location=args.binaries_location,
+                                    access=args.access
+                                )
 
                             item.recursive_create(repo)
                             item.recursive_update(repo)
@@ -525,7 +548,7 @@ class Command:
 
         logger.info(f"Found {count['valid']} valid items")
         logger.info(f"Found {count['invalid']} invalid items")
-        logger.info(f"Found {count['error']} errors")
+        logger.info(f"Found {count['errors']} errors")
         if not args.validate_only:
             logger.info(f"{count['unchanged']} of {count['total']} items remained unchanged")
             logger.info(f"Created {count['created']} of {count['total']} items")

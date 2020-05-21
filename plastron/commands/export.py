@@ -93,7 +93,9 @@ def format_size(size):
 
 
 class Command:
-    def __init__(self, config):
+    def __init__(self, config=None):
+        if config is None:
+            config = {}
         self.binaries_dest = config.get('BINARIES_DEST', os.path.curdir)
         self.exports_collection = config.get('COLLECTION', '/exports')
         self.result = None

@@ -2,15 +2,20 @@ import csv
 import logging
 import shutil
 import sys
+import urllib
 from argparse import ArgumentTypeError
 from os.path import isfile
-from tempfile import NamedTemporaryFile
+from urllib.parse import urlsplit
+
+from paramiko import SSHClient
+from paramiko.config import SSH_PORT
 from plastron import namespaces
 from plastron.exceptions import RESTAPIException, FailureException
 from plastron.http import Transaction
 from plastron.namespaces import dcterms
 from rdflib import URIRef
 from rdflib.util import from_n3
+from tempfile import NamedTemporaryFile
 
 logger = logging.getLogger(__name__)
 
@@ -34,6 +39,21 @@ def uri_or_curie(arg):
     if not isinstance(term, URIRef):
         raise ArgumentTypeError('must be a URI or CURIE')
     return term
+
+
+def get_ssh_client(sftp_uri):
+    if isinstance(sftp_uri, str):
+        sftp_uri = urlsplit(sftp_uri)
+    if not isinstance(sftp_uri, urllib.parse.SplitResult):
+        raise TypeError('Expects a string or a urllib.parse.SplitResult')
+    ssh_client = SSHClient()
+    ssh_client.load_system_host_keys()
+    ssh_client.connect(
+        hostname=sftp_uri.hostname,
+        username=sftp_uri.username,
+        port=sftp_uri.port or SSH_PORT
+    )
+    return ssh_client
 
 
 class ResourceList:

@@ -98,6 +98,7 @@ class Command:
             config = {}
         self.binaries_dest = config.get('BINARIES_DEST', os.path.curdir)
         self.exports_collection = config.get('COLLECTION', '/exports')
+        self.ssh_private_key = config.get('SSH_PRIVATE_KEY')
         self.result = None
 
     def __call__(self, *args, **kwargs):
@@ -117,7 +118,7 @@ class Command:
             if self.binaries_dest.startswith('sftp:'):
                 # remote (SFTP) destination
                 sftp_uri = urlsplit(self.binaries_dest)
-                ssh_client = get_ssh_client(sftp_uri)
+                ssh_client = get_ssh_client(sftp_uri, key_filename=self.ssh_private_key)
                 sftp_client = SFTPClient.from_transport(ssh_client.get_transport())
                 binaries_file = sftp_client.open(os.path.join(sftp_uri.path, binaries_filename), mode='wb')
             else:

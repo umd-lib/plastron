@@ -76,7 +76,7 @@ setup(
         'lxml>3.6.0',
         'numpy',
         'paramiko',
-        'Pillow>=6.2.0',
+        'Pillow>=6.2.2',
         'pyparsing',
         'PyYAML>3.12',
         'rdflib',

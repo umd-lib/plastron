@@ -224,10 +224,21 @@ def build_file_groups(filenames_string):
 
 
 def add_files(item, file_groups, base_location, access=None):
+    """
+    Add pages and files to the given item. A page is added for each key (basename) in the file_groups
+    parameter, and a file is added for each element in the value list for that key.
+
+    :param item: PCDM Object to add the pages to.
+    :param file_groups: Dictionary of basename to filename list mappings.
+    :param base_location: Location of the files.
+    :param access: Optional RDF class representing the access level for this item.
+    :return: The number of files added.
+    """
     if base_location is None:
         raise ConfigException('Must specify a binaries-location')
 
     logger.debug(f'Creating {len(file_groups.keys())} page(s)')
+    count = 0
 
     for n, filenames in enumerate(file_groups.values(), 1):
         # create a page object for each rootname
@@ -242,9 +253,12 @@ def add_files(item, file_groups, base_location, access=None):
         # add the files that are part of this page
         for filename in filenames:
             file = File(get_source(base_location, filename), title=filename)
+            count += 1
             page.add_file(file)
             if access is not None:
                 file.rdf_type.append(access)
+
+    return count
 
 
 class Command:
@@ -313,7 +327,8 @@ class Command:
             'invalid': 0,
             'created': 0,
             'updated': 0,
-            'unchanged': 0
+            'unchanged': 0,
+            'files': 0
         }
 
         if args.import_file.seekable():
@@ -493,7 +508,7 @@ class Command:
 
                             if 'FILES' in row and row['FILES'].strip() != '':
                                 logger.debug('Adding pages and files to new item')
-                                add_files(
+                                count['files'] += add_files(
                                     item,
                                     build_file_groups(row['FILES']),
                                     base_location=args.binaries_location,

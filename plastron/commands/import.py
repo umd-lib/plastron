@@ -197,6 +197,14 @@ def parse_message(message):
     )
 
 
+def parse_value_string(value_string, column, prop_type):
+    for value in value_string.split('|'):
+        if issubclass(prop_type, RDFDataProperty):
+            yield Literal(value, lang=column['lang_code'], datatype=column['datatype'])
+        else:
+            yield URIRef(value)
+
+
 class Command:
     def __init__(self):
         self.result = None
@@ -298,25 +306,20 @@ class Command:
 
             delete_graph = Graph()
             insert_graph = Graph()
+
             for attrs, columns in fields.items():
-                prop = attrgetter(attrs)(item)
                 prop_type = get_property_type(item.__class__, attrs)
-                new_values = []
-                for column in columns:
-                    header = column['header']
-                    language_code = column['lang_code']
-                    datatype = column['datatype']
-                    values = [v for v in row[header].split('|') if len(v.strip()) > 0]
-
-                    if issubclass(prop_type, RDFDataProperty):
-                        new_values.extend(Literal(v, lang=language_code, datatype=datatype) for v in values)
-                    else:
-                        new_values = [URIRef(v) for v in values]
-
-                # construct a SPARQL update by diffing for deletions and insertions
                 if '.' not in attrs:
                     # simple, non-embedded values
+                    # attrs is the entire property name
+                    new_values = []
+                    for column in columns:
+                        header = column['header']
+                        new_values.extend(parse_value_string(row[header], column, prop_type))
+
+                    # construct a SPARQL update by diffing for deletions and insertions
                     # update the property and get the sets of values deleted and inserted
+                    prop = getattr(item, attrs)
                     deleted_values, inserted_values = prop.update(new_values)
 
                     for deleted_value in deleted_values:
@@ -331,37 +334,41 @@ class Command:
                     # correlate positions and urirefs
                     # XXX: for now, assuming only 2 levels of chaining
                     first_attr, next_attr = attrs.split('.', 2)
+                    new_values = defaultdict(list)
+                    for column in columns:
+                        header = column['header']
+                        for i, value_string in enumerate(row[header].split(';')):
+                            new_values[i].extend(parse_value_string(value_string, column, prop_type))
                     if first_attr in index:
-                        for i, new_value in enumerate(new_values):
+                        for i, values in new_values.items():
                             # get the embedded object
                             obj = index[first_attr][i]
-                            try:
-                                old_value = getattr(obj, next_attr).values[0]
-                            except IndexError:
-                                old_value = None
-                            if new_value != old_value:
-                                setattr(obj, next_attr, new_value)
-                                if old_value is not None:
-                                    delete_graph.add((obj.uri, prop.uri, prop.get_term(old_value)))
-                                insert_graph.add((obj.uri, prop.uri, prop.get_term(new_value)))
+                            prop = getattr(obj, next_attr)
+                            deleted_values, inserted_values = prop.update(values)
+
+                            for deleted_value in deleted_values:
+                                delete_graph.add((item.uri, prop.uri, prop.get_term(deleted_value)))
+                            for inserted_value in inserted_values:
+                                insert_graph.add((item.uri, prop.uri, prop.get_term(inserted_value)))
                     else:
                         # add new hash objects that are not in the index
-                        prop_type = item.name_to_prop[first_attr]
-                        for i, new_value in enumerate(new_values):
+                        first_prop_type = item.name_to_prop[first_attr]
+                        for i, values in new_values.items():
                             # we can assume that for any properties with dotted notation,
                             # all attributes except for the last one are object properties
-                            if prop_type.obj_class is not None:
+                            if first_prop_type.obj_class is not None:
                                 # create a new object
                                 # TODO: remove hardcoded UUID fragment minting
-                                obj = prop_type.obj_class(uri=f'{item.uri}#{uuid4()}')
+                                obj = first_prop_type.obj_class(uri=f'{item.uri}#{uuid4()}')
                                 # add the new object to the index
-                                index[first_attr][0] = obj
-                                setattr(obj, next_attr, new_value)
+                                index[first_attr][i] = obj
+                                setattr(obj, next_attr, values)
                                 next_attr_prop = obj.name_to_prop[next_attr]
                                 # add that object to the main item
                                 getattr(item, first_attr).append(obj)
                                 insert_graph.add((item.uri, prop_type.uri, obj.uri))
-                                insert_graph.add((obj.uri, next_attr_prop.uri, next_attr_prop.get_term(new_value)))
+                                for value in values:
+                                    insert_graph.add((obj.uri, next_attr_prop.uri, value))
 
             # do a pass to remove statements that are both deleted and then re-inserted
             for statement in delete_graph:

@@ -13,6 +13,12 @@ class InboxEventHandler(FileSystemEventHandler):
         self.command_listener = command_listener
         self.message_box = message_box
 
+    def on_created(self, event):
+        if isinstance(event, FileCreatedEvent):
+            logger.info(f"Triggering inbox processing due to {event}")
+            message = self.message_box.message_class.read(event.src_path)
+            self.command_listener.process_message(message)
+
     def on_modified(self, event):
         if isinstance(event, FileModifiedEvent):
             logger.info(f"Triggering inbox processing due to {event}")

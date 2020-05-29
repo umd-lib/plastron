@@ -469,6 +469,10 @@ class Command:
                     delete_graph.remove(statement)
                     insert_graph.remove(statement)
 
+            # count the number of files referenced in this row
+            if 'FILES' in row and row['FILES'].strip() != '':
+                count['files'] = len(row['FILES'].split(';'))
+
             try:
                 report = validate(item)
             except NoValidationRulesetException as e:
@@ -512,7 +516,7 @@ class Command:
 
                             if 'FILES' in row and row['FILES'].strip() != '':
                                 logger.debug('Adding pages and files to new item')
-                                count['files'] += add_files(
+                                add_files(
                                     item,
                                     build_file_groups(row['FILES']),
                                     base_location=args.binaries_location,

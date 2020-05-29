@@ -1,5 +1,4 @@
 import hashlib
-import logging
 import mimetypes
 import zipfile
 from os.path import basename
@@ -12,9 +11,6 @@ from urllib.parse import urlsplit
 
 
 class BinarySource(object):
-    def __init__(self):
-        self.logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
-
     def data(self):
         raise NotImplementedError()
 
@@ -32,7 +28,6 @@ class BinarySource(object):
 
 class LocalFile(BinarySource):
     def __init__(self, localpath, mimetype=None, filename=None):
-        super().__init__()
         if mimetype is None:
             mimetype = mimetypes.guess_type(localpath)[0]
         self._mimetype = mimetype
@@ -51,7 +46,6 @@ class LocalFile(BinarySource):
 
 class RepositoryFile(BinarySource):
     def __init__(self, repo, file_uri):
-        super().__init__()
         file_uri = URIRef(file_uri)
         head_res = repo.head(file_uri)
 
@@ -92,7 +86,6 @@ class RemoteFile(BinarySource):
         :param mimetype: MIME type of the file. If not given, will attempt to detect by calling
             the "file" utility over an SSH connection.
         """
-        super().__init__()
         self.ssh_client = None
         self.sftp_client = None
         self.sftp_uri = urlsplit(location)
@@ -139,18 +132,35 @@ class RemoteFile(BinarySource):
 
 
 class ZipFile(BinarySource):
+    """
+    A ZIP file containing one or more binaries.
+    """
     def __init__(self, zip_file, path, mimetype=None):
-        super().__init__()
+        """
+
+        :param zip_file: ZIP file. This may be a zipfile.ZipFile object,
+            a string filename, an SFTP URI, or a readable file-like object.
+        :param path: Path to a single binary stored within the ZIP file.
+        :param mimetype: MIME type of the single binary. If not given,
+            will attempt to guess based on the path given.
+        """
+        self.zip_filename = None
+        self.zip_sftp_uri = None
+
         if isinstance(zip_file, zipfile.ZipFile):
-            self.zip_filename = zip_file.filename
             self.zip_file = zip_file
+            self.zip_filename = zip_file.filename
         else:
-            self.zip_filename = zip_file
+            # the zip_file arg is something other than a ZipFile
+            # we delay creation of the ZipFile to avoid hitting
+            # the filesystem, network, etc., until asked to read
+            # from the zip file
             self.zip_file = None
-            try:
-                self.zip_file = zipfile.ZipFile(zip_file)
-            except FileNotFoundError as e:
-                raise BinarySourceNotFoundError(f'Zip file {zip_file} not found') from e
+            if isinstance(zip_file, str) and zip_file.startswith('sftp:'):
+                self.zip_sftp_uri = urlsplit(zip_file)
+            else:
+                self.zip_filename = zip_file
+
         self.path = path
         self.filename = basename(path)
         if mimetype is None:
@@ -158,6 +168,16 @@ class ZipFile(BinarySource):
         self._mimetype = mimetype
 
     def data(self):
+        if self.zip_file is None:
+            try:
+                if self.zip_sftp_uri is not None:
+                    # read a remote file over SFTP
+                    sftp_client = SFTPClient.from_transport(get_ssh_client(self.zip_sftp_uri).get_transport())
+                    self.zip_file = zipfile.ZipFile(sftp_client.open(self.zip_sftp_uri.path, 'r'))
+                else:
+                    self.zip_file = zipfile.ZipFile(self.zip_filename)
+            except FileNotFoundError as e:
+                raise BinarySourceNotFoundError(f'Zip file {self.zip_filename} not found') from e
         try:
             return self.zip_file.open(self.path, 'r')
         except KeyError as e:

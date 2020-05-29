@@ -71,8 +71,9 @@ def configure_cli(subparsers):
         '--binaries-location',
         help=(
             'where to find binaries; either a path to a directory, '
-            'a "zip:<path to zipfile>" URI, or an SFTP URI in the form '
-            '"sftp://<user>@<host>/<path to dir>"'
+            'a "zip:<path to zipfile>" URI, an SFTP URI in the form '
+            '"sftp://<user>@<host>/<path to dir>", or a URI in the '
+            'form "zip+sftp://<user>@<host>/<path to zipfile>"'
         ),
         action='store'
     )
@@ -198,6 +199,7 @@ def get_source(base_location, path):
     :param base_location: The following forms are recognized:
         "zip:<path to zipfile>"
         "sftp:<user>@<host>/<path to dir>"
+        "zip+sftp:<user>@<host>/<path to zipfile>"
         "<local dir path>"
     :param path:
     :return:
@@ -206,6 +208,8 @@ def get_source(base_location, path):
         return ZipFile(base_location[4:], path)
     elif base_location.startswith('sftp:'):
         return RemoteFile(os.path.join(base_location, path))
+    elif base_location.startswith('zip+sftp:'):
+        return ZipFile(base_location[4:], path)
     else:
         # with no URI prefix, assume a local file path
         return LocalFile(localpath=os.path.join(base_location, path))
@@ -213,6 +217,8 @@ def get_source(base_location, path):
 
 def build_file_groups(filenames_string):
     file_groups = OrderedDict()
+    if filenames_string.strip() == '':
+        return file_groups
     for filename in filenames_string.split(';'):
         root, ext = splitext(basename(filename))
         if root not in file_groups:
@@ -543,7 +549,7 @@ class Command:
                         else:
                             updated_uris.append(item.uri)
 
-                    except (RESTAPIException, ConfigException, BinarySourceNotFoundError) as e:
+                    except (RESTAPIException, ConfigException, FailureException, BinarySourceNotFoundError) as e:
                         count['errors'] += 1
                         logger.error(f'{item} import failed: {e}')
                         txn.rollback()

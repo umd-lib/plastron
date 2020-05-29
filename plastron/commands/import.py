@@ -471,7 +471,7 @@ class Command:
 
             # count the number of files referenced in this row
             if 'FILES' in row and row['FILES'].strip() != '':
-                count['files'] = len(row['FILES'].split(';'))
+                count['files'] += len(row['FILES'].split(';'))
 
             try:
                 report = validate(item)

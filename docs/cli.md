@@ -241,8 +241,9 @@ optional arguments:
                         URI of the object that new items are PCDM members of
   --binaries-location BINARIES_LOCATION
                         where to find binaries; either a path to a directory,
-                        a "zip:<path to zipfile>" URI, or an SFTP URI in the
-                        form "sftp://<user>@<host>/<path to dir>"
+                        a "zip:<path to zipfile>" URI, an SFTP URI in the form
+                        "sftp://<user>@<host>/<path to dir>", or a URI in the
+                        form "zip+sftp://<user>@<host>/<path to zipfile>"
 ```
 
 ## Configuration

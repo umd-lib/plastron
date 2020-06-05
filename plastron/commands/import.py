@@ -192,29 +192,6 @@ def validate(item):
     return result
 
 
-def get_source(base_location, path):
-    """
-    Get an appropriate BinarySource based on the type of base_location.
-
-    :param base_location: The following forms are recognized:
-        "zip:<path to zipfile>"
-        "sftp:<user>@<host>/<path to dir>"
-        "zip+sftp:<user>@<host>/<path to zipfile>"
-        "<local dir path>"
-    :param path:
-    :return:
-    """
-    if base_location.startswith('zip:'):
-        return ZipFile(base_location[4:], path)
-    elif base_location.startswith('sftp:'):
-        return RemoteFile(os.path.join(base_location, path))
-    elif base_location.startswith('zip+sftp:'):
-        return ZipFile(base_location[4:], path)
-    else:
-        # with no URI prefix, assume a local file path
-        return LocalFile(localpath=os.path.join(base_location, path))
-
-
 def build_file_groups(filenames_string):
     file_groups = OrderedDict()
     if filenames_string.strip() == '':
@@ -228,44 +205,6 @@ def build_file_groups(filenames_string):
     return file_groups
 
 
-def add_files(item, file_groups, base_location, access=None):
-    """
-    Add pages and files to the given item. A page is added for each key (basename) in the file_groups
-    parameter, and a file is added for each element in the value list for that key.
-
-    :param item: PCDM Object to add the pages to.
-    :param file_groups: Dictionary of basename to filename list mappings.
-    :param base_location: Location of the files.
-    :param access: Optional RDF class representing the access level for this item.
-    :return: The number of files added.
-    """
-    if base_location is None:
-        raise ConfigException('Must specify a binaries-location')
-
-    logger.debug(f'Creating {len(file_groups.keys())} page(s)')
-    count = 0
-
-    for n, filenames in enumerate(file_groups.values(), 1):
-        # create a page object for each rootname
-        page = Page(title=f'Page {n}', number=n)
-        # add to the item
-        item.add_member(page)
-        proxy = item.append_proxy(page, title=page.title)
-        # add the access class to the page resources
-        if access is not None:
-            page.rdf_type.append(access)
-            proxy.rdf_type.append(access)
-        # add the files that are part of this page
-        for filename in filenames:
-            file = File(get_source(base_location, filename), title=filename)
-            count += 1
-            page.add_file(file)
-            if access is not None:
-                file.rdf_type.append(access)
-
-    return count
-
-
 def parse_value_string(value_string, column, prop_type):
     for value in value_string.split('|'):
         if issubclass(prop_type, RDFDataProperty):
@@ -277,12 +216,74 @@ def parse_value_string(value_string, column, prop_type):
 
 
 class Command:
-    def __init__(self, _config=None):
+    def __init__(self, config=None):
         self.result = None
+        if config is None:
+            config = {}
+        self.ssh_private_key = config.get('SSH_PRIVATE_KEY')
 
     def __call__(self, *args, **kwargs):
         for _ in self.execute(*args, **kwargs):
             pass
+
+    def get_source(self, base_location, path):
+        """
+        Get an appropriate BinarySource based on the type of base_location.
+
+        :param base_location: The following forms are recognized:
+            "zip:<path to zipfile>"
+            "sftp:<user>@<host>/<path to dir>"
+            "zip+sftp:<user>@<host>/<path to zipfile>"
+            "<local dir path>"
+        :param path:
+        :return:
+        """
+        if base_location.startswith('zip:'):
+            return ZipFile(base_location[4:], path)
+        elif base_location.startswith('sftp:'):
+            return RemoteFile(os.path.join(base_location, path), ssh_options={'key_filename': self.ssh_private_key})
+        elif base_location.startswith('zip+sftp:'):
+            return ZipFile(base_location[4:], path, ssh_options={'key_filename': self.ssh_private_key})
+        else:
+            # with no URI prefix, assume a local file path
+            return LocalFile(localpath=os.path.join(base_location, path))
+
+    def add_files(self, item, file_groups, base_location, access=None):
+        """
+        Add pages and files to the given item. A page is added for each key (basename) in the file_groups
+        parameter, and a file is added for each element in the value list for that key.
+
+        :param item: PCDM Object to add the pages to.
+        :param file_groups: Dictionary of basename to filename list mappings.
+        :param base_location: Location of the files.
+        :param access: Optional RDF class representing the access level for this item.
+        :return: The number of files added.
+        """
+        if base_location is None:
+            raise ConfigException('Must specify a binaries-location')
+
+        logger.debug(f'Creating {len(file_groups.keys())} page(s)')
+        count = 0
+
+        for n, filenames in enumerate(file_groups.values(), 1):
+            # create a page object for each rootname
+            page = Page(title=f'Page {n}', number=n)
+            # add to the item
+            item.add_member(page)
+            proxy = item.append_proxy(page, title=page.title)
+            # add the access class to the page resources
+            if access is not None:
+                page.rdf_type.append(access)
+                proxy.rdf_type.append(access)
+            # add the files that are part of this page
+            for filename in filenames:
+                file = File(self.get_source(base_location, filename), title=filename)
+                count += 1
+                page.add_file(file)
+                if access is not None:
+                    file.rdf_type.append(access)
+
+        return count
 
     @staticmethod
     def parse_message(message):
@@ -522,7 +523,7 @@ class Command:
 
                             if 'FILES' in row and row['FILES'].strip() != '':
                                 logger.debug('Adding pages and files to new item')
-                                add_files(
+                                self.add_files(
                                     item,
                                     build_file_groups(row['FILES']),
                                     base_location=args.binaries_location,

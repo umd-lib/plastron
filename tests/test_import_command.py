@@ -2,6 +2,7 @@ from importlib import import_module
 from plastron.files import LocalFile, RemoteFile, ZipFile
 
 imp = import_module('plastron.commands.import')
+cmd = imp.Command()
 
 
 def test_build_file_groups():
@@ -11,7 +12,7 @@ def test_build_file_groups():
 
 
 def test_get_source():
-    assert isinstance(imp.get_source('zip:foo.zip', 'bar.jpg'), ZipFile)
-    assert isinstance(imp.get_source('sftp://user@example.com/foo', 'bar.jpg'), RemoteFile)
-    assert isinstance(imp.get_source('zip+sftp://user@example.com/foo.zip', 'bar.jpg'), ZipFile)
-    assert isinstance(imp.get_source('/foo', 'bar'), LocalFile)
+    assert isinstance(cmd.get_source('zip:foo.zip', 'bar.jpg'), ZipFile)
+    assert isinstance(cmd.get_source('sftp://user@example.com/foo', 'bar.jpg'), RemoteFile)
+    assert isinstance(cmd.get_source('zip+sftp://user@example.com/foo.zip', 'bar.jpg'), ZipFile)
+    assert isinstance(cmd.get_source('/foo', 'bar'), LocalFile)

@@ -1,4 +1,3 @@
-import os
 import logging
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler, FileCreatedEvent, FileModifiedEvent
@@ -7,20 +6,19 @@ logger = logging.getLogger(__name__)
 
 
 class InboxEventHandler(FileSystemEventHandler):
-    """Triggers message processing when a file is added or modified in the
+    """Triggers message processing when a file is added in the
        inbox directory."""
+    # Note to maintainers: The original implementation of this class included
+    # both "on_created" and "on_modified" event handlers. On Mac OS X, new file
+    # creation only triggers the "on_created" event. On Linux, new file
+    # creation triggers both an "on_created" event and "on_modified" event,
+    # leading to duplicate processing (see LIBFCREPO-821).
     def __init__(self, command_listener, message_box):
         self.command_listener = command_listener
         self.message_box = message_box
 
     def on_created(self, event):
         if isinstance(event, FileCreatedEvent):
-            logger.info(f"Triggering inbox processing due to {event}")
-            message = self.message_box.message_class.read(event.src_path)
-            self.command_listener.process_message(message)
-
-    def on_modified(self, event):
-        if isinstance(event, FileModifiedEvent):
             logger.info(f"Triggering inbox processing due to {event}")
             message = self.message_box.message_class.read(event.src_path)
             self.command_listener.process_message(message)

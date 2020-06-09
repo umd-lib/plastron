@@ -161,7 +161,9 @@ $ plastron export --help
 usage: plastron export [-h] [-o OUTPUT_FILE | --upload-to UPLOAD_PATH]
                        [--upload-name UPLOAD_FILENAME] -f
                        {text/turtle,turtle,ttl,text/csv,csv}
-                       [--uri-template URI_TEMPLATE]
+                       [--uri-template URI_TEMPLATE] [--export-binaries]
+                       [--binaries-file BINARIES_FILE]
+                       [--binary-types BINARY_TYPES]
                        [uris [uris ...]]
 
 Export resources from the repository
@@ -182,6 +184,12 @@ optional arguments:
                         Export job format
   --uri-template URI_TEMPLATE
                         Public URI template
+  --export-binaries     Export binaries in addition to the metadata. Requires
+                        --binaries-file to be present
+  --binaries-file BINARIES_FILE
+                        File to write exported binaries to
+  --binary-types BINARY_TYPES
+                        Include only binaries with a MIME type from this list
 ```
 
 ### Update (update)

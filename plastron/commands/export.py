@@ -69,6 +69,11 @@ def configure_cli(subparsers):
         action='store'
     )
     parser.add_argument(
+        '--binary-types',
+        help='Include only binaries with a MIME type from this list',
+        action='store'
+    )
+    parser.add_argument(
         'uris',
         nargs='*',
         help='URIs of repository objects to export'
@@ -136,7 +141,8 @@ class Command:
             format=export_format,
             uri_template=message.args.get('uri-template'),
             export_binaries=export_binaries,
-            binaries_file=binaries_file
+            binaries_file=binaries_file,
+            binary_types=message.args.get('binary-types')
         )
 
     def execute(self, fcrepo, args):
@@ -153,10 +159,19 @@ class Command:
         if args.output_file is None:
             args.output_file = NamedTemporaryFile(mode='w+')
 
+        # default filter is None; in this case filter() will return
+        # all items that evaluate to true
+        mime_type_filter = None
+
         if args.export_binaries:
             if args.binaries_file is None:
                 raise FailureException('Option --export-binaries requires --binaries-file [filename]')
             binaries_zip = ZipFile(args.binaries_file, mode='w')
+            if args.binary_types is not None:
+                allowed_types = args.binary_types.split(',')
+
+                def mime_type_filter(file):
+                    return str(file.mimetype) in allowed_types
         else:
             binaries_zip = None
 
@@ -168,7 +183,7 @@ class Command:
                 obj = Object.from_repository(fcrepo, uri=uri)
                 if args.export_binaries:
                     logger.info(f'Gathering binaries for {uri}')
-                    binaries = list(obj.gather_files(fcrepo))
+                    binaries = list(filter(mime_type_filter, obj.gather_files(fcrepo)))
                     total_size = sum(int(file.size[0]) for file in binaries)
                     size, unit = format_size(total_size)
                     logger.info(f'Total size of binaries: {round(size, 2)} {unit}')

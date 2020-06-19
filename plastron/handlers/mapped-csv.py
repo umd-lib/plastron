@@ -232,7 +232,7 @@ def create_class_from_mapping(mapping, rdf_type=None):
                     datatype = from_n3(conf['datatype'], nsm=nsm)
                 else:
                     datatype = None
-                add_property = rdf.data_property(column, pred_uri, datatype=datatype)
+                add_property = rdf.data_property(column, pred_uri)
             add_property(cls)
 
     if rdf_type is not None:

@@ -221,7 +221,7 @@ class BatchItem:
 # dynamically-generated class based on column names and predicates that are
 # present in the mapping
 def create_class_from_mapping(mapping, rdf_type=None):
-    cls = type('csv', (pcdm.Item,), {})
+    cls = type('csv', (pcdm.Object,), {})
     for column, conf in mapping.items():
         if 'predicate' in conf:
             pred_uri = from_n3(conf['predicate'], nsm=nsm)
@@ -232,7 +232,7 @@ def create_class_from_mapping(mapping, rdf_type=None):
                     datatype = from_n3(conf['datatype'], nsm=nsm)
                 else:
                     datatype = None
-                add_property = rdf.data_property(column, pred_uri, datatype=datatype)
+                add_property = rdf.data_property(column, pred_uri)
             add_property(cls)
 
     if rdf_type is not None:

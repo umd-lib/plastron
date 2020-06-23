@@ -1,20 +1,21 @@
 import logging
 import os
-from argparse import Namespace, FileType
+from argparse import Namespace
+from bagit import make_bag
 from datetime import datetime
 from distutils.util import strtobool
 from email.utils import parsedate
+from os.path import basename, normpath, relpath, splitext
 from paramiko import SFTPClient
-from plastron import pcdm
 from plastron.exceptions import FailureException, DataReadException, RESTAPIException
-from plastron.files import LocalFile
 from plastron.namespaces import get_manager
 from plastron.pcdm import Object
-from plastron.serializers import SERIALIZER_CLASSES
+from plastron.serializers import EmptyItemListError, SERIALIZER_CLASSES
 from plastron.util import get_ssh_client
-from tempfile import NamedTemporaryFile
+from tempfile import TemporaryDirectory
+from time import mktime
 from urllib.parse import urlsplit
-from zipfile import ZipFile, ZipInfo
+from zipfile import ZipFile
 
 
 logger = logging.getLogger(__name__)
@@ -24,30 +25,22 @@ nsm = get_manager()
 def configure_cli(subparsers):
     parser = subparsers.add_parser(
         name='export',
-        description='Export resources from the repository'
+        description='Export resources from the repository as a BagIt bag'
     )
-    file_or_upload = parser.add_mutually_exclusive_group()
-    file_or_upload.add_argument(
-        '-o', '--output-file',
-        help='File to write export package to',
-        type=FileType('w'),
-        action='store',
-    )
-    file_or_upload.add_argument(
-        '--upload-to',
-        help='Repository path to POST the export file to',
-        dest='upload_path',
+    parser.add_argument(
+        '-o', '--output-dest',
+        help='Where to send the export. Can be a local filename or an SFTP URI',
+        required=True,
         action='store'
     )
     parser.add_argument(
-        '--upload-name',
-        help='Used to create the download filename for the uploaded export file in the repository',
-        dest='upload_filename',
+        '--key',
+        help='SSH private key file to use for SFTP connections',
         action='store'
     )
     parser.add_argument(
         '-f', '--format',
-        help='Export job format',
+        help='Format for exported metadata',
         action='store',
         choices=SERIALIZER_CLASSES.keys(),
         required=True
@@ -58,15 +51,9 @@ def configure_cli(subparsers):
         action='store'
     )
     parser.add_argument(
-        '--export-binaries',
-        help='Export binaries in addition to the metadata. Requires --binaries-file to be present',
+        '-B', '--export-binaries',
+        help='Export binaries in addition to the metadata',
         action='store_true'
-    )
-    parser.add_argument(
-        '--binaries-file',
-        help='File to write exported binaries to',
-        type=FileType('wb'),
-        action='store'
     )
     parser.add_argument(
         '--binary-types',
@@ -91,7 +78,7 @@ def format_size(size):
     if size < 1024:
         return size, 'MB'
     size /= 1024
-    if size < 2014:
+    if size < 1024:
         return size, 'GB'
     size /= 2014
     return size, 'TB'
@@ -101,8 +88,6 @@ class Command:
     def __init__(self, config=None):
         if config is None:
             config = {}
-        self.binaries_dest = config.get('BINARIES_DEST', os.path.curdir)
-        self.exports_collection = config.get('COLLECTION', '/exports')
         self.ssh_private_key = config.get('SSH_PRIVATE_KEY')
         self.result = None
 
@@ -115,34 +100,16 @@ class Command:
         export_format = message.args.get('format', 'text/turtle')
         logger.info(f'Received message to initiate export job {message.job_id} containing {len(uris)} items')
         logger.info(f'Requested export format is {export_format}')
-        upload_filename = message.args.get('name', message.job_id)
         export_binaries = bool(strtobool(message.args.get('export-binaries', 'false')))
-        if export_binaries:
-            binaries_filename = upload_filename + '_binaries.zip'
-            logger.info(f'Binaries will be saved to {os.path.join(self.binaries_dest, binaries_filename)}')
-            if self.binaries_dest.startswith('sftp:'):
-                # remote (SFTP) destination
-                sftp_uri = urlsplit(self.binaries_dest)
-                ssh_client = get_ssh_client(sftp_uri, key_filename=self.ssh_private_key)
-                sftp_client = SFTPClient.from_transport(ssh_client.get_transport())
-                binaries_file = sftp_client.open(os.path.join(sftp_uri.path, binaries_filename), mode='wb')
-            else:
-                # assume a local directory
-                binaries_filename = os.path.join(self.binaries_dest, binaries_filename)
-                binaries_file = open(binaries_filename, mode='wb')
-        else:
-            binaries_file = None
 
         return Namespace(
             uris=uris,
-            output_file=None,
-            upload_path=self.exports_collection,
-            upload_filename=upload_filename,
+            output_dest=message.args.get('output-dest'),
             format=export_format,
             uri_template=message.args.get('uri-template'),
             export_binaries=export_binaries,
-            binaries_file=binaries_file,
-            binary_types=message.args.get('binary-types')
+            binary_types=message.args.get('binary-types'),
+            key=self.ssh_private_key
         )
 
     def execute(self, fcrepo, args):
@@ -156,27 +123,23 @@ class Command:
             logger.error(f'Unknown format: {args.format}')
             raise FailureException()
 
-        if args.output_file is None:
-            args.output_file = NamedTemporaryFile(mode='w+')
-
-        # default filter is None; in this case filter() will return
-        # all items that evaluate to true
-        mime_type_filter = None
-
-        if args.export_binaries:
-            if args.binaries_file is None:
-                raise FailureException('Option --export-binaries requires --binaries-file [filename]')
-            binaries_zip = ZipFile(args.binaries_file, mode='w')
-            if args.binary_types is not None:
-                allowed_types = args.binary_types.split(',')
-
-                def mime_type_filter(file):
-                    return str(file.mimetype) in allowed_types
+        if args.export_binaries and args.binary_types is not None:
+            # filter files by their MIME type
+            def mime_type_filter(file):
+                return str(file.mimetype) in args.binary_types.split(',')
         else:
-            binaries_zip = None
+            # default filter is None; in this case filter() will return
+            # all items that evaluate to true
+            mime_type_filter = None
 
-        logger.debug(f'Exporting to file {args.output_file.name}')
-        serializer = serializer_class(args.output_file, public_uri_template=args.uri_template)
+        logger.debug(f'Export destination: {args.output_dest}')
+
+        # create a bag in a temporary directory to hold exported items
+        temp_dir = TemporaryDirectory()
+        bag = make_bag(temp_dir.name)
+
+        export_dir = os.path.join(temp_dir.name, 'data')
+        serializer = serializer_class(directory=export_dir, public_uri_template=args.uri_template)
         for uri in args.uris:
             try:
                 logger.info(f'Exporting item {count + 1}/{total}: {uri}')
@@ -195,12 +158,19 @@ class Command:
                 if binaries is not None:
                     for file in binaries:
                         response = fcrepo.head(file.uri)
+                        accessed = parsedate(response.headers['Date'])
                         modified = parsedate(response.headers['Last-Modified'])
-                        info = ZipInfo(filename=str(file.filename), date_time=modified[:6])
-                        logger.info(f'Adding {info.filename} to zip file')
-                        with binaries_zip.open(info, mode='w') as binary:
+
+                        binary_filename = os.path.join(export_dir, str(file.filename))
+                        with open(binary_filename, mode='wb') as binary:
                             for chunk in file.source.data():
                                 binary.write(chunk)
+
+                        # update the atime a mtime of the file to reflect the time of the
+                        # HTTP request and the resource's last-modified time in the repo
+                        os.utime(binary_filename, times=(mktime(accessed), mktime(modified)))
+                        logger.debug(f'Copied {file.uri} to {binary.name}')
+
                 count += 1
 
             except DataReadException as e:
@@ -227,39 +197,48 @@ class Command:
                 }
             }
 
-        serializer.finish()
+        try:
+            serializer.finish()
+        except EmptyItemListError:
+            logger.error("No items could be exported; skipping writing file")
 
         logger.info(f'Exported {count} of {total} items')
 
-        download_uri = None
-        # upload to the repo if requested
-        if args.upload_path is not None:
-            if count == 0:
-                logger.warning('No items exported, skipping upload to repository')
-            else:
-                if args.upload_filename is None:
-                    args.upload_filename = 'export_' + datetime.utcnow().strftime('%Y%m%d%H%M%S')
-                filename = args.upload_filename + serializer.file_extension
-                # rewind to the beginning of the file
-                args.output_file.seek(0)
+        # save the BagIt bag to send to the output destination
+        bag.save(manifests=True)
 
-                file = pcdm.File(LocalFile(
-                    args.output_file.name,
-                    mimetype=serializer.content_type,
-                    filename=filename
-                ))
-                with fcrepo.at_path(args.upload_path):
-                    file.create_object(repository=fcrepo)
-                    download_uri = file.uri
-                    logger.info(f'Uploaded export file to {file.uri}')
+        # parse the output destination to determine where to send the export
+        if args.output_dest.startswith('sftp:'):
+            # send over SFTP to a remote host
+            sftp_uri = urlsplit(args.output_dest)
+            ssh_client = get_ssh_client(sftp_uri, key_filename=args.key)
+            sftp_client = SFTPClient.from_transport(ssh_client.get_transport())
+            root, ext = splitext(basename(sftp_uri.path))
+            destination = sftp_client.open(sftp_uri.path, mode='w')
+        else:
+            # send to a local file
+            zip_filename = args.output_dest
+            root, ext = splitext(basename(zip_filename))
+            destination = zip_filename
+
+        # write out a single ZIP file of the whole bag
+        compress_bag(bag, destination, root)
 
         self.result = {
             'content_type': serializer.content_type,
             'file_extension': serializer.file_extension,
-            'download_uri': download_uri,
             'count': {
                 'total': total,
                 'exported': count,
                 'errors': errors
             }
         }
+
+
+def compress_bag(bag, dest, root_dirname=''):
+    with ZipFile(dest, mode='w') as zip_file:
+        for dirpath, dirnames, filenames in os.walk(bag.path):
+            for name in filenames:
+                src_filename = os.path.join(dirpath, name)
+                archived_name = normpath(os.path.join(root_dirname, relpath(dirpath, start=bag.path), name))
+                zip_file.write(filename=src_filename, arcname=archived_name)

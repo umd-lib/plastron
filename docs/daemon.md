@@ -82,10 +82,9 @@ This section configures options for specific commands.
 
 Options for the export command.
 
-| Option       |Description|
-|--------------|-----------|
-|`BINARIES_DIR`|Directory to store exported binaries ZIP packages|
-|`COLLECTION`  |Repository collection to store metadata exports|
+| Option          |Description|
+|-----------------|-----------|
+|`SSH_PRIVATE_KEY`|Filename of private key to use when making SSH/SFTP connections|
 
 ## STOMP Message Headers
 

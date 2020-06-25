@@ -158,36 +158,28 @@ optional arguments:
 
 ```
 $ plastron export --help
-usage: plastron export [-h] [-o OUTPUT_FILE | --upload-to UPLOAD_PATH]
-                       [--upload-name UPLOAD_FILENAME] -f
+usage: plastron export [-h] --output-dest OUTPUT_DEST [--key KEY] -f
                        {text/turtle,turtle,ttl,text/csv,csv}
                        [--uri-template URI_TEMPLATE] [--export-binaries]
-                       [--binaries-file BINARIES_FILE]
                        [--binary-types BINARY_TYPES]
                        [uris [uris ...]]
 
-Export resources from the repository
+Export resources from the repository as a BagIt bag
 
 positional arguments:
   uris                  URIs of repository objects to export
 
 optional arguments:
   -h, --help            show this help message and exit
-  -o OUTPUT_FILE, --output-file OUTPUT_FILE
-                        File to write export package to
-  --upload-to UPLOAD_PATH
-                        Repository path to POST the export file to
-  --upload-name UPLOAD_FILENAME
-                        Used to create the download filename for the uploaded
-                        export file in the repository
+  --output-dest OUTPUT_DEST
+                        Where to send the export. Can be a local filename or
+                        an SFTP URI
+  --key KEY             SSH private key file to use for SFTP connections
   -f {text/turtle,turtle,ttl,text/csv,csv}, --format {text/turtle,turtle,ttl,text/csv,csv}
-                        Export job format
+                        Format for exported metadata
   --uri-template URI_TEMPLATE
                         Public URI template
-  --export-binaries     Export binaries in addition to the metadata. Requires
-                        --binaries-file to be present
-  --binaries-file BINARIES_FILE
-                        File to write exported binaries to
+  --export-binaries     Export binaries in addition to the metadata
   --binary-types BINARY_TYPES
                         Include only binaries with a MIME type from this list
 ```

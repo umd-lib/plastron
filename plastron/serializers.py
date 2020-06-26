@@ -118,7 +118,7 @@ class CSVSerializer:
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.finish()
 
-    def write(self, graph: Graph, files=None):
+    def write(self, graph: Graph, files=None, binaries_dir=''):
         """
         Serializes the given graph as CSV data rows.
         """
@@ -136,7 +136,7 @@ class CSVSerializer:
         row = {k: ';'.join(v) for k, v in self.flatten(resource, self.content_models[resource_class]).items()}
         row['URI'] = str(main_subject)
         if files is not None:
-            row['FILES'] = ';'.join(file.filename[0] for file in files)
+            row['FILES'] = ';'.join(os.path.join(binaries_dir, file.filename[0]) for file in files)
         row['CREATED'] = str(graph.value(main_subject, fedora.created))
         row['MODIFIED'] = str(graph.value(main_subject, fedora.lastModified))
         if self.public_uri_template is not None:

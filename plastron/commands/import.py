@@ -205,8 +205,13 @@ def build_file_groups(filenames_string):
     return file_groups
 
 
+def not_empty(value):
+    return value is not None and value != ''
+
+
 def parse_value_string(value_string, column, prop_type):
-    for value in value_string.split('|'):
+    # filter out empty strings, so we don't get spurious empty values in the properties
+    for value in filter(not_empty, value_string.split('|')):
         if issubclass(prop_type, RDFDataProperty):
             # default to the property's defined datatype
             # if it was not specified in the column header

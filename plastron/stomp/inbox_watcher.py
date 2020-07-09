@@ -21,7 +21,8 @@ class InboxEventHandler(FileSystemEventHandler):
         if isinstance(event, FileCreatedEvent):
             logger.info(f"Triggering inbox processing due to {event}")
             message = self.message_box.message_class.read(event.src_path)
-            self.command_listener.process_message(message)
+            response_handler = self.command_listener.asynchronous_response_handler(message.id)
+            self.command_listener.process_message(message, response_handler)
 
 
 class InboxWatcher:

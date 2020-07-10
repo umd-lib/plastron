@@ -102,7 +102,7 @@ class CommandListener(ConnectionListener):
                 command = command_module.Command(config)
                 args = command.parse_message(message)
 
-                for status in command.execute(repo, args):
+                for status in (command.execute(repo, args) or []):
                     self.broker.connection.send(
                         self.status_topic,
                         headers={

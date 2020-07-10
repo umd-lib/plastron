@@ -246,6 +246,22 @@ optional arguments:
                         form "zip+sftp://<user>@<host>/<path to zipfile>"
 ```
 
+### Echo (echo)
+
+```
+$ plastron echo --help
+usage: plastron echo [-h] [-e ECHO_DELAY] -b BODY
+
+Diagnostic command for echoing input to output. Primarily intended for testing
+synchronous message processing.
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -e ECHO_DELAY, --echo-delay ECHO_DELAY
+                        The amount of time to delay the reply, in seconds
+  -b BODY, --body BODY  The text to echo back
+```
+
 ## Configuration
 
 ### Configuration Templates

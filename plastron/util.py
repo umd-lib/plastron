@@ -130,7 +130,8 @@ class ResourceList:
                             logger.error('Unable to roll back transaction, aborting')
                             raise FailureException()
                 transaction.commit()
-                shutil.copyfile(self.completed_buffer.filename, self.completed.filename)
+                if self.completed and self.completed.filename:
+                    shutil.copyfile(self.completed_buffer.filename, self.completed.filename)
                 return True
         else:
             for resource, graph in self.get_resources(traverse=traverse):

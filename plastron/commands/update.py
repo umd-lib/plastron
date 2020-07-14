@@ -81,7 +81,7 @@ class Command:
         )
 
     def update_item(self, resource, graph):
-        if resource.uri in self.resources.completed:
+        if self.resources.completed and resource.uri in self.resources.completed:
             logger.info(f'Resource {resource.uri} has already been updated; skipping')
             return
         headers = {'Content-Type': 'application/sparql-update'}

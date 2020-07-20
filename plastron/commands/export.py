@@ -1,5 +1,6 @@
 import logging
 import os
+import re
 from argparse import Namespace
 from bagit import make_bag
 from datetime import datetime
@@ -20,6 +21,7 @@ from zipfile import ZipFile
 
 logger = logging.getLogger(__name__)
 nsm = get_manager()
+UUID_REGEX = re.compile(r'([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})', re.IGNORECASE)
 
 
 def configure_cli(subparsers):
@@ -143,6 +145,15 @@ class Command:
         for uri in args.uris:
             try:
                 logger.info(f'Exporting item {count + 1}/{total}: {uri}')
+
+                # derive an item-level directory name from the URI
+                # currently this is hard-coded to look for a UUID
+                # TODO: expand to other types of unique ids?
+                match = UUID_REGEX.search(uri)
+                if match is None:
+                    raise DataReadException(f'No UUID found in {uri}')
+                item_dir = match[0]
+
                 obj = Object.from_repository(fcrepo, uri=uri)
                 if args.export_binaries:
                     logger.info(f'Gathering binaries for {uri}')
@@ -153,15 +164,17 @@ class Command:
                 else:
                     binaries = None
 
-                serializer.write(obj.graph(), files=binaries)
+                serializer.write(obj.graph(), files=binaries, binaries_dir=item_dir)
 
                 if binaries is not None:
+                    binaries_dir = os.path.join(export_dir, item_dir)
+                    os.makedirs(binaries_dir, exist_ok=True)
                     for file in binaries:
                         response = fcrepo.head(file.uri)
                         accessed = parsedate(response.headers['Date'])
                         modified = parsedate(response.headers['Last-Modified'])
 
-                        binary_filename = os.path.join(export_dir, str(file.filename))
+                        binary_filename = os.path.join(binaries_dir, str(file.filename))
                         with open(binary_filename, mode='wb') as binary:
                             for chunk in file.source.data():
                                 binary.write(chunk)

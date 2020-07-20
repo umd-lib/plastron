@@ -5,7 +5,7 @@ import yaml
 from rdflib import Literal, URIRef
 from rdflib.util import from_n3
 from plastron import pcdm, namespaces, rdf
-from plastron.util import LocalFile, RemoteFile
+from plastron.files import LocalFile, RemoteFile
 from plastron.exceptions import ConfigException
 from collections import OrderedDict
 
@@ -221,7 +221,7 @@ class BatchItem:
 # dynamically-generated class based on column names and predicates that are
 # present in the mapping
 def create_class_from_mapping(mapping, rdf_type=None):
-    cls = type('csv', (pcdm.Item,), {})
+    cls = type('csv', (pcdm.Object,), {})
     for column, conf in mapping.items():
         if 'predicate' in conf:
             pred_uri = from_n3(conf['predicate'], nsm=nsm)

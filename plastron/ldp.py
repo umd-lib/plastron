@@ -6,6 +6,7 @@ from rdflib import Graph, URIRef
 from datetime import datetime as dt
 from plastron import rdf
 from plastron.exceptions import RESTAPIException
+from plastron.http import Repository
 
 
 class Resource(rdf.Resource):
@@ -43,6 +44,9 @@ class Resource(rdf.Resource):
             return str(self.title)
         else:
             return repr(self)
+
+    def load(self, repository: Repository):
+        return self.read(repository.get_graph(self.uri))
 
     # create repository object by POST or PUT
     def create_object(self, repository, uri=None):

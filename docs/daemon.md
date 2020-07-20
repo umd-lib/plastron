@@ -74,6 +74,18 @@ This sub-section configures the queues and topics used.
 |`JOB_STATUS`    |Name of the topic to publish status updates to for running jobs|
 |`JOBS_COMPLETED`|Name of the queue to publish to when a job is complete|
 
+### `COMMANDS` section
+
+This section configures options for specific commands.
+
+#### `EXPORT` sub-section
+
+Options for the export command.
+
+| Option          |Description|
+|-----------------|-----------|
+|`SSH_PRIVATE_KEY`|Filename of private key to use when making SSH/SFTP connections|
+
 ## STOMP Message Headers
 
 The Plastron Daemon expects the following headers to be present in messages

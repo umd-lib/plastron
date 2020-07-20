@@ -8,12 +8,13 @@ from plastron.exceptions import FailureException, RESTAPIException
 from plastron.http import Repository
 from plastron.stomp import MessageBox, PlastronCommandMessage, PlastronMessage, Message
 from stomp.listener import ConnectionListener
+from plastron.stomp.inbox_watcher import InboxWatcher
 
 logger = logging.getLogger(__name__)
 
 
 class CommandListener(ConnectionListener):
-    def __init__(self, broker, repo_config):
+    def __init__(self, broker, repo_config, command_config):
         self.broker = broker
         self.repo_config = repo_config
         self.queue = self.broker.destinations['JOBS']
@@ -23,6 +24,8 @@ class CommandListener(ConnectionListener):
         self.outbox = MessageBox(os.path.join(self.broker.message_store_dir, 'outbox'))
         self.executor = ThreadPoolExecutor(thread_name_prefix=__name__)
         self.public_uri_template = self.broker.public_uri_template
+        self.inbox_watcher = None
+        self.command_config = command_config
 
     def on_connected(self, headers, body):
         # first attempt to send anything in the outbox
@@ -42,7 +45,14 @@ class CommandListener(ConnectionListener):
         self.broker.connection.subscribe(destination=self.queue, id='plastron')
         logger.info(f"Subscribed to {self.queue}")
 
+        self.inbox_watcher = InboxWatcher(self, self.inbox)
+        self.inbox_watcher.start()
+
     def on_message(self, headers, body):
+        # Note: Processing will occur via the InboxWatcher, which will
+        # respond to the inbox placing a file in the inbox message directory
+        # containing the message
+
         if headers['destination'] == self.queue:
             logger.debug(f'Received message on {self.queue} with headers: {headers}')
 
@@ -50,16 +60,17 @@ class CommandListener(ConnectionListener):
             message = PlastronCommandMessage(headers=headers, body=body)
             self.inbox.add(message.id, message)
 
-            # and then process the message
-            self.process_message(message)
-
     def process_message(self, message):
         # determine which command to load to process the message
         command_module = import_module('plastron.commands.' + message.command)
         # TODO: cache the command modules
         # TODO: check that the command module supports message processing
 
-        repo = Repository(self.repo_config, ua_string=f'plastron/{version}', on_behalf_of=message.args.get('on-behalf-of'))
+        repo = Repository(
+            config=self.repo_config,
+            ua_string=f'plastron/{version}',
+            on_behalf_of=message.args.get('on-behalf-of')
+        )
 
         # define the processor for this message
         def process():
@@ -71,8 +82,11 @@ class CommandListener(ConnectionListener):
                 if repo.delegated_user is not None:
                     logger.info(f'Running repository operations on behalf of {repo.delegated_user}')
 
-                args = command_module.parse_message(message)
-                command = command_module.Command()
+                # get the configuration options for this command
+                config = self.command_config.get(message.command.upper(), {})
+
+                command = command_module.Command(config)
+                args = command.parse_message(message)
 
                 for status in command.execute(repo, args):
                     self.broker.connection.send(
@@ -128,6 +142,10 @@ class CommandListener(ConnectionListener):
             self.outbox.remove(job_id)
 
         return response_handler
+
+    def on_disconnected(self):
+        if self.inbox_watcher:
+            self.inbox_watcher.stop()
 
 
 class ReconnectListener(ConnectionListener):

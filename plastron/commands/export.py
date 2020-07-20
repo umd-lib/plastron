@@ -1,45 +1,48 @@
 import logging
-from argparse import Namespace, FileType
+import os
+import re
+from argparse import Namespace
+from bagit import make_bag
 from datetime import datetime
-from plastron import pcdm
-from plastron.exceptions import FailureException, DataReadException
+from distutils.util import strtobool
+from email.utils import parsedate
+from os.path import basename, normpath, relpath, splitext
+from paramiko import SFTPClient
+from plastron.exceptions import FailureException, DataReadException, RESTAPIException
 from plastron.namespaces import get_manager
-from plastron.serializers import SERIALIZER_CLASSES
-from plastron.util import LocalFile
-from tempfile import NamedTemporaryFile
-from time import sleep
+from plastron.pcdm import Object
+from plastron.serializers import EmptyItemListError, SERIALIZER_CLASSES
+from plastron.util import get_ssh_client
+from tempfile import TemporaryDirectory
+from time import mktime
+from urllib.parse import urlsplit
+from zipfile import ZipFile
+
 
 logger = logging.getLogger(__name__)
 nsm = get_manager()
+UUID_REGEX = re.compile(r'([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})', re.IGNORECASE)
 
 
 def configure_cli(subparsers):
     parser = subparsers.add_parser(
         name='export',
-        description='Export resources from the repository'
+        description='Export resources from the repository as a BagIt bag'
     )
-    file_or_upload = parser.add_mutually_exclusive_group()
-    file_or_upload.add_argument(
-        '-o', '--output-file',
-        help='File to write export package to',
-        type=FileType('w'),
-        action='store',
-    )
-    file_or_upload.add_argument(
-        '--upload-to',
-        help='Repository path to POST the export file to',
-        dest='upload_path',
+    parser.add_argument(
+        '-o', '--output-dest',
+        help='Where to send the export. Can be a local filename or an SFTP URI',
+        required=True,
         action='store'
     )
     parser.add_argument(
-        '--upload-name',
-        help='Used to create the download filename for the uploaded export file in the repository',
-        dest='upload_filename',
+        '--key',
+        help='SSH private key file to use for SFTP connections',
         action='store'
     )
     parser.add_argument(
         '-f', '--format',
-        help='Export job format',
+        help='Format for exported metadata',
         action='store',
         choices=SERIALIZER_CLASSES.keys(),
         required=True
@@ -50,6 +53,16 @@ def configure_cli(subparsers):
         action='store'
     )
     parser.add_argument(
+        '-B', '--export-binaries',
+        help='Export binaries in addition to the metadata',
+        action='store_true'
+    )
+    parser.add_argument(
+        '--binary-types',
+        help='Include only binaries with a MIME type from this list',
+        action='store'
+    )
+    parser.add_argument(
         'uris',
         nargs='*',
         help='URIs of repository objects to export'
@@ -57,29 +70,49 @@ def configure_cli(subparsers):
     parser.set_defaults(cmd_name='export')
 
 
-def parse_message(message):
-    uris = message.body.split('\n')
-    export_format = message.args.get('format', 'text/turtle')
-    logger.info(f'Received message to initiate export job {message.job_id} containing {len(uris)} items')
-    logger.info(f'Requested export format is {export_format}')
-
-    return Namespace(
-        uris=uris,
-        output_file=None,
-        upload_path='/exports',
-        upload_filename=message.args.get('name', message.job_id),
-        format=export_format,
-        uri_template=message.args.get('uri-template')
-    )
+def format_size(size):
+    if size < 1024:
+        return size, 'B'
+    size /= 1024
+    if size < 1024:
+        return size, 'KB'
+    size /= 1024
+    if size < 1024:
+        return size, 'MB'
+    size /= 1024
+    if size < 1024:
+        return size, 'GB'
+    size /= 2014
+    return size, 'TB'
 
 
 class Command:
-    def __init__(self):
+    def __init__(self, config=None):
+        if config is None:
+            config = {}
+        self.ssh_private_key = config.get('SSH_PRIVATE_KEY')
         self.result = None
 
     def __call__(self, *args, **kwargs):
         for _ in self.execute(*args, **kwargs):
             pass
+
+    def parse_message(self, message):
+        uris = message.body.split('\n')
+        export_format = message.args.get('format', 'text/turtle')
+        logger.info(f'Received message to initiate export job {message.job_id} containing {len(uris)} items')
+        logger.info(f'Requested export format is {export_format}')
+        export_binaries = bool(strtobool(message.args.get('export-binaries', 'false')))
+
+        return Namespace(
+            uris=uris,
+            output_dest=message.args.get('output-dest'),
+            format=export_format,
+            uri_template=message.args.get('uri-template'),
+            export_binaries=export_binaries,
+            binary_types=message.args.get('binary-types'),
+            key=self.ssh_private_key
+        )
 
     def execute(self, fcrepo, args):
         start_time = datetime.now().timestamp()
@@ -92,81 +125,133 @@ class Command:
             logger.error(f'Unknown format: {args.format}')
             raise FailureException()
 
-        if args.output_file is None:
-            args.output_file = NamedTemporaryFile(mode='w+')
+        if args.export_binaries and args.binary_types is not None:
+            # filter files by their MIME type
+            def mime_type_filter(file):
+                return str(file.mimetype) in args.binary_types.split(',')
+        else:
+            # default filter is None; in this case filter() will return
+            # all items that evaluate to true
+            mime_type_filter = None
 
-        logger.debug(f'Exporting to file {args.output_file.name}')
-        with serializer_class(args.output_file, public_uri_template=args.uri_template) as serializer:
-            for uri in args.uris:
-                r = fcrepo.head(uri)
-                if r.status_code == 200:
-                    # do export
-                    if 'describedby' in r.links:
-                        # the resource is a binary, get the RDF description URI
-                        rdf_uri = r.links['describedby']['url']
-                    else:
-                        rdf_uri = uri
-                    logger.info(f'Exporting item {count + 1}/{total}: {uri}')
-                    graph = fcrepo.get_graph(rdf_uri)
-                    try:
-                        serializer.write(graph)
-                        count += 1
-                    except DataReadException as e:
-                        # log the failure, but continue to attempt to export the rest of the URIs
-                        logger.error(f'Export of {uri} failed: {e}')
-                        errors += 1
-                    sleep(1)
+        logger.debug(f'Export destination: {args.output_dest}')
+
+        # create a bag in a temporary directory to hold exported items
+        temp_dir = TemporaryDirectory()
+        bag = make_bag(temp_dir.name)
+
+        export_dir = os.path.join(temp_dir.name, 'data')
+        serializer = serializer_class(directory=export_dir, public_uri_template=args.uri_template)
+        for uri in args.uris:
+            try:
+                logger.info(f'Exporting item {count + 1}/{total}: {uri}')
+
+                # derive an item-level directory name from the URI
+                # currently this is hard-coded to look for a UUID
+                # TODO: expand to other types of unique ids?
+                match = UUID_REGEX.search(uri)
+                if match is None:
+                    raise DataReadException(f'No UUID found in {uri}')
+                item_dir = match[0]
+
+                obj = Object.from_repository(fcrepo, uri=uri)
+                if args.export_binaries:
+                    logger.info(f'Gathering binaries for {uri}')
+                    binaries = list(filter(mime_type_filter, obj.gather_files(fcrepo)))
+                    total_size = sum(int(file.size[0]) for file in binaries)
+                    size, unit = format_size(total_size)
+                    logger.info(f'Total size of binaries: {round(size, 2)} {unit}')
                 else:
-                    # log the failure, but continue to attempt to export the rest of the URIs
-                    logger.error(f'Unable to retrieve {uri}')
-                    errors += 1
+                    binaries = None
 
-                # update the status
-                now = datetime.now().timestamp()
-                yield {
-                    'time': {
-                        'started': start_time,
-                        'now': now,
-                        'elapsed': now - start_time
-                    },
-                    'count': {
-                        'total': total,
-                        'exported': count,
-                        'errors': errors
-                    }
+                serializer.write(obj.graph(), files=binaries, binaries_dir=item_dir)
+
+                if binaries is not None:
+                    binaries_dir = os.path.join(export_dir, item_dir)
+                    os.makedirs(binaries_dir, exist_ok=True)
+                    for file in binaries:
+                        response = fcrepo.head(file.uri)
+                        accessed = parsedate(response.headers['Date'])
+                        modified = parsedate(response.headers['Last-Modified'])
+
+                        binary_filename = os.path.join(binaries_dir, str(file.filename))
+                        with open(binary_filename, mode='wb') as binary:
+                            for chunk in file.source.data():
+                                binary.write(chunk)
+
+                        # update the atime a mtime of the file to reflect the time of the
+                        # HTTP request and the resource's last-modified time in the repo
+                        os.utime(binary_filename, times=(mktime(accessed), mktime(modified)))
+                        logger.debug(f'Copied {file.uri} to {binary.name}')
+
+                count += 1
+
+            except DataReadException as e:
+                # log the failure, but continue to attempt to export the rest of the URIs
+                logger.error(f'Export of {uri} failed: {e}')
+                errors += 1
+            except RESTAPIException as e:
+                # log the failure, but continue to attempt to export the rest of the URIs
+                logger.error(f'Unable to retrieve {uri}: {e}')
+                errors += 1
+
+            # update the status
+            now = datetime.now().timestamp()
+            yield {
+                'time': {
+                    'started': start_time,
+                    'now': now,
+                    'elapsed': now - start_time
+                },
+                'count': {
+                    'total': total,
+                    'exported': count,
+                    'errors': errors
                 }
+            }
+
+        try:
+            serializer.finish()
+        except EmptyItemListError:
+            logger.error("No items could be exported; skipping writing file")
 
         logger.info(f'Exported {count} of {total} items')
 
-        download_uri = None
-        # upload to the repo if requested
-        if args.upload_path is not None:
-            if count == 0:
-                logger.warning('No items exported, skipping upload to repository')
-            else:
-                if args.upload_filename is None:
-                    args.upload_filename = 'export_' + datetime.utcnow().strftime('%Y%m%d%H%M%S')
-                filename = args.upload_filename + serializer.file_extension
-                # rewind to the beginning of the file
-                args.output_file.seek(0)
+        # save the BagIt bag to send to the output destination
+        bag.save(manifests=True)
 
-                file = pcdm.File(LocalFile(
-                    args.output_file.name,
-                    mimetype=serializer.content_type,
-                    filename=filename
-                ))
-                with fcrepo.at_path(args.upload_path):
-                    file.create_object(repository=fcrepo)
-                    download_uri = file.uri
-                    logger.info(f'Uploaded export file to {file.uri}')
+        # parse the output destination to determine where to send the export
+        if args.output_dest.startswith('sftp:'):
+            # send over SFTP to a remote host
+            sftp_uri = urlsplit(args.output_dest)
+            ssh_client = get_ssh_client(sftp_uri, key_filename=args.key)
+            sftp_client = SFTPClient.from_transport(ssh_client.get_transport())
+            root, ext = splitext(basename(sftp_uri.path))
+            destination = sftp_client.open(sftp_uri.path, mode='w')
+        else:
+            # send to a local file
+            zip_filename = args.output_dest
+            root, ext = splitext(basename(zip_filename))
+            destination = zip_filename
+
+        # write out a single ZIP file of the whole bag
+        compress_bag(bag, destination, root)
 
         self.result = {
             'content_type': serializer.content_type,
             'file_extension': serializer.file_extension,
-            'download_uri': download_uri,
             'count': {
                 'total': total,
                 'exported': count,
                 'errors': errors
             }
         }
+
+
+def compress_bag(bag, dest, root_dirname=''):
+    with ZipFile(dest, mode='w') as zip_file:
+        for dirpath, dirnames, filenames in os.walk(bag.path):
+            for name in filenames:
+                src_filename = os.path.join(dirpath, name)
+                archived_name = normpath(os.path.join(root_dirname, relpath(dirpath, start=bag.path), name))
+                zip_file.write(filename=src_filename, arcname=archived_name)

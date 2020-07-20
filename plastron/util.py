@@ -1,19 +1,20 @@
 import csv
-import hashlib
 import logging
-import mimetypes
 import shutil
 import sys
+import urllib
 from argparse import ArgumentTypeError
-from os.path import basename, isfile
-from tempfile import NamedTemporaryFile
-from paramiko import SSHClient, SFTPClient
+from os.path import isfile
+from paramiko import AutoAddPolicy, SSHClient, SSHException
+from paramiko.config import SSH_PORT
 from plastron import namespaces
 from plastron.exceptions import RESTAPIException, FailureException
 from plastron.http import Transaction
-from plastron.namespaces import dcterms, ebucore
+from plastron.namespaces import dcterms
 from rdflib import URIRef
 from rdflib.util import from_n3
+from tempfile import NamedTemporaryFile
+from urllib.parse import urlsplit
 
 logger = logging.getLogger(__name__)
 
@@ -37,6 +38,26 @@ def uri_or_curie(arg):
     if not isinstance(term, URIRef):
         raise ArgumentTypeError('must be a URI or CURIE')
     return term
+
+
+def get_ssh_client(sftp_uri, **kwargs):
+    if isinstance(sftp_uri, str):
+        sftp_uri = urlsplit(sftp_uri)
+    if not isinstance(sftp_uri, urllib.parse.SplitResult):
+        raise TypeError('Expects a str or a urllib.parse.SplitResult')
+    ssh_client = SSHClient()
+    ssh_client.load_system_host_keys()
+    ssh_client.set_missing_host_key_policy(AutoAddPolicy)
+    try:
+        ssh_client.connect(
+            hostname=sftp_uri.hostname,
+            username=sftp_uri.username,
+            port=sftp_uri.port or SSH_PORT,
+            **kwargs
+        )
+        return ssh_client
+    except SSHException as e:
+        raise FailureException(str(e)) from e
 
 
 class ResourceList:
@@ -175,105 +196,3 @@ class ItemLog:
     def __del__(self):
         if self.fh is not None:
             self.fh.close()
-
-
-class BinarySource(object):
-    def __init__(self):
-        self.logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
-
-
-class LocalFile(BinarySource):
-    def __init__(self, localpath, mimetype=None, filename=None):
-        super().__init__()
-        if mimetype is None:
-            mimetype = mimetypes.guess_type(localpath)[0]
-        self._mimetype = mimetype
-        self.localpath = localpath
-        self.filename = filename if filename is not None else basename(localpath)
-
-    def data(self):
-        return open(self.localpath, 'rb')
-
-    def mimetype(self):
-        return self._mimetype
-
-    # generate SHA1 checksum on a file
-    def digest(self):
-        sha1 = hashlib.sha1()
-        with self.data() as stream:
-            for block in stream:
-                sha1.update(block)
-        return 'sha1=' + sha1.hexdigest()
-
-
-class RepositoryFile(BinarySource):
-    def __init__(self, repo, file_uri):
-        super().__init__()
-        file_uri = URIRef(file_uri)
-        head_res = repo.head(file_uri)
-        if 'describedby' in head_res.links:
-            rdf_uri = head_res.links['describedby']['url']
-            file_graph = repo.get_graph(rdf_uri)
-
-            self.file_uri = file_uri
-            self.repo = repo
-
-            self.title = file_graph.value(subject=file_uri, predicate=dcterms.title)
-            self._mimetype = file_graph.value(subject=file_uri, predicate=ebucore.hasMimeType)
-            self.filename = file_graph.value(subject=file_uri, predicate=ebucore.filename)
-            self.file_graph = file_graph
-            self.metadata_uri = rdf_uri
-        else:
-            raise Exception("No metadata for resource")
-
-    def mimetype(self):
-        return self._mimetype
-
-    def data(self):
-        return self.repo.get(self.file_uri, stream=True).raw
-
-
-class RemoteFile(BinarySource):
-    def __init__(self, host, remotepath, mimetype=None):
-        super().__init__()
-        self.ssh_client = None
-        self.sftp_client = None
-        self.host = host
-        self.remotepath = remotepath
-        self.filename = basename(remotepath)
-        self._mimetype = mimetype
-
-    def __del__(self):
-        # cleanup the SFTP and SSH clients
-        if self.sftp_client is not None:
-            self.sftp_client.close()
-        if self.ssh_client is not None:
-            self.ssh_client.close()
-
-    def ssh(self):
-        if self.ssh_client is None:
-            self.ssh_client = SSHClient()
-            self.ssh_client.load_system_host_keys()
-            self.ssh_client.connect(self.host)
-        return self.ssh_client
-
-    def sftp(self):
-        if self.sftp_client is None:
-            self.sftp_client = SFTPClient.from_transport(self.ssh().get_transport())
-        return self.sftp_client
-
-    def ssh_exec(self, cmd):
-        (stdin, stdout, stderr) = self.ssh().exec_command(cmd)
-        return stdout.readline().rstrip('\n')
-
-    def data(self):
-        return self.sftp().open(self.remotepath, mode='rb')
-
-    def mimetype(self):
-        if self._mimetype is None:
-            self._mimetype = self.ssh_exec(f'file --mime-type -F "" "{self.remotepath}"').split()[1]
-        return self._mimetype
-
-    def digest(self):
-        sha1sum = self.ssh_exec(f'sha1sum "{self.remotepath}"').split()[0]
-        return 'sha1=' + sha1sum

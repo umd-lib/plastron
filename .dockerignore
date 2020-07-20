@@ -9,5 +9,9 @@
 docker-compose.yml
 docker-plastron.yml
 
+.pytest_cache/
 dist/
+exports/
 logs/
+msg/
+plastron.egg-info/

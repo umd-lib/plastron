@@ -43,6 +43,7 @@ def main():
 
     repo_config = config['REPOSITORY']
     broker_config = config['MESSAGE_BROKER']
+    command_config = config['COMMANDS']
 
     logging_options = DEFAULT_LOGGING_OPTIONS
 
@@ -67,8 +68,10 @@ def main():
     logger.info(f'plastrond {version}')
 
     # setup listeners
+    # Order of listeners is important -- ReconnectListener should be the
+    # last listener
+    broker.connection.set_listener('command', CommandListener(broker, repo_config, command_config))
     broker.connection.set_listener('reconnect', ReconnectListener(broker))
-    broker.connection.set_listener('command', CommandListener(broker, repo_config))
 
     try:
         broker.connect()

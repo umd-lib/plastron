@@ -71,18 +71,20 @@ setup(
     # For an analysis of "install_requires" vs pip's requirements files see:
     # https://packaging.python.org/en/latest/requirements.html
     install_requires=[
+        'bagit',
         'edtf',
         'iso639',
         'lxml>3.6.0',
         'numpy',
         'paramiko',
-        'Pillow>=6.2.0',
+        'Pillow>=6.2.2',
         'pyparsing',
         'PyYAML>3.12',
         'rdflib',
         'requests',
         'setuptools',
-        'stomp.py'
+        'stomp.py',
+        'watchdog>=0.10.2'
     ],
     python_requires='>=3.6',
 
@@ -92,10 +94,9 @@ setup(
     #
     # Similar to `install_requires` above, these must be valid existing
     # projects.
-    # extras_require={  # Optional
-    #    'dev': ['check-manifest'],
-    #    'test': ['coverage'],
-    # },
+    extras_require={  # Optional
+        'test': ['pytest'],
+    },
 
     # TODO: config/templates/*.yml?
     # If there are data files included in your packages that need to be

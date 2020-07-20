@@ -32,3 +32,7 @@ class NoValidationRulesetException(Exception):
 
     def __str__(self):
         return self.message
+
+
+class BinarySourceNotFoundError(Exception):
+    pass

@@ -48,21 +48,24 @@ def ensure_text_mode(file):
 
 
 class TurtleSerializer:
-    def __init__(self, file):
-        self.file = file
+    def __init__(self, directory, **_kwargs):
+        self.directory_name = directory
         self.content_type = 'text/turtle'
         self.file_extension = '.ttl'
 
     def __enter__(self):
         return self
 
-    def write(self, graph: Graph):
+    def write(self, graph: Graph, **_kwargs):
         graph.namespace_manager = nsm
-        with ensure_binary_mode(self.file) as export_file:
+        with open(os.path.join(self.directory_name, 'metadata.ttl'), mode='wb') as export_file:
             graph.serialize(destination=export_file, format='turtle')
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
+    def finish(self):
         pass
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.finish()
 
 
 def detect_resource_class(graph, subject):
@@ -99,12 +102,14 @@ def write_csv_file(row_info, file):
 
 
 class CSVSerializer:
-    def __init__(self, file, **kwargs):
-        self.file = file
+    SYSTEM_HEADERS = ['URI', 'PUBLIC URI', 'CREATED', 'MODIFIED', 'INDEX', 'FILES']
+
+    def __init__(self, directory=None, public_uri_template=None):
+        self.directory_name = directory or os.path.curdir
         self.content_models = {}
         self.content_type = 'text/csv'
         self.file_extension = '.csv'
-        self.public_uri_template = kwargs.get('public_uri_template', None)
+        self.public_uri_template = public_uri_template
 
     def __enter__(self):
         self.rows = []
@@ -113,9 +118,7 @@ class CSVSerializer:
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.finish()
 
-    SYSTEM_HEADERS = ['URI', 'PUBLIC URI', 'CREATED', 'MODIFIED', 'INDEX']
-
-    def write(self, graph: Graph):
+    def write(self, graph: Graph, files=None, binaries_dir=''):
         """
         Serializes the given graph as CSV data rows.
         """
@@ -132,6 +135,8 @@ class CSVSerializer:
         resource = resource_class.from_graph(graph, subject=main_subject)
         row = {k: ';'.join(v) for k, v in self.flatten(resource, self.content_models[resource_class]).items()}
         row['URI'] = str(main_subject)
+        if files is not None:
+            row['FILES'] = ';'.join(os.path.join(binaries_dir, file.filename[0]) for file in files)
         row['CREATED'] = str(graph.value(main_subject, fedora.created))
         row['MODIFIED'] = str(graph.value(main_subject, fedora.lastModified))
         if self.public_uri_template is not None:
@@ -205,28 +210,20 @@ class CSVSerializer:
 
     def finish(self):
         """
-        Writes the actual CSV or ZIP file.
+        Writes the actual CSV file(s)
         """
         if len(self.content_models) == 0:
-            logger.error("No items could be exported; skipping writing file")
-        elif len(self.content_models) == 1:
-            # write a single CSV file
-            write_csv_file(next(iter(self.content_models.values())), file=self.file)
-        else:
-            # write a ZIP file containing individual CSV files
-            with ensure_binary_mode(self.file) as export_file:
-                with ZipFile(export_file, mode='w') as zip_fh:
-                    for resource_class, row_info in self.content_models.items():
-                        with NamedTemporaryFile(mode='w') as tmp:
-                            # write CSV file
-                            write_csv_file(row_info, tmp)
-                            # ensure contents are written to disk
-                            tmp.flush()
-                            # add CSV to ZIP file
-                            zip_fh.write(filename=tmp.name, arcname=resource_class.__name__ + '.csv')
-            # multi-content model CSV export actually produces ZIP files
-            self.content_type = 'application/zip'
-            self.file_extension = '.zip'
+            raise EmptyItemListError()
+
+        for resource_class, row_info in self.content_models.items():
+            metadata_filename = os.path.join(self.directory_name, resource_class.__name__ + '_metadata.csv')
+            with open(metadata_filename, mode='w') as metadata_file:
+                # write a CSV file for this model
+                write_csv_file(row_info, metadata_file)
+
+
+class EmptyItemListError(Exception):
+    pass
 
 
 SERIALIZER_CLASSES = {

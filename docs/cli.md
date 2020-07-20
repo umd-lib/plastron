@@ -158,30 +158,30 @@ optional arguments:
 
 ```
 $ plastron export --help
-usage: plastron export [-h] [-o OUTPUT_FILE | --upload-to UPLOAD_PATH]
-                       [--upload-name UPLOAD_FILENAME] -f
+usage: plastron export [-h] --output-dest OUTPUT_DEST [--key KEY] -f
                        {text/turtle,turtle,ttl,text/csv,csv}
-                       [--uri-template URI_TEMPLATE]
+                       [--uri-template URI_TEMPLATE] [--export-binaries]
+                       [--binary-types BINARY_TYPES]
                        [uris [uris ...]]
 
-Export resources from the repository
+Export resources from the repository as a BagIt bag
 
 positional arguments:
   uris                  URIs of repository objects to export
 
 optional arguments:
   -h, --help            show this help message and exit
-  -o OUTPUT_FILE, --output-file OUTPUT_FILE
-                        File to write export package to
-  --upload-to UPLOAD_PATH
-                        Repository path to POST the export file to
-  --upload-name UPLOAD_FILENAME
-                        Used to create the download filename for the uploaded
-                        export file in the repository
+  --output-dest OUTPUT_DEST
+                        Where to send the export. Can be a local filename or
+                        an SFTP URI
+  --key KEY             SSH private key file to use for SFTP connections
   -f {text/turtle,turtle,ttl,text/csv,csv}, --format {text/turtle,turtle,ttl,text/csv,csv}
-                        Export job format
+                        Format for exported metadata
   --uri-template URI_TEMPLATE
                         Public URI template
+  --export-binaries     Export binaries in addition to the metadata
+  --binary-types BINARY_TYPES
+                        Include only binaries with a MIME type from this list
 ```
 
 ### Update (update)
@@ -217,7 +217,9 @@ optional arguments:
 ```
 $ plastron import --help
 usage: plastron import [-h] -m MODEL [-l LIMIT] [--validate-only]
-                       [--make-template TEMPLATE_FILE]
+                       [--make-template TEMPLATE_FILE] [--access ACCESS]
+                       [--member-of MEMBER_OF]
+                       [--binaries-location BINARIES_LOCATION]
                        [import_file]
 
 Import data to the repository
@@ -234,6 +236,14 @@ optional arguments:
   --validate-only       only validate, do not do the actual import
   --make-template TEMPLATE_FILE
                         create a CSV template for the given model
+  --access ACCESS       URI or CURIE of the access class to apply to new items
+  --member-of MEMBER_OF
+                        URI of the object that new items are PCDM members of
+  --binaries-location BINARIES_LOCATION
+                        where to find binaries; either a path to a directory,
+                        a "zip:<path to zipfile>" URI, an SFTP URI in the form
+                        "sftp://<user>@<host>/<path to dir>", or a URI in the
+                        form "zip+sftp://<user>@<host>/<path to zipfile>"
 ```
 
 ## Configuration

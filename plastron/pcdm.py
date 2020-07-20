@@ -1,8 +1,8 @@
 from rdflib import URIRef
 from plastron import ldp, ore, rdf
 from plastron.exceptions import RESTAPIException
-from plastron.namespaces import dcterms, dcmitype, ebucore, fabio, pcdm, pcdmuse
-from plastron.util import LocalFile
+from plastron.namespaces import dcterms, dcmitype, ebucore, fabio, pcdm, pcdmuse, premis
+from plastron.files import LocalFile, RepositoryFile
 from PIL import Image
 
 # alias the rdflib Namespace
@@ -29,16 +29,31 @@ class Object(ore.Aggregation):
         self.related.append(obj)
         obj.related_of.append(self)
 
+    def gather_files(self, repository):
+        for proxy in self.load_proxies(repository):
+            page = Object.from_repository(repository, proxy.proxy_for[0])
+            for file_uri in page.files:
+                file = File.from_repository(repository, file_uri)
+                graph = repository.get_graph(file_uri)
+                file.read(graph)
+                yield file
+
 
 @rdf.object_property('file_of', pcdm.fileOf)
 @rdf.data_property('mimetype', ebucore.hasMimeType)
 @rdf.data_property('filename', ebucore.filename)
+@rdf.data_property('size', premis.hasSize)
 @rdf.data_property('width', ebucore.width)
 @rdf.data_property('height', ebucore.height)
 @rdf.object_property('dcmitype', dcterms.type)
 @rdf.data_property('title', dcterms.title)
 @rdf.rdf_class(pcdm.File)
 class File(ldp.Resource):
+    @classmethod
+    def from_repository(cls, repo, uri, include_server_managed=True):
+        source = RepositoryFile(repo, uri)
+        return cls(source, uri=uri)
+
     def __init__(self, source, **kwargs):
         super().__init__(**kwargs)
         self.source = source

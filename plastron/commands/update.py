@@ -1,4 +1,7 @@
+import io
+import json
 import logging
+from argparse import Namespace
 from email.utils import parsedate_to_datetime
 from plastron.exceptions import RESTAPIException
 from plastron.util import get_title_string, ResourceList, parse_predicate_list
@@ -51,13 +54,29 @@ def configure_cli(subparsers):
 
 
 class Command:
+    def __init__(self, _config=None):
+        self.result = None
+        self.repository = None
+        self.dry_run = False
+        self.sparql_update = None
+        self.resources = None
+
     def __call__(self, fcrepo, args):
+        self.execute(fcrepo, args)
+
+    def execute(self, fcrepo, args):
         self.repository = fcrepo
         self.repository.test_connection()
         self.dry_run = args.dry_run
 
-        with open(args.update_file, 'r') as update_file:
-            self.sparql_update = update_file.read().encode('utf-8')
+        # args.update_file is a StringIO when coming from the daemon
+        # (see "parse_message" method), a regular file when coming from the CLI
+        if isinstance(args.update_file, io.StringIO):
+            self.sparql_update = args.update_file.getvalue().encode('utf-8')
+        else:
+            with open(args.update_file, 'r') as update_file:
+                self.sparql_update = update_file.read().encode('utf-8')
+
         logger.debug(
             f'SPARQL Update query:\n'
             f'====BEGIN====\n'
@@ -96,3 +115,21 @@ class Command:
                 self.resources.log_completed(resource.uri, title, timestamp)
             else:
                 raise RESTAPIException(response)
+
+    @staticmethod
+    def parse_message(message):
+        message.body = message.body.encode('utf-8').decode('utf-8-sig')
+        body = json.loads(message.body)
+        uris = body['uri']
+        sparql_update = body['sparql_update']
+
+        return Namespace(
+            dry_run=message.args.get('dry-run', False),
+            recursive=message.args.get('recursive', False),
+            # Default to no transactions, due to LIBFCREPO-842
+            use_transactions=not bool(message.args.get('no-transactions', True)),
+            uris=uris,
+            update_file=io.StringIO(sparql_update),
+            file=None,
+            completed=None
+        )

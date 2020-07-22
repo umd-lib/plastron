@@ -1,10 +1,13 @@
+import importlib
 import io
 import json
 import logging
 from argparse import Namespace
 from email.utils import parsedate_to_datetime
-from plastron.exceptions import RESTAPIException
+from plastron.exceptions import FailureException, RESTAPIException
+from plastron.ldp import Resource
 from plastron.util import get_title_string, ResourceList, parse_predicate_list
+from pyparsing import ParseException
 
 logger = logging.getLogger(__name__)
 
@@ -37,6 +40,17 @@ def configure_cli(subparsers):
         dest='use_transactions'
     )
     parser.add_argument(
+        '--validate',
+        help='validate before updating',
+        action='store_true',
+        dest='validate'
+    )
+    parser.add_argument(
+        '-m', '--model',
+        help='The model class to use for validation (Item, Issue, Poster, or Letter)',
+        action='store',
+    )
+    parser.add_argument(
         '--completed',
         help='file recording the URIs of updated resources',
         action='store'
@@ -53,6 +67,23 @@ def configure_cli(subparsers):
     parser.set_defaults(cmd_name='update')
 
 
+def validate(item):
+    result = item.validate()
+
+    if result.is_valid():
+        logger.info(f'"{item}" is valid')
+        for outcome in result.passed():
+            logger.debug(f'  ✓ {outcome}')
+    else:
+        logger.warning(f'{item} is invalid')
+        for outcome in result.failed():
+            logger.warning(f'  ✗ {outcome}')
+        for outcome in result.passed():
+            logger.debug(f'  ✓ {outcome}')
+
+    return result
+
+
 class Command:
     def __init__(self, _config=None):
         self.result = None
@@ -60,6 +91,8 @@ class Command:
         self.dry_run = False
         self.sparql_update = None
         self.resources = None
+        self.validate = False
+        self.model = None
 
     def __call__(self, fcrepo, args):
         self.execute(fcrepo, args)
@@ -68,6 +101,8 @@ class Command:
         self.repository = fcrepo
         self.repository.test_connection()
         self.dry_run = args.dry_run
+        self.validate = args.validate
+        self.model = args.model
 
         # args.update_file is a StringIO when coming from the daemon
         # (see "parse_message" method), a regular file when coming from the CLI
@@ -105,16 +140,50 @@ class Command:
             return
         headers = {'Content-Type': 'application/sparql-update'}
         title = get_title_string(graph)
+
+        errors = []
+
+        if self.validate:
+            if self.model is None:
+                raise FailureException("Model must be provided when performing validation")
+
+            # Retrieve the resource from the repository
+            ldp_resource = Resource(resource.uri)
+            ldp_resource.load(self.repository)
+
+            # Retrieve the Graph of the resource
+            graph = ldp_resource.graph()
+            try:
+                # Apply the update in-memory to the resource
+                graph.update(self.sparql_update.decode())
+            except ParseException as parse_error:
+                errors.append(parse_error)
+                raise FailureException(errors)
+
+            # Retrieve the model to use for validation
+            model_class = getattr(importlib.import_module("plastron.models"), self.model)
+
+            # Validate the updated in-memory Graph using the model
+            issue = model_class.from_graph(graph, subject=resource.uri)
+            validation_result = validate(issue)
+
+            is_valid = validation_result.is_valid()
+            if not is_valid:
+                for failed in validation_result.failed():
+                    errors.append(failed)
+                    raise FailureException(errors)
+
         if self.dry_run:
             logger.info(f'Would update resource {resource} {title}')
+            return
+
+        response = self.repository.patch(resource.description_uri, data=self.sparql_update, headers=headers)
+        if response.status_code == 204:
+            logger.info(f'Updated resource {resource} {title}')
+            timestamp = parsedate_to_datetime(response.headers['date']).isoformat('T')
+            self.resources.log_completed(resource.uri, title, timestamp)
         else:
-            response = self.repository.patch(resource.description_uri, data=self.sparql_update, headers=headers)
-            if response.status_code == 204:
-                logger.info(f'Updated resource {resource} {title}')
-                timestamp = parsedate_to_datetime(response.headers['date']).isoformat('T')
-                self.resources.log_completed(resource.uri, title, timestamp)
-            else:
-                raise RESTAPIException(response)
+            raise RESTAPIException(response)
 
     @staticmethod
     def parse_message(message):
@@ -124,8 +193,10 @@ class Command:
         sparql_update = body['sparql_update']
 
         return Namespace(
-            dry_run=message.args.get('dry-run', False),
-            recursive=message.args.get('recursive', False),
+            dry_run=bool(message.args.get('dry-run', False)),
+            validate=bool(message.args.get('validate', False)),
+            model=message.args.get('model', None),
+            recursive=message.args.get('recursive', None),
             # Default to no transactions, due to LIBFCREPO-842
             use_transactions=not bool(message.args.get('no-transactions', True)),
             uris=uris,

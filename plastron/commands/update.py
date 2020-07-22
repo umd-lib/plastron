@@ -170,8 +170,8 @@ class Command:
             is_valid = validation_result.is_valid()
             if not is_valid:
                 for failed in validation_result.failed():
-                    errors.append(failed)
-                    raise FailureException(errors)
+                    errors.append(str(failed))
+                raise FailureException(errors)
 
         if self.dry_run:
             logger.info(f'Would update resource {resource} {title}')

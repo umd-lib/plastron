@@ -145,7 +145,7 @@ class Command:
 
         if self.validate:
             if self.model is None:
-                raise RESTAPIException("Model must be provided when performing validation")
+                raise FailureException("Model must be provided when performing validation")
 
             # Retrieve the resource from the repository
             ldp_resource = Resource(resource.uri)

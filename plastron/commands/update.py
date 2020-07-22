@@ -141,42 +141,43 @@ class Command:
         headers = {'Content-Type': 'application/sparql-update'}
         title = get_title_string(graph)
 
-        if self.dry_run:
-            logger.info(f'Would update resource {resource} {title}')
-        else:
-            errors = []
+        errors = []
 
-            if self.validate:
-                if self.model is None:
-                    raise RESTAPIException("Model must be provided when performing validation")
+        if self.validate:
+            if self.model is None:
+                raise RESTAPIException("Model must be provided when performing validation")
 
-                ldp_resource = Resource(resource.uri)
-                ldp_resource.load(self.repository)
-                graph = ldp_resource.graph()
-                try:
-                    graph.update(self.sparql_update.decode())
-                except ParseException as parse_error:
-                    errors.append(parse_error)
+            ldp_resource = Resource(resource.uri)
+            ldp_resource.load(self.repository)
+            graph = ldp_resource.graph()
+            try:
+                graph.update(self.sparql_update.decode())
+            except ParseException as parse_error:
+                errors.append(parse_error)
+                raise FailureException(errors)
+
+            model_class = getattr(importlib.import_module("plastron.models"), self.model)
+
+            issue = model_class.from_graph(graph, subject=resource.uri)
+            validation_result = validate(issue)
+
+            is_valid = validation_result.is_valid()
+            if not is_valid:
+                for failed in validation_result.failed():
+                    errors.append(failed)
                     raise FailureException(errors)
 
-                model_class = getattr(importlib.import_module("plastron.models"), self.model)
+        if self.dry_run:
+            logger.info(f'Would update resource {resource} {title}')
+            return
 
-                issue = model_class.from_graph(graph, subject=resource.uri)
-                validation_result = validate(issue)
-
-                is_valid = validation_result.is_valid()
-                if not is_valid:
-                    for failed in validation_result.failed():
-                        errors.append(failed)
-                        raise FailureException(errors)
-
-            response = self.repository.patch(resource.description_uri, data=self.sparql_update, headers=headers)
-            if response.status_code == 204:
-                logger.info(f'Updated resource {resource} {title}')
-                timestamp = parsedate_to_datetime(response.headers['date']).isoformat('T')
-                self.resources.log_completed(resource.uri, title, timestamp)
-            else:
-                raise RESTAPIException(response)
+        response = self.repository.patch(resource.description_uri, data=self.sparql_update, headers=headers)
+        if response.status_code == 204:
+            logger.info(f'Updated resource {resource} {title}')
+            timestamp = parsedate_to_datetime(response.headers['date']).isoformat('T')
+            self.resources.log_completed(resource.uri, title, timestamp)
+        else:
+            raise RESTAPIException(response)
 
     @staticmethod
     def parse_message(message):

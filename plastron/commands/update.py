@@ -147,17 +147,23 @@ class Command:
             if self.model is None:
                 raise RESTAPIException("Model must be provided when performing validation")
 
+            # Retrieve the resource from the repository
             ldp_resource = Resource(resource.uri)
             ldp_resource.load(self.repository)
+
+            # Retrieve the Graph of the resource
             graph = ldp_resource.graph()
             try:
+                # Apply the update in-memory to the resource
                 graph.update(self.sparql_update.decode())
             except ParseException as parse_error:
                 errors.append(parse_error)
                 raise FailureException(errors)
 
+            # Retrieve the model to use for validation
             model_class = getattr(importlib.import_module("plastron.models"), self.model)
 
+            # Validate the updated in-memory Graph using the model
             issue = model_class.from_graph(graph, subject=resource.uri)
             validation_result = validate(issue)
 

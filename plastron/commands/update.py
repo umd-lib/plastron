@@ -105,6 +105,9 @@ class Command:
         self.validate = args.validate
         self.model = args.model
 
+        if self.validate and not self.model:
+            raise FailureException("Model must be provided when performing validation")
+
         # args.update_file is a StringIO when coming from the daemon
         # (see "parse_message" method), a regular file when coming from the CLI
         if isinstance(args.update_file, io.StringIO):
@@ -145,24 +148,18 @@ class Command:
         errors = []
 
         if self.validate:
-            if self.model is None:
-                raise FailureException("Model must be provided when performing validation")
-
-            # Retrieve the resource from the repository
-            ldp_resource = Resource(resource.uri)
-            ldp_resource.load(self.repository)
-
-            # Retrieve the Graph of the resource
-            graph = ldp_resource.graph()
             try:
-                # Apply the update in-memory to the resource
+                # Apply the update in-memory to the resource graph
                 graph.update(self.sparql_update.decode())
             except ParseException as parse_error:
                 errors.append(parse_error)
                 raise FailureException(errors)
 
             # Retrieve the model to use for validation
-            model_class = getattr(importlib.import_module("plastron.models"), self.model)
+            try:
+                model_class = getattr(importlib.import_module("plastron.models"), self.model)
+            except AttributeError as e:
+                raise FailureException(f'Unable to load model "{self.model}"') from e
 
             # Validate the updated in-memory Graph using the model
             issue = model_class.from_graph(graph, subject=resource.uri)

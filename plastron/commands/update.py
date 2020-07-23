@@ -3,6 +3,7 @@ import io
 import json
 import logging
 from argparse import Namespace
+from distutils.util import strtobool
 from email.utils import parsedate_to_datetime
 from plastron.exceptions import FailureException, RESTAPIException
 from plastron.ldp import Resource
@@ -191,14 +192,17 @@ class Command:
         body = json.loads(message.body)
         uris = body['uri']
         sparql_update = body['sparql_update']
+        dry_run = bool(strtobool(message.args.get('dry-run', 'false')))
+        do_validate = bool(strtobool(message.args.get('validate', 'false')))
+        # Default to no transactions, due to LIBFCREPO-842
+        use_transactions = not bool(strtobool(message.args.get('no-transactions', 'true')))
 
         return Namespace(
-            dry_run=bool(message.args.get('dry-run', False)),
-            validate=bool(message.args.get('validate', False)),
+            dry_run=dry_run,
+            validate=do_validate,
             model=message.args.get('model', None),
             recursive=message.args.get('recursive', None),
-            # Default to no transactions, due to LIBFCREPO-842
-            use_transactions=not bool(message.args.get('no-transactions', True)),
+            use_transactions=use_transactions,
             uris=uris,
             update_file=io.StringIO(sparql_update),
             file=None,

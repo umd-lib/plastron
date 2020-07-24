@@ -6,11 +6,11 @@ from typing import Callable
 
 
 def non_empty(values):
-    return [v for v in values if len(v.strip()) > 0]
+    return [v for v in values if len(str(v).strip()) > 0]
 
 
-def required(prop, *args):
-    return min_values(prop, 1)
+def required(prop, is_required=True):
+    return len(non_empty(prop)) > 0 if is_required else True
 
 
 def min_values(prop, length):

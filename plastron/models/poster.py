@@ -44,55 +44,63 @@ class Poster(pcdm.Object):
     }
     VALIDATION_RULESET = {
         'title': {
-            'min_values': 1
+            'required': True
         },
         'alternative': {
-            'min_values': 1
+            'required': True
         },
         # "place" is not currently exported
         'place': {},
         'rights': {
+            'required': True,
             'exactly': 1
         },
         # "identifier" is not currently exported
         'identifier': {},
         'format': {},
         'type': {
-            'min_values': 1
+            'required': True
         },
         'subject': {
-            'min_values': 1
+            'required': True
         },
         'location': {
-            'min_values': 1
+            'required': True
         },
         'date': {
+            'required': True,
             'exactly': 1,
             'function': is_edtf_formatted
         },
         'language': {
+            'required': True,
             'exactly': 1
         },
         'description': {},
         'extent': {
+            'required': True,
             'exactly': 1
         },
         'issue': {
+            'required': True,
             'exactly': 1
         },
         'locator': {
+            'required': True,
             'exactly': 1
         },
         'latitude': {
+            'required': True,
             'exactly': 1
         },
         'longitude': {
+            'required': True,
             'exactly': 1
         },
         'part_of': {
-            'min_values': 1
+            'required': True
         },
         'publisher': {
-            'min_values': 1
+            'required': True
         }
     }

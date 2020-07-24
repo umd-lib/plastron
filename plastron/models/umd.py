@@ -54,15 +54,18 @@ class Item(pcdm.Object):
     }
     VALIDATION_RULESET = {
         'object_type': {
+            'required': True,
             'exactly': 1
         },
         'identifier': {
-            'min_values': 1
+            'required': True
         },
         'rights': {
+            'required': True,
             'exactly': 1
         },
         'title': {
+            'required': True,
             'exactly': 1
         },
         'format': {},

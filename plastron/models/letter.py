@@ -69,46 +69,55 @@ class Letter(pcdm.Object):
     }
     VALIDATION_RULESET = {
         'author': {
-            'min_values': 1
+            'required': True
         },
         'recipient': {
-            'min_values': 1
+            'required': True
         },
         'part_of': {
+            'required': True,
             'exactly': 1
         },
         'place': {
-            'min_values': 1
+            'required': True
         },
         'subject': {
-            'min_values': 1
+            'required': True
         },
         'rights': {
+            'required': True,
             'exactly': 1
         },
         'identifier': {
-            'min_values': 1
+            'required': True
         },
         'type': {
+            'required': True,
             'exactly': 1
         },
         'date': {
+            'required': True,
             'exactly': 1,
             'function': is_edtf_formatted
         },
         'language': {
+            'required': True,
             'exactly': 1
         },
         'description': {
+            'required': True,
             'exactly': 1
         },
         'bibliographic_citation': {
+            'required': True,
             'exactly': 1
         },
         'extent': {
+            'required': True,
             'exactly': 1
         },
         'rights_holder': {
+            'required': True,
             'exactly': 1
         },
     }

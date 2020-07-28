@@ -11,7 +11,7 @@ from paramiko import SFTPClient
 from plastron.exceptions import FailureException, DataReadException, RESTAPIException
 from plastron.namespaces import get_manager
 from plastron.pcdm import Object
-from plastron.serializers import EmptyItemListError, SERIALIZER_CLASSES
+from plastron.serializers import EmptyItemListError, SERIALIZER_CLASSES, detect_resource_class
 from plastron.util import get_ssh_client
 from tempfile import TemporaryDirectory
 from time import mktime
@@ -154,7 +154,10 @@ class Command:
                     raise DataReadException(f'No UUID found in {uri}')
                 item_dir = match[0]
 
-                obj = Object.from_repository(fcrepo, uri=uri)
+                graph = fcrepo.get_graph(uri)
+                model_class = detect_resource_class(graph, uri, fallback=Object)
+                obj = model_class.from_graph(graph, uri)
+
                 if args.export_binaries:
                     logger.info(f'Gathering binaries for {uri}')
                     binaries = list(filter(mime_type_filter, obj.gather_files(fcrepo)))

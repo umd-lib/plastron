@@ -8,9 +8,7 @@ from plastron.models import Issue, Letter, Poster
 from plastron.namespaces import get_manager, bibo, rdf, fedora
 from plastron.rdf import RDFObjectProperty, RDFDataProperty, Resource
 from rdflib import Literal, Graph, URIRef
-from tempfile import NamedTemporaryFile
 from urllib.parse import urlparse
-from zipfile import ZipFile
 
 
 logger = logging.getLogger(__name__)
@@ -21,6 +19,19 @@ MODEL_MAP = {
     bibo.Issue: Issue,
     bibo.Letter: Letter
 }
+
+
+def detect_resource_class(graph, subject, fallback=None):
+    types = set(graph.objects(URIRef(subject), rdf.type))
+
+    for rdf_type, cls in MODEL_MAP.items():
+        if rdf_type in types:
+            return cls
+    else:
+        if fallback is not None:
+            return fallback
+        else:
+            raise DataReadException(f'Unable to detect resource type for {subject}')
 
 
 @contextmanager
@@ -66,16 +77,6 @@ class TurtleSerializer:
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.finish()
-
-
-def detect_resource_class(graph, subject):
-    types = set([o for s, p, o in graph.triples((subject, rdf.type, None))])
-
-    for rdf_type, cls in MODEL_MAP.items():
-        if rdf_type in types:
-            return cls
-    else:
-        raise DataReadException(f'Unable to detect resource type for {subject}')
 
 
 def write_csv_file(row_info, file):

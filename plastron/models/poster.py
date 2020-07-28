@@ -6,7 +6,8 @@ from plastron.validation import is_edtf_formatted
 @rdf.object_property('place', dcterms.spatial)
 @rdf.object_property('rights', dcterms.rights)
 @rdf.data_property('identifier', dc.identifier)
-@rdf.data_property('format', dc.format)
+# must use the subscripting syntax, since dc.format returns the format method of Namespace
+@rdf.data_property('format', dc['format'])
 @rdf.data_property('type', edm.hasType)
 @rdf.data_property('subject', dc.subject)
 @rdf.data_property('location', dc.coverage)

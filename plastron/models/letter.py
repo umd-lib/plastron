@@ -69,20 +69,16 @@ class Letter(pcdm.Object):
     }
     VALIDATION_RULESET = {
         'author': {
-            'required': True
         },
         'recipient': {
-            'required': True
         },
         'part_of': {
             'required': True,
             'exactly': 1
         },
         'place': {
-            'required': True
         },
         'subject': {
-            'required': True
         },
         'rights': {
             'required': True,
@@ -96,7 +92,6 @@ class Letter(pcdm.Object):
             'exactly': 1
         },
         'date': {
-            'required': True,
             'exactly': 1,
             'function': is_edtf_formatted
         },
@@ -117,6 +112,10 @@ class Letter(pcdm.Object):
             'exactly': 1
         },
         'rights_holder': {
+            'required': True,
+            'exactly': 1
+        },
+        'title': {
             'required': True,
             'exactly': 1
         },

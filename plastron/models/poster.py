@@ -76,7 +76,8 @@ class Poster(pcdm.Object):
         'location': {
         },
         'date': {
-            'exactly': 1,
+            # Can't do "exactly 1", because that makes it required
+            # 'exactly': 1,
             'function': is_edtf_formatted
         },
         'language': {
@@ -85,20 +86,24 @@ class Poster(pcdm.Object):
         },
         'description': {},
         'extent': {
-            'exactly': 1,
+            # Can't do "exactly 1", because that makes it required
+            # 'exactly': 1,
         },
         'issue': {
-            'exactly': 1,
+            # Can't do "exactly 1", because that makes it required
+            # 'exactly': 1,
         },
         'locator': {
             'required': True,
             'exactly': 1
         },
         'latitude': {
-            'exactly': 1,
+            # Can't do "exactly 1", because that makes it required
+            # 'exactly': 1,
         },
         'longitude': {
-            'exactly': 1,
+            # Can't do "exactly 1", because that makes it required
+            # 'exactly': 1,
         },
         'part_of': {
             'required': True

@@ -92,7 +92,8 @@ class Letter(pcdm.Object):
             'exactly': 1
         },
         'date': {
-            'exactly': 1,
+            # Can't do "exactly 1", because that makes it required
+            # 'exactly': 1,
             'function': is_edtf_formatted
         },
         'language': {

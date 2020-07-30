@@ -4,6 +4,9 @@ from pyparsing import ParseException
 
 
 def is_edtf_formatted(value):
+    # Allow blank values
+    if str(value).strip() == "":
+        return True
     try:
         parse_edtf(value)
         return True

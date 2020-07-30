@@ -283,7 +283,8 @@ class Resource(metaclass=Meta):
                 rule = getattr(plastron.validation.rules, rule_name)
                 prop = getattr(self, field)
                 if isinstance(prop, RDFObjectProperty) and prop.is_embedded:
-                    prop.validate(prop, result)
+                    for obj in prop.values:
+                        obj.validate(prop, result)
                 else:
                     if rule(prop, arg):
                         result.passes(prop, rule, arg)

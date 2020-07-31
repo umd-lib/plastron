@@ -5,7 +5,7 @@ from plastron.validation import is_edtf_formatted
 
 @rdf.object_property('place', dcterms.spatial)
 @rdf.object_property('rights', dcterms.rights)
-@rdf.data_property('identifier', dc.identifier)
+@rdf.data_property('identifier', dcterms.identifier)
 # must use the subscripting syntax, since dc.format returns the format method of Namespace
 @rdf.data_property('format', dc['format'])
 @rdf.data_property('type', edm.hasType)
@@ -41,14 +41,14 @@ class Poster(pcdm.Object):
         'longitude': 'Longitude',
         'latitude': 'Latitude',
         'subject': 'Subject',
-        'rights': 'Rights'
+        'rights': 'Rights',
+        'identifier': 'Identifier',
     }
     VALIDATION_RULESET = {
         'title': {
             'required': True
         },
         'alternative': {
-            'required': True
         },
         # "place" is not currently exported
         'place': {},
@@ -57,20 +57,27 @@ class Poster(pcdm.Object):
             'exactly': 1
         },
         # "identifier" is not currently exported
-        'identifier': {},
-        'format': {},
+        'identifier': {
+            'required': True,
+            'exactly': 1
+        },
+        'format': {
+            'required': True,
+            'exactly': 1
+        },
         'type': {
-            'required': True
+            'required': True,
+            # Can't do "exactly 1", because existing records have
+            # multiple entries
+            # 'exactly': 1,
         },
         'subject': {
-            'required': True
         },
         'location': {
-            'required': True
         },
         'date': {
-            'required': True,
-            'exactly': 1,
+            # Can't do "exactly 1", because that makes it required
+            # 'exactly': 1,
             'function': is_edtf_formatted
         },
         'language': {
@@ -79,29 +86,28 @@ class Poster(pcdm.Object):
         },
         'description': {},
         'extent': {
-            'required': True,
-            'exactly': 1
+            # Can't do "exactly 1", because that makes it required
+            # 'exactly': 1,
         },
         'issue': {
-            'required': True,
-            'exactly': 1
+            # Can't do "exactly 1", because that makes it required
+            # 'exactly': 1,
         },
         'locator': {
             'required': True,
             'exactly': 1
         },
         'latitude': {
-            'required': True,
-            'exactly': 1
+            # Can't do "exactly 1", because that makes it required
+            # 'exactly': 1,
         },
         'longitude': {
-            'required': True,
-            'exactly': 1
+            # Can't do "exactly 1", because that makes it required
+            # 'exactly': 1,
         },
         'part_of': {
             'required': True
         },
         'publisher': {
-            'required': True
         }
     }

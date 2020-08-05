@@ -13,5 +13,5 @@ class Command:
     def __call__(self, fcrepo, args):
         try:
             fcrepo.test_connection()
-        except Exception:
-            raise FailureException()
+        except ConnectionError as e:
+            raise FailureException(str(e)) from e

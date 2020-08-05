@@ -137,8 +137,12 @@ class Repository:
         self.relpath = self._path_stack.pop()
 
     def is_reachable(self):
-        response = self.head(self.endpoint + self.relpath)
-        return response.status_code == 200
+        try:
+            response = self.head(self.fullpath)
+            return response.status_code == 200
+        except requests.exceptions.ConnectionError as e:
+            self.logger.error(str(e))
+            return False
 
     def test_connection(self):
         # test connection to fcrepo
@@ -148,8 +152,7 @@ class Repository:
         if self.is_reachable():
             self.logger.info("Connection successful.")
         else:
-            self.logger.warning("Unable to connect.")
-            raise Exception("Unable to connect")
+            raise ConnectionError(f'Unable to connect to {self.fullpath}')
 
     def request(self, method, url, headers=None, **kwargs):
         if headers is None:

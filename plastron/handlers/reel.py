@@ -50,3 +50,6 @@ class BatchItem:
                 reel.add_member(Page.from_repository(self.batch.repo, row['uri']))
 
         return reel
+
+    def post_creation_hook(self):
+        pass

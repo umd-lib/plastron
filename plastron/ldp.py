@@ -168,10 +168,6 @@ class Resource(rdf.Resource):
     def print_graph(self):
         print(self.graph().serialize(format="turtle").decode())
 
-    # called after creation of object in repo
-    def post_creation_hook(self):
-        pass
-
     def create_annotations(self, repository):
         with repository.at_path('annotations'):
             for annotation in self.annotations:

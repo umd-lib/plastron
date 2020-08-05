@@ -171,3 +171,6 @@ class BatchItem:
             item.append_proxy(page, title=f'Proxy for page {n} in {item.title}')
 
         return item
+
+    def post_creation_hook(self):
+        pass

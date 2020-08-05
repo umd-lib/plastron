@@ -22,6 +22,10 @@ class RESTAPIException(Exception):
         return '{0} {1}'.format(self.response.status_code, self.response.reason)
 
 
+class TransactionError(RESTAPIException):
+    pass
+
+
 class FailureException(Exception):
     pass
 

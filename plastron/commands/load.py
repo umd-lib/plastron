@@ -3,12 +3,13 @@ import os
 import re
 import yaml
 from argparse import ArgumentTypeError
+from collections import namedtuple
 from datetime import datetime
 from importlib import import_module
-from time import sleep
-from plastron.exceptions import ConfigException, DataReadException, RESTAPIException, FailureException
+from plastron.exceptions import ConfigException, DataReadException, RESTAPIException, FailureException, TransactionError
 from plastron.http import Transaction
 from plastron.util import ItemLog
+from time import sleep
 
 logger = logging.getLogger(__name__)
 now = datetime.utcnow().strftime('%Y%m%d%H%M%S')
@@ -144,9 +145,7 @@ class Command:
             load_set = get_load_set(batch, args.percent)
 
             # create all batch objects in repository
-            for n, item in enumerate(batch):
-                is_loaded = False
-
+            for n, batch_item in enumerate(batch):
                 if n not in load_set:
                     logger.info(f"Loading {args.percent}, skipping item {n}")
                     continue
@@ -155,41 +154,37 @@ class Command:
                 if args.limit is not None and n >= args.limit:
                     logger.info(f"Stopping after {args.limit} item(s)")
                     break
-                elif item.path in completed:
+                elif batch_item.path in completed:
                     continue
-                elif item.path in ignored:
-                    logger.debug(f"Ignoring {item.path}")
+                elif batch_item.path in ignored:
+                    logger.debug(f"Ignoring {batch_item.path}")
                     continue
 
                 logger.info(f"Processing item {n + 1}/{batch.length}...")
 
                 try:
                     logger.info(f"Loading item {n + 1}")
-                    is_loaded = load_item(
-                        fcrepo, item, args, extra=batch_config.extra
+                    loaded = load_item(
+                        fcrepo, batch_item, args, extra=batch_config.extra
                     )
-                except RESTAPIException:
-                    logger.error(
-                        "Unable to commit or rollback transaction, aborting"
-                    )
-                    raise FailureException()
+                    row = {
+                        'number': n + 1,
+                        'path': batch_item.path,
+                        'timestamp': str(datetime.utcnow()),
+                        'title': getattr(loaded.item, 'title', 'N/A'),
+                        'uri': getattr(loaded.item, 'uri', 'N/A')
+                    }
+
+                    # write item details to relevant summary CSV
+                    if loaded.successfully:
+                        completed.writerow(row)
+                    else:
+                        skipped.writerow(row)
+
+                except TransactionError as e:
+                    raise FailureException('Unable to commit or rollback transaction, aborting') from e
                 except DataReadException as e:
                     logger.error(f"Skipping item {n + 1}: {e.message}")
-
-                row = {'number': n + 1,
-                       'path': item.path,
-                       'timestamp': getattr(
-                           item, 'creation_timestamp', str(datetime.utcnow())
-                       ),
-                       'title': getattr(item, 'title', 'N/A'),
-                       'uri': getattr(item, 'uri', 'N/A')
-                       }
-
-                # write item details to relevant summary CSV
-                if is_loaded:
-                    completed.writerow(row)
-                else:
-                    skipped.writerow(row)
 
                 if args.wait:
                     logger.info("Pausing {0} seconds".format(args.wait))
@@ -216,69 +211,58 @@ def percentage(n):
     return p
 
 
-def load_item_internal(fcrepo, item, args, extra=None):
-    logger.info('Creating item')
-    item.recursive_create(fcrepo)
-    logger.info('Creating ordering proxies')
-    item.create_proxies(fcrepo)
-    if args.create_annotations:
-        logger.info('Creating annotations')
-        item.create_annotations(fcrepo)
-
-    if extra:
-        logger.info('Adding additional triples')
-        if re.search(r'\.(ttl|n3|nt)$', extra):
-            rdf_format = 'n3'
-        elif re.search(r'\.(rdf|xml)$', extra):
-            rdf_format = 'xml'
-        else:
-            raise ConfigException("Unrecognized extra triples file format")
-        item.add_extra_properties(extra, rdf_format)
-
-    logger.info('Updating item and components')
-    item.recursive_update(fcrepo)
-    if args.create_annotations:
-        logger.info('Updating annotations')
-        item.update_annotations(fcrepo)
-
-
 def load_item(fcrepo, batch_item, args, extra=None):
     # read data for item
     logger.info('Reading item data')
     item = batch_item.read_data()
 
-    if args.use_transactions:
-        # open transaction
-        with Transaction(fcrepo, keep_alive=90) as txn:
-            # create item and its components
-            try:
-                load_item_internal(fcrepo, item, args, extra)
+    txn_class = Transaction if args.use_transactions else NullTransaction
 
-                # commit transaction
-                txn.commit()
-                logger.info('Performing post-creation actions')
-                item.post_creation_hook()
-                return True
+    loaded = namedtuple('loaded', ['successfully', 'item'])
 
-            except (RESTAPIException, FileNotFoundError) as e:
-                # if anything fails during item creation or committing the transaction
-                # attempt to rollback the current transaction
-                # failures here will be caught by the main loop's exception handler
-                # and should trigger a system exit
-                logger.error("Item creation failed: {0}".format(e))
-                txn.rollback()
-                logger.warning('Transaction rolled back. Continuing load.')
-
-            except KeyboardInterrupt as e:
-                logger.error("Load interrupted")
-                raise e
-    else:
+    # open transaction
+    with txn_class(fcrepo, keep_alive=90) as txn:
+        # create item and its components
         try:
-            load_item_internal(fcrepo, item, args, extra)
-            return True
+            logger.info('Creating item')
+            item.recursive_create(fcrepo)
+            logger.info('Creating ordering proxies')
+            item.create_proxies(fcrepo)
+            if args.create_annotations:
+                logger.info('Creating annotations')
+                item.create_annotations(fcrepo)
+
+            if extra:
+                logger.info('Adding additional triples')
+                if re.search(r'\.(ttl|n3|nt)$', extra):
+                    rdf_format = 'n3'
+                elif re.search(r'\.(rdf|xml)$', extra):
+                    rdf_format = 'xml'
+                else:
+                    raise ConfigException("Unrecognized extra triples file format")
+                item.add_extra_properties(extra, rdf_format)
+
+            logger.info('Updating item and components')
+            item.recursive_update(fcrepo)
+            if args.create_annotations:
+                logger.info('Updating annotations')
+                item.update_annotations(fcrepo)
+
+            # commit transaction
+            txn.commit()
+            logger.info('Performing post-creation actions')
+            batch_item.post_creation_hook()
+            return loaded(successfully=True, item=item)
+
         except (RESTAPIException, FileNotFoundError) as e:
-            logger.error("Item creation failed: {0}".format(e))
-            logger.warning('Continuing load.')
+            # if anything fails during item creation or committing the transaction
+            # attempt to rollback the current transaction
+            # failures here will be caught by the main loop's exception handler
+            # and should trigger a system exit
+            logger.error(f"Item creation failed: {e}")
+            txn.rollback()
+            return loaded(successfully=False, item=item)
+
         except KeyboardInterrupt as e:
             logger.error("Load interrupted")
             raise e
@@ -320,3 +304,26 @@ class BatchConfig:
         if missing_fields:
             field_names = ', '.join(missing_fields)
             raise ConfigException(f'Missing required batch configuration field(s): {field_names}')
+
+
+class NullTransaction:
+    def __init__(self, *_args):
+        pass
+
+    def __enter__(self):
+        pass
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        pass
+
+    def begin(self):
+        pass
+
+    def maintain(self):
+        pass
+
+    def commit(self):
+        pass
+
+    def rollback(self):
+        pass

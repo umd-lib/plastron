@@ -217,6 +217,9 @@ class BatchItem:
     def read_data(self):
         return self.item
 
+    def post_creation_hook(self):
+        pass
+
 
 # dynamically-generated class based on column names and predicates that are
 # present in the mapping

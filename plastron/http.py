@@ -3,7 +3,7 @@ import os
 import requests
 import threading
 from collections import namedtuple
-from plastron.exceptions import RESTAPIException
+from plastron.exceptions import RESTAPIException, TransactionError
 from rdflib import Graph, URIRef
 
 OMIT_SERVER_MANAGED_TRIPLES = 'return=representation; omit="http://fedora.info/definitions/v4/repository#ServerManaged"'
@@ -113,7 +113,7 @@ class Repository:
             response = self.post(self.uri(), **kwargs)
 
         if response.status_code == 201:
-            created_url = response.headers['Location'] if 'Location' in response.headers else url
+            created_url = response.headers.get('Location', url)
             return URIRef(self._remove_transaction_uri(created_url))
         else:
             raise RESTAPIException(response)
@@ -233,7 +233,7 @@ class Transaction:
             self.active = True
         else:
             self.logger.error('Failed to create transaction')
-            raise RESTAPIException(response)
+            raise TransactionError(response)
 
     def maintain(self):
         if self.active:
@@ -243,7 +243,7 @@ class Transaction:
                 self.logger.info(f'Transaction {self} is active until {response.headers["Expires"]}')
             else:
                 self.logger.error(f'Failed to maintain transaction {self}')
-                raise RESTAPIException(response)
+                raise TransactionError(response)
 
     def commit(self):
         if self.active:
@@ -255,7 +255,7 @@ class Transaction:
                 self.active = False
             else:
                 self.logger.error(f'Failed to commit transaction {self}')
-                raise RESTAPIException(response)
+                raise TransactionError(response)
 
     def rollback(self):
         if self.active:
@@ -267,7 +267,7 @@ class Transaction:
                 self.active = False
             else:
                 self.logger.error(f'Failed to roll back transaction {self}')
-                raise RESTAPIException(response)
+                raise TransactionError(response)
 
 
 # based on https://stackoverflow.com/a/12435256/5124907

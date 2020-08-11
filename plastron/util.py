@@ -1,5 +1,6 @@
 import csv
 import logging
+import os
 import shutil
 import sys
 import urllib
@@ -58,6 +59,45 @@ def get_ssh_client(sftp_uri, **kwargs):
         return ssh_client
     except SSHException as e:
         raise FailureException(str(e)) from e
+
+
+def envsubst(value, env=None):
+    """
+    Recursively replace ${VAR_NAME} placeholders in value with the values of the
+    corresponding keys of env. If env is not given, it defaults to the environment
+    variables in os.environ.
+
+    Any placeholders that do not have a corresponding key in the env dictionary
+    are left as is.
+
+    :param value: Value to search for ${VAR_NAME} placeholders.
+    :param env: Dictionary of values to use as replacements. If not given, defaults
+        to os.environ.
+    :return: If value is a string, the result of replacing ${VAR_NAME} with the
+        corresponding value from env. If value is a list, returns a new list where each
+        item in value replaced with the result of calling envsubst() on that item. If
+        value is a dictionary, returns a new dictionary where each item value is replaced
+        with the result of calling envsubst() on that value.
+    """
+    if env is None:
+        env = os.environ
+    if isinstance(value, str):
+        if '${' in value:
+            try:
+                return value.replace('${', '{').format(**env)
+            except KeyError as e:
+                missing_key = str(e.args[0])
+                logger.warning(f'Environment variable ${{{missing_key}}} not found')
+                # for a missing key, just return the string without substitution
+                return envsubst(value, {missing_key: f'${{{missing_key}}}', **env})
+        else:
+            return value
+    elif isinstance(value, list):
+        return [envsubst(v, env) for v in value]
+    elif isinstance(value, dict):
+        return {k: envsubst(v, env) for k, v in value.items()}
+    else:
+        return value
 
 
 class ResourceList:

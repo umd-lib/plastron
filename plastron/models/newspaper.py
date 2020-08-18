@@ -3,7 +3,6 @@ from rdflib import URIRef
 from plastron import pcdm, ocr, oa, rdf
 from plastron.exceptions import DataReadException
 from plastron.namespaces import bibo, carriers, dc, dcterms, ebucore, fabio, ndnp, pcdmuse, prov, sc
-from plastron.files import RepositoryFile
 
 
 @rdf.data_property('title', dcterms.title)
@@ -129,7 +128,7 @@ class Page(pcdm.Object):
 
         # load ALTO XML into page object, for text extraction
         try:
-            with ocr_file.source.data() as stream:
+            with ocr_file.source as stream:
                 tree = parse(stream)
         except OSError:
             raise DataReadException("Unable to read {0}".format(ocr_file.filename))
@@ -158,32 +157,22 @@ class File(pcdm.File):
     """Newspaper file"""
 
     @classmethod
-    def from_repository(cls, repo, file_uri):
-        source = RepositoryFile(repo, file_uri)
-        file_graph = source.file_graph
-        title = file_graph.value(subject=file_uri, predicate=dcterms.title)
-        file = cls(source, title=title)
-        file.uri = file_uri
-        file.created = True
-        file.updated = True
+    def from_repository(cls, repo, uri, include_server_managed=True):
+        obj = super().from_repository(repo, uri, include_server_managed)
 
-        types = list(file_graph.objects(subject=file_uri, predicate=rdf.ns.type))
+        types = obj.rdf_type.values
         if pcdmuse.PreservationMasterFile in types:
-            file.use = 'master'
-        elif pcdmuse.IntermediateFile in types:
-            file.use = 'service'
-        elif pcdmuse.ServiceFile in types:
-            file.use = 'derivative'
-        elif pcdmuse.ExtractedText in types:
-            file.use = 'ocr'
-
-        if file.use == 'master':
-            file.width = file_graph.value(subject=file_uri, predicate=ebucore.width)
-            file.height = file_graph.value(subject=file_uri, predicate=ebucore.height)
+            obj.use = 'master'
             # TODO: how to not hardocde this?
-            file.resolution = (400, 400)
+            obj.resolution = (400, 400)
+        elif pcdmuse.IntermediateFile in types:
+            obj.use = 'service'
+        elif pcdmuse.ServiceFile in types:
+            obj.use = 'derivative'
+        elif pcdmuse.ExtractedText in types:
+            obj.use = 'ocr'
 
-        return file
+        return obj
 
 
 @rdf.object_property('issue', pcdm.ns.memberOf)

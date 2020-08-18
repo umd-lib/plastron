@@ -179,8 +179,9 @@ class Command:
 
                         binary_filename = os.path.join(binaries_dir, str(file.filename))
                         with open(binary_filename, mode='wb') as binary:
-                            for chunk in file.source.data():
-                                binary.write(chunk)
+                            with file.source as stream:
+                                for chunk in stream:
+                                    binary.write(chunk)
 
                         # update the atime a mtime of the file to reflect the time of the
                         # HTTP request and the resource's last-modified time in the repo

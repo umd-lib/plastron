@@ -409,6 +409,11 @@ class Command:
 
             index = build_lookup_index(item, row.get('INDEX'))
 
+            # track new embedded objects that are added to the graph
+            # so we can ensure that they have at least one statement
+            # where they appear as the subject
+            new_objects = defaultdict(Graph)
+
             delete_graph = Graph()
             insert_graph = Graph()
 
@@ -456,7 +461,7 @@ class Command:
                             for inserted_value in inserted_values:
                                 insert_graph.add((item.uri, prop.uri, prop.get_term(inserted_value)))
                     else:
-                        # add new hash objects that are not in the index
+                        # create new embedded objects (a.k.a hash resources) that are not in the index
                         first_prop_type = item.name_to_prop[first_attr]
                         for i, values in new_values.items():
                             # we can assume that for any properties with dotted notation,
@@ -469,11 +474,16 @@ class Command:
                                 index[first_attr][i] = obj
                                 setattr(obj, next_attr, values)
                                 next_attr_prop = obj.name_to_prop[next_attr]
-                                # add that object to the main item
-                                getattr(item, first_attr).append(obj)
-                                insert_graph.add((item.uri, prop_type.uri, obj.uri))
                                 for value in values:
-                                    insert_graph.add((obj.uri, next_attr_prop.uri, value))
+                                    new_objects[(first_attr, obj)].add((obj.uri, next_attr_prop.uri, value))
+
+            # add new embedded objects to the insert graph
+            for (attr, obj), graph in new_objects.items():
+                # add that object to the main item
+                getattr(item, attr).append(obj)
+                # add to the insert graph
+                insert_graph.add((item.uri, item.name_to_prop[attr].uri, obj.uri))
+                insert_graph += graph
 
             # do a pass to remove statements that are both deleted and then re-inserted
             for statement in delete_graph:

@@ -13,7 +13,7 @@ umdtype = Namespace('http://vocab.lib.umd.edu/datatype#')
 @rdf.object_property('rights', dcterms.rights)
 @rdf.data_property('title', dcterms.title)
 @rdf.object_property('format', edm.hasType)
-@rdf.object_property('archival_collection', dcterms.isPartOf, embed=True, obj_class=LabeledThing)
+@rdf.object_property('archival_collection', dcterms.isPartOf)
 @rdf.data_property('date', dc.date)
 @rdf.data_property('description', dcterms.description)
 @rdf.data_property('alternate_title', dcterms.alternative)
@@ -34,7 +34,7 @@ class Item(pcdm.Object):
         'rights': 'Rights Statement',
         'title': 'Title',
         'format': 'Format',
-        'archival_collection.label': 'Archival Collection',
+        'archival_collection': 'Archival Collection',
         'date': 'Date',
         'description': 'Description',
         'alternate_title': 'Alternate Title',
@@ -54,15 +54,18 @@ class Item(pcdm.Object):
     }
     VALIDATION_RULESET = {
         'object_type': {
+            'required': True,
             'exactly': 1
         },
         'identifier': {
-            'min_values': 1
+            'required': True
         },
         'rights': {
+            'required': True,
             'exactly': 1
         },
         'title': {
+            'required': True,
             'exactly': 1
         },
         'format': {},

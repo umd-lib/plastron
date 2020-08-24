@@ -7,11 +7,11 @@ from datetime import datetime
 from distutils.util import strtobool
 from email.utils import parsedate
 from os.path import basename, normpath, relpath, splitext
-from paramiko import SFTPClient
+from paramiko import SFTPClient, SSHException
 from plastron.exceptions import FailureException, DataReadException, RESTAPIException
 from plastron.namespaces import get_manager
 from plastron.pcdm import Object
-from plastron.serializers import EmptyItemListError, SERIALIZER_CLASSES
+from plastron.serializers import EmptyItemListError, SERIALIZER_CLASSES, detect_resource_class
 from plastron.util import get_ssh_client
 from tempfile import TemporaryDirectory
 from time import mktime
@@ -134,7 +134,7 @@ class Command:
             # all items that evaluate to true
             mime_type_filter = None
 
-        logger.debug(f'Export destination: {args.output_dest}')
+        logger.info(f'Export destination: {args.output_dest}')
 
         # create a bag in a temporary directory to hold exported items
         temp_dir = TemporaryDirectory()
@@ -154,7 +154,10 @@ class Command:
                     raise DataReadException(f'No UUID found in {uri}')
                 item_dir = match[0]
 
-                obj = Object.from_repository(fcrepo, uri=uri)
+                graph = fcrepo.get_graph(uri)
+                model_class = detect_resource_class(graph, uri, fallback=Object)
+                obj = model_class.from_graph(graph, uri)
+
                 if args.export_binaries:
                     logger.info(f'Gathering binaries for {uri}')
                     binaries = list(filter(mime_type_filter, obj.gather_files(fcrepo)))
@@ -225,9 +228,12 @@ class Command:
             # send over SFTP to a remote host
             sftp_uri = urlsplit(args.output_dest)
             ssh_client = get_ssh_client(sftp_uri, key_filename=args.key)
-            sftp_client = SFTPClient.from_transport(ssh_client.get_transport())
-            root, ext = splitext(basename(sftp_uri.path))
-            destination = sftp_client.open(sftp_uri.path, mode='w')
+            try:
+                sftp_client = SFTPClient.from_transport(ssh_client.get_transport())
+                root, ext = splitext(basename(sftp_uri.path))
+                destination = sftp_client.open(sftp_uri.path, mode='w')
+            except SSHException as e:
+                raise FailureException(str(e)) from e
         else:
             # send to a local file
             zip_filename = args.output_dest

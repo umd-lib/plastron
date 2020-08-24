@@ -20,6 +20,7 @@ class CommandListener(ConnectionListener):
         self.queue = self.broker.destinations['JOBS']
         self.completed_queue = self.broker.destinations['COMPLETED_JOBS']
         self.status_topic = self.broker.destinations['JOB_STATUS']
+        self.synchronous_queue = self.broker.destinations['SYNCHRONOUS_JOBS']
         self.inbox = MessageBox(os.path.join(self.broker.message_store_dir, 'inbox'))
         self.outbox = MessageBox(os.path.join(self.broker.message_store_dir, 'outbox'))
         self.executor = ThreadPoolExecutor(thread_name_prefix=__name__)
@@ -39,11 +40,16 @@ class CommandListener(ConnectionListener):
 
         # then process anything in the inbox
         for message in self.inbox(PlastronCommandMessage):
-            self.process_message(message)
+            response_handler = self.asynchronous_response_handler(message.id)
+            self.process_message(message, response_handler)
 
         # then subscribe to the queue to receive incoming messages
         self.broker.connection.subscribe(destination=self.queue, id='plastron')
         logger.info(f"Subscribed to {self.queue}")
+
+        # Subscribe for synchronous jobs
+        self.broker.connection.subscribe(destination=self.synchronous_queue, id='plastron')
+        logger.info(f"Subscribed to {self.synchronous_queue} for synchronous jobs")
 
         self.inbox_watcher = InboxWatcher(self, self.inbox)
         self.inbox_watcher.start()
@@ -53,6 +59,14 @@ class CommandListener(ConnectionListener):
         # respond to the inbox placing a file in the inbox message directory
         # containing the message
 
+        if headers['destination'] == self.synchronous_queue:
+            logger.debug(f'Received synchronous job message on {self.synchronous_queue} with headers: {headers}')
+            message = PlastronCommandMessage(headers=headers, body=body)
+            reply_to_queue = headers['reply-to']
+            response_handler = self.synchronous_response_handler(reply_to_queue)
+            self.process_message(message, response_handler)
+            return
+
         if headers['destination'] == self.queue:
             logger.debug(f'Received message on {self.queue} with headers: {headers}')
 
@@ -60,7 +74,7 @@ class CommandListener(ConnectionListener):
             message = PlastronCommandMessage(headers=headers, body=body)
             self.inbox.add(message.id, message)
 
-    def process_message(self, message):
+    def process_message(self, message, response_handler):
         # determine which command to load to process the message
         command_module = import_module('plastron.commands.' + message.command)
         # TODO: cache the command modules
@@ -88,7 +102,7 @@ class CommandListener(ConnectionListener):
                 command = command_module.Command(config)
                 args = command.parse_message(message)
 
-                for status in command.execute(repo, args):
+                for status in (command.execute(repo, args) or []):
                     self.broker.connection.send(
                         self.status_topic,
                         headers={
@@ -120,9 +134,20 @@ class CommandListener(ConnectionListener):
                 )
 
         # process message
-        self.executor.submit(process).add_done_callback(self.get_response_handler(message.id))
+        self.executor.submit(process).add_done_callback(response_handler)
 
-    def get_response_handler(self, message_id):
+    def synchronous_response_handler(self, reply_to_queue):
+        # define the response handler for this message
+        def response_handler(future):
+            response = future.result()
+
+            # send to the specified "reply to" queue
+            self.broker.connection.send(reply_to_queue, response.body, headers=response.headers)
+            logger.debug(f'Response message sent to {reply_to_queue} with headers: {response.headers}')
+
+        return response_handler
+
+    def asynchronous_response_handler(self, message_id):
         # define the response handler for this message
         def response_handler(future):
             response = future.result()

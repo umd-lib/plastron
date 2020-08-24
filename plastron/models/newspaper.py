@@ -23,19 +23,24 @@ class Issue(pcdm.Object):
     }
     VALIDATION_RULESET = {
         'title': {
+            'required': True,
             'exactly': 1
         },
         'date': {
+            'required': True,
             'exactly': 1,
             'value_pattern': r'^\d\d\d\d-\d\d-\d\d$'
         },
         'volume': {
+            'required': True,
             'exactly': 1
         },
         'issue': {
+            'required': True,
             'exactly': 1
         },
         'edition': {
+            'required': True,
             'exactly': 1
         }
     }

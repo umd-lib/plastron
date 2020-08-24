@@ -189,7 +189,8 @@ optional arguments:
 ```
 $ plastron update --help
 usage: plastron update [-h] -u UPDATE_FILE [-R RECURSIVE] [-d]
-                       [--no-transactions] [--completed COMPLETED] [-f FILE]
+                       [--no-transactions] [--validate] [-m MODEL]
+                       [--completed COMPLETED] [-f FILE]
                        [uris [uris ...]]
 
 Update objects in the repository
@@ -207,6 +208,10 @@ optional arguments:
   -d, --dry-run         Simulate an update without modifying the repository
   --no-transactions, --no-txn
                         run the update without using transactions
+  --validate            validate before updating
+  -m MODEL, --model MODEL
+                        The model class to use for validation (Item, Issue,
+                        Poster, or Letter)
   --completed COMPLETED
                         file recording the URIs of updated resources
   -f FILE, --file FILE  File containing a list of URIs to update
@@ -244,6 +249,22 @@ optional arguments:
                         a "zip:<path to zipfile>" URI, an SFTP URI in the form
                         "sftp://<user>@<host>/<path to dir>", or a URI in the
                         form "zip+sftp://<user>@<host>/<path to zipfile>"
+```
+
+### Echo (echo)
+
+```
+$ plastron echo --help
+usage: plastron echo [-h] [-e ECHO_DELAY] -b BODY
+
+Diagnostic command for echoing input to output. Primarily intended for testing
+synchronous message processing.
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -e ECHO_DELAY, --echo-delay ECHO_DELAY
+                        The amount of time to delay the reply, in seconds
+  -b BODY, --body BODY  The text to echo back
 ```
 
 ## Configuration

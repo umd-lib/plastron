@@ -218,12 +218,7 @@ def percentage(n):
 
 def load_item_internal(fcrepo, item, args, extra=None):
     logger.info('Creating item')
-    item.recursive_create(fcrepo)
-    logger.info('Creating ordering proxies')
-    item.create_proxies(fcrepo)
-    if args.create_annotations:
-        logger.info('Creating annotations')
-        item.create_annotations(fcrepo)
+    item.create(fcrepo)
 
     if extra:
         logger.info('Adding additional triples')

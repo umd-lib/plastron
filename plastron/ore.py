@@ -62,9 +62,13 @@ class Aggregation(ldp.Resource):
         """
         return AggregationIterator(self)
 
-    def create_proxies(self, repository):
-        for proxy in self:
-            proxy.create_object(repository)
+    def proxies(self):
+        return [proxy for proxy in self]
+
+    def create(self, repository: Repository, container_path=None, slug=None, headers=None, recursive=True, **kwargs):
+        super().create(repository, container_path=container_path, slug=slug, headers=headers, recursive=recursive, **kwargs)
+        if recursive:
+            repository.create_proxies(self)
 
 
 class AggregationIterator:

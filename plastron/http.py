@@ -1,12 +1,19 @@
 import logging
 import os
+from base64 import urlsafe_b64encode
+
 import requests
 import threading
 from collections import namedtuple
-from plastron.exceptions import RESTAPIException
+from plastron.exceptions import ConfigException, RESTAPIException
 from rdflib import Graph, URIRef
 
+
 OMIT_SERVER_MANAGED_TRIPLES = 'return=representation; omit="http://fedora.info/definitions/v4/repository#ServerManaged"'
+
+
+def random_slug(length=6):
+    return urlsafe_b64encode(os.urandom(length)).decode()
 
 
 # lightweight representation of a resource URI and URI of its description
@@ -18,10 +25,72 @@ class Resource(namedtuple('Resource', ['uri', 'description_uri'])):
         return self.uri
 
 
+class FlatCreator:
+    """
+    Creates all linked objects at the same container level as the initial item.
+    """
+    def __init__(self, repository):
+        self.repository = repository
+
+    def create_members(self, item):
+        self.repository.create_all(item.container_path, item.members)
+
+    def create_files(self, item):
+        self.repository.create_all(item.container_path, item.files)
+
+    def create_proxies(self, item):
+        self.repository.create_all(item.container_path, item.proxies())
+
+    def create_related(self, item):
+        self.repository.create_all(item.container_path, item.related)
+
+    def create_annotations(self, item):
+        self.repository.create_all(item.container_path, item.annotations)
+
+
+class HierarchicalCreator:
+    """
+    Creates linked objects in an ldp:contains hierarchy, using intermediate
+    containers to group by relationship:
+
+    * Members = /m
+    * Files = /f
+    * Proxies = /x
+
+    Related items, however, are created in the same container as the initial
+    item.
+    """
+    def __init__(self, repository):
+        self.repository = repository
+
+    def create_members(self, item):
+        self.repository.create_all(item.path + '/m', item.members, name_function=random_slug)
+
+    def create_files(self, item):
+        # create as child resources, grouped by relationship
+        self.repository.create_all(item.path + '/f', item.files, name_function=random_slug)
+
+    def create_proxies(self, item):
+        # create as child resources, grouped by relationship
+        self.repository.create_all(item.path + '/x', item.proxies(), name_function=random_slug)
+
+    def create_related(self, item):
+        # create related objects at the same container level as this object
+        self.repository.create_all(item.container_path, item.related)
+
+    def create_annotations(self, item):
+        # create as child resources, grouped by relationship
+        self.repository.create_all(item.path + '/a', item.annotations, name_function=random_slug)
+
+
 class Repository:
     def __init__(self, config, ua_string=None, on_behalf_of=None):
-        self.endpoint = config['REST_ENDPOINT']
+        # repo root
+        self.endpoint = config['REST_ENDPOINT'].rstrip('/')
+        # default container path
         self.relpath = config['RELPATH']
+        if not self.relpath.startswith('/'):
+            self.relpath = '/' + self.relpath
         self._path_stack = [self.relpath]
         self.fullpath = '/'.join(
             [p.strip('/') for p in (self.endpoint, self.relpath)]
@@ -30,11 +99,17 @@ class Repository:
         self.transaction = None
         self.load_binaries = True
         self.log_dir = config['LOG_DIR']
-        self.logger = logging.getLogger(
-            __name__ + '.' + self.__class__.__name__
-        )
+        self.logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
         self.ua_string = ua_string
         self.delegated_user = on_behalf_of
+
+        structure_type = config.get('STRUCTURE', 'flat').lower()
+        if structure_type == 'hierarchical':
+            self.creator = HierarchicalCreator(self)
+        elif structure_type == 'flat':
+            self.creator = FlatCreator(self)
+        else:
+            raise ConfigException(f'Unknown STRUCTURE value: {structure_type}')
 
         if 'CLIENT_CERT' in config and 'CLIENT_KEY' in config:
             self.session.cert = (config['CLIENT_CERT'], config['CLIENT_KEY'])
@@ -56,15 +131,14 @@ class Repository:
         self.relpath = self._path_stack.pop()
 
     def is_reachable(self):
-        response = self.head(self.fullpath)
+        response = self.head(self.endpoint + self.relpath)
         return response.status_code == 200
 
     def test_connection(self):
         # test connection to fcrepo
-        self.logger.debug("fcrepo.endpoint = %s", self.endpoint)
-        self.logger.debug("fcrepo.relpath = %s", self.relpath)
-        self.logger.debug("fcrepo.fullpath = %s", self.fullpath)
-        self.logger.info("Testing connection to {0}".format(self.fullpath))
+        self.logger.debug(f"Endpoint = {self.endpoint}")
+        self.logger.debug(f"Default container path = {self.relpath}")
+        self.logger.info(f"Testing connection to {self.endpoint + self.relpath}")
         if self.is_reachable():
             self.logger.info("Connection successful.")
         else:
@@ -106,17 +180,51 @@ class Repository:
         response = self.head(url, **kwargs)
         return response.status_code == 200
 
-    def create(self, url=None, **kwargs):
+    def path_exists(self, path, **kwargs):
+        return self.exists(self.endpoint + path, **kwargs)
+
+    def create(self, path=None, url=None, container_path=None, **kwargs):
         if url is not None:
             response = self.put(url, **kwargs)
+        elif path is not None:
+            response = self.put(self.endpoint + path, **kwargs)
         else:
-            response = self.post(self.uri(), **kwargs)
+            container_uri = self.endpoint + (container_path or self.relpath)
+            response = self.post(container_uri, **kwargs)
 
         if response.status_code == 201:
             created_url = response.headers['Location'] if 'Location' in response.headers else url
             return URIRef(self._remove_transaction_uri(created_url))
         else:
             raise RESTAPIException(response)
+
+    def create_all(self, container_path, resources, name_function=None):
+        # ensure the container exists
+        if len(resources) > 0 and not self.path_exists(container_path):
+            self.create(path=container_path)
+
+        for obj in resources:
+            if obj.created or obj.exists_in_repo(self):
+                obj.created = True
+                self.logger.debug(f'Object "{obj}" exists. Skipping.')
+            else:
+                slug = name_function() if callable(name_function) else None
+                obj.create(self, container_path=container_path, slug=slug)
+
+    def create_members(self, item):
+        self.creator.create_members(item)
+
+    def create_files(self, item):
+        self.creator.create_files(item)
+
+    def create_proxies(self, item):
+        self.creator.create_proxies(item)
+
+    def create_related(self, item):
+        self.creator.create_related(item)
+
+    def create_annotations(self, item):
+        self.creator.create_annotations(item)
 
     def recursive_get(self, url, traverse=None, **kwargs):
         target = self.get_description_uri(url)

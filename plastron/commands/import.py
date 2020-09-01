@@ -11,7 +11,7 @@ from os.path import basename, splitext
 from plastron import rdf
 from plastron.exceptions import DataReadException, NoValidationRulesetException, RESTAPIException, FailureException, \
     ConfigException, BinarySourceNotFoundError
-from plastron.files import LocalFile, RemoteFile, ZipFile
+from plastron.files import HTTPFileSource, LocalFileSource, RemoteFileSource, ZipFileSource
 from plastron.http import Transaction
 from plastron.namespaces import get_manager
 from plastron.pcdm import File, Page
@@ -125,7 +125,7 @@ def build_fields(fieldnames, property_attrs):
         if '[' in header:
             # this field has a language tag
             # header format is "Header Label [Language Label]"
-            header_label, language_label = re.search(r'^([^[]+)\s+\[(.+)\]$', header).groups()
+            header_label, language_label = re.search(r'^([^[]+)\s+\[(.+)]$', header).groups()
             try:
                 attrs = property_attrs[header_label]
             except KeyError as e:
@@ -233,25 +233,38 @@ class Command:
 
     def get_source(self, base_location, path):
         """
-        Get an appropriate BinarySource based on the type of base_location.
+        Get an appropriate BinarySource based on the type of ``base_location``.
+        The following forms of ``base_location`` are recognized:
 
-        :param base_location: The following forms are recognized:
-            "zip:<path to zipfile>"
-            "sftp:<user>@<host>/<path to dir>"
-            "zip+sftp:<user>@<host>/<path to zipfile>"
-            "<local dir path>"
+        * ``zip:<path to zipfile>``
+        * ``sftp:<user>@<host>/<path to dir>``
+        * ``http://<host>/<path to dir>``
+        * ``zip+sftp:<user>@<host>/<path to zipfile>``
+        * ``<local dir path>``
+
+        :param base_location:
         :param path:
         :return:
         """
         if base_location.startswith('zip:'):
-            return ZipFile(base_location[4:], path)
+            return ZipFileSource(base_location[4:], path)
         elif base_location.startswith('sftp:'):
-            return RemoteFile(os.path.join(base_location, path), ssh_options={'key_filename': self.ssh_private_key})
+            return RemoteFileSource(
+                location=os.path.join(base_location, path),
+                ssh_options={'key_filename': self.ssh_private_key}
+            )
+        elif base_location.startswith('http:') or base_location.startswith('https:'):
+            base_uri = base_location if base_location.endswith('/') else base_location + '/'
+            return HTTPFileSource(base_uri + path)
         elif base_location.startswith('zip+sftp:'):
-            return ZipFile(base_location[4:], path, ssh_options={'key_filename': self.ssh_private_key})
+            return ZipFileSource(
+                zip_file=base_location[4:],
+                path=path,
+                ssh_options={'key_filename': self.ssh_private_key}
+            )
         else:
             # with no URI prefix, assume a local file path
-            return LocalFile(localpath=os.path.join(base_location, path))
+            return LocalFileSource(localpath=os.path.join(base_location, path))
 
     def add_files(self, item, file_groups, base_location, access=None):
         """

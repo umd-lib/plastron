@@ -2,7 +2,7 @@ from rdflib import URIRef
 from plastron import ldp, ore, rdf
 from plastron.exceptions import RESTAPIException
 from plastron.namespaces import dcterms, dcmitype, ebucore, fabio, pcdm, pcdmuse, premis
-from plastron.files import LocalFile, RepositoryFile
+from plastron.files import LocalFileSource, RepositoryFileSource
 from PIL import Image
 
 # alias the rdflib Namespace
@@ -51,15 +51,9 @@ class Object(ore.Aggregation):
 class File(ldp.Resource):
     @classmethod
     def from_repository(cls, repo, uri, include_server_managed=True):
-        source = RepositoryFile(repo, uri)
-        return cls(source, uri=uri)
-
-    def __init__(self, source, **kwargs):
-        super().__init__(**kwargs)
-        self.source = source
-        self.filename = source.filename
-        if self.title is None:
-            self.title = self.filename
+        obj = super().from_repository(repo, uri, include_server_managed)
+        obj.source = RepositoryFileSource(repo, uri)
+        return obj
 
     # upload a binary resource
     def create_object(self, repository, uri=None):
@@ -74,7 +68,7 @@ class File(ldp.Resource):
 
         self.logger.info(f'Loading {self.source.filename}')
 
-        with self.source.data() as stream:
+        with self.source as stream:
             headers = {
                 'Content-Type': self.source.mimetype(),
                 'Digest': self.source.digest(),
@@ -102,9 +96,10 @@ class File(ldp.Resource):
             if self.width is None or self.height is None:
                 # use PIL
                 try:
-                    with Image.open(self.source.data()) as img:
-                        self.width = img.width
-                        self.height = img.height
+                    with self.source as stream:
+                        with Image.open(stream) as img:
+                            self.width = img.width
+                            self.height = img.height
                 except IOError as e:
                     self.logger.warn(f'Cannot read image file: {e}')
 
@@ -163,6 +158,6 @@ def get_file_object(path):
         cls = FILE_CLASS_FOR[extension]
     else:
         cls = File
-    f = cls(LocalFile(path))
+    f = cls(LocalFileSource(path))
     f.dcmitype = dcmitype.Text
     return f

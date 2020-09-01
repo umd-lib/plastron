@@ -11,7 +11,7 @@ from os.path import basename, splitext
 from plastron import rdf
 from plastron.exceptions import DataReadException, NoValidationRulesetException, RESTAPIException, FailureException, \
     ConfigException, BinarySourceNotFoundError
-from plastron.files import LocalFileSource, RemoteFileSource, ZipFileSource
+from plastron.files import HTTPFileSource, LocalFileSource, RemoteFileSource, ZipFileSource
 from plastron.http import Transaction
 from plastron.namespaces import get_manager
 from plastron.pcdm import File, Page
@@ -238,6 +238,7 @@ class Command:
 
         * ``zip:<path to zipfile>``
         * ``sftp:<user>@<host>/<path to dir>``
+        * ``http://<host>/<path to dir>``
         * ``zip+sftp:<user>@<host>/<path to zipfile>``
         * ``<local dir path>``
 
@@ -252,6 +253,9 @@ class Command:
                 location=os.path.join(base_location, path),
                 ssh_options={'key_filename': self.ssh_private_key}
             )
+        elif base_location.startswith('http:') or base_location.startswith('https:'):
+            base_uri = base_location if base_location.endswith('/') else base_location + '/'
+            return HTTPFileSource(base_uri + path)
         elif base_location.startswith('zip+sftp:'):
             return ZipFileSource(
                 zip_file=base_location[4:],

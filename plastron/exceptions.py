@@ -37,5 +37,6 @@ class NoValidationRulesetException(Exception):
 class BinarySourceError(Exception):
     pass
 
+
 class BinarySourceNotFoundError(BinarySourceError):
     pass

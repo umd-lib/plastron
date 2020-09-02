@@ -66,7 +66,14 @@ class Aggregation(ldp.Resource):
         return [proxy for proxy in self]
 
     def create(self, repository: Repository, container_path=None, slug=None, headers=None, recursive=True, **kwargs):
-        super().create(repository, container_path=container_path, slug=slug, headers=headers, recursive=recursive, **kwargs)
+        super().create(
+            repository=repository,
+            container_path=container_path,
+            slug=slug,
+            headers=headers,
+            recursive=recursive,
+            **kwargs
+        )
         if recursive:
             repository.create_proxies(self)
 

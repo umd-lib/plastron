@@ -1,12 +1,12 @@
-"""On LDP, see http://www.w3.org/TR/2015/REC-ldp-20150226"""
-
 import logging
-from uuid import uuid4
-from rdflib import Graph, URIRef
-from datetime import datetime as dt
+from datetime import datetime
+from os.path import dirname
+
 from plastron import rdf
 from plastron.exceptions import RESTAPIException
 from plastron.http import Repository
+from rdflib import Graph, URIRef
+from uuid import uuid4
 
 
 class Resource(rdf.Resource):
@@ -33,6 +33,8 @@ class Resource(rdf.Resource):
         self.extra = Graph()
         self.created = False
         self.updated = False
+        self.path = None
+        self.container_path = None
         self.uuid = None
         self.creation_timestamp = None
         self.logger = logging.getLogger(
@@ -48,27 +50,36 @@ class Resource(rdf.Resource):
     def load(self, repository: Repository):
         return self.read(repository.get_graph(self.uri))
 
-    # create repository object by POST or PUT
-    def create_object(self, repository, uri=None):
-        if self.created:
-            return False
-        elif self.exists_in_repo(repository):
-            self.created = True
-            return False
+    def create(self, repository: Repository, container_path=None, slug=None, headers=None, recursive=True, **kwargs):
+        if not self.created and not self.exists_in_repo(repository):
 
-        self.logger.info(f"Creating {self}...")
-        try:
-            self.uri = repository.create(url=uri)
+            self.logger.info(f"Creating {self}...")
+            if headers is None:
+                headers = {}
+            if slug is not None:
+                headers['Slug'] = slug
+            try:
+                self.uri = repository.create(container_path=container_path, headers=headers, **kwargs)
+                self.path = self.uri[len(repository.endpoint):]
+                self.created = True
+                # TODO: get this from the response headers
+                self.creation_timestamp = datetime.now()
+                # TODO: get the fedora:parent
+                self.container_path = container_path or repository.relpath
+                self.logger.info(f"Created {self}")
+                self.uuid = str(self.uri).rsplit('/', 1)[-1]
+                self.logger.info(f'URI: {self.uri}')
+                self.create_fragments()
+                repository.create_all(self.path + '/a', self.annotations)
+            except RESTAPIException as e:
+                self.logger.error(f"Failed to create {self}: {e}")
+                raise
+        else:
             self.created = True
-            self.logger.info(f"Created {self}")
-            self.uuid = str(self.uri).rsplit('/', 1)[-1]
-            self.logger.info(
-                'URI: {0} / UUID: {1}'.format(self.uri, self.uuid)
-            )
-            self.create_fragments()
-        except RESTAPIException as e:
-            self.logger.error(f"Failed to create {self}")
-            raise e
+            self.logger.debug(f'Object "{self}" exists. Skipping.')
+
+        if recursive:
+            repository.create_annotations(self)
 
     def create_fragments(self):
         for obj in self.embedded_objects():
@@ -126,20 +137,6 @@ class Resource(rdf.Resource):
             self.logger.error(query)
             raise RESTAPIException(response)
 
-    # recursively create an object and components and that don't yet exist
-    def recursive_create(self, repository):
-        if self.create_object(repository):
-            self.creation_timestamp = dt.now()
-        else:
-            self.logger.debug(f'Object "{self}" exists. Skipping.')
-
-        for obj in self.linked_objects():
-            if obj.created or obj.exists_in_repo(repository):
-                obj.created = True
-                self.logger.debug(f'Object "{self}" exists. Skipping.')
-            else:
-                obj.recursive_create(repository)
-
     # recursively update an object and all its components and files
     def recursive_update(self, repository):
         if not self.updated:
@@ -171,11 +168,6 @@ class Resource(rdf.Resource):
     # called after creation of object in repo
     def post_creation_hook(self):
         pass
-
-    def create_annotations(self, repository):
-        with repository.at_path('annotations'):
-            for annotation in self.annotations:
-                annotation.recursive_create(repository)
 
     def update_annotations(self, repository):
         for annotation in self.annotations:

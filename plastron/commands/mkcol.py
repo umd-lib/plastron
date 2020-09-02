@@ -38,7 +38,7 @@ class Command:
             try:
                 collection = pcdm.Collection()
                 collection.title = args.name
-                collection.create_object(fcrepo)
+                collection.create(fcrepo, recursive=False)
                 collection.update_object(fcrepo)
 
             except RESTAPIException as e:
@@ -49,7 +49,7 @@ class Command:
                 try:
                     collection = pcdm.Collection()
                     collection.title = args.name
-                    collection.create_object(fcrepo)
+                    collection.create(fcrepo, recursive=False)
                     collection.update_object(fcrepo)
                     txn.commit()
 

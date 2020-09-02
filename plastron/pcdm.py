@@ -1,9 +1,8 @@
-from rdflib import URIRef
 from plastron import ldp, ore, rdf
-from plastron.exceptions import RESTAPIException
 from plastron.namespaces import dcterms, dcmitype, ebucore, fabio, pcdm, pcdmuse, premis
 from plastron.files import LocalFileSource, RepositoryFileSource
 from PIL import Image
+
 
 # alias the rdflib Namespace
 ns = pcdm
@@ -38,6 +37,21 @@ class Object(ore.Aggregation):
                 file.read(graph)
                 yield file
 
+    # recursively create an object and components and that don't yet exist
+    def create(self, repository, container_path=None, slug=None, headers=None, recursive=True, **kwargs):
+        super().create(
+            repository=repository,
+            container_path=container_path,
+            slug=slug,
+            headers=headers,
+            recursive=recursive,
+            **kwargs
+        )
+        if recursive:
+            repository.create_members(self)
+            repository.create_files(self)
+            repository.create_related(self)
+
 
 @rdf.object_property('file_of', pcdm.fileOf)
 @rdf.data_property('mimetype', ebucore.hasMimeType)
@@ -56,7 +70,7 @@ class File(ldp.Resource):
         return obj
 
     # upload a binary resource
-    def create_object(self, repository, uri=None):
+    def create(self, repository, uri=None, container_path=None, slug=None, headers=None, **kwargs):
         if not repository.load_binaries:
             self.logger.info(f'Skipping loading for binary {self.source.filename}')
             return True
@@ -69,22 +83,18 @@ class File(ldp.Resource):
         self.logger.info(f'Loading {self.source.filename}')
 
         with self.source as stream:
-            headers = {
+            if headers is None:
+                headers = {}
+            headers.update({
                 'Content-Type': self.source.mimetype(),
                 'Digest': self.source.digest(),
                 'Content-Disposition': f'attachment; filename="{self.source.filename}"'
-            }
-            if uri is not None:
-                response = repository.put(uri, data=stream, headers=headers)
-            else:
-                response = repository.post(repository.uri(), data=stream, headers=headers)
-
-        if response.status_code == 201:
-            self.uri = URIRef(response.headers['Location'])
+            })
+            if slug is not None:
+                headers['Slug'] = slug
+            self.uri = repository.create(url=uri, container_path=container_path, data=stream, headers=headers)
             self.created = True
             return True
-        else:
-            raise RESTAPIException(response)
 
     def update_object(self, repository, patch_uri=None):
         if not repository.load_binaries:

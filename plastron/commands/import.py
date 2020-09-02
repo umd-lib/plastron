@@ -78,6 +78,14 @@ def configure_cli(subparsers):
         action='store'
     )
     parser.add_argument(
+        '--container',
+        help=(
+            'parent container for new items; defaults to the RELPATH'
+            'in the repo configuration file'
+        ),
+        action='store'
+    )
+    parser.add_argument(
         'import_file', nargs='?',
         help='name of the file to import from',
         type=FileType('r', encoding='utf-8-sig'),
@@ -295,7 +303,8 @@ class Command:
                 proxy.rdf_type.append(access)
             # add the files that are part of this page
             for filename in filenames:
-                file = File(self.get_source(base_location, filename), title=filename)
+                file = File(title=filename)
+                file.source = self.get_source(base_location, filename)
                 count += 1
                 page.add_file(file)
                 if access is not None:
@@ -558,7 +567,7 @@ class Command:
                                     access=args.access
                                 )
 
-                            item.recursive_create(repo)
+                            item.create(repo, container_path=args.container)
                             item.recursive_update(repo)
 
                             count['created'] += 1

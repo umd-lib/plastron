@@ -7,6 +7,7 @@ from plastron.files import HTTPFileSource
 from plastron.http import Transaction
 from plastron.models import Item
 from plastron.pcdm import File
+from plastron.util import uri_or_curie
 from rdflib import URIRef
 
 
@@ -36,6 +37,12 @@ def configure_cli(subparsers):
     parser.add_argument(
         '--member-of',
         help='URI of the object that new items are PCDM members of',
+        action='store'
+    )
+    parser.add_argument(
+        '--access',
+        help='URI or CURIE of the access class to apply to new items',
+        type=uri_or_curie,
         action='store'
     )
     parser.add_argument(
@@ -77,6 +84,7 @@ class Command:
         else:
             output_file = sys.stdout
         csv_writer = csv.DictWriter(output_file, fieldnames=csv_file.fieldnames)
+        csv_writer.writeheader()
         for n, row in enumerate(csv_file, start=1):
             id = row[args.identifier_column]
             if not row[args.binary_column]:
@@ -89,6 +97,9 @@ class Command:
             item.add_file(file)
             if args.member_of is not None:
                 item.member_of = URIRef(args.member_of)
+            if args.access is not None:
+                item.rdf_types.add(args.access)
+                file.rdf_types.add(args.access)
             try:
                 with Transaction(repo) as txn:
                     try:

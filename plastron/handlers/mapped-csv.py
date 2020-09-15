@@ -5,7 +5,7 @@ import yaml
 from rdflib import Literal, URIRef
 from rdflib.util import from_n3
 from plastron import pcdm, namespaces, rdf
-from plastron.files import LocalFile, RemoteFile
+from plastron.files import LocalFileSource, RemoteFileSource
 from plastron.exceptions import ConfigException
 from collections import OrderedDict
 
@@ -26,7 +26,7 @@ def get_file_object(path, source=None):
     else:
         cls = pcdm.File
     if source is None:
-        source = LocalFile(path)
+        source = LocalFileSource(path)
     f = cls(source)
     return f
 
@@ -147,11 +147,11 @@ class Batch:
 
                     for filename in filenames:
                         if 'host' in filename_conf:
-                            source = RemoteFile(filename_conf['host'], filename)
+                            source = RemoteFileSource(filename_conf['host'], filename)
                         else:
                             # local file
                             localpath = os.path.join(self.file_path, filename)
-                            source = LocalFile(localpath)
+                            source = LocalFileSource(localpath)
 
                         f = get_file_object(filename, source)
                         for column, conf in mapping.items():
@@ -177,7 +177,7 @@ class Batch:
                         if len(key_parts) == 2:
                             # top-level
                             for entry in members[key]:
-                                source = LocalFile(entry.path)
+                                source = LocalFileSource(entry.path)
                                 f = get_file_object(entry.name, source)
                                 yield f
 
@@ -188,7 +188,7 @@ class Batch:
                             sequence_number = int(key_parts[2])
                             page = pcdm.Page(number=str(sequence_number), title=f'Page {sequence_number}')
                             for entry in members[key]:
-                                source = LocalFile(entry.path)
+                                source = LocalFileSource(entry.path)
                                 f = get_file_object(entry.name, source)
                                 for column, conf in mapping.items():
                                     set_value(f, column, conf, line)

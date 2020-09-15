@@ -1,5 +1,5 @@
 from importlib import import_module
-from plastron.files import LocalFile, RemoteFile, ZipFile
+from plastron.files import LocalFileSource, RemoteFileSource, ZipFileSource
 from plastron.rdf import RDFDataProperty
 
 imp = import_module('plastron.commands.import')
@@ -13,10 +13,10 @@ def test_build_file_groups():
 
 
 def test_get_source():
-    assert isinstance(cmd.get_source('zip:foo.zip', 'bar.jpg'), ZipFile)
-    assert isinstance(cmd.get_source('sftp://user@example.com/foo', 'bar.jpg'), RemoteFile)
-    assert isinstance(cmd.get_source('zip+sftp://user@example.com/foo.zip', 'bar.jpg'), ZipFile)
-    assert isinstance(cmd.get_source('/foo', 'bar'), LocalFile)
+    assert isinstance(cmd.get_source('zip:foo.zip', 'bar.jpg'), ZipFileSource)
+    assert isinstance(cmd.get_source('sftp://user@example.com/foo', 'bar.jpg'), RemoteFileSource)
+    assert isinstance(cmd.get_source('zip+sftp://user@example.com/foo.zip', 'bar.jpg'), ZipFileSource)
+    assert isinstance(cmd.get_source('/foo', 'bar'), LocalFileSource)
 
 
 def test_parse_value_string():

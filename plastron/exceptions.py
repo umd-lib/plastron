@@ -34,5 +34,9 @@ class NoValidationRulesetException(Exception):
         return self.message
 
 
-class BinarySourceNotFoundError(Exception):
+class BinarySourceError(Exception):
+    pass
+
+
+class BinarySourceNotFoundError(BinarySourceError):
     pass

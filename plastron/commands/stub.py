@@ -89,6 +89,7 @@ class Command:
             id = row[args.identifier_column]
             if not row[args.binary_column]:
                 logger.warning(f'No binary source URI found for {id}; skipping')
+                csv_writer.writerow(row)
                 continue
             source = HTTPFileSource(row[args.binary_column])
             item = Item(identifier=id, title=f'Stub for {id}')

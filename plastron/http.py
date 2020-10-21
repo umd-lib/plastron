@@ -111,7 +111,13 @@ class Repository:
         else:
             raise ConfigException(f'Unknown STRUCTURE value: {structure_type}')
 
-        if 'CLIENT_CERT' in config and 'CLIENT_KEY' in config:
+        # set up authentication credentials; in order of preference:
+        #   1. Bearer token
+        #   2. SSL client cert
+        #   3. HTTP Basic username/password
+        if 'AUTH_TOKEN' in config:
+            self.session.headers.update({'Authorization': f"Bearer {config['AUTH_TOKEN']}"})
+        elif 'CLIENT_CERT' in config and 'CLIENT_KEY' in config:
             self.session.cert = (config['CLIENT_CERT'], config['CLIENT_KEY'])
         elif 'FEDORA_USER' in config and 'FEDORA_PASSWORD' in config:
             self.session.auth = (config['FEDORA_USER'], config['FEDORA_PASSWORD'])

@@ -62,7 +62,7 @@ class Object(ore.Aggregation):
 @rdf.object_property('dcmitype', dcterms.type)
 @rdf.data_property('title', dcterms.title)
 @rdf.rdf_class(pcdm.File)
-class File(ldp.Resource):
+class File(ldp.NonRdfSource):
     @classmethod
     def from_repository(cls, repo, uri, include_server_managed=True):
         obj = super().from_repository(repo, uri, include_server_managed)
@@ -162,12 +162,13 @@ FILE_CLASS_FOR = {
 }
 
 
-def get_file_object(path):
+def get_file_object(path, source=None):
     extension = path[path.rfind('.'):]
     if extension in FILE_CLASS_FOR:
         cls = FILE_CLASS_FOR[extension]
     else:
         cls = File
-    f = cls(LocalFileSource(path))
-    f.dcmitype = dcmitype.Text
+    if source is None:
+        source = LocalFileSource(path)
+    f = cls.from_source(source)
     return f

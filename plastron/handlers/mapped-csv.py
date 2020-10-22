@@ -11,25 +11,6 @@ from collections import OrderedDict
 
 nsm = namespaces.get_manager()
 
-FILE_CLASS_FOR = {
-    '.tif': pcdm.PreservationMasterFile,
-    '.jpg': pcdm.IntermediateFile,
-    '.txt': pcdm.ExtractedText,
-    '.xml': pcdm.ExtractedText,
-}
-
-
-def get_file_object(path, source=None):
-    extension = path[path.rfind('.'):]
-    if extension in FILE_CLASS_FOR:
-        cls = FILE_CLASS_FOR[extension]
-    else:
-        cls = pcdm.File
-    if source is None:
-        source = LocalFileSource(path)
-    f = cls(source)
-    return f
-
 
 class Batch:
     """Class representing the mapped and parsed CSV data"""
@@ -153,7 +134,7 @@ class Batch:
                             localpath = os.path.join(self.file_path, filename)
                             source = LocalFileSource(localpath)
 
-                        f = get_file_object(filename, source)
+                        f = pcdm.get_file_object(filename, source)
                         for column, conf in mapping.items():
                             set_value(f, column, conf, line)
                         yield f
@@ -178,7 +159,7 @@ class Batch:
                             # top-level
                             for entry in members[key]:
                                 source = LocalFileSource(entry.path)
-                                f = get_file_object(entry.name, source)
+                                f = pcdm.get_file_object(entry.name, source)
                                 yield f
 
                         elif len(key_parts) == 3:
@@ -189,7 +170,7 @@ class Batch:
                             page = pcdm.Page(number=str(sequence_number), title=f'Page {sequence_number}')
                             for entry in members[key]:
                                 source = LocalFileSource(entry.path)
-                                f = get_file_object(entry.name, source)
+                                f = pcdm.get_file_object(entry.name, source)
                                 for column, conf in mapping.items():
                                     set_value(f, column, conf, line)
                                 page.add_file(f)

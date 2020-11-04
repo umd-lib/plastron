@@ -185,7 +185,11 @@ class NonRdfSource(Resource):
     """Class representing a Linked Data Platform Non-RDF Source (LDP-NR)
     An LDPR whose state is not represented in RDF. For example, these can be
     binary or text documents that do not have useful RDF representations."""
-    pass
+    @classmethod
+    def from_source(cls, source=None, **kwargs):
+        obj = cls(**kwargs)
+        obj.source = source
+        return obj
 
 
 class Container(RdfSource):

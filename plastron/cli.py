@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-import argparse
 import logging
 import logging.config
 import os
 import sys
 import yaml
+from argparse import ArgumentParser, FileType
 from datetime import datetime
 from importlib import import_module
 from pkgutil import iter_modules
@@ -14,6 +14,7 @@ from plastron import commands, version
 from plastron.exceptions import FailureException
 from plastron.logging import DEFAULT_LOGGING_OPTIONS
 from plastron.http import Repository
+from plastron.stomp import Broker
 
 logger = logging.getLogger(__name__)
 now = datetime.utcnow().strftime('%Y%m%d%H%M%S')
@@ -22,7 +23,7 @@ now = datetime.utcnow().strftime('%Y%m%d%H%M%S')
 def main():
     """Parse args and handle options."""
 
-    parser = argparse.ArgumentParser(
+    parser = ArgumentParser(
         prog='plastron',
         description='Batch operation tool for Fedora 4.'
     )
@@ -33,6 +34,13 @@ def main():
         '-r', '--repo',
         help='Path to repository configuration file.',
         action='store'
+    )
+    common_required.add_argument(
+        '-c', '--config',
+        help='Path to configuration file.',
+        action='store',
+        dest='config_file',
+        type=FileType('r')
     )
     common_required.add_argument(
         '-V', '--version',
@@ -76,12 +84,27 @@ def main():
         parser.print_help()
         sys.exit(0)
 
-    # load required repository config file and create repository object
-    with open(args.repo, 'r') as repo_config_file:
-        repo_config = yaml.safe_load(repo_config_file)
-        fcrepo = Repository(
-            repo_config, ua_string=f'plastron/{version}', on_behalf_of=args.delegated_user
-        )
+    if args.config_file is not None:
+        # new-style, combined config file (a la plastron.daemon)
+        config = yaml.safe_load(args.config_file)
+        repo_config = config['REPOSITORY']
+        broker_config = config.get('MESSAGE_BROKER', None)
+        command_config = config.get('COMMANDS', None)
+    else:
+        # old-style, repository-only config file
+        with open(args.repo, 'r') as repo_config_file:
+            repo_config = yaml.safe_load(repo_config_file)
+        broker_config = None
+        command_config = None
+
+    fcrepo = Repository(
+        repo_config, ua_string=f'plastron/{version}', on_behalf_of=args.delegated_user
+    )
+
+    if broker_config is not None:
+        broker = Broker(broker_config)
+    else:
+        broker = None
 
     # get basic logging options
     if 'LOGGING_CONFIG' in repo_config:
@@ -108,12 +131,18 @@ def main():
     logging.config.dictConfig(logging_options)
 
     # get the selected subcommand
-    command = command_modules[args.cmd_name].Command()
+    command_module = command_modules[args.cmd_name]
 
     try:
+        if hasattr(command_module, 'Command'):
+            command = command_module.Command()
+            command.repo = fcrepo
+            command.broker = broker
+        else:
+            raise FailureException(f'Unable to execute command {args.cmd_name}')
         # dispatch to the selected subcommand
         print_header(args)
-        logger.info(f'Loaded repo configuration from {args.repo}')
+        logger.info(f'Loaded repo configuration from {args.repo or args.config_file.name}')
         if args.delegated_user is not None:
             logger.info(f'Running repository operations on behalf of {args.delegated_user}')
         command(fcrepo, args)

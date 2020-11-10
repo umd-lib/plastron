@@ -106,7 +106,7 @@ class Broker:
                 logger.warning('Connection attempt failed')
                 sleep(1)
 
-    def destination(self, name : str):
+    def destination(self, name: str):
         return self.destinations[name.upper()]
 
     def send_message(self, destination, headers=None, body='', **kwargs):

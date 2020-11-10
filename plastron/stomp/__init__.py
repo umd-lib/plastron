@@ -93,7 +93,7 @@ class Broker:
         # set up STOMP client
         broker_server = tuple(config['SERVER'].split(':', 2))
         self.connection = Connection([broker_server])
-        self.destinations = config['DESTINATIONS']
+        self.destinations = config.get('DESTINATIONS', {})
         self.message_store_dir = config['MESSAGE_STORE_DIR']
         self.public_uri_template = config.get('PUBLIC_URI_TEMPLATE', os.environ.get('PUBLIC_URI_TEMPLATE', None))
 
@@ -105,3 +105,19 @@ class Broker:
             except ConnectFailedException:
                 logger.warning('Connection attempt failed')
                 sleep(1)
+
+    def destination(self, name: str):
+        return self.destinations[name.upper()]
+
+    def send_message(self, destination, headers=None, body='', **kwargs):
+        if headers is None:
+            headers = {}
+        self.connection.send(
+            destination=destination,
+            headers=headers,
+            body=body,
+            **kwargs
+        )
+
+    def disconnect(self):
+        self.connection.disconnect()

@@ -95,6 +95,7 @@ setup(
     # Similar to `install_requires` above, these must be valid existing
     # projects.
     extras_require={  # Optional
+        'dev': ['pycodestyle'],
         'test': ['pytest'],
     },
 

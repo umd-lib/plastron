@@ -161,6 +161,10 @@ class Resource(rdf.Resource):
             source=triples_file, format=rdf_format, publicID=self.uri
         )
 
+    # return any extra triples along with the main graph
+    def graph(self, nsm=None):
+        return super().graph(nsm) + self.extra
+
     # show the object's graph, serialized as turtle
     def print_graph(self):
         print(self.graph().serialize(format="turtle").decode())

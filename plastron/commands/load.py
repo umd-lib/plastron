@@ -295,7 +295,12 @@ class BatchConfig:
         self.mapfile = os.path.join(self.log_dir, options.get('MAPFILE', 'mapfile.csv'))
 
         self.handler_options = options.get('HANDLER_OPTIONS', {})
-        self.extra = options.get('EXTRA', None)
+        extra = options.get('EXTRA', None)
+        if extra is not None:
+            self.extra = os.path.join(self.root_dir, extra)
+        else:
+            self.extra = None
+
 
         # required fields
         missing_fields = []

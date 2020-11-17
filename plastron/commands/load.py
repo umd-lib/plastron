@@ -301,7 +301,6 @@ class BatchConfig:
         else:
             self.extra = None
 
-
         # required fields
         missing_fields = []
         try:

@@ -286,6 +286,16 @@ with the `-r` or `--repo` option. These are the recognized configuration keys:
 |`RELPATH`      |Path within repository to load objects to|
 |`LOG_DIR`      |Directory to write log files|
 
+#### JSON Web Token (JWT) Authentication
+
+Only **one** of these should be used. `AUTH_TOKEN` takes precedence over
+`JWT_SECRET` if both are present.
+
+| Option     | Description |
+| ---------- | ----------- |
+|`AUTH_TOKEN`|Serialized JWT ready to be added to an "Authorization: Bearer ..." header|
+|`JWT_SECRET`|Secret string to use to generate JWTs on-the-fly|
+
 #### Client Certificate Authentication
 
 | Option      | Description |

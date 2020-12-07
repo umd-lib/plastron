@@ -1,10 +1,12 @@
 import logging
 import os
-from base64 import urlsafe_b64encode
-
 import requests
 import threading
+import time
+from base64 import urlsafe_b64encode
 from collections import namedtuple
+from jwcrypto.jwk import JWK
+from jwcrypto.jwt import JWT
 from plastron.exceptions import ConfigException, RESTAPIException
 from rdflib import Graph, URIRef
 
@@ -14,6 +16,31 @@ OMIT_SERVER_MANAGED_TRIPLES = 'return=representation; omit="http://fedora.info/d
 
 def random_slug(length=6):
     return urlsafe_b64encode(os.urandom(length)).decode()
+
+
+def auth_token(secret: str, valid_for=3600) -> JWT:
+    """
+    Create an admin auth token from the specified secret. By default, the token
+    will be valid for 1 hour (3600 seconds).
+
+    :param secret:
+    :param valid_for:
+    :return:
+    """
+    token = JWT(
+        header={
+            'alg': 'HS256'
+        },
+        claims={
+            'sub': 'plastron',
+            'iss': 'plastron',
+            'exp': time.time() + valid_for,
+            'role': 'fedoraAdmin'
+        }
+    )
+    key = JWK(kty='oct', k=secret)
+    token.make_signed_token(key)
+    return token
 
 
 # lightweight representation of a resource URI and URI of its description
@@ -96,6 +123,7 @@ class Repository:
             [p.strip('/') for p in (self.endpoint, self.relpath)]
         )
         self.session = requests.Session()
+        self.jwt_secret = None
         self.transaction = None
         self.load_binaries = True
         self.log_dir = config['LOG_DIR']
@@ -116,7 +144,13 @@ class Repository:
         #   2. SSL client cert
         #   3. HTTP Basic username/password
         if 'AUTH_TOKEN' in config:
-            self.session.headers.update({'Authorization': f"Bearer {config['AUTH_TOKEN']}"})
+            self.session.headers.update(
+                {'Authorization': f"Bearer {config['AUTH_TOKEN']}"}
+            )
+        elif 'JWT_SECRET' in config:
+            self.session.headers.update(
+                {'Authorization': f"Bearer {auth_token(config['JWT_SECRET']).serialize()}"}
+            )
         elif 'CLIENT_CERT' in config and 'CLIENT_KEY' in config:
             self.session.cert = (config['CLIENT_CERT'], config['CLIENT_KEY'])
         elif 'FEDORA_USER' in config and 'FEDORA_PASSWORD' in config:

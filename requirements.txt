@@ -1,6 +1,7 @@
 iso639
 pyparsing
 edtf
+jwcrypto==0.8
 setuptools==39.0.1
 rdflib==4.2.1
 requests>=2.20.0

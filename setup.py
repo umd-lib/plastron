@@ -74,6 +74,7 @@ setup(
         'bagit',
         'edtf',
         'iso639',
+        'jwcrypto',
         'lxml>3.6.0',
         'numpy',
         'paramiko',

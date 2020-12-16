@@ -43,7 +43,7 @@ def main():
 
     repo_config = config['REPOSITORY']
     broker_config = config['MESSAGE_BROKER']
-    command_config = config['COMMANDS']
+    command_config = config.get('COMMANDS', {})
 
     logging_options = DEFAULT_LOGGING_OPTIONS
 

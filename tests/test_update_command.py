@@ -1,7 +1,7 @@
 from argparse import Namespace
 from plastron.commands.update import Command
 from plastron.exceptions import FailureException
-from plastron.stomp import PlastronCommandMessage
+from plastron.stomp.messages import PlastronCommandMessage
 from pytest import raises
 
 

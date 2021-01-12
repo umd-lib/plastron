@@ -7,6 +7,7 @@ import re
 from argparse import FileType, Namespace, ArgumentTypeError
 from collections import OrderedDict, defaultdict
 from datetime import datetime
+from distutils.util import strtobool
 from os.path import basename, splitext
 from plastron import rdf
 from plastron.exceptions import DataReadException, NoValidationRulesetException, RESTAPIException, FailureException, \
@@ -274,7 +275,7 @@ class Command:
             # with no URI prefix, assume a local file path
             return LocalFileSource(localpath=os.path.join(base_location, path))
 
-    def add_files(self, item, file_groups, base_location, access=None):
+    def add_files(self, item, file_groups, base_location, access=None, create_pages=True):
         """
         Add pages and files to the given item. A page is added for each key (basename) in the file_groups
         parameter, and a file is added for each element in the value list for that key.
@@ -283,30 +284,39 @@ class Command:
         :param file_groups: Dictionary of basename to filename list mappings.
         :param base_location: Location of the files.
         :param access: Optional RDF class representing the access level for this item.
+        :param create_pages: Whether to create an intermediate page object for each file group. Defaults to True.
         :return: The number of files added.
         """
         if base_location is None:
             raise ConfigException('Must specify a binaries-location')
 
-        logger.debug(f'Creating {len(file_groups.keys())} page(s)')
+        if create_pages:
+            logger.debug(f'Creating {len(file_groups.keys())} page(s)')
+
         count = 0
 
         for n, filenames in enumerate(file_groups.values(), 1):
-            # create a page object for each rootname
-            page = Page(title=f'Page {n}', number=n)
-            # add to the item
-            item.add_member(page)
-            proxy = item.append_proxy(page, title=page.title)
-            # add the access class to the page resources
-            if access is not None:
-                page.rdf_type.append(access)
-                proxy.rdf_type.append(access)
-            # add the files that are part of this page
+            if create_pages:
+                # create a page object for each rootname
+                page = Page(title=f'Page {n}', number=n)
+                # add to the item
+                item.add_member(page)
+                proxy = item.append_proxy(page, title=page.title)
+                # add the access class to the page resources
+                if access is not None:
+                    page.rdf_type.append(access)
+                    proxy.rdf_type.append(access)
+                file_parent = page
+            else:
+                # files will be added directly to the item
+                file_parent = item
+
+            # add the files to their parent object (either the item or a page)
             for filename in filenames:
                 file = File(title=filename)
                 file.source = self.get_source(base_location, filename)
                 count += 1
-                page.add_file(file)
+                file_parent.add_file(file)
                 if access is not None:
                     file.rdf_type.append(access)
 
@@ -559,12 +569,14 @@ class Command:
                                 item.member_of = URIRef(args.member_of)
 
                             if 'FILES' in row and row['FILES'].strip() != '':
+                                create_pages = bool(strtobool(row.get('CREATE_PAGES', 'True')))
                                 logger.debug('Adding pages and files to new item')
                                 self.add_files(
                                     item,
                                     build_file_groups(row['FILES']),
                                     base_location=args.binaries_location,
-                                    access=args.access
+                                    access=args.access,
+                                    create_pages=create_pages
                                 )
 
                             item.create(repo, container_path=args.container)

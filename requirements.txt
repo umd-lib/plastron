@@ -12,5 +12,5 @@ Pillow>=6.2.2
 pytest
 stomp.py==4.1.21
 numpy==1.17.1
-watchdog>=0.10.2
+watchdog==0.10.3
 bagit~=1.7.0

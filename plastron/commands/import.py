@@ -579,7 +579,14 @@ class Command:
                                     create_pages=create_pages
                                 )
 
-                            item.create(repo, container_path=args.container)
+                            # Use "repo.relpath" as default for "container",
+                            # but allow it to be overridden by args
+                            container = repo.relpath
+                            if hasattr(args, 'container'):
+                                container = args.container
+                            logger.debug(f"container: {container}")
+
+                            item.create(repo, container_path=container)
                             item.recursive_update(repo)
 
                             count['created'] += 1

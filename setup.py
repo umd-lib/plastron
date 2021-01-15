@@ -85,7 +85,7 @@ setup(
         'requests',
         'setuptools',
         'stomp.py',
-        'watchdog>=0.10.2'
+        'watchdog==0.10.3'
     ],
     python_requires='>=3.6',
 

@@ -22,9 +22,11 @@ def configure_cli(subparsers):
     )
     parser.set_defaults(cmd_name='annotate')
 
+
 @rdf.object_property('derived_from', prov.wasDerivedFrom)
 class FullTextAnnotation(Annotation):
     pass
+
 
 class Command:
     def __init__(self, config=None):

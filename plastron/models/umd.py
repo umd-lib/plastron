@@ -1,11 +1,13 @@
 from plastron import pcdm, rdf
 from plastron.authority import LabeledThing
 from plastron.namespaces import dc, dcterms, edm
+from plastron.pcdm import Page
 from plastron.validation import is_edtf_formatted, is_valid_iso639_code
 from rdflib import Namespace
 
 
 umdtype = Namespace('http://vocab.lib.umd.edu/datatype#')
+umdform = Namespace('http://vocab.lib.umd.edu/form#')
 
 
 @rdf.object_property('object_type', dcterms.type)
@@ -97,3 +99,12 @@ class Item(pcdm.Object):
             'max_values': 1
         }
     }
+
+    def get_new_member(self, rootname, number):
+        if str(self.object_type) == str(umdform.pool_reports):
+            if rootname == 'body-processed-redacted':
+                return Page(title=f'Body', number=number)
+            else:
+                return Page(title=f'Attachment {number - 1}', number=number)
+        else:
+            return Page(title=f'Page {number}', number=number)

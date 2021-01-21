@@ -55,6 +55,8 @@ class Resource(namedtuple('Resource', ['uri', 'description_uri'])):
 class FlatCreator:
     """
     Creates all linked objects at the same container level as the initial item.
+    However, proxies and annotations are still created within child containers
+    of the item.
     """
     def __init__(self, repository):
         self.repository = repository
@@ -66,13 +68,15 @@ class FlatCreator:
         self.repository.create_all(item.container_path, item.files)
 
     def create_proxies(self, item):
-        self.repository.create_all(item.container_path, item.proxies())
+        # create as child resources, grouped by relationship
+        self.repository.create_all(item.path + '/x', item.proxies(), name_function=random_slug)
 
     def create_related(self, item):
         self.repository.create_all(item.container_path, item.related)
 
     def create_annotations(self, item):
-        self.repository.create_all(item.container_path, item.annotations)
+        # create as child resources, grouped by relationship
+        self.repository.create_all(item.path + '/a', item.annotations, name_function=random_slug)
 
 
 class HierarchicalCreator:
@@ -83,6 +87,7 @@ class HierarchicalCreator:
     * Members = /m
     * Files = /f
     * Proxies = /x
+    * Annotations = /a
 
     Related items, however, are created in the same container as the initial
     item.

@@ -72,6 +72,7 @@ setup(
     # https://packaging.python.org/en/latest/requirements.html
     install_requires=[
         'bagit',
+        'BeautifulSoup4',
         'edtf',
         'iso639',
         'jwcrypto',

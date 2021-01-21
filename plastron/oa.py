@@ -29,10 +29,8 @@ class Annotation(ldp.Resource):
 @rdf.rdf_class(oa.TextualBody)
 class TextualBody(ldp.Resource):
     def __str__(self):
-        if len(self.value) <= 25:
-            return str(self.value)
-        else:
-            return self.value[:24] + '…'
+        value = str(self.value)
+        return value if len(value) <= 25 else value[:24] + '…'
 
 
 @rdf.object_property('selector', oa.hasSelector, embed=True)

@@ -19,6 +19,8 @@ class Resource(rdf.Resource):
     def from_repository(cls, repo, uri, include_server_managed=True):
         graph = repo.get_graph(uri, include_server_managed=include_server_managed)
         obj = cls.from_graph(graph, subject=uri)
+        obj.uri = uri
+        obj.path = obj.uri[len(repo.endpoint):]
 
         # mark as created and updated so that the create_object and update_object
         # methods doesn't try try to modify it

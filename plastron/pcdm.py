@@ -52,6 +52,9 @@ class Object(ore.Aggregation):
             repository.create_files(self)
             repository.create_related(self)
 
+    def get_new_member(self, rootname, number):
+        return Page(title=f'Page {number}', number=number)
+
 
 @rdf.object_property('file_of', pcdm.fileOf)
 @rdf.data_property('mimetype', ebucore.hasMimeType)

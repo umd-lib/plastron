@@ -15,7 +15,7 @@ from plastron.exceptions import DataReadException, NoValidationRulesetException,
 from plastron.files import HTTPFileSource, LocalFileSource, RemoteFileSource, ZipFileSource
 from plastron.http import Transaction
 from plastron.namespaces import get_manager
-from plastron.pcdm import File, Page
+from plastron.pcdm import File
 from plastron.rdf import RDFDataProperty
 from plastron.serializers import CSVSerializer
 from plastron.util import uri_or_curie
@@ -295,23 +295,24 @@ class Command:
 
         count = 0
 
-        for n, filenames in enumerate(file_groups.values(), 1):
+        for n, (rootname, filenames) in enumerate(file_groups.items(), 1):
             if create_pages:
-                # create a page object for each rootname
-                page = Page(title=f'Page {n}', number=n)
+                # create a member object for each rootname
+                # delegate to the item model how to build the member object
+                member = item.get_new_member(rootname, n)
                 # add to the item
-                item.add_member(page)
-                proxy = item.append_proxy(page, title=page.title)
-                # add the access class to the page resources
+                item.add_member(member)
+                proxy = item.append_proxy(member, title=member.title)
+                # add the access class to the member resources
                 if access is not None:
-                    page.rdf_type.append(access)
+                    member.rdf_type.append(access)
                     proxy.rdf_type.append(access)
-                file_parent = page
+                file_parent = member
             else:
                 # files will be added directly to the item
                 file_parent = item
 
-            # add the files to their parent object (either the item or a page)
+            # add the files to their parent object (either the item or a member)
             for filename in filenames:
                 file = File(title=filename)
                 file.source = self.get_source(base_location, filename)

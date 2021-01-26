@@ -39,7 +39,7 @@ class Command:
                 collection = pcdm.Collection()
                 collection.title = args.name
                 collection.create(fcrepo, recursive=False)
-                collection.update_object(fcrepo)
+                collection.update(fcrepo, recursive=False)
 
             except RESTAPIException as e:
                 logger.error(f'Error in collection creation: {e}')
@@ -50,7 +50,7 @@ class Command:
                     collection = pcdm.Collection()
                     collection.title = args.name
                     collection.create(fcrepo, recursive=False)
-                    collection.update_object(fcrepo)
+                    collection.update(fcrepo, recursive=False)
                     txn.commit()
 
                 except RESTAPIException as e:

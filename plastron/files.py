@@ -284,7 +284,7 @@ class ZipFileSource(BinarySource):
             self.source.close()
 
     def open(self):
-        if self.zip_file is None:
+        if self.source is not None:
             try:
                 self.zip_file = zipfile.ZipFile(self.source.open())
             except FileNotFoundError as e:

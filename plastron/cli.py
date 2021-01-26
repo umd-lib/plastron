@@ -135,7 +135,7 @@ def main():
 
     try:
         if hasattr(command_module, 'Command'):
-            command = command_module.Command()
+            command = command_module.Command(config=command_config.get(args.cmd_name.upper()))
             command.repo = fcrepo
             command.broker = broker
         else:

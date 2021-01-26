@@ -1,10 +1,12 @@
 import csv
 import logging
 import os
+import re
 import shutil
 import sys
 import urllib
 from argparse import ArgumentTypeError
+from datetime import datetime
 from os.path import isfile
 from paramiko import AutoAddPolicy, SSHClient, SSHException
 from paramiko.config import SSH_PORT
@@ -59,6 +61,14 @@ def get_ssh_client(sftp_uri, **kwargs):
         return ssh_client
     except SSHException as e:
         raise FailureException(str(e)) from e
+
+
+def datetimestamp(digits_only=True):
+    now = str(datetime.utcnow().isoformat(timespec='seconds'))
+    if digits_only:
+        return re.sub(r'[^0-9]', '', now)
+    else:
+        return now
 
 
 def envsubst(value, env=None):
@@ -196,37 +206,47 @@ class ItemLog:
         self.filename = filename
         self.fieldnames = fieldnames
         self.keyfield = keyfield
+        self.write_header = header
         self.item_keys = set()
         self.fh = None
         self.writer = None
+        if self.exists():
+            self.read()
 
-        if not isfile(self.filename):
-            with open(self.filename, 'w', 1) as fh:
-                writer = csv.DictWriter(fh, fieldnames=self.fieldnames)
-                if header:
-                    writer.writeheader()
-        else:
-            with open(self.filename, 'r', 1) as fh:
-                reader = csv.DictReader(fh)
+    def exists(self):
+        return isfile(self.filename)
 
-                # check the validity of the map file data
-                if not reader.fieldnames == fieldnames:
-                    raise Exception('Fieldnames in {0} do not match expected fieldnames'.format(filename))
+    def create(self):
+        with open(self.filename, mode='w', buffering=1) as fh:
+            writer = csv.DictWriter(fh, fieldnames=self.fieldnames)
+            if self.write_header:
+                writer.writeheader()
 
-                # read the data from the existing file
-                for row in reader:
-                    self.item_keys.add(row[self.keyfield])
+    def read(self):
+        with open(self.filename, mode='r', buffering=1) as fh:
+            reader = csv.DictReader(fh)
+            # check the validity of the map file data
+            if not reader.fieldnames == self.fieldnames:
+                raise ItemLogError(f'Fieldnames in {self.filename} do not match expected fieldnames')
+            # read the data from the existing file
+            for row in reader:
+                self.item_keys.add(row[self.keyfield])
 
     def get_writer(self):
+        if not self.exists():
+            self.create()
         if self.fh is None:
-            self.fh = open(self.filename, 'a', 1)
+            self.fh = open(self.filename, mode='a', buffering=1)
         if self.writer is None:
             self.writer = csv.DictWriter(self.fh, fieldnames=self.fieldnames)
         return self.writer
 
-    def writerow(self, row):
+    def append(self, row):
         self.get_writer().writerow(row)
         self.item_keys.add(row[self.keyfield])
+
+    def writerow(self, row):
+        self.append(row)
 
     def __contains__(self, other):
         return other in self.item_keys
@@ -234,6 +254,6 @@ class ItemLog:
     def __len__(self):
         return len(self.item_keys)
 
-    def __del__(self):
-        if self.fh is not None:
-            self.fh.close()
+
+class ItemLogError(Exception):
+    pass

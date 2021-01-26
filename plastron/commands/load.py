@@ -231,7 +231,7 @@ def load_item_internal(fcrepo, item, args, extra=None):
         item.add_extra_properties(extra, rdf_format)
 
     logger.info('Updating item and components')
-    item.recursive_update(fcrepo)
+    item.update(fcrepo)
     if args.create_annotations:
         logger.info('Updating annotations')
         item.update_annotations(fcrepo)

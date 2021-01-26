@@ -4,23 +4,26 @@ import logging
 import os
 import plastron.models
 import re
+import yaml
+
 from argparse import FileType, Namespace, ArgumentTypeError
 from collections import OrderedDict, defaultdict
 from datetime import datetime
 from distutils.util import strtobool
 from os.path import basename, splitext
 from plastron import rdf
-from plastron.exceptions import DataReadException, NoValidationRulesetException, RESTAPIException, FailureException, \
-    ConfigException, BinarySourceNotFoundError
+from plastron.exceptions import DataReadException, NoValidationRulesetException, RESTAPIException, \
+    FailureException, ConfigException
 from plastron.files import HTTPFileSource, LocalFileSource, RemoteFileSource, ZipFileSource
 from plastron.http import Transaction
 from plastron.namespaces import get_manager
 from plastron.pcdm import File
 from plastron.rdf import RDFDataProperty
 from plastron.serializers import CSVSerializer
-from plastron.util import uri_or_curie
+from plastron.util import ItemLog, datetimestamp, uri_or_curie
 from rdflib import URIRef, Graph, Literal
 from rdflib.util import from_n3
+from shutil import copyfileobj
 from uuid import uuid4
 
 
@@ -36,7 +39,6 @@ def configure_cli(subparsers):
     parser.add_argument(
         '-m', '--model',
         help='data model to use',
-        required=True,
         action='store'
     )
     parser.add_argument(
@@ -85,6 +87,16 @@ def configure_cli(subparsers):
             'in the repo configuration file'
         ),
         action='store'
+    )
+    parser.add_argument(
+        '--job-id',
+        help='unique identifier for this job; defaults to "import-{timestamp}"',
+        action='store'
+    )
+    parser.add_argument(
+        '--resume',
+        help='resume a job that has been started; requires --job-id {id} to be present',
+        action='store_true'
     )
     parser.add_argument(
         'import_file', nargs='?',
@@ -229,12 +241,94 @@ def parse_value_string(value_string, column, prop_type):
             yield URIRef(value)
 
 
+class ModelClassNotFoundError(Exception):
+    pass
+
+
+class Job:
+    def __init__(self, id, jobs_dir):
+        self.id = id
+        # use a timestamp to differentiate different runs of the same import job
+        self.run_timestamp = datetimestamp()
+        self.dir = os.path.join(jobs_dir, self.id.replace('/', '-'))
+        self.config_filename = os.path.join(self.dir, 'config.yml')
+        self.metadata_filename = os.path.join(self.dir, 'source.csv')
+        self.config = {}
+
+        # record of items that are successfully loaded
+        completed_fieldnames = ['id', 'timestamp', 'title', 'uri']
+        self.completed_log = ItemLog(os.path.join(self.dir, 'completed.log.csv'), completed_fieldnames, 'id')
+
+        # record of items that are unable to be loaded during this import run
+        dropped_basename = f'dropped-{self.run_timestamp}'
+        dropped_log_filename = os.path.join(self.dir, f'{dropped_basename}.log.csv')
+        dropped_fieldnames = ['id', 'timestamp', 'title', 'uri', 'reason']
+        self.dropped_log = ItemLog(dropped_log_filename, dropped_fieldnames, 'id')
+
+    def __getattr__(self, item):
+        try:
+            return self.config[item]
+        except KeyError:
+            raise AttributeError(f'No attribute or config key named {item} found')
+
+    def dir_exists(self):
+        return os.path.isdir(self.dir)
+
+    def load_config(self):
+        with open(self.config_filename) as config_file:
+            self.config = yaml.safe_load(config_file)
+        return self.config
+
+    def save_config(self, config):
+        # store the relevant config
+        self.config = config
+
+        # if we are not resuming, make sure the directory exists
+        os.makedirs(self.dir, exist_ok=True)
+        with open(self.config_filename, mode='w') as config_file:
+            yaml.dump(
+                stream=config_file,
+                data={'job_id': self.id, **self.config}
+            )
+
+    def store_metadata_file(self, input_file):
+        with open(self.metadata_filename, mode='w') as file:
+            copyfileobj(input_file, file)
+            logger.debug(f"Copied input file {getattr(input_file, 'name', '<>')} to {file.name}")
+
+    def get_model_class(self):
+        try:
+            return getattr(plastron.models, self.model)
+        except AttributeError as e:
+            raise ModelClassNotFoundError(self.model) from e
+
+    def drop(self, item, line_reference, reason=''):
+        logger.warning(f'Dropping {line_reference} from import job "{self.id}" run {self.run_timestamp}: {reason}')
+        self.dropped_log.append({
+            'id': getattr(item, 'identifier', line_reference),
+            'timestamp': datetimestamp(digits_only=False),
+            'title': getattr(item, 'title', ''),
+            'uri': getattr(item, 'uri', ''),
+            'reason': reason
+        })
+
+    def complete(self, item, line_reference):
+        # write to the completed item log
+        self.completed_log.append({
+            'id': getattr(item, 'identifier', line_reference),
+            'timestamp': datetimestamp(digits_only=False),
+            'title': getattr(item, 'title', ''),
+            'uri': getattr(item, 'uri', '')
+        })
+
+
 class Command:
     def __init__(self, config=None):
         self.result = None
         if config is None:
             config = {}
         self.ssh_private_key = config.get('SSH_PRIVATE_KEY')
+        self.jobs_dir = config.get('JOBS_DIR', 'jobs')
 
     def __call__(self, *args, **kwargs):
         for _ in self.execute(*args, **kwargs):
@@ -338,20 +432,57 @@ class Command:
             model=message.args.get('model'),
             limit=message.args.get('limit', None),
             validate_only=message.args.get('validate-only', False),
+            resume=message.args.get('resume', False),
             import_file=io.StringIO(message.body),
             template_file=None,
             access=access_uri,
             member_of=message.args.get('member-of'),
-            binaries_location=message.args.get('binaries-location')
+            binaries_location=message.args.get('binaries-location'),
+            container=message.args.get('container', None),
+            job_id=message.job_id
         )
 
     def execute(self, repo, args):
         start_time = datetime.now().timestamp()
+
+        if args.resume and args.job_id is None:
+            raise FailureException('Resuming a job requires a job id')
+
+        if args.job_id is None:
+            # TODO: generate a more unique id? add in user and hostname?
+            args.job_id = f"import-{datetimestamp()}"
+
+        job = Job(args.job_id, jobs_dir=self.jobs_dir)
+        logger.debug(f'Job directory is {job.dir}')
+
+        if args.resume and not job.dir_exists():
+            raise FailureException(f'Cannot resume job {job.id}: no such job directory found in {self.jobs_dir}')
+
+        # load or create config
+        if args.resume:
+            logger.info(f'Resuming saved job {job.id}')
+            # load stored config from the previous run of this job
+            try:
+                job.load_config()
+            except FileNotFoundError:
+                raise FailureException(f'Cannot resume job {job.id}: no config.yml found in {job.dir}')
+        else:
+            if args.model is None:
+                raise FailureException('A model is required unless resuming an existing job')
+            job.save_config({
+                'model': args.model,
+                'access': args.access,
+                'member_of': args.member_of,
+                # Use "repo.relpath" as default for "container",
+                # but allow it to be overridden by args
+                'container': args.container or repo.relpath,
+                'binaries_location': args.binaries_location
+            })
+
         try:
-            model_class = getattr(plastron.models, args.model)
-        except AttributeError:
-            logger.error(f'Unknown model: {args.model}')
-            raise FailureException()
+            model_class = job.get_model_class()
+        except ModelClassNotFoundError as e:
+            raise FailureException(f'Model class {e} not found') from e
 
         if args.template_file is not None:
             if not hasattr(model_class, 'HEADER_MAP'):
@@ -362,16 +493,25 @@ class Command:
             writer.writerow(list(model_class.HEADER_MAP.values()) + ['FILES'])
             return
 
-        if args.import_file is None:
-            logger.info('No import file given')
-            return
+        if args.import_file is None and not args.resume:
+            raise FailureException('An import file is required unless resuming an existing job')
 
         if args.validate_only:
             logger.info('Validation-only mode, skipping imports')
 
         property_attrs = {header: attrs for attrs, header in model_class.HEADER_MAP.items()}
+        identifier_column = model_class.HEADER_MAP['identifier']
 
-        csv_file = csv.DictReader(args.import_file)
+        # if an import file was provided, save that as the new CSV metadata file
+        if args.import_file is not None:
+            job.store_metadata_file(args.import_file)
+
+        try:
+            metadata_file = open(job.metadata_filename, 'r')
+        except FileNotFoundError as e:
+            raise FailureException(f'Cannot read source file "{job.metadata_filename}: {e}') from e
+
+        csv_file = csv.DictReader(metadata_file)
 
         count = {
             'total': None,
@@ -385,12 +525,12 @@ class Command:
             'files': 0
         }
 
-        if args.import_file.seekable():
+        if metadata_file.seekable():
             # get the row count of the file
             count['total'] = sum(1 for _ in csv_file)
             # rewind the file and re-create the CSV reader
-            args.import_file.seek(0)
-            csv_file = csv.DictReader(args.import_file)
+            metadata_file.seek(0)
+            csv_file = csv.DictReader(metadata_file)
         else:
             # file is not seekable, so we can't get a row count in advance
             count['total'] = None
@@ -398,14 +538,17 @@ class Command:
         try:
             fields = build_fields(csv_file.fieldnames, property_attrs)
         except DataReadException as e:
-            logger.error(str(e))
-            raise FailureException(e.message)
+            raise FailureException(str(e)) from e
+
+        initial_completed_item_count = len(job.completed_log)
+        logger.info(f'Found {initial_completed_item_count} completed items')
 
         reports = []
         updated_uris = []
         created_uris = []
+        skipped = 0
         for row_number, row in enumerate(csv_file, 1):
-            line_reference = f"{getattr(args.import_file, 'name', '<>')}:{row_number + 1}"
+            line_reference = f"{getattr(metadata_file, 'name', '<>')}:{row_number + 1}"
             if args.limit is not None and row_number > args.limit:
                 logger.info(f'Stopping after {args.limit} rows')
                 break
@@ -413,18 +556,22 @@ class Command:
             count['rows'] += 1
             if any(v is None for v in row.values()):
                 count['errors'] += 1
-                error_msg = f'Line {line_reference} has the wrong number of columns'
                 reports.append({
                     'line': line_reference,
                     'is_valid': False,
-                    'error': error_msg
+                    'error': f'Line {line_reference} has the wrong number of columns'
                 })
-                logger.warning(f'Skipping: {error_msg}')
+                job.drop(item=None, line_reference=line_reference, reason='Wrong number of columns')
+                continue
+
+            if row[identifier_column] in job.completed_log:
+                logger.info(f'Already loaded "{row[identifier_column]}" from {line_reference}, skipping')
+                skipped += 1
                 continue
 
             if 'URI' not in row or row['URI'].strip() == '':
                 # no URI in the CSV means we will create a new object
-                logger.info(f'No URI found for {line_reference}, creating new object')
+                logger.info(f'No URI found for {line_reference}; will create new resource')
                 uri = None
             else:
                 uri = URIRef(row['URI'])
@@ -546,75 +693,82 @@ class Command:
                 # skip invalid items
                 count['invalid'] += 1
                 logger.warning(f'Skipping "{item}"')
+                job.drop(
+                    item=item,
+                    line_reference=line_reference,
+                    reason=(
+                        'Validation failures: '
+                        '; '.join(' '.join(str(f) for f in outcome) for outcome in report.failed())
+                    )
+                )
                 continue
 
             if args.validate_only:
                 # validation-only mode
                 continue
 
-            # construct the SPARQL Update query if there are any deletions or insertions
-            if len(delete_graph) > 0 or len(insert_graph) > 0:
-                with Transaction(repo) as txn:
+            try:
+                if not item.created:
+                    # if an item is new, don't construct a SPARQL Update query
+                    # instead, just create and update normally
+                    # create new item in the repo
+                    logger.debug('Creating a new item')
+                    # add the access class
+                    if job.access is not None:
+                        item.rdf_type.append(job.access)
+                    # add the collection membership
+                    if job.member_of is not None:
+                        item.member_of = URIRef(job.member_of)
+
+                    if 'FILES' in row and row['FILES'].strip() != '':
+                        create_pages = bool(strtobool(row.get('CREATE_PAGES', 'True')))
+                        logger.debug('Adding pages and files to new item')
+                        self.add_files(
+                            item,
+                            build_file_groups(row['FILES']),
+                            base_location=job.binaries_location,
+                            access=job.access,
+                            create_pages=create_pages
+                        )
+
+                    logger.debug(f"Creating resources in container: {job.container}")
+
                     try:
-                        is_new = not item.created
-                        if is_new:
-                            # if an item is new, don't construct a SPARQL Update query
-                            # instead, just create and update normally
-                            # create new item in the repo
-                            logger.debug('Creating a new item')
-                            # add the access class
-                            if args.access is not None:
-                                item.rdf_type.append(args.access)
-                            # add the collection membership
-                            if args.member_of is not None:
-                                item.member_of = URIRef(args.member_of)
+                        with Transaction(repo) as txn:
+                            item.create(repo, container_path=job.container)
+                            item.update(repo)
+                            txn.commit()
+                    except Exception as e:
+                        raise FailureException(f'Creating item failed: {e}') from e
 
-                            if 'FILES' in row and row['FILES'].strip() != '':
-                                create_pages = bool(strtobool(row.get('CREATE_PAGES', 'True')))
-                                logger.debug('Adding pages and files to new item')
-                                self.add_files(
-                                    item,
-                                    build_file_groups(row['FILES']),
-                                    base_location=args.binaries_location,
-                                    access=args.access,
-                                    create_pages=create_pages
-                                )
+                    job.complete(item, line_reference)
+                    count['created'] += 1
+                    created_uris.append(item.uri)
 
-                            # Use "repo.relpath" as default for "container",
-                            # but allow it to be overridden by args
-                            container = repo.relpath
-                            if hasattr(args, 'container'):
-                                container = args.container
-                            logger.debug(f"container: {container}")
+                elif len(delete_graph) > 0 or len(insert_graph) > 0:
+                    # construct the SPARQL Update query if there are any deletions or insertions
+                    # then do a PATCH update of an existing item
+                    logger.info(f'Sending update for {item}')
+                    sparql_update = repo.build_sparql_update(delete_graph, insert_graph)
+                    logger.debug(sparql_update)
+                    try:
+                        item.patch(repo, sparql_update)
+                    except RESTAPIException as e:
+                        raise FailureException(f'Updating item failed: {e}') from e
 
-                            item.create(repo, container_path=container)
-                            item.recursive_update(repo)
+                    job.complete(item, line_reference)
+                    count['updated'] += 1
+                    updated_uris.append(item.uri)
 
-                            count['created'] += 1
+                else:
+                    count['unchanged'] += 1
+                    logger.info(f'No changes found for "{item}" ({uri}); skipping')
+                    skipped += 1
 
-                        else:
-                            # do a PATCH update of an existing item
-                            logger.info(f'Sending update for {item}')
-                            sparql_update = repo.build_sparql_update(delete_graph, insert_graph)
-                            logger.debug(sparql_update)
-                            item.patch(repo, sparql_update)
-
-                            count['updated'] += 1
-
-                        txn.commit()
-                        if is_new:
-                            created_uris.append(item.uri)
-                        else:
-                            updated_uris.append(item.uri)
-
-                    except (RESTAPIException, ConfigException, FailureException, BinarySourceNotFoundError) as e:
-                        count['errors'] += 1
-                        logger.error(f'{item} import failed: {e}')
-                        txn.rollback()
-                        logger.warning(f'Rolled back transaction {txn}')
-            else:
-                count['unchanged'] += 1
-                logger.info(f'No changes found for "{item}" ({uri})')
+            except FailureException as e:
+                count['errors'] += 1
+                logger.error(f'{item} import failed: {e}')
+                job.drop(item, line_reference, reason=str(e))
 
             # update the status
             now = datetime.now().timestamp()
@@ -632,6 +786,10 @@ class Command:
             # use the final row count as the total count for the
             # job completion message
             count['total'] = count['rows']
+
+        logger.info(f'Skipped {skipped} items')
+        logger.info(f'Completed {len(job.completed_log) - initial_completed_item_count} items')
+        logger.info(f'Dropped {len(job.dropped_log)} items')
 
         logger.info(f"Found {count['valid']} valid items")
         logger.info(f"Found {count['invalid']} invalid items")

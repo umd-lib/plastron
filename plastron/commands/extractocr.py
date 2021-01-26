@@ -84,7 +84,7 @@ def extract(fcrepo, uri):
             logger.info("Creating annotations for page {0}".format(page.title))
             for annotation in page.textblocks():
                 annotation.create(fcrepo)
-                annotation.update_object(fcrepo)
+                annotation.update(fcrepo)
 
             txn.commit()
             return True

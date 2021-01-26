@@ -4,7 +4,7 @@ from os.path import dirname
 
 from plastron import rdf
 from plastron.exceptions import RESTAPIException
-from plastron.http import Repository
+from plastron.http import Repository, ResourceURI
 from rdflib import Graph, URIRef
 from uuid import uuid4
 
@@ -16,11 +16,14 @@ class Resource(rdf.Resource):
     Resources."""
 
     @classmethod
-    def from_repository(cls, repo, uri, include_server_managed=True):
+    def from_repository(cls, repo: Repository, uri, include_server_managed=True):
         graph = repo.get_graph(uri, include_server_managed=include_server_managed)
         obj = cls.from_graph(graph, subject=uri)
         obj.uri = uri
         obj.path = obj.uri[len(repo.endpoint):]
+
+        # get the description URI
+        obj.resource = ResourceURI(uri, repo.get_description_uri(uri))
 
         # mark as created and updated so that the create_object and update_object
         # methods doesn't try try to modify it
@@ -37,6 +40,7 @@ class Resource(rdf.Resource):
         self.updated = False
         self.path = None
         self.container_path = None
+        self.resource = None
         self.uuid = None
         self.creation_timestamp = None
         self.logger = logging.getLogger(
@@ -61,8 +65,9 @@ class Resource(rdf.Resource):
             if slug is not None:
                 headers['Slug'] = slug
             try:
-                self.uri = repository.create(container_path=container_path, headers=headers, **kwargs)
-                self.path = self.uri[len(repository.endpoint):]
+                self.resource = repository.create(container_path=container_path, headers=headers, **kwargs)
+                self.uri = URIRef(self.resource.uri)
+                self.path = self.resource.uri[len(repository.endpoint):]
                 self.created = True
                 # TODO: get this from the response headers
                 self.creation_timestamp = datetime.now()
@@ -72,7 +77,6 @@ class Resource(rdf.Resource):
                 self.uuid = str(self.uri).rsplit('/', 1)[-1]
                 self.logger.info(f'URI: {self.uri}')
                 self.create_fragments()
-                repository.create_all(self.path + '/a', self.annotations)
             except RESTAPIException as e:
                 self.logger.error(f"Failed to create {self}: {e}")
                 raise
@@ -92,7 +96,7 @@ class Resource(rdf.Resource):
     def patch(self, repository, sparql_update):
         headers = {'Content-Type': 'application/sparql-update'}
         self.logger.info(f"Updating {self}")
-        response = repository.patch(self.uri, data=sparql_update, headers=headers)
+        response = repository.patch(self.resource.description_uri, data=sparql_update, headers=headers)
         if response.status_code == 204:
             self.logger.info(f"Updated {self}")
             self.updated = True
@@ -100,60 +104,22 @@ class Resource(rdf.Resource):
         else:
             self.logger.error(f"Failed to update {self}")
             self.logger.error(sparql_update)
+            self.logger.error(response.text)
             raise RESTAPIException(response)
 
     # update existing repo object with SPARQL update
-    def update_object(self, repository, patch_uri=None):
-        graph = self.graph()
-        if not patch_uri:
-            patch_uri = self.uri
-        prolog = ''
-        # TODO: limit this to just the prefixes that are used in the graph
-        for (prefix, uri) in graph.namespace_manager.namespaces():
-            prolog += "PREFIX {0}: {1}\n".format(prefix, uri.n3())
-
-        triples = []
-        for (s, p, o) in graph:
-            subject = s.n3(graph.namespace_manager)
-            if '#' in subject:
-                subject = '<' + subject[subject.index('#'):]
-            else:
-                subject = '<>'
-            triples.append("{0} {1} {2}.".format(
-                subject,
-                graph.namespace_manager.normalizeUri(p),
-                o.n3(graph.namespace_manager)
-            ))
-
-        query = prolog + "INSERT DATA {{{0}}}".format("\n".join(triples))
-        data = query.encode('utf-8')
-        headers = {'Content-Type': 'application/sparql-update'}
-        self.logger.info(f"Updating {self}")
-        response = repository.patch(str(patch_uri), data=data, headers=headers)
-        if response.status_code == 204:
-            self.logger.info(f"Updated {self}")
-            self.updated = True
-            return response
-        else:
-            self.logger.error(f"Failed to update {self}")
-            self.logger.error(query)
-            raise RESTAPIException(response)
-
-    # recursively update an object and all its components and files
-    def recursive_update(self, repository):
+    def update(self, repository, recursive=True):
         if not self.updated:
-            self.update_object(repository)
-            for obj in self.linked_objects():
-                obj.recursive_update(repository)
+            self.patch(repository, repository.build_sparql_update(insert_graph=self.graph()))
+            if recursive:
+                # recursively update an object and all its components and files
+                for obj in self.linked_objects():
+                    obj.update(repository)
 
     # check for the existence of a local object in the repository
     def exists_in_repo(self, repository):
         if str(self.uri).startswith(repository.endpoint):
-            response = repository.head(str(self.uri))
-            if response.status_code == 200:
-                return True
-            else:
-                return False
+            return repository.exists(str(self.uri))
         else:
             return False
 
@@ -173,7 +139,7 @@ class Resource(rdf.Resource):
 
     def update_annotations(self, repository):
         for annotation in self.annotations:
-            annotation.recursive_update(repository)
+            annotation.update(repository)
 
 
 class RdfSource(Resource):

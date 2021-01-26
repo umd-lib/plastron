@@ -102,7 +102,7 @@ class Item(pcdm.Object):
 
     def get_new_member(self, rootname, number):
         if str(self.object_type) == str(umdform.pool_reports):
-            if rootname == 'body-processed-redacted':
+            if rootname.startswith('body-'):
                 return Page(title=f'Body', number=number)
             else:
                 return Page(title=f'Attachment {number - 1}', number=number)

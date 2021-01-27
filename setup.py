@@ -73,7 +73,7 @@ setup(
     install_requires=[
         'bagit',
         'BeautifulSoup4',
-        'edtf',
+        'edtf-validate',
         'iso639',
         'jwcrypto',
         'lxml>3.6.0',

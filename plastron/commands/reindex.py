@@ -1,7 +1,8 @@
 import logging
-
 from plastron.commands import BaseCommand
+from plastron.namespaces import rdf
 from plastron.util import ResourceList, parse_predicate_list
+from rdflib import URIRef
 
 logger = logging.getLogger(__name__)
 
@@ -45,12 +46,14 @@ class Command(BaseCommand):
         )
         self.broker.disconnect()
 
-    def reindex_item(self, resource, _graph):
+    def reindex_item(self, resource, graph):
+        types = ','.join(graph.objects(subject=URIRef(resource.uri), predicate=rdf.type))
         self.broker.send_message(
             destination=self.reindexing_queue,
             headers={
                 'CamelFcrepoUri': resource.uri,
                 'CamelFcrepoPath': resource.uri.replace(self.repo.endpoint, ''),
+                'CamelFcrepoResourceType': types,
                 'CamelFcrepoUser': self.username,
                 'persistent': 'true'
             }

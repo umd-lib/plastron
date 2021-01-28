@@ -23,7 +23,7 @@ def test_required():
 
 
 @pytest.mark.parametrize(
-    'datetime_string',[
+    'datetime_string', [
         # dates at 11pm fail in edtf 4.0.1
         # these pass when using edtf-validate 1.1.0
         '2020-07-10T23:44:38Z',

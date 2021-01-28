@@ -6,7 +6,7 @@ def is_edtf_formatted(value):
     # Allow blank values
     if str(value).strip() == "":
         return True
-    return is_valid_edtf(value)
+    return is_valid_edtf(str(value))
 
 
 def is_valid_iso639_code(value):

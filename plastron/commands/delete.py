@@ -1,5 +1,7 @@
 import logging
 from email.utils import parsedate_to_datetime
+
+from plastron.commands import BaseCommand
 from plastron.exceptions import RESTAPIException
 from plastron.util import get_title_string, ResourceList, parse_predicate_list
 
@@ -45,7 +47,7 @@ def configure_cli(subparsers):
     parser.set_defaults(cmd_name='delete')
 
 
-class Command:
+class Command(BaseCommand):
     def __call__(self, fcrepo, args):
         self.repository = fcrepo
         self.repository.test_connection()

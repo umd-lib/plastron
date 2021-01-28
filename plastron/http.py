@@ -7,8 +7,9 @@ from base64 import urlsafe_b64encode
 from collections import namedtuple
 from jwcrypto.jwk import JWK
 from jwcrypto.jwt import JWT
-from plastron.exceptions import ConfigException, RESTAPIException
+from plastron.exceptions import ConfigException, FailureException, RESTAPIException
 from rdflib import Graph, URIRef
+from requests.exceptions import ConnectionError
 
 
 OMIT_SERVER_MANAGED_TRIPLES = 'return=representation; omit="http://fedora.info/definitions/v4/repository#ServerManaged"'
@@ -45,7 +46,7 @@ def auth_token(secret: str, valid_for=3600) -> JWT:
 
 # lightweight representation of a resource URI and URI of its description
 # for RDFSources, in general the uri and description_uri will be the same
-class Resource(namedtuple('Resource', ['uri', 'description_uri'])):
+class ResourceURI(namedtuple('Resource', ['uri', 'description_uri'])):
     __slots__ = ()
 
     def __str__(self):
@@ -241,8 +242,14 @@ class Repository:
             response = self.post(container_uri, **kwargs)
 
         if response.status_code == 201:
-            created_url = response.headers['Location'] if 'Location' in response.headers else url
-            return URIRef(self._remove_transaction_uri(created_url))
+            created_uri = self._remove_transaction_uri(
+                response.headers['Location'] if 'Location' in response.headers else url
+            )
+            if 'describedby' in response.links:
+                description_uri = response.links['describedby']['url']
+            else:
+                description_uri = created_uri
+            return ResourceURI(created_uri, description_uri)
         else:
             raise RESTAPIException(response)
 
@@ -277,7 +284,7 @@ class Repository:
     def recursive_get(self, url, traverse=None, **kwargs):
         target = self.get_description_uri(url)
         graph = self.get_graph(target)
-        resource = Resource(
+        resource = ResourceURI(
             uri=self._remove_transaction_uri(url),
             description_uri=self._remove_transaction_uri(target)
         )
@@ -312,15 +319,28 @@ class Repository:
         graph.parse(data=response.text, format='nt')
         return graph
 
-    def build_sparql_update(self, delete_graph, insert_graph):
+    def build_sparql_update(self, delete_graph=None, insert_graph=None):
         # go through each graph and update subjects with transaction IDs
-        self._update_subjects_within_transaction(delete_graph)
-        self._update_subjects_within_transaction(insert_graph)
+        if delete_graph is not None:
+            self._update_subjects_within_transaction(delete_graph)
+            deletes = delete_graph.serialize(format='nt').decode('utf-8').strip()
+        else:
+            deletes = None
 
-        deletes = delete_graph.serialize(format='nt').decode('utf-8').strip()
-        inserts = insert_graph.serialize(format='nt').decode('utf-8').strip()
-        sparql_update = f"DELETE {{ {deletes} }} INSERT {{ {inserts} }} WHERE {{}}"
-        return sparql_update
+        if insert_graph is not None:
+            self._update_subjects_within_transaction(insert_graph)
+            inserts = insert_graph.serialize(format='nt').decode('utf-8').strip()
+        else:
+            inserts = None
+
+        if deletes is not None and inserts is not None:
+            return f"DELETE {{ {deletes} }} INSERT {{ {inserts} }} WHERE {{}}"
+        elif deletes is not None:
+            return f"DELETE DATA {{ {deletes} }}"
+        elif inserts is not None:
+            return f"INSERT DATA {{ {inserts} }}"
+        else:
+            return ''
 
     def get_transaction_endpoint(self):
         return os.path.join(self.endpoint, 'fcr:tx')
@@ -367,7 +387,10 @@ class Transaction:
         self.uri = None
 
     def __enter__(self):
-        self.begin()
+        try:
+            self.begin()
+        except TransactionError as e:
+            raise FailureException(f'Transaction failed: {e}')
         return self
 
     def __str__(self):
@@ -377,10 +400,20 @@ class Transaction:
         # when we leave the transaction context, always
         # set the stop flag on the keep-alive ping
         self.keep_alive.stop()
+        # on an exception, rollback the transaction
+        if exc_type is not None:
+            if exc_type == TransactionError:
+                raise FailureException(f'Transaction failed: {exc_val}')
+            self.rollback()
+            # return false to propagate the exception upward
+            return False
 
     def begin(self):
         self.logger.info('Creating transaction')
-        response = self.repository.post(self.repository.get_transaction_endpoint())
+        try:
+            response = self.repository.post(self.repository.get_transaction_endpoint())
+        except ConnectionError as e:
+            raise TransactionError(f'Failed to create transaction: {e}') from e
         if response.status_code == 201:
             self.uri = response.headers['Location']
             self.repository.transaction = self
@@ -394,7 +427,10 @@ class Transaction:
     def maintain(self):
         if self.active:
             self.logger.info(f'Maintaining transaction {self}')
-            response = self.repository.post(os.path.join(self.uri, 'fcr:tx'))
+            try:
+                response = self.repository.post(os.path.join(self.uri, 'fcr:tx'))
+            except ConnectionError as e:
+                raise TransactionError(f'Failed to maintain transaction {self}: {e}') from e
             if response.status_code == 204:
                 self.logger.info(f'Transaction {self} is active until {response.headers["Expires"]}')
             else:
@@ -403,24 +439,30 @@ class Transaction:
 
     def commit(self):
         if self.active:
+            self.keep_alive.stop()
+            self.active = False
             self.logger.info(f'Committing transaction {self}')
-            response = self.repository.post(os.path.join(self.uri, 'fcr:tx/fcr:commit'))
+            try:
+                response = self.repository.post(os.path.join(self.uri, 'fcr:tx/fcr:commit'))
+            except ConnectionError as e:
+                raise TransactionError(f'Failed to commit transaction {self}: {e}') from e
             if response.status_code == 204:
                 self.logger.info(f'Committed transaction {self}')
-                self.keep_alive.stop()
-                self.active = False
             else:
                 self.logger.error(f'Failed to commit transaction {self}')
                 raise RESTAPIException(response)
 
     def rollback(self):
         if self.active:
+            self.keep_alive.stop()
+            self.active = False
             self.logger.info(f'Rolling back transaction {self}')
-            response = self.repository.post(os.path.join(self.uri, 'fcr:tx/fcr:rollback'))
+            try:
+                response = self.repository.post(os.path.join(self.uri, 'fcr:tx/fcr:rollback'))
+            except ConnectionError as e:
+                raise TransactionError(f'Failed to roll back transaction {self}: {e}') from e
             if response.status_code == 204:
                 self.logger.info(f'Rolled back transaction {self}')
-                self.keep_alive.stop()
-                self.active = False
             else:
                 self.logger.error(f'Failed to roll back transaction {self}')
                 raise RESTAPIException(response)
@@ -440,3 +482,7 @@ class TransactionKeepAlive(threading.Thread):
 
     def stop(self):
         self.stopped.set()
+
+
+class TransactionError(Exception):
+    pass

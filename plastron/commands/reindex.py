@@ -1,5 +1,6 @@
 import logging
 
+from plastron.commands import BaseCommand
 from plastron.util import ResourceList, parse_predicate_list
 
 logger = logging.getLogger(__name__)
@@ -22,8 +23,9 @@ def configure_cli(subparsers):
     parser.set_defaults(cmd_name='reindex')
 
 
-class Command:
-    def __init__(self):
+class Command(BaseCommand):
+    def __init__(self, config=None):
+        super().__init__(config=config)
         self.broker = None
         self.repo = None
 

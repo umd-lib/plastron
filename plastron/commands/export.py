@@ -8,6 +8,8 @@ from distutils.util import strtobool
 from email.utils import parsedate
 from os.path import basename, normpath, relpath, splitext
 from paramiko import SFTPClient, SSHException
+
+from plastron.commands import BaseCommand
 from plastron.exceptions import FailureException, DataReadException, RESTAPIException
 from plastron.namespaces import get_manager
 from plastron.pcdm import Object
@@ -86,11 +88,10 @@ def format_size(size):
     return size, 'TB'
 
 
-class Command:
+class Command(BaseCommand):
     def __init__(self, config=None):
-        if config is None:
-            config = {}
-        self.ssh_private_key = config.get('SSH_PRIVATE_KEY')
+        super().__init__(config=config)
+        self.ssh_private_key = self.config.get('SSH_PRIVATE_KEY')
         self.result = None
 
     def __call__(self, *args, **kwargs):

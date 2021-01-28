@@ -1,4 +1,6 @@
 import logging
+
+from plastron.commands import BaseCommand
 from plastron.util import get_title_string, ResourceList, parse_predicate_list
 
 logger = logging.getLogger(__name__)
@@ -28,7 +30,7 @@ def configure_cli(subparsers):
     parser.set_defaults(cmd_name='list')
 
 
-class Command:
+class Command(BaseCommand):
     def __call__(self, fcrepo, args):
         self.long = args.long
 

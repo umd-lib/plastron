@@ -6,6 +6,8 @@ from argparse import ArgumentTypeError
 from datetime import datetime
 from importlib import import_module
 from time import sleep
+
+from plastron.commands import BaseCommand
 from plastron.exceptions import ConfigException, DataReadException, RESTAPIException, FailureException
 from plastron.http import Transaction
 from plastron.util import ItemLog
@@ -78,7 +80,7 @@ def configure_cli(subparsers):
     parser.set_defaults(cmd_name='load')
 
 
-class Command:
+class Command(BaseCommand):
 
     def __call__(self, fcrepo, args):
         # Load batch configuration
@@ -231,7 +233,7 @@ def load_item_internal(fcrepo, item, args, extra=None):
         item.add_extra_properties(extra, rdf_format)
 
     logger.info('Updating item and components')
-    item.recursive_update(fcrepo)
+    item.update(fcrepo)
     if args.create_annotations:
         logger.info('Updating annotations')
         item.update_annotations(fcrepo)

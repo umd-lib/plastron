@@ -72,8 +72,15 @@ class File(ldp.NonRdfSource):
         obj.source = RepositoryFileSource(repo, uri)
         return obj
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # for image files
+        # TODO: move these to a subclass or mix-in?
+        self.width = None
+        self.height = None
+
     # upload a binary resource
-    def create(self, repository, uri=None, container_path=None, slug=None, headers=None, **kwargs):
+    def create(self, repository, container_path=None, slug=None, headers=None, **kwargs):
         if not repository.load_binaries:
             self.logger.info(f'Skipping loading for binary {self.source.filename}')
             return True
@@ -85,21 +92,20 @@ class File(ldp.NonRdfSource):
 
         self.logger.info(f'Loading {self.source.filename}')
 
-        with self.source as stream:
-            if headers is None:
-                headers = {}
-            headers.update({
-                'Content-Type': self.source.mimetype(),
-                'Digest': self.source.digest(),
-                'Content-Disposition': f'attachment; filename="{self.source.filename}"'
-            })
-            if slug is not None:
-                headers['Slug'] = slug
-            self.uri = repository.create(url=uri, container_path=container_path, data=stream, headers=headers)
-            self.created = True
-            return True
+        if headers is None:
+            headers = {}
+        headers.update({
+            'Content-Type': self.source.mimetype(),
+            'Digest': self.source.digest(),
+            'Content-Disposition': f'attachment; filename="{self.source.filename}"'
+        })
 
-    def update_object(self, repository, patch_uri=None):
+        with self.source as stream:
+            super().create(repository, container_path=container_path, slug=slug, headers=headers, data=stream, **kwargs)
+        self.created = True
+        return True
+
+    def update(self, repository, recursive=True):
         if not repository.load_binaries:
             self.logger.info(f'Skipping update for binary {self.source.filename}')
             return True
@@ -116,13 +122,7 @@ class File(ldp.NonRdfSource):
                 except IOError as e:
                     self.logger.warn(f'Cannot read image file: {e}')
 
-        head_response = repository.head(self.uri)
-        if 'describedby' in head_response.links:
-            target = head_response.links['describedby']['url']
-        else:
-            raise Exception(f'Missing describedby Link header for {self.uri}')
-
-        return super().update_object(repository, patch_uri=target)
+        return super().update(repository, recursive=recursive)
 
 
 @rdf.rdf_class(pcdmuse.PreservationMasterFile)

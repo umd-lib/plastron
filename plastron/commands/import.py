@@ -12,6 +12,7 @@ from datetime import datetime
 from distutils.util import strtobool
 from os.path import basename, splitext
 from plastron import rdf
+from plastron.commands import BaseCommand
 from plastron.exceptions import DataReadException, NoValidationRulesetException, RESTAPIException, \
     FailureException, ConfigException
 from plastron.files import HTTPFileSource, LocalFileSource, RemoteFileSource, ZipFileSource
@@ -322,13 +323,12 @@ class Job:
         })
 
 
-class Command:
+class Command(BaseCommand):
     def __init__(self, config=None):
+        super().__init__(config=config)
         self.result = None
-        if config is None:
-            config = {}
-        self.ssh_private_key = config.get('SSH_PRIVATE_KEY')
-        self.jobs_dir = config.get('JOBS_DIR', 'jobs')
+        self.ssh_private_key = self.config.get('SSH_PRIVATE_KEY')
+        self.jobs_dir = self.config.get('JOBS_DIR', 'jobs')
 
     def __call__(self, *args, **kwargs):
         for _ in self.execute(*args, **kwargs):

@@ -1,6 +1,7 @@
 import logging
 import yaml
 from plastron import pcdm
+from plastron.commands import BaseCommand
 from plastron.exceptions import RESTAPIException, FailureException
 from plastron.http import Transaction
 
@@ -32,7 +33,7 @@ def configure_cli(subparsers):
     parser.set_defaults(cmd_name='mkcol')
 
 
-class Command:
+class Command(BaseCommand):
     def __call__(self, fcrepo, args):
         if args.notransactions:
             try:

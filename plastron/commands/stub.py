@@ -2,6 +2,8 @@ import csv
 import logging
 import sys
 from argparse import FileType
+
+from plastron.commands import BaseCommand
 from plastron.exceptions import FailureException, RESTAPIException
 from plastron.files import HTTPFileSource
 from plastron.http import Transaction
@@ -76,7 +78,7 @@ def configure_cli(subparsers):
     parser.set_defaults(cmd_name='stub')
 
 
-class Command:
+class Command(BaseCommand):
     def __call__(self, repo, args):
         csv_file = csv.DictReader(args.source_file)
         if args.output_file is not None:

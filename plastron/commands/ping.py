@@ -1,3 +1,4 @@
+from plastron.commands import BaseCommand
 from plastron.exceptions import FailureException
 
 
@@ -9,7 +10,7 @@ def configure_cli(subparsers):
     parser_ping.set_defaults(cmd_name='ping')
 
 
-class Command:
+class Command(BaseCommand):
     def __call__(self, fcrepo, args):
         try:
             fcrepo.test_connection()

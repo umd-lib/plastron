@@ -3,6 +3,7 @@ import logging
 from bs4 import BeautifulSoup
 from io import BytesIO
 from plastron import rdf
+from plastron.commands import BaseCommand
 from plastron.namespaces import prov, sc
 from plastron.oa import Annotation, SpecificResource, TextualBody
 from plastron.pcdm import File, Object
@@ -28,12 +29,10 @@ class FullTextAnnotation(Annotation):
     pass
 
 
-class Command:
+class Command(BaseCommand):
     def __init__(self, config=None):
+        super().__init__(config)
         self.result = None
-        if config is None:
-            config = {}
-        self.config = config
 
     def __call__(self, *args, **kwargs):
         for _ in self.execute(*args, **kwargs):

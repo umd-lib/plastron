@@ -1,4 +1,6 @@
 from PIL import Image
+
+from plastron.commands import BaseCommand
 from plastron.files import RepositoryFileSource
 import logging
 
@@ -20,7 +22,7 @@ def configure_cli(subparsers):
     parser.set_defaults(cmd_name='imgsize')
 
 
-class Command:
+class Command(BaseCommand):
     def __call__(self, fcrepo, args):
         for uri in args.uris:
             source = RepositoryFileSource(fcrepo, uri)

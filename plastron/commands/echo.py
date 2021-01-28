@@ -1,6 +1,8 @@
 import logging
 import time
 from argparse import Namespace
+
+from plastron.commands import BaseCommand
 from plastron.namespaces import get_manager
 
 
@@ -31,12 +33,11 @@ def configure_cli(subparsers):
     parser.set_defaults(cmd_name='echo')
 
 
-class Command:
+class Command(BaseCommand):
     def __init__(self, config=None):
+        super().__init__(config=config)
         self.result = None
-        if config is None:
-            config = {}
-        self.ssh_private_key = config.get('SSH_PRIVATE_KEY')
+        self.ssh_private_key = self.config.get('SSH_PRIVATE_KEY')
 
     def __call__(self, *args, **kwargs):
         self.execute(*args, **kwargs)

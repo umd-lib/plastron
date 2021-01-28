@@ -89,13 +89,13 @@ def main():
         config = yaml.safe_load(args.config_file)
         repo_config = config['REPOSITORY']
         broker_config = config.get('MESSAGE_BROKER', None)
-        command_config = config.get('COMMANDS', None)
+        command_config = config.get('COMMANDS', {})
     else:
         # old-style, repository-only config file
         with open(args.repo, 'r') as repo_config_file:
             repo_config = yaml.safe_load(repo_config_file)
         broker_config = None
-        command_config = None
+        command_config = {}
 
     fcrepo = Repository(
         repo_config, ua_string=f'plastron/{version}', on_behalf_of=args.delegated_user

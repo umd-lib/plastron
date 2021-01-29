@@ -7,6 +7,7 @@ import re
 import yaml
 
 from argparse import FileType, Namespace, ArgumentTypeError
+from bs4 import BeautifulSoup
 from collections import OrderedDict, defaultdict
 from datetime import datetime
 from distutils.util import strtobool
@@ -17,7 +18,8 @@ from plastron.exceptions import DataReadException, NoValidationRulesetException,
     FailureException, ConfigException
 from plastron.files import HTTPFileSource, LocalFileSource, RemoteFileSource, ZipFileSource
 from plastron.http import Transaction
-from plastron.namespaces import get_manager
+from plastron.namespaces import get_manager, prov, sc
+from plastron.oa import Annotation, TextualBody
 from plastron.pcdm import File
 from plastron.rdf import RDFDataProperty
 from plastron.serializers import CSVSerializer
@@ -84,7 +86,7 @@ def configure_cli(subparsers):
     parser.add_argument(
         '--container',
         help=(
-            'parent container for new items; defaults to the RELPATH'
+            'parent container for new items; defaults to the RELPATH '
             'in the repo configuration file'
         ),
         action='store'
@@ -98,6 +100,15 @@ def configure_cli(subparsers):
         '--resume',
         help='resume a job that has been started; requires --job-id {id} to be present',
         action='store_true'
+    )
+    parser.add_argument(
+        '--extract-text-from', '-x',
+        help=(
+            'extract text from binaries of the given MIME types, '
+            'and add as annotations'
+        ),
+        dest='extract_text_types',
+        action='store'
     )
     parser.add_argument(
         'import_file', nargs='?',
@@ -240,6 +251,30 @@ def parse_value_string(value_string, column, prop_type):
             yield Literal(value, lang=column['lang_code'], datatype=column.get('datatype', prop_type.datatype))
         else:
             yield URIRef(value)
+
+
+def annotate_from_files(item, mime_types):
+    for member in item.members:
+        # extract text from HTML files
+        for file in filter(lambda f: str(f.mimetype) in mime_types, member.files):
+            if str(file.mimetype) == 'text/html':
+                # get text from HTML
+                with file.source as stream:
+                    text = BeautifulSoup(io.BytesIO(b''.join(stream)), features='lxml').get_text()
+            else:
+                logger.warning(f'Extracting text from {file.mimetype} is not supported')
+                continue
+
+            annotation = FullTextAnnotation(
+                target=member,
+                body=TextualBody(value=text, content_type='text/plain'),
+                motivation=sc.painting,
+                derived_from=file
+            )
+            # don't embed full resources
+            annotation.props['target'].is_embedded = False
+
+            member.annotations.append(annotation)
 
 
 class ModelClassNotFoundError(Exception):
@@ -408,8 +443,10 @@ class Command(BaseCommand):
 
             # add the files to their parent object (either the item or a member)
             for filename in filenames:
-                file = File(title=filename)
-                file.source = self.get_source(base_location, filename)
+                file = File.from_source(
+                    title=filename,
+                    source=self.get_source(base_location, filename)
+                )
                 count += 1
                 file_parent.add_file(file)
                 if access is not None:
@@ -439,6 +476,7 @@ class Command(BaseCommand):
             member_of=message.args.get('member-of'),
             binaries_location=message.args.get('binaries-location'),
             container=message.args.get('container', None),
+            extract_text_types=message.args.get('extract-text', None),
             job_id=message.job_id
         )
 
@@ -731,6 +769,9 @@ class Command(BaseCommand):
                             create_pages=create_pages
                         )
 
+                    if args.extract_text_types is not None:
+                        annotate_from_files(item, args.extract_text_types.split(','))
+
                     logger.debug(f"Creating resources in container: {job.container}")
 
                     try:
@@ -778,7 +819,7 @@ class Command(BaseCommand):
                     'now': now,
                     'elapsed': now - start_time
                 },
-                'count': count,
+                'count': count
             }
 
         if count['total'] is None:
@@ -806,3 +847,8 @@ class Command(BaseCommand):
                 'updated': updated_uris
             }
         }
+
+
+@rdf.object_property('derived_from', prov.wasDerivedFrom)
+class FullTextAnnotation(Annotation):
+    pass

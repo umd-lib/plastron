@@ -115,6 +115,9 @@ class Resource(rdf.Resource):
                 # recursively update an object and all its components and files
                 for obj in self.linked_objects():
                     obj.update(repository)
+                # update any annotations
+                for annotation in self.annotations:
+                    annotation.update(repository)
 
     # check for the existence of a local object in the repository
     def exists_in_repo(self, repository):

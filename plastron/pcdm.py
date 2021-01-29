@@ -72,6 +72,12 @@ class File(ldp.NonRdfSource):
         obj.source = RepositoryFileSource(repo, uri)
         return obj
 
+    @classmethod
+    def from_source(cls, source=None, **kwargs):
+        obj = super().from_source(source=source, **kwargs)
+        obj.mimetype = source.mimetype()
+        return obj
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         # for image files

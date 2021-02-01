@@ -110,6 +110,10 @@ class Resource(rdf.Resource):
     # update existing repo object with SPARQL update
     def update(self, repository, recursive=True):
         if not self.updated:
+            # Ensure item being updated has a ResourceURI
+            if self.resource is None:
+                self.resource = ResourceURI(self.uri, repository.get_description_uri(self.uri))
+
             self.patch(repository, repository.build_sparql_update(insert_graph=self.graph()))
             if recursive:
                 # recursively update an object and all its components and files

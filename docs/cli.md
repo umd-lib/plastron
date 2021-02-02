@@ -174,6 +174,64 @@ where {CONFIG_FILE} is the Plastron configuration file.
 want to delete the collection resource as well, add the URI of the collection
 to the list in "delete_uris.txt" or delete it using a second "delete" command.
 
+#### Example - Delete all items in a Collection (Hierarchical Structure)
+
+In a "hierarchical" structure, all the items in a collection are descendents of
+the collection URI. Therefore, deleting a collection consists of simply deleting
+the collection URI.
+
+If the collection is going to be loaded again at the original URI, the
+"tombstone" for the collection also needs to be deleted.
+
+1) Delete the collection URI using the the "delete" command of the Plastron CLI.
+The general form of the command is:
+
+```
+plastron --config {CONFIG_FILE} delete {COLLECTION_URI}
+```
+
+where {CONFIG_FILE} is the Plastron configuration file, and {COLLECTION_URI}
+is the URI of the collection.
+
+For example, if the configuration file is "config/localhost.yml" and the
+collection URI is "http://localhost:8080/rest/dc/2016/1" the command would be:
+
+```
+plastron --config config/localhost.yml delete http://localhost:8080/rest/dc/2016/1
+```
+
+2) (Optional) Delete the "tombstone" resource for the collection URI using
+"curl".
+
+2.1) Get an "auth token" accessing the fcrepo web application by going to
+"{FCREPO URL}/user/token?subject=curl&role=fedoraAdmin". For example, for
+the local development environment:
+
+[http://localhost:8080/user/token?subject=curl&role=fedoraAdmin](http://localhost:8080/user/token?subject=curl&role=fedoraAdmin)
+
+2.2) Create an "AUTH_TOKEN" environment variable:
+
+```
+export AUTH_TOKEN={TOKEN}
+```
+
+where {TOKEN} is the JWT token string returned by the previous step.
+
+2.3) To delete the tombstone, the general form of the command is:
+
+```
+curl -H "Authorization: Bearer $AUTH_TOKEN" -X DELETE {COLLECTION_URI}/fcr:tombstone
+```
+
+where {COLLECTION_URI} is the URI of the collection.
+
+Using "http://localhost:8080/rest/dc/2016/1" as our collection URI, the command
+would be:
+
+```
+curl -H "Authorization: Bearer $AUTH_TOKEN" -X DELETE http://localhost:8080/rest/dc/2016/1/fcr:tombstone
+```
+
 ### Extract OCR (extractocr)
 
 ```

@@ -15,7 +15,7 @@ from os.path import basename, splitext
 from plastron import rdf
 from plastron.commands import BaseCommand
 from plastron.exceptions import DataReadException, NoValidationRulesetException, RESTAPIException, \
-    FailureException, ConfigException
+    FailureException, ConfigError
 from plastron.files import HTTPFileSource, LocalFileSource, RemoteFileSource, ZipFileSource
 from plastron.http import Transaction
 from plastron.namespaces import get_manager, prov, sc
@@ -417,7 +417,7 @@ class Command(BaseCommand):
         :return: The number of files added.
         """
         if base_location is None:
-            raise ConfigException('Must specify a binaries-location')
+            raise ConfigError('Must specify a binaries-location')
 
         if create_pages:
             logger.debug(f'Creating {len(file_groups.keys())} page(s)')

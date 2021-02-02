@@ -3,7 +3,7 @@ import io
 import zipfile
 import requests
 from mimetypes import guess_type
-from os.path import basename
+from os.path import basename, isfile
 from paramiko import SFTPClient
 from plastron.exceptions import BinarySourceError, BinarySourceNotFoundError, RESTAPIException
 from plastron.util import get_ssh_client
@@ -32,6 +32,9 @@ class BinarySource:
         raise NotImplementedError()
 
     def mimetype(self):
+        raise NotImplementedError()
+
+    def exists(self):
         raise NotImplementedError()
 
     def digest(self):
@@ -73,6 +76,9 @@ class StringSource(BinarySource):
     def mimetype(self):
         return self._mimetype
 
+    def exists(self):
+        return True
+
 
 class LocalFileSource(BinarySource):
     """
@@ -102,6 +108,9 @@ class LocalFileSource(BinarySource):
 
     def mimetype(self):
         return self._mimetype
+
+    def exists(self):
+        return isfile(self.localpath)
 
 
 class HTTPFileSource(BinarySource):
@@ -140,6 +149,9 @@ class HTTPFileSource(BinarySource):
         # no special cleanup for HTTP requests
         pass
 
+    def exists(self):
+        return requests.request('HEAD', self.uri).status_code == 200
+
 
 class RepositoryFileSource(BinarySource):
     """
@@ -171,6 +183,9 @@ class RepositoryFileSource(BinarySource):
     def close(self):
         # no special cleanup for HTTP requests
         pass
+
+    def exists(self):
+        return self.repo.exists(self.file_uri)
 
 
 class RemoteFileSource(BinarySource):
@@ -237,6 +252,10 @@ class RemoteFileSource(BinarySource):
         sha1sum = self.ssh_exec(f'sha1sum "{self.sftp_uri.path}"').split()[0]
         return 'sha1=' + sha1sum
 
+    def exists(self):
+        (_, stdout, _) = self.ssh().exec_command(f'test -f "{self.sftp_uri.path}"')
+        return stdout.channel.recv_exit_status() == 0
+
 
 class ZipFileSource(BinarySource):
     """
@@ -283,19 +302,30 @@ class ZipFileSource(BinarySource):
         if self.source is not None:
             self.source.close()
 
-    def open(self):
+    def get_zip_file(self):
+        if self.zip_file is not None:
+            return self.zip_file
         if self.source is not None:
             try:
                 self.zip_file = zipfile.ZipFile(self.source.open())
             except FileNotFoundError as e:
                 raise BinarySourceNotFoundError(f'Zip file {self.source} not found') from e
+            return self.zip_file
 
+    def open(self):
         # open the desired file from the archive
         try:
-            self.file = self.zip_file.open(self.path, 'r')
+            self.file = self.get_zip_file().open(self.path, 'r')
             return self.file
         except KeyError as e:
             raise BinarySourceNotFoundError(f"'{self.path}' not found in file '{self.source}'") from e
 
     def mimetype(self):
         return self._mimetype
+
+    def exists(self):
+        try:
+            self.get_zip_file().getinfo(self.path)
+            return True
+        except KeyError:
+            return False

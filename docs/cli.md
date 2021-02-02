@@ -140,6 +140,40 @@ optional arguments:
   -f FILE, --file FILE  File containing a list of URIs to delete```
 ```
 
+#### Example - Delete all items in a Collection (Flat Structure)
+
+In a "flat" structure, all the items in a collection are a child of a single
+parent container (typically "/pcdm"), and items and pages are siblings instead
+of parent-child.  To delete all the resources associated with a single
+collection:
+
+1) In Solr, run a query:
+
+| Field                | Value                             | Note |
+| -------------------- | --------------------------------- | ---- |
+| q                    | pcdm_member_of:"{COLLECTION_URI}" | where {COLLECTION_URI} is the collection URI |
+| rows                 | 1000                              | a number large enough to get all the resources |
+| fl                   | id                                |      |
+| Raw Query Parameters | csv.header=no                     | Disables the "header" line in the CSV |
+| wt                   | csv                               |      |
+
+This will generate a list of URIs to be deleted.
+
+2) Copy the list of URIs from the previous step, and save in a file such as
+"delete_uris.txt"
+
+3) Run the Plastron CLI:
+
+```
+plastron --config {CONFIG_FILE} delete --recursive "pcdm:hasMember,pcdm:hasFile,pcdm:hasRelatedObject" --file delete_uris.txt
+```
+
+where {CONFIG_FILE} is the Plastron configuration file.
+
+**Note:** The above does _not_ delete the collection resource itself. If you
+want to delete the collection resource as well, add the URI of the collection
+to the list in "delete_uris.txt" or delete it using a second "delete" command.
+
 ### Extract OCR (extractocr)
 
 ```

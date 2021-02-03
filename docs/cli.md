@@ -6,7 +6,7 @@
 $ plastron --help
 usage: plastron [-h] (-r REPO | -c CONFIG_FILE | -V) [-v] [-q]
                 [--on-behalf-of DELEGATED_USER]
-                {annotate,delete,del,rm,echo,export,extractocr,imgsize,import,list,ls,load,mkcol,ping,reindex,stub,update}
+                {annotate,create,delete,del,rm,echo,export,extractocr,imgsize,import,list,ls,load,mkcol,ping,reindex,stub,update}
                 ...
 
 Batch operation tool for Fedora 4.
@@ -23,7 +23,7 @@ optional arguments:
                         delegate repository operations to this username
 
 commands:
-  {annotate,delete,del,rm,echo,export,extractocr,imgsize,import,list,ls,load,mkcol,ping,reindex,stub,update}
+  {annotate,create,delete,del,rm,echo,export,extractocr,imgsize,import,list,ls,load,mkcol,ping,reindex,stub,update}
 ```
 
 ### Check version
@@ -54,7 +54,42 @@ optional arguments:
   -h, --help  show this help message and exit
 ```
 
+### Create (create)
+
+```
+$ plastron create -h
+usage: plastron create [-h] [-D PREDICATE VALUE] [-O PREDICATE VALUE]
+                       [-T TYPE] [--collection NAME] [--container PATH]
+                       [path]
+
+Create a resource in the repository
+
+positional arguments:
+  path                  path to the new resource
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -D PREDICATE VALUE, --data-property PREDICATE VALUE
+                        an RDF data property to set on the newly created
+                        resource; VALUE is treated as a Literal; repeatable
+  -O PREDICATE VALUE, --object-property PREDICATE VALUE
+                        an RDF object property to set on the newly created
+                        resource; VALUE is treated as a CURIE or URIRef;
+                        repeatable
+  -T TYPE, --rdf-type TYPE
+                        RDF type to add to the newly created resource;
+                        equivalent to "-O rdf:type TYPE"; TYPE is treated as a
+                        CURIE or URIRef; repeatable
+  --collection NAME     shortcut for "-T pcdm:collection -D dcterms:title
+                        NAME"
+  --container PATH      parent container for the new resource; use this to
+                        create a new resource with a repository-generated
+                        identifier
+```
+
 ### Create Collection (mkcol)
+
+**DEPRECATED:** Use `plastron create --collection` instead.
 
 ```
 $ plastron mkcol --help

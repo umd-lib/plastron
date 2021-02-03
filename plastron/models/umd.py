@@ -57,22 +57,27 @@ class Item(pcdm.Object):
     VALIDATION_RULESET = {
         'object_type': {
             'required': True,
-            'exactly': 1
+            'exactly': 1,
+            'from_vocabulary': 'http://purl.org/dc/dcmitype/',
         },
         'identifier': {
             'required': True
         },
         'rights': {
             'required': True,
-            'exactly': 1
+            'exactly': 1,
+            'from_vocabulary': 'http://vocab.lib.umd.edu/rightsStatement#'
         },
         'title': {
             'required': True,
             'exactly': 1
         },
-        'format': {},
+        'format': {
+            'from_vocabulary': 'http://vocab.lib.umd.edu/form#'
+        },
         'archival_collection': {
-            'max_values': 1
+            'max_values': 1,
+            'from_vocabulary': 'http://vocab.lib.umd.edu/collection#'
         },
         'date': {
             'max_values': 1,

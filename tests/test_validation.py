@@ -1,25 +1,36 @@
 import pytest
+from plastron.rdf import RDFObjectProperty
 from plastron.validation import is_edtf_formatted
-from plastron.validation.rules import required
+from plastron.validation.rules import from_vocabulary, required
+from rdflib import URIRef
 
 
-def test_required():
-    # no values fails
-    assert required([]) is False
+@pytest.mark.parametrize(
+    ('values', 'expected'),
+    [
+        # no values fails
+        ([], False),
+        # empty string fails
+        ([''], False),
+        # blank string fails
+        (['  '], False),
+        # non-empty strings pass
+        (['foo'], True),
+        (['0'], True),
+        # non-string values pass
+        ([0], True),
+        ([1.0], True),
+        # only need one non-empty string to pass
+        (['foo', ''], True)
+    ]
+)
+def test_required(values, expected):
+    assert required(values) is expected
+
+
+def test_not_required():
     # no values but not actually required passes
     assert required([], False) is True
-    # empty string fails
-    assert required(['']) is False
-    # blank string fails
-    assert required(['  ']) is False
-    # non-empty strings pass
-    assert required(['foo']) is True
-    assert required(['0']) is True
-    # non-string values pass
-    assert required([0]) is True
-    assert required([1.0]) is True
-    # only need one non-empty string to pass
-    assert required(['foo', '']) is True
 
 
 @pytest.mark.parametrize(
@@ -38,3 +49,17 @@ def test_required():
     ])
 def test_is_edtf_formatted(datetime_string):
     assert is_edtf_formatted(datetime_string) is True
+
+
+@pytest.mark.parametrize(
+    ('value', 'vocab_uri', 'expected'),
+    [
+        ('http://purl.org/dc/dcmitype/Image', 'http://purl.org/dc/dcmitype/', True),
+        ('http://purl.org/dc/dcmitype/Text', 'http://purl.org/dc/dcmitype/', True),
+        ('http://example.com/Text', 'http://purl.org/dc/dcmitype/', False),
+    ]
+)
+def test_from_vocabulary(value, vocab_uri, expected):
+    prop = RDFObjectProperty()
+    prop.values = [URIRef(value)]
+    assert from_vocabulary(prop, vocab_uri) is expected

@@ -142,7 +142,7 @@ optional arguments:
 
 #### Example - Delete all items in a Collection (Flat Structure)
 
-In a "flat" structure, all the items in a collection are a child of a single
+In a "flat" structure, all the items in a collection are children of a single
 parent container (typically "/pcdm"), and items and pages are siblings instead
 of parent-child.  To delete all the resources associated with a single
 collection:
@@ -165,7 +165,7 @@ This will generate a list of URIs to be deleted.
 3) Run the Plastron CLI:
 
 ```
-plastron --config {CONFIG_FILE} delete --recursive "pcdm:hasMember,pcdm:hasFile,pcdm:hasRelatedObject" --file delete_uris.txt
+$ plastron --config {CONFIG_FILE} delete --recursive "pcdm:hasMember,pcdm:hasFile,pcdm:hasRelatedObject" --file delete_uris.txt
 ```
 
 where {CONFIG_FILE} is the Plastron configuration file.
@@ -187,7 +187,7 @@ If the collection is going to be loaded again at the original URI, the
 The general form of the command is:
 
 ```
-plastron --config {CONFIG_FILE} delete {COLLECTION_URI}
+$ plastron --config {CONFIG_FILE} delete {COLLECTION_URI}
 ```
 
 where {CONFIG_FILE} is the Plastron configuration file, and {COLLECTION_URI}
@@ -197,40 +197,40 @@ For example, if the configuration file is "config/localhost.yml" and the
 collection URI is "http://localhost:8080/rest/dc/2016/1" the command would be:
 
 ```
-plastron --config config/localhost.yml delete http://localhost:8080/rest/dc/2016/1
+$ plastron --config config/localhost.yml delete http://localhost:8080/rest/dc/2016/1
 ```
 
 2) (Optional) Delete the "tombstone" resource for the collection URI using
-"curl".
+"curl":
 
-2.1) Get an "auth token" accessing the fcrepo web application by going to
-"{FCREPO URL}/user/token?subject=curl&role=fedoraAdmin". For example, for
-the local development environment:
+    2.1. Get an "auth token" accessing the fcrepo web application by going to
+    "{FCREPO URL}/user/token?subject=curl&role=fedoraAdmin". For example, for
+    the local development environment:
 
-[http://localhost:8080/user/token?subject=curl&role=fedoraAdmin](http://localhost:8080/user/token?subject=curl&role=fedoraAdmin)
+    [http://localhost:8080/user/token?subject=curl&role=fedoraAdmin](http://localhost:8080/user/token?subject=curl&role=fedoraAdmin)
 
-2.2) Create an "AUTH_TOKEN" environment variable:
+    2.2. Create an "AUTH_TOKEN" environment variable:
 
-```
-export AUTH_TOKEN={TOKEN}
-```
+    ```
+    $ export AUTH_TOKEN={TOKEN}
+    ```
 
-where {TOKEN} is the JWT token string returned by the previous step.
+    where {TOKEN} is the JWT token string returned by the previous step.
 
-2.3) To delete the tombstone, the general form of the command is:
+    2.3. To delete the tombstone, the general form of the command is:
 
-```
-curl -H "Authorization: Bearer $AUTH_TOKEN" -X DELETE {COLLECTION_URI}/fcr:tombstone
-```
+    ```
+    $ curl -H "Authorization: Bearer $AUTH_TOKEN" -X DELETE {COLLECTION_URI}/fcr:tombstone
+    ```
 
-where {COLLECTION_URI} is the URI of the collection.
+    where {COLLECTION_URI} is the URI of the collection.
 
-Using "http://localhost:8080/rest/dc/2016/1" as our collection URI, the command
-would be:
+    Using "http://localhost:8080/rest/dc/2016/1" as our collection URI, the command
+    would be:
 
-```
-curl -H "Authorization: Bearer $AUTH_TOKEN" -X DELETE http://localhost:8080/rest/dc/2016/1/fcr:tombstone
-```
+    ```
+    $ curl -H "Authorization: Bearer $AUTH_TOKEN" -X DELETE http://localhost:8080/rest/dc/2016/1/fcr:tombstone
+    ```
 
 ### Extract OCR (extractocr)
 

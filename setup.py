@@ -83,6 +83,7 @@ setup(
         'pyparsing',
         'PyYAML>3.12',
         'rdflib',
+        'rdflib-jsonld',
         'requests',
         'setuptools',
         'stomp.py',

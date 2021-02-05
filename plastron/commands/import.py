@@ -444,7 +444,7 @@ class Command(BaseCommand):
             # add the files to their parent object (either the item or a member)
             for filename in filenames:
                 file = File.from_source(
-                    title=filename,
+                    title=basename(filename),
                     source=self.get_source(base_location, filename)
                 )
                 count += 1

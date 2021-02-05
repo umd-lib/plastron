@@ -212,11 +212,11 @@ def validate(item):
     result = item.validate()
 
     if result.is_valid():
-        logger.info(f'"{item}" is valid')
+        logger.info(f'"{item}" passed metadata validation')
         for outcome in result.passed():
             logger.debug(f'  ✓ {outcome}')
     else:
-        logger.warning(f'{item} is invalid')
+        logger.warning(f'"{item}" failed metadata validation')
         for outcome in result.failed():
             logger.warning(f'  ✗ {outcome}')
         for outcome in result.passed():
@@ -733,13 +733,16 @@ class Command(BaseCommand):
             })
 
             missing_files = [name for name in filenames if not self.get_source(job.binaries_location, name).exists()]
+            if len(missing_files) > 0:
+                logger.warning(f'{len(missing_files)} file(s) for "{item}" not found')
 
             if report.is_valid() and len(missing_files) == 0:
                 count['valid'] += 1
+                logger.info(f'"{item}" is valid')
             else:
                 # drop invalid items
                 count['invalid'] += 1
-                logger.warning(f'Skipping "{item}"')
+                logger.warning(f'"{item}" is invalid, skipping')
                 reasons = [' '.join(str(f) for f in outcome) for outcome in report.failed()]
                 if len(missing_files) > 0:
                     reasons.extend(f'Missing file: {f}' for f in missing_files)

@@ -7,7 +7,7 @@ from base64 import urlsafe_b64encode
 from collections import namedtuple
 from jwcrypto.jwk import JWK
 from jwcrypto.jwt import JWT
-from plastron.exceptions import ConfigException, FailureException, RESTAPIException
+from plastron.exceptions import ConfigError, FailureException, RESTAPIException
 from rdflib import Graph, URIRef
 from requests.exceptions import ConnectionError
 
@@ -143,7 +143,7 @@ class Repository:
         elif structure_type == 'flat':
             self.creator = FlatCreator(self)
         else:
-            raise ConfigException(f'Unknown STRUCTURE value: {structure_type}')
+            raise ConfigError(f'Unknown STRUCTURE value: {structure_type}')
 
         # set up authentication credentials; in order of preference:
         #   1. Bearer token

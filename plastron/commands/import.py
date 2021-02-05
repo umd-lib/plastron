@@ -15,7 +15,7 @@ from os.path import basename, splitext
 from plastron import rdf
 from plastron.commands import BaseCommand
 from plastron.exceptions import DataReadException, NoValidationRulesetException, RESTAPIException, \
-    FailureException, ConfigException
+    FailureException, ConfigError
 from plastron.files import HTTPFileSource, LocalFileSource, RemoteFileSource, ZipFileSource
 from plastron.http import Transaction
 from plastron.namespaces import get_manager, prov, sc
@@ -212,11 +212,11 @@ def validate(item):
     result = item.validate()
 
     if result.is_valid():
-        logger.info(f'"{item}" is valid')
+        logger.info(f'"{item}" passed metadata validation')
         for outcome in result.passed():
             logger.debug(f'  ✓ {outcome}')
     else:
-        logger.warning(f'{item} is invalid')
+        logger.warning(f'"{item}" failed metadata validation')
         for outcome in result.failed():
             logger.warning(f'  ✗ {outcome}')
         for outcome in result.passed():
@@ -417,7 +417,7 @@ class Command(BaseCommand):
         :return: The number of files added.
         """
         if base_location is None:
-            raise ConfigException('Must specify a binaries-location')
+            raise ConfigError('Must specify a binaries-location')
 
         if create_pages:
             logger.debug(f'Creating {len(file_groups.keys())} page(s)')
@@ -573,6 +573,10 @@ class Command(BaseCommand):
             # file is not seekable, so we can't get a row count in advance
             count['total'] = None
 
+        has_binaries = 'FILES' in csv_file.fieldnames
+        if has_binaries and job.binaries_location is None:
+            raise ConfigError('Must specify --binaries-location if the metadata has a FILES column')
+
         try:
             fields = build_fields(csv_file.fieldnames, property_attrs)
         except DataReadException as e:
@@ -711,7 +715,10 @@ class Command(BaseCommand):
 
             # count the number of files referenced in this row
             if 'FILES' in row and row['FILES'].strip() != '':
-                count['files'] += len(row['FILES'].split(';'))
+                filenames = row['FILES'].strip().split(';')
+                count['files'] += len(filenames)
+            else:
+                filenames = []
 
             try:
                 report = validate(item)
@@ -725,19 +732,24 @@ class Command(BaseCommand):
                 'failed': [outcome for outcome in report.failed()]
             })
 
-            if report.is_valid():
+            missing_files = [name for name in filenames if not self.get_source(job.binaries_location, name).exists()]
+            if len(missing_files) > 0:
+                logger.warning(f'{len(missing_files)} file(s) for "{item}" not found')
+
+            if report.is_valid() and len(missing_files) == 0:
                 count['valid'] += 1
+                logger.info(f'"{item}" is valid')
             else:
-                # skip invalid items
+                # drop invalid items
                 count['invalid'] += 1
-                logger.warning(f'Skipping "{item}"')
+                logger.warning(f'"{item}" is invalid, skipping')
+                reasons = [' '.join(str(f) for f in outcome) for outcome in report.failed()]
+                if len(missing_files) > 0:
+                    reasons.extend(f'Missing file: {f}' for f in missing_files)
                 job.drop(
                     item=item,
                     line_reference=line_reference,
-                    reason=(
-                        'Validation failures: '
-                        '; '.join(' '.join(str(f) for f in outcome) for outcome in report.failed())
-                    )
+                    reason=f'Validation failures: {"; ".join(reasons)}'
                 )
                 continue
 

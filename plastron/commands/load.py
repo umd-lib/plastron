@@ -8,7 +8,7 @@ from importlib import import_module
 from time import sleep
 
 from plastron.commands import BaseCommand
-from plastron.exceptions import ConfigException, DataReadException, RESTAPIException, FailureException
+from plastron.exceptions import ConfigError, DataReadException, RESTAPIException, FailureException
 from plastron.http import Transaction
 from plastron.util import ItemLog
 
@@ -86,7 +86,7 @@ class Command(BaseCommand):
         # Load batch configuration
         try:
             batch_config = BatchConfig(args.batch)
-        except ConfigException as e:
+        except ConfigError as e:
             logger.error(e.message)
             logger.error(f'Failed to load batch configuration from {args.batch}')
             raise FailureException(e.message)
@@ -111,7 +111,7 @@ class Command(BaseCommand):
 
         try:
             batch = handler.Batch(fcrepo, batch_config)
-        except (ConfigException, DataReadException) as e:
+        except (ConfigError, DataReadException) as e:
             logger.error(e.message)
             logger.error('Failed to initialize batch')
             raise FailureException(e.message)
@@ -229,7 +229,7 @@ def load_item_internal(fcrepo, item, args, extra=None):
         elif re.search(r'\.(rdf|xml)$', extra):
             rdf_format = 'xml'
         else:
-            raise ConfigException("Unrecognized extra triples file format")
+            raise ConfigError("Unrecognized extra triples file format")
         item.add_extra_properties(extra, rdf_format)
 
     logger.info('Updating item and components')
@@ -316,4 +316,4 @@ class BatchConfig:
 
         if missing_fields:
             field_names = ', '.join(missing_fields)
-            raise ConfigException(f'Missing required batch configuration field(s): {field_names}')
+            raise ConfigError(f'Missing required batch configuration field(s): {field_names}')

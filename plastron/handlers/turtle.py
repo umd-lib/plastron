@@ -6,7 +6,7 @@ import yaml
 from rdflib import Graph
 from plastron import pcdm, rdf
 from plastron.authority import create_authority
-from plastron.exceptions import ConfigException, DataReadException
+from plastron.exceptions import ConfigError, DataReadException
 from plastron.namespaces import dcterms
 from plastron.pcdm import Page, get_file_object
 
@@ -29,7 +29,7 @@ class Batch:
 
         # Check for required metadata file
         if not os.path.isfile(config.batch_file):
-            raise ConfigException('Specified metadata file could not be found')
+            raise ConfigError('Specified metadata file could not be found')
 
         # check for an existing file index
         file_index = os.path.join(config.data_dir, 'file_index.yml')

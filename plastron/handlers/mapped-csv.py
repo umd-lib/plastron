@@ -6,7 +6,7 @@ from rdflib import Literal, URIRef
 from rdflib.util import from_n3
 from plastron import pcdm, namespaces, rdf
 from plastron.files import LocalFileSource, RemoteFileSource
-from plastron.exceptions import ConfigException
+from plastron.exceptions import ConfigError
 from collections import OrderedDict
 
 nsm = namespaces.get_manager()
@@ -33,7 +33,7 @@ class Batch:
 
         if missing_fields:
             field_names = ', '.join(missing_fields)
-            raise ConfigException(f'Missing required HANDLER_OPTIONS in batch configuration: {field_names}')
+            raise ConfigError(f'Missing required HANDLER_OPTIONS in batch configuration: {field_names}')
 
         if 'RDF_TYPE' in config.handler_options:
             self.item_rdf_type = URIRef(from_n3(config.handler_options['RDF_TYPE'], nsm=nsm))
@@ -49,7 +49,7 @@ class Batch:
                 self.logger.info(f'Reading metadata file {config.batch_file}')
                 self.rows = [r for r in csv.DictReader(f)]
         except FileNotFoundError as e:
-            raise ConfigException(e)
+            raise ConfigError(e)
 
         key_column = get_flagged_column(self.mapping, 'key')
         if key_column is not None:
@@ -254,7 +254,7 @@ def set_value(item, column, conf, line):
 def get_flagged_column(mapping, flag):
     cols = [col for col in mapping if flag in mapping[col] and mapping[col][flag]]
     if len(cols) > 1:
-        raise ConfigException(f"Only one {flag} column per mapping level is allowed")
+        raise ConfigError(f"Only one {flag} column per mapping level is allowed")
     elif len(cols) == 1:
         return cols[0]
     else:

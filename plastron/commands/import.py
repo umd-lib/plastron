@@ -1,3 +1,4 @@
+import copy
 import csv
 import io
 import logging
@@ -369,6 +370,14 @@ class Command(BaseCommand):
         for _ in self.execute(*args, **kwargs):
             pass
 
+    def override_repo_config(self, repo_config, args):
+        result_config = copy.deepcopy(repo_config)
+
+        if args.structure:
+            result_config['STRUCTURE'] = args.structure
+
+        return result_config
+
     def get_source(self, base_location, path):
         """
         Get an appropriate BinarySource based on the type of ``base_location``.
@@ -477,7 +486,8 @@ class Command(BaseCommand):
             binaries_location=message.args.get('binaries-location'),
             container=message.args.get('container', None),
             extract_text_types=message.args.get('extract-text', None),
-            job_id=message.job_id
+            job_id=message.job_id,
+            structure=message.args.get('structure', None)
         )
 
     def execute(self, repo, args):

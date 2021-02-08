@@ -123,19 +123,23 @@ class MessageProcessor:
         # determine which command to load to process the message
         command = self.get_command(message.command)
 
-        repo = Repository(
-            config=self.repo_config,
-            ua_string=f'plastron/{version}',
-            on_behalf_of=message.args.get('on-behalf-of')
-        )
         if message.job_id is None:
             raise FailureException('Expecting a PlastronJobId header')
 
         logger.info(f'Received message to initiate job {message.job_id}')
-        if repo.delegated_user is not None:
-            logger.info(f'Running repository operations on behalf of {repo.delegated_user}')
 
         args = command.parse_message(message)
+
+        cmd_repo_config = command.override_repo_config(self.repo_config, args)
+
+        repo = Repository(
+            config=cmd_repo_config,
+            ua_string=f'plastron/{version}',
+            on_behalf_of=message.args.get('on-behalf-of')
+        )
+
+        if repo.delegated_user is not None:
+            logger.info(f'Running repository operations on behalf of {repo.delegated_user}')
 
         for status in (command.execute(repo, args) or []):
             progress_topic.send(

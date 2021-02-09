@@ -1,7 +1,10 @@
+import copy
 from importlib import import_module
 from plastron.files import LocalFileSource, RemoteFileSource, ZipFileSource
+from plastron.http import Repository, FlatCreator, HierarchicalCreator
 from plastron.pcdm import Object
 from plastron.rdf import RDFDataProperty
+from plastron.stomp.messages import PlastronCommandMessage
 
 imp = import_module('plastron.commands.import')
 cmd = imp.Command()
@@ -70,3 +73,112 @@ def test_add_files_unpaged():
     assert len(item.proxies()) == 0
     # all 4 files should be attached directly to the item
     assert len(item.files) == 4
+
+
+# "Flat" layout config
+flat_repo_config = {
+    'REST_ENDPOINT': 'http://example.com/rest',
+    'RELPATH': '/pcdm',
+    'LOG_DIR': 'logs',
+    'STRUCTURE': 'flat'
+}
+
+# "Hierarchical" layout config
+hierarchical_repo_config = {
+    'REST_ENDPOINT': 'http://example.com/rest',
+    'RELPATH': '/dc/2021/2',
+    'LOG_DIR': 'logs',
+    'STRUCTURE': 'hierarchical'
+}
+
+# Import message does not specify structure
+no_structure_message = PlastronCommandMessage({
+    'message-id': 'TEST-no-structure',
+    'PlastronJobId': '1',
+    'PlastronCommand': 'import',
+})
+
+# Import message specifies "flat" structure
+flat_structure_message = PlastronCommandMessage({
+    'message-id': 'TEST-flat-structure',
+    'PlastronJobId': '1',
+    'PlastronCommand': 'import',
+    'PlastronArg-structure': 'flat'
+})
+
+# Import message specified "hierarchical" structure
+hierarchical_structure_message = PlastronCommandMessage({
+    'message-id': 'TEST-hierarchical-structure',
+    'PlastronJobId': '1',
+    'PlastronCommand': 'import',
+    'PlastronArg-structure': 'hierarchical'
+})
+
+
+def test_repo_config_uses_structure_from_repo_config_if_no_structure_specified():
+    # Flat structure in repo_config
+    args = cmd.parse_message(no_structure_message)
+
+    new_repo_config = cmd.repo_config(flat_repo_config, args)
+    assert new_repo_config['STRUCTURE'] == 'flat'
+
+    # Hierarchical structure in repo_config
+    args = cmd.parse_message(no_structure_message)
+
+    new_repo_config = cmd.repo_config(hierarchical_repo_config, args)
+    assert new_repo_config['STRUCTURE'] == 'hierarchical'
+
+
+def test_repo_config_uses_structure_from_message():
+    # Hierarchical structure specified in message
+    args = cmd.parse_message(hierarchical_structure_message)
+
+    new_repo_config = cmd.repo_config(flat_repo_config, args)
+    assert new_repo_config['STRUCTURE'] == 'hierarchical'
+
+    # Flat structure specified in message
+    args = cmd.parse_message(flat_structure_message)
+
+    new_repo_config = cmd.repo_config(hierarchical_repo_config, args)
+    assert new_repo_config['STRUCTURE'] == 'flat'
+
+
+# "relpath" layout config
+relpath_repo_config = {
+    'REST_ENDPOINT': 'http://example.com/rest',
+    'RELPATH': '/pcdm',
+    'LOG_DIR': 'logs',
+    'STRUCTURE': 'flat'
+}
+
+# Import message without relpath
+no_relpath_message = PlastronCommandMessage({
+    'message-id': 'TEST-without-relpath',
+    'PlastronJobId': '1',
+    'PlastronCommand': 'import',
+    'PlastronArg-structure': 'flat'
+})
+
+relpath_message = PlastronCommandMessage({
+    'message-id': 'TEST-with-relpath',
+    'PlastronJobId': '1',
+    'PlastronCommand': 'import',
+    'PlastronArg-structure': 'flat',
+    'PlastronArg-relpath': '/test-relpath'
+})
+
+
+def test_repo_config_uses_relpath_from_repo_config_if_no_relpath_specified():
+    # Flat structure in repo_config
+    args = cmd.parse_message(no_relpath_message)
+
+    new_repo_config = cmd.repo_config(relpath_repo_config, args)
+    assert new_repo_config['RELPATH'] == '/pcdm'
+
+
+def test_repo_config_uses_relpath_from_message():
+    # Hierarchical structure specified in message
+    args = cmd.parse_message(relpath_message)
+
+    new_repo_config = cmd.repo_config(flat_repo_config, args)
+    assert new_repo_config['RELPATH'] == '/test-relpath'

@@ -86,3 +86,6 @@ jobs/
 
 # virtualenv directory
 venv/
+
+.python-version
+

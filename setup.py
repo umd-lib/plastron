@@ -74,6 +74,7 @@ setup(
         'bagit',
         'BeautifulSoup4',
         'edtf-validate',
+        'Flask',
         'iso639',
         'jwcrypto',
         'lxml>3.6.0',

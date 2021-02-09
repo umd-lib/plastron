@@ -301,6 +301,8 @@ class ZipFileSource(BinarySource):
             self.file.close()
         if self.source is not None:
             self.source.close()
+        if self.zip_file is not None:
+            self.zip_file = None
 
     def get_zip_file(self):
         if self.zip_file is not None:

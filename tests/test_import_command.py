@@ -141,3 +141,44 @@ def test_override_repo_config_uses_structure_from_message():
 
     new_repo_config = cmd.override_repo_config(hierarchical_repo_config, args)
     assert new_repo_config['STRUCTURE'] == 'flat'
+
+
+# "relpath" layout config
+relpath_repo_config = {
+    'REST_ENDPOINT': 'http://example.com/rest',
+    'RELPATH': '/pcdm',
+    'LOG_DIR': 'logs',
+    'STRUCTURE': 'flat'
+}
+
+# Import message without relpath
+no_relpath_message = PlastronCommandMessage({
+    'message-id': 'TEST-without-relpath',
+    'PlastronJobId': '1',
+    'PlastronCommand': 'import',
+    'PlastronArg-structure': 'flat'
+})
+
+relpath_message = PlastronCommandMessage({
+    'message-id': 'TEST-with-relpath',
+    'PlastronJobId': '1',
+    'PlastronCommand': 'import',
+    'PlastronArg-structure': 'flat',
+    'PlastronArg-relpath': '/test-relpath'
+})
+
+
+def test_override_repo_config_uses_relpath_from_repo_config_if_no_relpath_specified():
+    # Flat structure in repo_config
+    args = cmd.parse_message(no_relpath_message)
+
+    new_repo_config = cmd.override_repo_config(relpath_repo_config, args)
+    assert new_repo_config['RELPATH'] == '/pcdm'
+
+
+def test_override_repo_config_uses_relpath_from_message():
+    # Hierarchical structure specified in message
+    args = cmd.parse_message(relpath_message)
+
+    new_repo_config = cmd.override_repo_config(flat_repo_config, args)
+    assert new_repo_config['RELPATH'] == '/test-relpath'

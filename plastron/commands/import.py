@@ -376,6 +376,9 @@ class Command(BaseCommand):
         if args.structure:
             result_config['STRUCTURE'] = args.structure
 
+        if args.relpath:
+            result_config['RELPATH'] = args.relpath
+
         return result_config
 
     def get_source(self, base_location, path):
@@ -487,7 +490,8 @@ class Command(BaseCommand):
             container=message.args.get('container', None),
             extract_text_types=message.args.get('extract-text', None),
             job_id=message.job_id,
-            structure=message.args.get('structure', None)
+            structure=message.args.get('structure', None),
+            relpath=message.args.get('relpath', None)
         )
 
     def execute(self, repo, args):

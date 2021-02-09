@@ -4,10 +4,12 @@ class BaseCommand:
             config = {}
         self.config = config
 
-    # Enable repository config dictionary to be overridden by the command before
-    # actually creating the respository.
-    #
-    # The default implemented of this method simply returns the provided
-    # repo_config dictionary without change
-    def override_repo_config(self, repo_config, args={}):
+    def repo_config(self, repo_config, args={}):
+        """
+        Enable default repository config dictionary to be overridden by the
+        command before actually creating the repository.
+
+        The default implemention of this method simply returns the provided
+        repo_config dictionary without change
+        """
         return repo_config

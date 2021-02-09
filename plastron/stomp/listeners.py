@@ -130,7 +130,7 @@ class MessageProcessor:
 
         args = command.parse_message(message)
 
-        cmd_repo_config = command.override_repo_config(self.repo_config, args)
+        cmd_repo_config = command.repo_config(self.repo_config, args)
 
         repo = Repository(
             config=cmd_repo_config,

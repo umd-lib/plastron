@@ -115,31 +115,31 @@ hierarchical_structure_message = PlastronCommandMessage({
 })
 
 
-def test_override_repo_config_uses_structure_from_repo_config_if_no_structure_specified():
+def test_repo_config_uses_structure_from_repo_config_if_no_structure_specified():
     # Flat structure in repo_config
     args = cmd.parse_message(no_structure_message)
 
-    new_repo_config = cmd.override_repo_config(flat_repo_config, args)
+    new_repo_config = cmd.repo_config(flat_repo_config, args)
     assert new_repo_config['STRUCTURE'] == 'flat'
 
     # Hierarchical structure in repo_config
     args = cmd.parse_message(no_structure_message)
 
-    new_repo_config = cmd.override_repo_config(hierarchical_repo_config, args)
+    new_repo_config = cmd.repo_config(hierarchical_repo_config, args)
     assert new_repo_config['STRUCTURE'] == 'hierarchical'
 
 
-def test_override_repo_config_uses_structure_from_message():
+def test_repo_config_uses_structure_from_message():
     # Hierarchical structure specified in message
     args = cmd.parse_message(hierarchical_structure_message)
 
-    new_repo_config = cmd.override_repo_config(flat_repo_config, args)
+    new_repo_config = cmd.repo_config(flat_repo_config, args)
     assert new_repo_config['STRUCTURE'] == 'hierarchical'
 
     # Flat structure specified in message
     args = cmd.parse_message(flat_structure_message)
 
-    new_repo_config = cmd.override_repo_config(hierarchical_repo_config, args)
+    new_repo_config = cmd.repo_config(hierarchical_repo_config, args)
     assert new_repo_config['STRUCTURE'] == 'flat'
 
 
@@ -168,17 +168,17 @@ relpath_message = PlastronCommandMessage({
 })
 
 
-def test_override_repo_config_uses_relpath_from_repo_config_if_no_relpath_specified():
+def test_repo_config_uses_relpath_from_repo_config_if_no_relpath_specified():
     # Flat structure in repo_config
     args = cmd.parse_message(no_relpath_message)
 
-    new_repo_config = cmd.override_repo_config(relpath_repo_config, args)
+    new_repo_config = cmd.repo_config(relpath_repo_config, args)
     assert new_repo_config['RELPATH'] == '/pcdm'
 
 
-def test_override_repo_config_uses_relpath_from_message():
+def test_repo_config_uses_relpath_from_message():
     # Hierarchical structure specified in message
     args = cmd.parse_message(relpath_message)
 
-    new_repo_config = cmd.override_repo_config(flat_repo_config, args)
+    new_repo_config = cmd.repo_config(flat_repo_config, args)
     assert new_repo_config['RELPATH'] == '/test-relpath'

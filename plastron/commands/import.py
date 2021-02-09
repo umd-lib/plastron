@@ -370,7 +370,12 @@ class Command(BaseCommand):
         for _ in self.execute(*args, **kwargs):
             pass
 
-    def override_repo_config(self, repo_config, args):
+    def repo_config(self, repo_config, args):
+        """
+        Returns a deep copy of the provided repo_config, updated with
+        layout structure and relpath information from the args
+        (if provided).
+        """
         result_config = copy.deepcopy(repo_config)
 
         if args.structure:

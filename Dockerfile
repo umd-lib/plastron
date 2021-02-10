@@ -10,7 +10,7 @@ FROM python:3.6.12-slim
 RUN mkdir -p /opt/plastron
 COPY . /opt/plastron
 WORKDIR /opt/plastron
-RUN pip install .
+RUN pip install -r requirements.txt .
 ENV PYTHONUNBUFFERED=1
 VOLUME /var/opt/plastron
 

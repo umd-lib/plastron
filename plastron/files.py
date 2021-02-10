@@ -217,10 +217,13 @@ class RemoteFileSource(BinarySource):
         """
         if self.file is not None:
             self.file.close()
+            self.file = None
         if self.sftp_client is not None:
             self.sftp_client.close()
+            self.sftp_client = None
         if self.ssh_client is not None:
             self.ssh_client.close()
+            self.ssh_client = None
 
     def ssh(self):
         if self.ssh_client is None:

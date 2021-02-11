@@ -377,6 +377,7 @@ Only **one** of these should be used. `AUTH_TOKEN` takes precedence over
 | Option      | Description |
 | ----------- | ----------- |
 |`SERVER_CERT`|Path to a PEM-encoded copy of the server's SSL certificate; only needed for servers using self-signed certs|
+|`REPO_EXTERNAL_URL`|The URL to use for generating resource URIs, in preference to `REST_ENDPOINT`. Typically the "FCREPO_BASE_URL" parameter used with Kubernetes.|
 
 ### Batch Configuration
 

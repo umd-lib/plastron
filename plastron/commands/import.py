@@ -152,7 +152,8 @@ def get_property_type(model_class: rdf.Resource, attrs):
         return model_class.name_to_prop[attrs]
 
 
-def build_fields(fieldnames, property_attrs):
+def build_fields(fieldnames, model_class):
+    property_attrs = {header: attrs for attrs, header in model_class.HEADER_MAP.items()}
     fields = defaultdict(list)
     # group typed and language-tagged columns by their property attribute
     for header in fieldnames:
@@ -200,11 +201,17 @@ def build_fields(fieldnames, property_attrs):
             if header not in CSVSerializer.SYSTEM_HEADERS:
                 if header not in property_attrs:
                     raise DataReadException(f'Unrecognized header "{header}" in import file.')
+                # check for a default datatype defined in the model
                 attrs = property_attrs[header]
+                prop = model_class.name_to_prop.get(attrs)
+                if prop is not None and issubclass(prop, RDFDataProperty):
+                    datatype_uri = prop.datatype
+                else:
+                    datatype_uri = None
                 fields[attrs].append({
                     'header': header,
                     'lang_code': None,
-                    'datatype': None
+                    'datatype': datatype_uri
                 })
     return fields
 
@@ -556,7 +563,6 @@ class Command(BaseCommand):
         if args.validate_only:
             logger.info('Validation-only mode, skipping imports')
 
-        property_attrs = {header: attrs for attrs, header in model_class.HEADER_MAP.items()}
         identifier_column = model_class.HEADER_MAP['identifier']
 
         # if an import file was provided, save that as the new CSV metadata file
@@ -597,7 +603,7 @@ class Command(BaseCommand):
             raise ConfigError('Must specify --binaries-location if the metadata has a FILES column')
 
         try:
-            fields = build_fields(csv_file.fieldnames, property_attrs)
+            fields = build_fields(csv_file.fieldnames, model_class)
         except DataReadException as e:
             raise FailureException(str(e)) from e
 

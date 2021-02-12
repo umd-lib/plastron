@@ -1,7 +1,7 @@
-import copy
+import pytest
 from importlib import import_module
 from plastron.files import LocalFileSource, RemoteFileSource, ZipFileSource
-from plastron.http import Repository, FlatCreator, HierarchicalCreator
+from plastron.models import Item, umdtype
 from plastron.pcdm import Object
 from plastron.rdf import RDFDataProperty
 from plastron.stomp.messages import PlastronCommandMessage
@@ -10,17 +10,39 @@ imp = import_module('plastron.commands.import')
 cmd = imp.Command()
 
 
-def test_build_file_groups():
-    assert len(imp.build_file_groups('')) == 0
-    assert len(imp.build_file_groups('foo.jpg;foo.png')) == 1
-    assert len(imp.build_file_groups('foo.jpg;bar.jpg')) == 2
+@pytest.mark.parametrize(
+    ('value', 'expected_count'),
+    [
+        ('', 0),
+        ('foo.jpg;foo.png', 1),
+        ('foo.jpg;bar.jpg', 2)
+    ]
+)
+def test_build_file_groups(value, expected_count):
+    assert len(imp.build_file_groups(value)) == expected_count
 
 
-def test_get_source():
-    assert isinstance(cmd.get_source('zip:foo.zip', 'bar.jpg'), ZipFileSource)
-    assert isinstance(cmd.get_source('sftp://user@example.com/foo', 'bar.jpg'), RemoteFileSource)
-    assert isinstance(cmd.get_source('zip+sftp://user@example.com/foo.zip', 'bar.jpg'), ZipFileSource)
-    assert isinstance(cmd.get_source('/foo', 'bar'), LocalFileSource)
+def test_build_fields_with_default_datatype():
+    fields = imp.build_fields(['Accession Number'], Item)
+    assert fields['accession_number'][0]['datatype'] == umdtype.accessionNumber
+
+
+def test_build_fields_without_default_datatype():
+    fields = imp.build_fields(['Identifier'], Item)
+    assert fields['identifier'][0]['datatype'] is None
+
+
+@pytest.mark.parametrize(
+    ('base_location', 'path', 'expected_class'),
+    [
+        ('zip:foo.zip', 'bar.jpg', ZipFileSource),
+        ('sftp://user@example.com/foo', 'bar.jpg', RemoteFileSource),
+        ('zip+sftp://user@example.com/foo.zip', 'bar.jpg', ZipFileSource),
+        ('/foo', 'bar', LocalFileSource)
+    ]
+)
+def test_get_source(base_location, path, expected_class):
+    assert isinstance(cmd.get_source(base_location, path), expected_class)
 
 
 def test_parse_value_string():

@@ -7,6 +7,7 @@ from plastron.exceptions import RESTAPIException
 from plastron.http import Repository, ResourceURI
 from rdflib import Graph, URIRef
 from uuid import uuid4
+from urllib.parse import urlsplit
 
 
 class Resource(rdf.Resource):
@@ -67,7 +68,15 @@ class Resource(rdf.Resource):
             try:
                 self.resource = repository.create(container_path=container_path, headers=headers, **kwargs)
                 self.uri = URIRef(self.resource.uri)
-                self.path = self.resource.uri[len(repository.endpoint):]
+
+                if (repository.is_forwarded()):
+                    # Reverse forwarded URL back to fcrepo URL
+                    parsed_resource_uri = urlsplit(self.resource.uri)
+                    parsed_path = parsed_resource_uri.path
+                    self.path = parsed_path[len(repository.endpoint_base_path):]
+                else:
+                    self.path = self.resource.uri[len(repository.endpoint):]
+
                 self.created = True
                 # TODO: get this from the response headers
                 self.creation_timestamp = datetime.now()

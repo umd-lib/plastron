@@ -159,10 +159,10 @@ class Repository:
                 self.forwarded_proto = proto
 
                 self.session.headers.update(
-                    {'X-Forwarded-Host': self.forwarded_host}
-                )
-                self.session.headers.update(
-                    {'X-Forwarded-Proto': self.forwarded_proto}
+                    {
+                        'X-Forwarded-Host': self.forwarded_host,
+                        'X-Forwarded-Proto': self.forwarded_proto
+                    }
                 )
 
                 self.forwarded_endpoint = f"{self.forwarded_proto}://{self.forwarded_host}{self.endpoint_base_path}"

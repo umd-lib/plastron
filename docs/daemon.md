@@ -42,49 +42,10 @@ docker logs -f plastrond_plastrond.1.<generated_id>
 
 ## Configuration
 
-The plastrond configuration file is similar in format to the
-[CLI configuration](cli.md), with the notable exception that it
-introduces sections to separate the various systems in the
-configuration.
+See [Configuration](configuration.md).
 
 See [docker-plastron.yml](../docker-plastron.yml) for an example
 of the config file.
-
-### `REPOSITORY` section
-
-Options in this section are identical to those in the [CLI configuration](cli.md).
-
-### `MESSAGE_BROKER` section
-
-This section configures the [STOMP] message broker (e.g., ActiveMQ).
-
-| Option            |Description|
-|-------------------|-----------|
-|`SERVER`           |Hostname and port of the STOMP server, e.g. `localhost:61613`|
-|`MESSAGE_STORE_DIR`|Path to the directory to hold the message inbox and outbox|
-|`DESTINATIONS`     |Sub-section containing queue and topic names|
-
-#### `DESTINATIONS` sub-section
-
-This sub-section configures the queues and topics used.
-
-| Option         |Description|
-|----------------|-----------|
-|`JOBS`          |Name of the queue to subscribe to for receiving job requests|
-|`JOB_STATUS`    |Name of the topic to publish status updates to for running jobs|
-|`JOBS_COMPLETED`|Name of the queue to publish to when a job is complete|
-
-### `COMMANDS` section
-
-This section configures options for specific commands.
-
-#### `EXPORT` sub-section
-
-Options for the export command.
-
-| Option          |Description|
-|-----------------|-----------|
-|`SSH_PRIVATE_KEY`|Filename of private key to use when making SSH/SFTP connections|
 
 ## STOMP Message Headers
 
@@ -104,5 +65,3 @@ all commands:
 
 See the [messages documentation](messages.md) for details on the headers and bodies
 of the messages the Plastron Daemon emits.
-
-[STOMP]: https://stomp.github.io/

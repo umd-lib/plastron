@@ -99,7 +99,7 @@ setup(
     # projects.
     extras_require={  # Optional
         'dev': ['pycodestyle'],
-        'test': ['pytest'],
+        'test': ['pytest', 'freezegun'],
     },
 
     # TODO: config/templates/*.yml?

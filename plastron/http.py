@@ -200,6 +200,9 @@ class Repository:
             headers['User-Agent'] = self.ua_string
         if self.delegated_user is not None:
             headers['On-Behalf-Of'] = self.delegated_user
+
+        self.auth.refresh_auth(self.session)
+
         response = self.session.request(method, target_uri, headers=headers, **kwargs)
         self.logger.debug("%s %s", response.status_code, response.reason)
         return response

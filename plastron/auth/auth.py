@@ -3,6 +3,7 @@ import time
 from abc import ABC, abstractmethod
 from jwcrypto.jwk import JWK  # type: ignore
 from jwcrypto.jwt import JWT  # type: ignore
+import logging
 from requests import Session
 from typing import Dict, List, Type
 
@@ -10,12 +11,27 @@ from typing import Dict, List, Type
 class Auth(ABC):
     @abstractmethod
     def __init__(self, config: Dict[str, str]):
-
         pass
 
     @abstractmethod
     def configure_session(self, session: Session) -> None:
         '''Modifies given Session with appropriate values for auth method'''
+        pass
+
+    def is_expired(self) -> bool:
+        '''
+        Returns True if the authorization has expired, False otherwise.
+
+        The default implementation always returns False.
+        '''
+        return False
+
+    def refresh_auth(self, session: Session) -> None:
+        '''
+        Refreshes an expired authorization, and updates the given session.
+
+        The default implementation does nothing.
+        '''
         pass
 
     @classmethod
@@ -63,10 +79,14 @@ class ProvidedJwtTokenAuth(Auth):
 
 
 class JwtSecretAuth(Auth):
+    EXPIRATION_TIME_IN_SECONDS: int = 3600
+
     '''Auth for JWT_SECRET provided in config'''
     def __init__(self, config: Dict[str, str]):
+        self.logger = logging.getLogger(type(self).__name__)
         self.jwt_secret = config['JWT_SECRET']
-        self.jwt_token = JwtSecretAuth.__auth_token(self.jwt_secret).serialize()
+        self.expiration_time = time.time() + JwtSecretAuth.EXPIRATION_TIME_IN_SECONDS
+        self.jwt_token = JwtSecretAuth.__auth_token(self.jwt_secret, self.expiration_time).serialize()
 
     @classmethod
     def handles(cls, config: Dict[str, str]) -> bool:
@@ -75,8 +95,20 @@ class JwtSecretAuth(Auth):
     def configure_session(self, session: Session) -> None:
         session.headers.update({'Authorization': f"Bearer {self.jwt_token}"})
 
+    def is_expired(self) -> bool:
+        return self.expiration_time < time.time()
+
+    def refresh_auth(self, session: Session) -> None:
+        # Refresh if within grace period of the expiration time
+        grace_period_in_seconds = 60
+        if self.is_expired() or (self.expiration_time - time.time() < grace_period_in_seconds):
+            self.logger.debug(f"Refreshing auth token, which expires at {self.expiration_time}")
+            self.expiration_time = time.time() + JwtSecretAuth.EXPIRATION_TIME_IN_SECONDS
+            self.jwt_token = JwtSecretAuth.__auth_token(self.jwt_secret, self.expiration_time).serialize()
+            self.configure_session(session)
+
     @classmethod
-    def __auth_token(cls, secret: str, valid_for: int = 3600) -> JWT:
+    def __auth_token(cls, secret: str, expiration_time: float) -> JWT:
         """
         Create an admin auth token from the specified secret. By default, the token
         will be valid for 1 hour (3600 seconds).
@@ -92,7 +124,7 @@ class JwtSecretAuth(Auth):
             claims={
                 'sub': 'plastron',
                 'iss': 'plastron',
-                'exp': time.time() + valid_for,
+                'exp': expiration_time,
                 'role': 'fedoraAdmin'
             }
         )

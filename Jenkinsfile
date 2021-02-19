@@ -100,8 +100,8 @@ pipeline {
           python -m pip install virtualenv
           virtualenv venv
           . venv/bin/activate
-          
-          pip install -e .  
+
+          pip install -e .[test]
         '''
       }
     }
@@ -110,10 +110,7 @@ pipeline {
       steps {
         sh '''
           . venv/bin/activate
-          
-          # Install pytest
-          pip install pytest
-          
+
           pytest -v --junitxml=reports/results.xml -o junit_family=xunit1
         '''
       }
@@ -128,10 +125,10 @@ pipeline {
       steps {
         sh '''
           . venv/bin/activate
-          
+
           # Install pycodestyle
           pip install pycodestyle
-          
+
           # Run pycodesytyle
           # Send output to standard out for "Record compiler warnings and static analysis results"
           # post-build action

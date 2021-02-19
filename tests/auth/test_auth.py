@@ -64,7 +64,7 @@ def test_auth_factory_fedora_user():
     auth = AuthFactory.create(config)
     assert isinstance(auth, FedoraUserAuth)
 
-    session = Session
+    session = Session()
     auth.configure_session(session)
     assert session.auth == (config['FEDORA_USER'], config['FEDORA_PASSWORD'])
 

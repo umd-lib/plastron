@@ -330,7 +330,12 @@ class ZipFileSource(BinarySource):
 
     def exists(self):
         try:
-            self.get_zip_file().getinfo(self.path)
-            return True
+            if self.source:
+                with self.source:
+                    self.get_zip_file().getinfo(self.path)
+                    return True
+            else:
+                self.get_zip_file().getinfo(self.path)
+                return True
         except KeyError:
             return False

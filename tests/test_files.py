@@ -1,3 +1,4 @@
+from unittest.mock import MagicMock
 from tempfile import TemporaryFile
 from uuid import uuid4
 from zipfile import ZipFile
@@ -56,3 +57,45 @@ def test_nonexistent_http_file_source():
     uri = f'http://www.example.com/{uuid4()}'
     f = HTTPFileSource(uri)
     assert f.exists() is False
+
+
+def test_zip_file_source_exists():
+    zip_file_source = ZipFileSource('tests/resources/sample.zip', 'sample_image.jpg')
+    assert zip_file_source.exists()
+
+
+def setup_remote_file_source_mock(remote_file_source):
+    # Wrap the given remote_file_sourcee in a mock, so that the methods that
+    # are accessed can be queried
+    mock = MagicMock(wraps=remote_file_source)
+    # Return a "real" Zip, so we don't have to mock zipfile.ZipFile
+    mock.open.return_value = open('tests/resources/sample.zip', 'rb')
+    # Need to mock __exit__ (following code in BinarySource.__exit__) because
+    # "wraps" doesn't handle magic methods
+    mock.__exit__.side_effect = (lambda _arg1, _arg2, _arg3: mock.close())
+
+    return mock
+
+
+def test_zip_file_source_exists_closes_remote_file_source():
+    zip_file_source = ZipFileSource('sftp://user@example.com/sample.zip', 'sample_image.jpg')
+    remote_file_source = zip_file_source.source
+
+    remote_file_source_mock = setup_remote_file_source_mock(remote_file_source)
+    zip_file_source.source = remote_file_source_mock
+
+    assert zip_file_source.exists()
+    remote_file_source_mock.open.assert_called()
+    remote_file_source_mock.close.assert_called()
+
+
+def test_zip_file_source_exists_closes_remote_file_source_when_file_does_not_exist():
+    zip_file_source = ZipFileSource('sftp://user@example.com/sample.zip', 'does_not_exist.jpg')
+    remote_file_source = zip_file_source.source
+
+    remote_file_source_mock = setup_remote_file_source_mock(remote_file_source)
+    zip_file_source.source = remote_file_source_mock
+
+    assert not zip_file_source.exists()
+    remote_file_source_mock.open.assert_called()
+    remote_file_source_mock.close.assert_called()

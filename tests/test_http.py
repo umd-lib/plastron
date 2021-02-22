@@ -1,4 +1,5 @@
 import pytest
+from plastron.auth import ProvidedJwtTokenAuth
 from plastron.http import Repository
 from plastron.exceptions import RESTAPIException
 
@@ -10,6 +11,7 @@ def repo_base_config():
         'REST_ENDPOINT': 'http://base-host.com:8080/rest',
         'RELPATH': '/pcdm',
         'LOG_DIR': '/logs',
+        'AUTH_TOKEN': 'abcd-1234'
     }
 
 
@@ -184,3 +186,12 @@ def test_undo_forward_when_forwarding(repo_forwarded_config):
     assert 'http://base-host.com:8080/rest/ab/cd/def#1234' == repository.undo_forward(forwarded_url)
 
     assert 'http://base-host.com:8080/rest/ab/cd/def#1234' == repository.undo_forward(forwarded_url)
+
+
+def test_repository_auth(repo_base_config):
+    repository = Repository(repo_base_config)
+
+    assert isinstance(repository.auth, ProvidedJwtTokenAuth)
+    session = repository.session
+    assert session.headers.get('Authorization')
+    assert session.headers['Authorization'] == 'Bearer abcd-1234'

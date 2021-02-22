@@ -4,7 +4,7 @@ import requests
 import threading
 from base64 import urlsafe_b64encode
 from collections import namedtuple
-from plastron.auth.auth import AuthFactory
+from plastron.auth import AuthFactory
 from plastron.exceptions import ConfigError, FailureException, RESTAPIException
 from rdflib import Graph, URIRef
 from requests.exceptions import ConnectionError

@@ -1,5 +1,5 @@
 import pytest
-from plastron.auth.auth import ProvidedJwtTokenAuth
+from plastron.auth import ProvidedJwtTokenAuth
 from plastron.http import Repository
 from plastron.exceptions import RESTAPIException
 
@@ -7,14 +7,12 @@ from plastron.exceptions import RESTAPIException
 @pytest.fixture()
 def repo_base_config():
     """Required parameters for Repository configuration"""
-    config = {
+    return {
         'REST_ENDPOINT': 'http://base-host.com:8080/rest',
         'RELPATH': '/pcdm',
         'LOG_DIR': '/logs',
+        'AUTH_TOKEN': 'abcd-1234'
     }
-    # Also requires an "auth" config
-    config.update({'AUTH_TOKEN': 'abcd-1234'})
-    return config
 
 
 @pytest.fixture()

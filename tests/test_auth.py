@@ -9,7 +9,7 @@ from jwcrypto.jwk import JWK
 from jwcrypto.jwt import JWT
 from requests import Session
 
-from plastron.auth.auth import AuthFactory, ProvidedJwtTokenAuth, JwtSecretAuth, ClientCertAuth, FedoraUserAuth
+from plastron.auth import AuthFactory, ProvidedJwtTokenAuth, JwtSecretAuth, ClientCertAuth, FedoraUserAuth
 
 
 def test_auth_factory_no_config():

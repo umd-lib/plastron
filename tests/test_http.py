@@ -153,6 +153,21 @@ def test_forwarded_params_are_optional(repo_base_config):
     assert not ('X-Forwarded-Proto' in repository.session.headers.keys())
 
 
+def test_forwarded_endpoint_should_include_port_if_present(repo_base_config):
+    config = repo_base_config
+    config['REPO_EXTERNAL_URL'] = 'https://forwarded-host.com:1234/'
+
+    repository = Repository(config)
+
+    assert repository.is_forwarded()
+    assert ('X-Forwarded-Host' in repository.session.headers.keys())
+    assert ('X-Forwarded-Proto' in repository.session.headers.keys())
+    assert 'forwarded-host.com:1234' == repository.session.headers['X-Forwarded-Host']
+    assert 'https' == repository.session.headers['X-Forwarded-Proto']
+
+    assert repository.forwarded_endpoint == 'https://forwarded-host.com:1234/rest'
+
+
 def test_forwarded_params_not_used_if_rest_endpoint_and_fcrepo_base_url_match(repo_base_config):
     config = repo_base_config
     repo_base_config['REPO_EXTERNAL_URL'] = 'http://base-host.com:8080/'

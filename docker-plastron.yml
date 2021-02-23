@@ -1,15 +1,14 @@
 REPOSITORY:
-  REST_ENDPOINT: https://fcrepolocal/fcrepo/rest
+  REST_ENDPOINT: http://repository:8080/rest
+  REPO_EXTERNAL_URL: http://localhost:8080/rest
   RELPATH: /pcdm
-  CLIENT_CERT: /run/secrets/batchloader.pem
-  CLIENT_KEY: /run/secrets/batchloader.key
-  SERVER_CERT: /run/secrets/repository.pem
+  JWT_SECRET: <REPLACE WITH JWT_SECRET FROM umd-fcrepo>
   LOG_DIR: /var/log/plastron
 MESSAGE_BROKER:
-  SERVER: fcrepolocal:61613
+  SERVER: activemq:61613
   MESSAGE_STORE_DIR: /var/opt/plastron/msg/export
   DESTINATIONS:
     JOBS: /queue/plastron.jobs
-    JOB_STATUS: /topic/plastron.jobs.status
-    COMPLETED_JOBS: /queue/plastron.jobs.completed
+    JOB_PROGRESS: /topic/plastron.jobs.progress
+    JOB_STATUS: /queue/plastron.jobs.status
     SYNCHRONOUS_JOBS: /queue/plastron.jobs.synchronous

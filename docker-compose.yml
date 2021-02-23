@@ -1,25 +1,18 @@
 version: "3.7"
 services:
   plastrond:
-    image: plastrond
+    image: docker.lib.umd.edu/plastrond
     configs:
       - source: plastrond
         target: /etc/plastrond.yml
-    secrets:
-      - batchloader.pem
-      - batchloader.key
-      - repository.pem
     volumes:
       - plastrond:/var/opt/plastron
 configs:
   plastrond:
     file: docker-plastron.yml
-secrets:
-  batchloader.pem:
-    external: true
-  batchloader.key:
-    external: true
-  repository.pem:
-    external: true
 volumes:
   plastrond:
+networks:
+  default:
+    external: true
+    name: umd-fcrepo_default

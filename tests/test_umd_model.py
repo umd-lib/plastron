@@ -40,7 +40,7 @@ def test_get_new_member():
 
 
 def test_get_new_member_pool_report():
-    pool_report = Item(object_type=umdform.pool_reports)
+    pool_report = Item(format=umdform.pool_reports)
 
     body = pool_report.get_new_member('body-processed-redacted', 1)
     assert isinstance(body, Page)

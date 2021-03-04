@@ -106,7 +106,7 @@ class Item(pcdm.Object):
     }
 
     def get_new_member(self, rootname, number):
-        if str(self.object_type) == str(umdform.pool_reports):
+        if str(self.format) == str(umdform.pool_reports):
             if rootname.startswith('body-'):
                 return Page(title=f'Body', number=number)
             else:

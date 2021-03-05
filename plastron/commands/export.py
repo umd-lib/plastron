@@ -11,6 +11,7 @@ from paramiko import SFTPClient, SSHException
 
 from plastron.commands import BaseCommand
 from plastron.exceptions import FailureException, DataReadException, RESTAPIException
+from plastron.models import Item
 from plastron.namespaces import get_manager
 from plastron.pcdm import Object
 from plastron.serializers import EmptyItemListError, SERIALIZER_CLASSES, detect_resource_class
@@ -156,7 +157,7 @@ class Command(BaseCommand):
                 item_dir = match[0]
 
                 graph = fcrepo.get_graph(uri)
-                model_class = detect_resource_class(graph, uri, fallback=Object)
+                model_class = detect_resource_class(graph, uri, fallback=Item)
                 obj = model_class.from_graph(graph, uri)
 
                 if args.export_binaries:
@@ -168,7 +169,7 @@ class Command(BaseCommand):
                 else:
                     binaries = None
 
-                serializer.write(obj.graph(), files=binaries, binaries_dir=item_dir)
+                serializer.write(obj, files=binaries, binaries_dir=item_dir)
 
                 if binaries is not None:
                     binaries_dir = os.path.join(export_dir, item_dir)

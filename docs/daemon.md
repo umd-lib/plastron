@@ -17,18 +17,13 @@ plastrond -c <config_file>
 # if you are not already running in swarm mode
 docker swarm init
 
-# create secrets from the SSL client and server certs;
-# assume that $FCREPO_VAGRANT and $PLASTRON are your
-# fcrepo-vagrant and plastron source code directories
-cd $FCREPO_VAGRANT
-bin/clientcert batchloader $PLASTRON/batchloader
-cd $PLASTRON
-docker secret create batchloader.pem batchloader.pem 
-docker secret create batchloader.key batchloader.key 
-docker secret create repository.pem $FCREPO_VAGRANT/dist/fcrepo/ssl/crt/fcrepolocal.crt 
-
 # build the image
 docker build -t plastrond .
+
+# Create an "archelon_id" private/public key pair
+# The Archelon instance should be configured with "archelon_id.pub" as the
+# PLASTRON_PUBLIC_KEY
+ssh-keygen -q -t rsa -N '' -f archelon_id
 
 # deploy the stack
 docker stack deploy -c docker-compose.yml plastrond

@@ -89,3 +89,7 @@ venv/
 
 .python-version
 
+# SSH Keys
+archelon_id
+archelon_id.pub
+

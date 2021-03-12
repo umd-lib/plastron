@@ -15,3 +15,7 @@ exports/
 logs/
 msg/
 plastron.egg-info/
+
+# SSH Keys
+archelon_id
+archelon_id.pub

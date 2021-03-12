@@ -98,7 +98,7 @@ class Repository:
         # Extract endpoint URL components for managing forward host
         parsed_endpoint_url = urlsplit(self.endpoint)
         endpoint_proto = parsed_endpoint_url.scheme
-        endpoint_host = parsed_endpoint_url.hostname
+        endpoint_host = parsed_endpoint_url.netloc
         self.endpoint_base_path = parsed_endpoint_url.path
 
         # default container path
@@ -125,7 +125,7 @@ class Repository:
         if repo_external_url is not None:
             parsed_repo_external_url = urlsplit(repo_external_url)
             proto = parsed_repo_external_url.scheme
-            host = parsed_repo_external_url.hostname
+            host = parsed_repo_external_url.netloc
             if (proto != endpoint_proto) or (host != endpoint_host):
                 # We are forwarding
                 self.forwarded_host = host

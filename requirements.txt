@@ -17,7 +17,7 @@ iniconfig==1.1.1
 iso639==0.1.4
 isodate==0.6.0
 jwcrypto==0.8
-lxml==4.6.2
+lxml==4.6.3
 numpy==1.17.1
 packaging==20.8
 paramiko==2.7.2

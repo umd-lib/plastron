@@ -21,7 +21,7 @@ from plastron.files import HTTPFileSource, LocalFileSource, RemoteFileSource, Zi
 from plastron.http import Transaction
 from plastron.namespaces import get_manager, prov, sc
 from plastron.oa import Annotation, TextualBody
-from plastron.pcdm import File
+from plastron.pcdm import File, PreservationMasterFile
 from plastron.rdf import RDFDataProperty
 from plastron.serializers import CSVSerializer
 from plastron.util import ItemLog, datetimestamp, uri_or_curie
@@ -428,6 +428,29 @@ class Command(BaseCommand):
             # with no URI prefix, assume a local file path
             return LocalFileSource(localpath=os.path.join(base_location, path))
 
+    def get_file(self, base_location, filename):
+        """
+        Get a file object for the given base_location and filename.
+
+        Currently, if the file has an "image/tiff" MIME type, this method returns
+        a :py:class:`plastron.pcdm.PreservationMasterFile`; otherwise it returns
+        a basic :py:class:`plastron.pcdm.File`.
+
+        :param base_location:
+        :param filename:
+        :return:
+        """
+        source = self.get_source(base_location, filename)
+
+        # XXX: hardcoded image/tiff as the preservation master format
+        # TODO: make preservation master format configurable per collection or job
+        if source.mimetype() == 'image/tiff':
+            file_class = PreservationMasterFile
+        else:
+            file_class = File
+
+        return file_class.from_source(title=basename(filename), source=source)
+
     def add_files(self, item, file_groups, base_location, access=None, create_pages=True):
         """
         Add pages and files to the given item. A page is added for each key (basename) in the file_groups
@@ -467,10 +490,7 @@ class Command(BaseCommand):
 
             # add the files to their parent object (either the item or a member)
             for filename in filenames:
-                file = File.from_source(
-                    title=basename(filename),
-                    source=self.get_source(base_location, filename)
-                )
+                file = self.get_file(base_location, filename)
                 count += 1
                 file_parent.add_file(file)
                 if access is not None:

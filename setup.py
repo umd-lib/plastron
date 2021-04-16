@@ -72,8 +72,10 @@ setup(
     # https://packaging.python.org/en/latest/requirements.html
     install_requires=[
         'bagit',
-        'edtf',
+        'BeautifulSoup4',
+        'edtf-validate',
         'iso639',
+        'jwcrypto',
         'lxml>3.6.0',
         'numpy',
         'paramiko',
@@ -81,10 +83,11 @@ setup(
         'pyparsing',
         'PyYAML>3.12',
         'rdflib',
+        'rdflib-jsonld',
         'requests',
         'setuptools',
         'stomp.py',
-        'watchdog>=0.10.2'
+        'watchdog==0.10.3'
     ],
     python_requires='>=3.6',
 
@@ -95,7 +98,8 @@ setup(
     # Similar to `install_requires` above, these must be valid existing
     # projects.
     extras_require={  # Optional
-        'test': ['pytest'],
+        'dev': ['pycodestyle'],
+        'test': ['pytest', 'freezegun'],
     },
 
     # TODO: config/templates/*.yml?

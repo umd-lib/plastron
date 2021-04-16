@@ -5,30 +5,11 @@ import yaml
 from rdflib import Literal, URIRef
 from rdflib.util import from_n3
 from plastron import pcdm, namespaces, rdf
-from plastron.files import LocalFile, RemoteFile
-from plastron.exceptions import ConfigException
+from plastron.files import LocalFileSource, RemoteFileSource
+from plastron.exceptions import ConfigError
 from collections import OrderedDict
 
 nsm = namespaces.get_manager()
-
-FILE_CLASS_FOR = {
-    '.tif': pcdm.PreservationMasterFile,
-    '.jpg': pcdm.IntermediateFile,
-    '.txt': pcdm.ExtractedText,
-    '.xml': pcdm.ExtractedText,
-}
-
-
-def get_file_object(path, source=None):
-    extension = path[path.rfind('.'):]
-    if extension in FILE_CLASS_FOR:
-        cls = FILE_CLASS_FOR[extension]
-    else:
-        cls = pcdm.File
-    if source is None:
-        source = LocalFile(path)
-    f = cls(source)
-    return f
 
 
 class Batch:
@@ -52,7 +33,7 @@ class Batch:
 
         if missing_fields:
             field_names = ', '.join(missing_fields)
-            raise ConfigException(f'Missing required HANDLER_OPTIONS in batch configuration: {field_names}')
+            raise ConfigError(f'Missing required HANDLER_OPTIONS in batch configuration: {field_names}')
 
         if 'RDF_TYPE' in config.handler_options:
             self.item_rdf_type = URIRef(from_n3(config.handler_options['RDF_TYPE'], nsm=nsm))
@@ -68,7 +49,7 @@ class Batch:
                 self.logger.info(f'Reading metadata file {config.batch_file}')
                 self.rows = [r for r in csv.DictReader(f)]
         except FileNotFoundError as e:
-            raise ConfigException(e)
+            raise ConfigError(e)
 
         key_column = get_flagged_column(self.mapping, 'key')
         if key_column is not None:
@@ -147,13 +128,13 @@ class Batch:
 
                     for filename in filenames:
                         if 'host' in filename_conf:
-                            source = RemoteFile(filename_conf['host'], filename)
+                            source = RemoteFileSource(filename_conf['host'], filename)
                         else:
                             # local file
                             localpath = os.path.join(self.file_path, filename)
-                            source = LocalFile(localpath)
+                            source = LocalFileSource(localpath)
 
-                        f = get_file_object(filename, source)
+                        f = pcdm.get_file_object(filename, source)
                         for column, conf in mapping.items():
                             set_value(f, column, conf, line)
                         yield f
@@ -177,8 +158,8 @@ class Batch:
                         if len(key_parts) == 2:
                             # top-level
                             for entry in members[key]:
-                                source = LocalFile(entry.path)
-                                f = get_file_object(entry.name, source)
+                                source = LocalFileSource(entry.path)
+                                f = pcdm.get_file_object(entry.name, source)
                                 yield f
 
                         elif len(key_parts) == 3:
@@ -188,8 +169,8 @@ class Batch:
                             sequence_number = int(key_parts[2])
                             page = pcdm.Page(number=str(sequence_number), title=f'Page {sequence_number}')
                             for entry in members[key]:
-                                source = LocalFile(entry.path)
-                                f = get_file_object(entry.name, source)
+                                source = LocalFileSource(entry.path)
+                                f = pcdm.get_file_object(entry.name, source)
                                 for column, conf in mapping.items():
                                     set_value(f, column, conf, line)
                                 page.add_file(f)
@@ -273,7 +254,7 @@ def set_value(item, column, conf, line):
 def get_flagged_column(mapping, flag):
     cols = [col for col in mapping if flag in mapping[col] and mapping[col][flag]]
     if len(cols) > 1:
-        raise ConfigException(f"Only one {flag} column per mapping level is allowed")
+        raise ConfigError(f"Only one {flag} column per mapping level is allowed")
     elif len(cols) == 1:
         return cols[0]
     else:

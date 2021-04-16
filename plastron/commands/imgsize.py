@@ -1,5 +1,7 @@
 from PIL import Image
-from plastron.files import RepositoryFile
+
+from plastron.commands import BaseCommand
+from plastron.files import RepositoryFileSource
 import logging
 
 Image.MAX_IMAGE_PIXELS = None
@@ -20,14 +22,14 @@ def configure_cli(subparsers):
     parser.set_defaults(cmd_name='imgsize')
 
 
-class Command:
+class Command(BaseCommand):
     def __call__(self, fcrepo, args):
         for uri in args.uris:
-            source = RepositoryFile(fcrepo, uri)
+            source = RepositoryFileSource(fcrepo, uri)
             if source.mimetype().startswith('image/'):
                 logger.info(f'Reading image data from {uri}')
 
-                image = Image.open(source.data())
+                image = Image.open(source.open())
 
                 logger.info(f'URI: {uri}, Width: {image.width}, Height: {image.height}')
 

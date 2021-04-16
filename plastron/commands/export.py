@@ -8,7 +8,10 @@ from distutils.util import strtobool
 from email.utils import parsedate
 from os.path import basename, normpath, relpath, splitext
 from paramiko import SFTPClient, SSHException
+
+from plastron.commands import BaseCommand
 from plastron.exceptions import FailureException, DataReadException, RESTAPIException
+from plastron.models import Item
 from plastron.namespaces import get_manager
 from plastron.pcdm import Object
 from plastron.serializers import EmptyItemListError, SERIALIZER_CLASSES, detect_resource_class
@@ -86,11 +89,10 @@ def format_size(size):
     return size, 'TB'
 
 
-class Command:
+class Command(BaseCommand):
     def __init__(self, config=None):
-        if config is None:
-            config = {}
-        self.ssh_private_key = config.get('SSH_PRIVATE_KEY')
+        super().__init__(config=config)
+        self.ssh_private_key = self.config.get('SSH_PRIVATE_KEY')
         self.result = None
 
     def __call__(self, *args, **kwargs):
@@ -155,7 +157,7 @@ class Command:
                 item_dir = match[0]
 
                 graph = fcrepo.get_graph(uri)
-                model_class = detect_resource_class(graph, uri, fallback=Object)
+                model_class = detect_resource_class(graph, uri, fallback=Item)
                 obj = model_class.from_graph(graph, uri)
 
                 if args.export_binaries:
@@ -167,7 +169,7 @@ class Command:
                 else:
                     binaries = None
 
-                serializer.write(obj.graph(), files=binaries, binaries_dir=item_dir)
+                serializer.write(obj, files=binaries, binaries_dir=item_dir)
 
                 if binaries is not None:
                     binaries_dir = os.path.join(export_dir, item_dir)
@@ -179,8 +181,9 @@ class Command:
 
                         binary_filename = os.path.join(binaries_dir, str(file.filename))
                         with open(binary_filename, mode='wb') as binary:
-                            for chunk in file.source.data():
-                                binary.write(chunk)
+                            with file.source as stream:
+                                for chunk in stream:
+                                    binary.write(chunk)
 
                         # update the atime a mtime of the file to reflect the time of the
                         # HTTP request and the resource's last-modified time in the repo

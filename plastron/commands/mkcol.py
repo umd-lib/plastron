@@ -1,6 +1,7 @@
 import logging
 import yaml
 from plastron import pcdm
+from plastron.commands import BaseCommand
 from plastron.exceptions import RESTAPIException, FailureException
 from plastron.http import Transaction
 
@@ -32,14 +33,14 @@ def configure_cli(subparsers):
     parser.set_defaults(cmd_name='mkcol')
 
 
-class Command:
+class Command(BaseCommand):
     def __call__(self, fcrepo, args):
         if args.notransactions:
             try:
                 collection = pcdm.Collection()
                 collection.title = args.name
-                collection.create_object(fcrepo)
-                collection.update_object(fcrepo)
+                collection.create(fcrepo, recursive=False)
+                collection.update(fcrepo, recursive=False)
 
             except RESTAPIException as e:
                 logger.error(f'Error in collection creation: {e}')
@@ -49,8 +50,8 @@ class Command:
                 try:
                     collection = pcdm.Collection()
                     collection.title = args.name
-                    collection.create_object(fcrepo)
-                    collection.update_object(fcrepo)
+                    collection.create(fcrepo, recursive=False)
+                    collection.update(fcrepo, recursive=False)
                     txn.commit()
 
                 except RESTAPIException as e:

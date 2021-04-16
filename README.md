@@ -22,11 +22,11 @@ See these instructions for [installing pyenv](https://github.com/pyenv/pyenv#ins
 then run the following:
 
 ```
-# install Python 3.6.2
-pyenv install 3.6.2
+# install Python 3.6.12
+pyenv install 3.6.12
 
 # create a new virtual environment based on 3.6.2 for Plastron
-pyenv virtualenv 3.6.2 plastron
+pyenv virtualenv 3.6.12 plastron
 
 # switch to that environment in your current shell
 pyenv shell plastron
@@ -39,7 +39,7 @@ To install Plastron in [development mode], do the following:
 ```
 git clone git@github.com:umd-lib/plastron.git
 cd plastron
-pip install -e .
+pip install -e .[dev,test]
 ```
 
 This allows for in-place editing of Plastron's source code in the
@@ -62,7 +62,7 @@ components are:
 * Data handlers for batch ingest formats ([handler modules](plastron/handlers))
 * Entrypoint interfaces (currently a command-line tool and
   a daemon) ([cli.py](plastron/cli.py), [daemon.py](plastron/daemon.py))
-  
+
 The intent is that the runnable commands be useful units
 of work that are able to be called interchangeably from
 any of the entrypoint interfaces, or be directly included

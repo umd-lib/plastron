@@ -2,6 +2,7 @@ import logging
 import sys
 from datetime import datetime
 from plastron import util
+from plastron.commands import BaseCommand
 from plastron.exceptions import RESTAPIException, DataReadException, FailureException
 from plastron.models.newspaper import Page
 from plastron.http import Transaction
@@ -23,7 +24,7 @@ def configure_cli(subparsers):
     parser.set_defaults(cmd_name='extractocr')
 
 
-class Command:
+class Command(BaseCommand):
     def __call__(self, fcrepo, args):
         fieldnames = ['uri', 'timestamp']
 
@@ -83,8 +84,8 @@ def extract(fcrepo, uri):
             page = Page.from_repository(fcrepo, uri)
             logger.info("Creating annotations for page {0}".format(page.title))
             for annotation in page.textblocks():
-                annotation.create_object(fcrepo)
-                annotation.update_object(fcrepo)
+                annotation.create(fcrepo)
+                annotation.update(fcrepo)
 
             txn.commit()
             return True

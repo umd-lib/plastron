@@ -1,9 +1,8 @@
-from rdflib import URIRef
 from plastron import ldp, ore, rdf
-from plastron.exceptions import RESTAPIException
 from plastron.namespaces import dcterms, dcmitype, ebucore, fabio, pcdm, pcdmuse, premis
-from plastron.files import LocalFile, RepositoryFile
+from plastron.files import LocalFileSource, RepositoryFileSource
 from PIL import Image
+
 
 # alias the rdflib Namespace
 ns = pcdm
@@ -38,6 +37,24 @@ class Object(ore.Aggregation):
                 file.read(graph)
                 yield file
 
+    # recursively create an object and components and that don't yet exist
+    def create(self, repository, container_path=None, slug=None, headers=None, recursive=True, **kwargs):
+        super().create(
+            repository=repository,
+            container_path=container_path,
+            slug=slug,
+            headers=headers,
+            recursive=recursive,
+            **kwargs
+        )
+        if recursive:
+            repository.create_members(self)
+            repository.create_files(self)
+            repository.create_related(self)
+
+    def get_new_member(self, rootname, number):
+        return Page(title=f'Page {number}', number=number)
+
 
 @rdf.object_property('file_of', pcdm.fileOf)
 @rdf.data_property('mimetype', ebucore.hasMimeType)
@@ -48,21 +65,28 @@ class Object(ore.Aggregation):
 @rdf.object_property('dcmitype', dcterms.type)
 @rdf.data_property('title', dcterms.title)
 @rdf.rdf_class(pcdm.File)
-class File(ldp.Resource):
+class File(ldp.NonRdfSource):
     @classmethod
     def from_repository(cls, repo, uri, include_server_managed=True):
-        source = RepositoryFile(repo, uri)
-        return cls(source, uri=uri)
+        obj = super().from_repository(repo, uri, include_server_managed)
+        obj.source = RepositoryFileSource(repo, uri)
+        return obj
 
-    def __init__(self, source, **kwargs):
-        super().__init__(**kwargs)
-        self.source = source
-        self.filename = source.filename
-        if self.title is None:
-            self.title = self.filename
+    @classmethod
+    def from_source(cls, source=None, **kwargs):
+        obj = super().from_source(source=source, **kwargs)
+        obj.mimetype = source.mimetype()
+        return obj
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # for image files
+        # TODO: move these to a subclass or mix-in?
+        self.width = None
+        self.height = None
 
     # upload a binary resource
-    def create_object(self, repository, uri=None):
+    def create(self, repository, container_path=None, slug=None, headers=None, **kwargs):
         if not repository.load_binaries:
             self.logger.info(f'Skipping loading for binary {self.source.filename}')
             return True
@@ -74,25 +98,20 @@ class File(ldp.Resource):
 
         self.logger.info(f'Loading {self.source.filename}')
 
-        with self.source.data() as stream:
-            headers = {
-                'Content-Type': self.source.mimetype(),
-                'Digest': self.source.digest(),
-                'Content-Disposition': f'attachment; filename="{self.source.filename}"'
-            }
-            if uri is not None:
-                response = repository.put(uri, data=stream, headers=headers)
-            else:
-                response = repository.post(repository.uri(), data=stream, headers=headers)
+        if headers is None:
+            headers = {}
+        headers.update({
+            'Content-Type': self.source.mimetype(),
+            'Digest': self.source.digest(),
+            'Content-Disposition': f'attachment; filename="{self.source.filename}"'
+        })
 
-        if response.status_code == 201:
-            self.uri = URIRef(response.headers['Location'])
-            self.created = True
-            return True
-        else:
-            raise RESTAPIException(response)
+        with self.source as stream:
+            super().create(repository, container_path=container_path, slug=slug, headers=headers, data=stream, **kwargs)
+        self.created = True
+        return True
 
-    def update_object(self, repository, patch_uri=None):
+    def update(self, repository, recursive=True):
         if not repository.load_binaries:
             self.logger.info(f'Skipping update for binary {self.source.filename}')
             return True
@@ -102,19 +121,14 @@ class File(ldp.Resource):
             if self.width is None or self.height is None:
                 # use PIL
                 try:
-                    with Image.open(self.source.data()) as img:
-                        self.width = img.width
-                        self.height = img.height
+                    with self.source as stream:
+                        with Image.open(stream) as img:
+                            self.width = img.width
+                            self.height = img.height
                 except IOError as e:
                     self.logger.warn(f'Cannot read image file: {e}')
 
-        head_response = repository.head(self.uri)
-        if 'describedby' in head_response.links:
-            target = head_response.links['describedby']['url']
-        else:
-            raise Exception(f'Missing describedby Link header for {self.uri}')
-
-        return super().update_object(repository, patch_uri=target)
+        return super().update(repository, recursive=recursive)
 
 
 @rdf.rdf_class(pcdmuse.PreservationMasterFile)
@@ -157,12 +171,13 @@ FILE_CLASS_FOR = {
 }
 
 
-def get_file_object(path):
+def get_file_object(path, source=None):
     extension = path[path.rfind('.'):]
     if extension in FILE_CLASS_FOR:
         cls = FILE_CLASS_FOR[extension]
     else:
         cls = File
-    f = cls(LocalFile(path))
-    f.dcmitype = dcmitype.Text
+    if source is None:
+        source = LocalFileSource(path)
+    f = cls.from_source(source)
     return f

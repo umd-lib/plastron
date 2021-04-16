@@ -1,4 +1,4 @@
-class ConfigException(Exception):
+class ConfigError(Exception):
     def __init__(self, message):
         self.message = message
 
@@ -34,5 +34,9 @@ class NoValidationRulesetException(Exception):
         return self.message
 
 
-class BinarySourceNotFoundError(Exception):
+class BinarySourceError(Exception):
+    pass
+
+
+class BinarySourceNotFoundError(BinarySourceError):
     pass

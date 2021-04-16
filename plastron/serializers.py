@@ -63,17 +63,17 @@ class TurtleSerializer:
         self.directory_name = directory
         self.content_type = 'text/turtle'
         self.file_extension = '.ttl'
+        self.graph = Graph(namespace_manager=nsm)
 
     def __enter__(self):
         return self
 
-    def write(self, graph: Graph, **_kwargs):
-        graph.namespace_manager = nsm
-        with open(os.path.join(self.directory_name, 'metadata.ttl'), mode='wb') as export_file:
-            graph.serialize(destination=export_file, format='turtle')
+    def write(self, resource, **_kwargs):
+        self.graph += resource.graph()
 
     def finish(self):
-        pass
+        with open(os.path.join(self.directory_name, 'metadata.ttl'), mode='wb') as export_file:
+            self.graph.serialize(destination=export_file, format='turtle')
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.finish()
@@ -119,12 +119,11 @@ class CSVSerializer:
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.finish()
 
-    def write(self, graph: Graph, files=None, binaries_dir=''):
+    def write(self, resource, files=None, binaries_dir=''):
         """
-        Serializes the given graph as CSV data rows.
+        Serializes the given resource as CSV data rows.
         """
-        main_subject = set([s for s in graph.subjects() if '#' not in str(s)]).pop()
-        resource_class = detect_resource_class(graph, main_subject)
+        resource_class = type(resource)
         if resource_class not in self.content_models:
             self.content_models[resource_class] = {
                 'header_map': resource_class.HEADER_MAP,
@@ -133,15 +132,15 @@ class CSVSerializer:
                 'rows': []
             }
 
-        resource = resource_class.from_graph(graph, subject=main_subject)
+        graph = resource.graph()
         row = {k: ';'.join(v) for k, v in self.flatten(resource, self.content_models[resource_class]).items()}
-        row['URI'] = str(main_subject)
+        row['URI'] = str(resource.uri)
         if files is not None:
             row['FILES'] = ';'.join(os.path.join(binaries_dir, file.filename[0]) for file in files)
-        row['CREATED'] = str(graph.value(main_subject, fedora.created))
-        row['MODIFIED'] = str(graph.value(main_subject, fedora.lastModified))
+        row['CREATED'] = str(graph.value(resource.uri, fedora.created))
+        row['MODIFIED'] = str(graph.value(resource.uri, fedora.lastModified))
         if self.public_uri_template is not None:
-            uri = urlparse(main_subject)
+            uri = urlparse(resource.uri)
             uuid = os.path.basename(uri.path)
             row['PUBLIC URI'] = self.public_uri_template.format(uuid=uuid)
 

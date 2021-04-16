@@ -9,7 +9,7 @@ import os
 from plastron import pcdm
 from plastron.exceptions import DataReadException
 from plastron.namespaces import dcmitype, ndnp
-from plastron.files import LocalFile
+from plastron.files import LocalFileSource
 from plastron.models.newspaper import Article, Issue, IssueMetadata, MetadataFile, Page
 
 # alias the rdflib Namespace
@@ -186,13 +186,13 @@ class BatchItem:
             issue.edition = root.find(m['edition']).text
 
         # add the issue and article-level XML files as related objects
-        issue.add_related(IssueMetadata(MetadataFile(
-            LocalFile(self.path),
-            title='{0}, issue METS metadata'.format(issue.title)
+        issue.add_related(IssueMetadata(MetadataFile.from_source(
+            LocalFileSource(self.path),
+            title=f'{issue.title}, issue METS metadata'
         )))
-        issue.add_related(IssueMetadata(MetadataFile(
-            LocalFile(self.article_path),
-            title='{0}, article METS metadata'.format(issue.title)
+        issue.add_related(IssueMetadata(MetadataFile.from_source(
+            LocalFileSource(self.article_path),
+            title=f'{issue.title}, article METS metadata'
         )))
 
         # create a page object for each page and append to list of pages
@@ -274,11 +274,13 @@ class BatchItem:
             localpath = os.path.join(self.dir, os.path.basename(href))
             basename = os.path.basename(localpath)
             mimetype = techmd['PREMIS'].find('.//premis:formatName', xmlns).text
-            source = LocalFile(localpath, mimetype=mimetype)
 
             file_class = FILE_CLASS_FOR[use]
 
-            file = file_class(source, title=f'{basename} ({use})')
+            file = file_class.from_source(
+                LocalFileSource(localpath, mimetype=mimetype),
+                title=f'{basename} ({use})'
+            )
             file.use = use
             file.basename = basename
             file.dcmitype = dcmitype.Text

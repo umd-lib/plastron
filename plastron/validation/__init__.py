@@ -1,17 +1,12 @@
-from edtf import parse_edtf
+from edtf_validate.valid_edtf import is_valid as is_valid_edtf
 from iso639 import is_valid639_1, is_valid639_2
-from pyparsing import ParseException
 
 
 def is_edtf_formatted(value):
     # Allow blank values
     if str(value).strip() == "":
         return True
-    try:
-        parse_edtf(value)
-        return True
-    except ParseException:
-        return False
+    return is_valid_edtf(str(value))
 
 
 def is_valid_iso639_code(value):

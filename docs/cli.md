@@ -4,8 +4,9 @@
 
 ```
 $ plastron --help
-usage: plastron [-h] (-r REPO | -V) [-v] [-q] [--on-behalf-of DELEGATED_USER]
-                {delete,del,rm,export,extractocr,imgsize,import,list,ls,load,mkcol,ping,update}
+usage: plastron [-h] (-r REPO | -c CONFIG_FILE | -V) [-v] [-q]
+                [--on-behalf-of DELEGATED_USER]
+                {annotate,delete,del,rm,echo,export,extractocr,imgsize,import,list,ls,load,mkcol,ping,reindex,stub,update}
                 ...
 
 Batch operation tool for Fedora 4.
@@ -13,6 +14,8 @@ Batch operation tool for Fedora 4.
 optional arguments:
   -h, --help            show this help message and exit
   -r REPO, --repo REPO  Path to repository configuration file.
+  -c CONFIG_FILE, --config CONFIG_FILE
+                        Path to configuration file.
   -V, --version         Print version and exit.
   -v, --verbose         increase the verbosity of the status output
   -q, --quiet           decrease the verbosity of the status output
@@ -20,32 +23,154 @@ optional arguments:
                         delegate repository operations to this username
 
 commands:
-  {delete,del,rm,export,extractocr,imgsize,import,list,ls,load,mkcol,ping,update}
+  {annotate,delete,del,rm,echo,export,extractocr,imgsize,import,list,ls,load,mkcol,ping,reindex,stub,update}
 ```
 
 ### Check version
 
 ```
 $ plastron --version
-3.2.0rc2
+3.5.0
 ```
 
 ## Commands
 
-All commands require you to specify a repository configuration file using
-the `-r` or `--repo` option *before* the command name. For example,
-`plastron -r path/to/repo.yml ping`.
+All commands require you to specify a configuration file using either the
+`-c|--config` or `-r|--repo` option *before* the command name. For example,
+`plastron -c path/to/repo.yml ping`.
 
-### Ping (ping)
+### Annotate (annotate)
 
 ```
-$ plastron ping --help
-usage: plastron ping [-h]
+$ plastron annotate --help
+usage: plastron annotate [-h] [uris [uris ...]]
 
-Check connection to the repository
+Annotate resources with the text content of their HTML files
+
+positional arguments:
+  uris        URIs of repository objects to process
 
 optional arguments:
   -h, --help  show this help message and exit
+```
+
+### Create Collection (mkcol)
+
+```
+$ plastron mkcol --help
+usage: plastron mkcol [-h] -n NAME [-b BATCH] [--notransactions]
+
+Create a PCDM Collection in the repository
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -n NAME, --name NAME  Name of the collection.
+  -b BATCH, --batch BATCH
+                        Path to batch configuration file.
+  --notransactions      run the load without using transactions
+```
+
+### Delete (delete, del, rm)
+
+See [Delete Command](delete.md)
+
+### Echo (echo)
+
+```
+$ plastron echo --help
+usage: plastron echo [-h] [-e ECHO_DELAY] -b BODY
+
+Diagnostic command for echoing input to output. Primarily intended for testing
+synchronous message processing.
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -e ECHO_DELAY, --echo-delay ECHO_DELAY
+                        The amount of time to delay the reply, in seconds
+  -b BODY, --body BODY  The text to echo back
+```
+
+### Export (export)
+
+```
+$ plastron export --help
+usage: plastron export [-h] -o OUTPUT_DEST [--key KEY] -f
+                       {text/turtle,turtle,ttl,text/csv,csv}
+                       [--uri-template URI_TEMPLATE] [-B]
+                       [--binary-types BINARY_TYPES]
+                       [uris [uris ...]]
+
+Export resources from the repository as a BagIt bag
+
+positional arguments:
+  uris                  URIs of repository objects to export
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -o OUTPUT_DEST, --output-dest OUTPUT_DEST
+                        Where to send the export. Can be a local filename or
+                        an SFTP URI
+  --key KEY             SSH private key file to use for SFTP connections
+  -f {text/turtle,turtle,ttl,text/csv,csv}, --format {text/turtle,turtle,ttl,text/csv,csv}
+                        Format for exported metadata
+  --uri-template URI_TEMPLATE
+                        Public URI template
+  -B, --export-binaries
+                        Export binaries in addition to the metadata
+  --binary-types BINARY_TYPES
+                        Include only binaries with a MIME type from this list
+```
+
+### Extract OCR (extractocr)
+
+```
+$ plastron extractocr --help
+usage: plastron extractocr [-h] [--ignore IGNORE]
+
+Create annotations from OCR data stored in the repository
+
+optional arguments:
+  -h, --help            show this help message and exit
+  --ignore IGNORE, -i IGNORE
+                        file listing items to ignore
+```
+
+### Image Size (imgsize)
+
+```
+$ plastron imgsize --help
+usage: plastron imgsize [-h] [uris [uris ...]]
+
+Add width and height to image resources
+
+positional arguments:
+  uris        URIs of repository objects to get image info
+
+optional arguments:
+  -h, --help  show this help message and exit
+```
+
+### Import (import)
+
+See [Import Command](import.md)
+
+### List (list, ls)
+
+```
+$ plastron list --help
+usage: plastron list [-h] [-l] [-R RECURSIVE] [uris [uris ...]]
+
+List objects in the repository
+
+positional arguments:
+  uris                  URIs of repository objects to list
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -l, --long            Display additional information besides the URI
+  -R RECURSIVE, --recursive RECURSIVE
+                        List additional objects found by traversing the given
+                        predicate(s)
 ```
 
 ### Load (load)
@@ -79,109 +204,34 @@ required arguments:
                         path to batch configuration file
 ```
 
-### List (list, ls)
+### Ping (ping)
 
 ```
-$ plastron list --help
-usage: plastron list [-h] [-l] [-R RECURSIVE] [uris [uris ...]]
+$ plastron ping --help
+usage: plastron ping [-h]
 
-List objects in the repository
-
-positional arguments:
-  uris                  URIs of repository objects to list
+Check connection to the repository
 
 optional arguments:
-  -h, --help            show this help message and exit
-  -l, --long            Display additional information besides the URI
-  -R RECURSIVE, --recursive RECURSIVE
-                        List additional objects found by traversing the given
-                        predicate(s)
+  -h, --help  show this help message and exit
 ```
 
-### Create Collection (mkcol)
+### Reindex (reindex)
 
 ```
-$ plastron mkcol --help
-usage: plastron mkcol [-h] -n NAME [-b BATCH] [--notransactions]
+$ plastron reindex --help
+usage: plastron reindex [-h] [-R RECURSIVE] [uris [uris ...]]
 
-Create a PCDM Collection in the repository
-
-optional arguments:
-  -h, --help            show this help message and exit
-  -n NAME, --name NAME  Name of the collection.
-  -b BATCH, --batch BATCH
-                        Path to batch configuration file.
-  --notransactions      run the load without using transactions
-```
-
-### Delete (delete, del, rm)
-
-```
-$ plastron delete --help
-usage: plastron delete [-h] [-R RECURSIVE] [-d] [--no-transactions]
-                       [--completed COMPLETED] [-f FILE]
-                       [uris [uris ...]]
-
-Delete objects from the repository
+Reindex objects in the repository
 
 positional arguments:
-  uris                  Repository URIs to be deleted.
+  uris                  URIs of repository objects to reindex
 
 optional arguments:
   -h, --help            show this help message and exit
   -R RECURSIVE, --recursive RECURSIVE
-                        Delete additional objects found by traversing the
+                        Reindex additional objects found by traversing the
                         given predicate(s)
-  -d, --dry-run         Simulate a delete without modifying the repository
-  --no-transactions, --no-txn
-                        run the update without using transactions
-  --completed COMPLETED
-                        file recording the URIs of deleted resources
-  -f FILE, --file FILE  File containing a list of URIs to delete```
-```
-
-### Extract OCR (extractocr)
-
-```
-$ plastron extractocr --help
-usage: plastron extractocr [-h] [--ignore IGNORE]
-
-Create annotations from OCR data stored in the repository
-
-optional arguments:
-  -h, --help            show this help message and exit
-  --ignore IGNORE, -i IGNORE
-                        file listing items to ignore
-```
-
-### Export (export)
-
-```
-$ plastron export --help
-usage: plastron export [-h] --output-dest OUTPUT_DEST [--key KEY] -f
-                       {text/turtle,turtle,ttl,text/csv,csv}
-                       [--uri-template URI_TEMPLATE] [--export-binaries]
-                       [--binary-types BINARY_TYPES]
-                       [uris [uris ...]]
-
-Export resources from the repository as a BagIt bag
-
-positional arguments:
-  uris                  URIs of repository objects to export
-
-optional arguments:
-  -h, --help            show this help message and exit
-  --output-dest OUTPUT_DEST
-                        Where to send the export. Can be a local filename or
-                        an SFTP URI
-  --key KEY             SSH private key file to use for SFTP connections
-  -f {text/turtle,turtle,ttl,text/csv,csv}, --format {text/turtle,turtle,ttl,text/csv,csv}
-                        Format for exported metadata
-  --uri-template URI_TEMPLATE
-                        Public URI template
-  --export-binaries     Export binaries in addition to the metadata
-  --binary-types BINARY_TYPES
-                        Include only binaries with a MIME type from this list
 ```
 
 ### Update (update)
@@ -217,94 +267,13 @@ optional arguments:
   -f FILE, --file FILE  File containing a list of URIs to update
 ```
 
-### Import (import)
-
-```
-$ plastron import --help
-usage: plastron import [-h] -m MODEL [-l LIMIT] [--validate-only]
-                       [--make-template TEMPLATE_FILE] [--access ACCESS]
-                       [--member-of MEMBER_OF]
-                       [--binaries-location BINARIES_LOCATION]
-                       [import_file]
-
-Import data to the repository
-
-positional arguments:
-  import_file           name of the file to import from
-
-optional arguments:
-  -h, --help            show this help message and exit
-  -m MODEL, --model MODEL
-                        data model to use
-  -l LIMIT, --limit LIMIT
-                        limit the number of rows to read from the import file
-  --validate-only       only validate, do not do the actual import
-  --make-template TEMPLATE_FILE
-                        create a CSV template for the given model
-  --access ACCESS       URI or CURIE of the access class to apply to new items
-  --member-of MEMBER_OF
-                        URI of the object that new items are PCDM members of
-  --binaries-location BINARIES_LOCATION
-                        where to find binaries; either a path to a directory,
-                        a "zip:<path to zipfile>" URI, an SFTP URI in the form
-                        "sftp://<user>@<host>/<path to dir>", or a URI in the
-                        form "zip+sftp://<user>@<host>/<path to zipfile>"
-```
-
-### Echo (echo)
-
-```
-$ plastron echo --help
-usage: plastron echo [-h] [-e ECHO_DELAY] -b BODY
-
-Diagnostic command for echoing input to output. Primarily intended for testing
-synchronous message processing.
-
-optional arguments:
-  -h, --help            show this help message and exit
-  -e ECHO_DELAY, --echo-delay ECHO_DELAY
-                        The amount of time to delay the reply, in seconds
-  -b BODY, --body BODY  The text to echo back
-```
-
 ## Configuration
-
-### Configuration Templates
-
-Templates for creating the configuration files can be found at [config/templates](../config/templates)
 
 ### Repository Configuration
 
 The repository connection is configured in a YAML file and passed to `plastron`
 with the `-r` or `--repo` option. These are the recognized configuration keys:
 
-#### Required
-
-| Option        | Description |
-| ------------- | ----------- |
-|`REST_ENDPOINT`|Repository root URL|
-|`RELPATH`      |Path within repository to load objects to|
-|`LOG_DIR`      |Directory to write log files|
-
-#### Client Certificate Authentication
-
-| Option      | Description |
-| ----------- | ----------- |
-|`CLIENT_CERT`|PEM-encoded client SSL cert for authentication|
-|`CLIENT_KEY` |PEM-encoded client SSL key for authentication|
-
-#### Password Authentication
-
-| Option          | Description |
-| --------------- | ----------- |
-|`FEDORA_USER`    |Username for authentication|
-|`FEDORA_PASSWORD`|Password for authentication|
-
-#### Optional
-
-| Option      | Description |
-| ----------- | ----------- |
-|`SERVER_CERT`|Path to a PEM-encoded copy of the server's SSL certificate; only needed for servers using self-signed certs|
 
 ### Batch Configuration
 

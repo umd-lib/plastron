@@ -9,10 +9,10 @@ import yaml
 
 from datetime import datetime
 from plastron import version
-from plastron.http import Repository
 from plastron.logging import DEFAULT_LOGGING_OPTIONS
 from plastron.stomp import Broker
 from plastron.stomp.listeners import ReconnectListener, CommandListener
+from plastron.util import envsubst
 
 logger = logging.getLogger(__name__)
 now = datetime.utcnow().strftime('%Y%m%d%H%M%S')
@@ -39,11 +39,11 @@ def main():
     args = parser.parse_args()
 
     with open(args.config, 'r') as config_file:
-        config = yaml.safe_load(config_file)
+        config = envsubst(yaml.safe_load(config_file))
 
     repo_config = config['REPOSITORY']
     broker_config = config['MESSAGE_BROKER']
-    command_config = config['COMMANDS']
+    command_config = config.get('COMMANDS', {})
 
     logging_options = DEFAULT_LOGGING_OPTIONS
 

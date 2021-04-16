@@ -2,44 +2,154 @@ import logging
 import os
 import requests
 import threading
+from base64 import urlsafe_b64encode
 from collections import namedtuple
-from plastron.exceptions import RESTAPIException
+from plastron.auth import AuthFactory
+from plastron.exceptions import ConfigError, FailureException, RESTAPIException
 from rdflib import Graph, URIRef
+from requests.exceptions import ConnectionError
+from urllib.parse import urlsplit
+
 
 OMIT_SERVER_MANAGED_TRIPLES = 'return=representation; omit="http://fedora.info/definitions/v4/repository#ServerManaged"'
 
 
+def random_slug(length=6):
+    return urlsafe_b64encode(os.urandom(length)).decode()
+
+
 # lightweight representation of a resource URI and URI of its description
 # for RDFSources, in general the uri and description_uri will be the same
-class Resource(namedtuple('Resource', ['uri', 'description_uri'])):
+class ResourceURI(namedtuple('Resource', ['uri', 'description_uri'])):
     __slots__ = ()
 
     def __str__(self):
         return self.uri
 
 
+class FlatCreator:
+    """
+    Creates all linked objects at the same container level as the initial item.
+    However, proxies and annotations are still created within child containers
+    of the item.
+    """
+    def __init__(self, repository):
+        self.repository = repository
+
+    def create_members(self, item):
+        self.repository.create_all(item.container_path, item.members)
+
+    def create_files(self, item):
+        self.repository.create_all(item.container_path, item.files)
+
+    def create_proxies(self, item):
+        # create as child resources, grouped by relationship
+        self.repository.create_all(item.path + '/x', item.proxies(), name_function=random_slug)
+
+    def create_related(self, item):
+        self.repository.create_all(item.container_path, item.related)
+
+    def create_annotations(self, item):
+        # create as child resources, grouped by relationship
+        self.repository.create_all(item.path + '/a', item.annotations, name_function=random_slug)
+
+
+class HierarchicalCreator:
+    """
+    Creates linked objects in an ldp:contains hierarchy, using intermediate
+    containers to group by relationship:
+
+    * Members = /m
+    * Files = /f
+    * Proxies = /x
+    * Annotations = /a
+
+    Related items, however, are created in the same container as the initial
+    item.
+    """
+    def __init__(self, repository):
+        self.repository = repository
+
+    def create_members(self, item):
+        self.repository.create_all(item.path + '/m', item.members, name_function=random_slug)
+
+    def create_files(self, item):
+        # create as child resources, grouped by relationship
+        self.repository.create_all(item.path + '/f', item.files, name_function=random_slug)
+
+    def create_proxies(self, item):
+        # create as child resources, grouped by relationship
+        self.repository.create_all(item.path + '/x', item.proxies(), name_function=random_slug)
+
+    def create_related(self, item):
+        # create related objects at the same container level as this object
+        self.repository.create_all(item.container_path, item.related)
+
+    def create_annotations(self, item):
+        # create as child resources, grouped by relationship
+        self.repository.create_all(item.path + '/a', item.annotations, name_function=random_slug)
+
+
 class Repository:
     def __init__(self, config, ua_string=None, on_behalf_of=None):
-        self.endpoint = config['REST_ENDPOINT']
+        # repo root
+        self.endpoint = config['REST_ENDPOINT'].rstrip('/')
+
+        # Extract endpoint URL components for managing forward host
+        parsed_endpoint_url = urlsplit(self.endpoint)
+        endpoint_proto = parsed_endpoint_url.scheme
+        endpoint_host = parsed_endpoint_url.hostname
+        self.endpoint_base_path = parsed_endpoint_url.path
+
+        # default container path
         self.relpath = config['RELPATH']
+        if not self.relpath.startswith('/'):
+            self.relpath = '/' + self.relpath
         self._path_stack = [self.relpath]
         self.fullpath = '/'.join(
             [p.strip('/') for p in (self.endpoint, self.relpath)]
         )
         self.session = requests.Session()
+        self.jwt_secret = None
         self.transaction = None
         self.load_binaries = True
         self.log_dir = config['LOG_DIR']
-        self.logger = logging.getLogger(
-            __name__ + '.' + self.__class__.__name__
-        )
+        self.logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
         self.ua_string = ua_string
         self.delegated_user = on_behalf_of
 
-        if 'CLIENT_CERT' in config and 'CLIENT_KEY' in config:
-            self.session.cert = (config['CLIENT_CERT'], config['CLIENT_KEY'])
-        elif 'FEDORA_USER' in config and 'FEDORA_PASSWORD' in config:
-            self.session.auth = (config['FEDORA_USER'], config['FEDORA_PASSWORD'])
+        repo_external_url = config.get('REPO_EXTERNAL_URL')
+        self.forwarded_host = None
+        self.forwarded_proto = None
+        self.forwarded_endpoint = None
+        if repo_external_url is not None:
+            parsed_repo_external_url = urlsplit(repo_external_url)
+            proto = parsed_repo_external_url.scheme
+            host = parsed_repo_external_url.hostname
+            if (proto != endpoint_proto) or (host != endpoint_host):
+                # We are forwarding
+                self.forwarded_host = host
+                self.forwarded_proto = proto
+
+                self.session.headers.update(
+                    {
+                        'X-Forwarded-Host': self.forwarded_host,
+                        'X-Forwarded-Proto': self.forwarded_proto
+                    }
+                )
+
+                self.forwarded_endpoint = f"{self.forwarded_proto}://{self.forwarded_host}{self.endpoint_base_path}"
+
+        structure_type = config.get('STRUCTURE', 'flat').lower()
+        if structure_type == 'hierarchical':
+            self.creator = HierarchicalCreator(self)
+        elif structure_type == 'flat':
+            self.creator = FlatCreator(self)
+        else:
+            raise ConfigError(f'Unknown STRUCTURE value: {structure_type}')
+
+        self.auth = AuthFactory.create(config)
+        self.auth.configure_session(self.session)
 
         if 'SERVER_CERT' in config:
             self.session.verify = config['SERVER_CERT']
@@ -55,31 +165,44 @@ class Repository:
     def __exit__(self, type, value, traceback):
         self.relpath = self._path_stack.pop()
 
+    def is_forwarded(self):
+        return self.forwarded_endpoint is not None
+
     def is_reachable(self):
-        response = self.head(self.fullpath)
-        return response.status_code == 200
+        try:
+            response = self.head(self.fullpath)
+            return response.status_code == 200
+        except requests.exceptions.ConnectionError as e:
+            self.logger.error(str(e))
+            return False
 
     def test_connection(self):
         # test connection to fcrepo
-        self.logger.debug("fcrepo.endpoint = %s", self.endpoint)
-        self.logger.debug("fcrepo.relpath = %s", self.relpath)
-        self.logger.debug("fcrepo.fullpath = %s", self.fullpath)
-        self.logger.info("Testing connection to {0}".format(self.fullpath))
+        self.logger.debug(f"Endpoint = {self.endpoint}")
+        self.logger.debug(f"Default container path = {self.relpath}")
+        self.logger.info(f"Testing connection to {self.endpoint + self.relpath}")
         if self.is_reachable():
             self.logger.info("Connection successful.")
         else:
-            self.logger.warning("Unable to connect.")
-            raise Exception("Unable to connect")
+            raise ConnectionError(f'Unable to connect to {self.fullpath}')
 
     def request(self, method, url, headers=None, **kwargs):
         if headers is None:
             headers = {}
         target_uri = self._insert_transaction_uri(url)
+
+        if self.is_forwarded():
+            # Reverse forward
+            target_uri = self.undo_forward(target_uri)
+
         self.logger.debug("%s %s", method, target_uri)
         if self.ua_string is not None:
             headers['User-Agent'] = self.ua_string
         if self.delegated_user is not None:
             headers['On-Behalf-Of'] = self.delegated_user
+
+        self.auth.refresh_auth(self.session)
+
         response = self.session.request(method, target_uri, headers=headers, **kwargs)
         self.logger.debug("%s %s", response.status_code, response.reason)
         return response
@@ -106,22 +229,61 @@ class Repository:
         response = self.head(url, **kwargs)
         return response.status_code == 200
 
-    def create(self, url=None, **kwargs):
+    def path_exists(self, path, **kwargs):
+        return self.exists(self.endpoint + path, **kwargs)
+
+    def create(self, path=None, url=None, container_path=None, **kwargs):
         if url is not None:
             response = self.put(url, **kwargs)
+        elif path is not None:
+            response = self.put(self.endpoint + path, **kwargs)
         else:
-            response = self.post(self.uri(), **kwargs)
+            container_uri = self.endpoint + (container_path or self.relpath)
+            response = self.post(container_uri, **kwargs)
 
         if response.status_code == 201:
-            created_url = response.headers['Location'] if 'Location' in response.headers else url
-            return URIRef(self._remove_transaction_uri(created_url))
+            created_uri = self._remove_transaction_uri(
+                response.headers['Location'] if 'Location' in response.headers else url
+            )
+            created_uri = self.handle_forward(created_uri)
+            description_uri = self.process_description_uri(created_uri, response)
+
+            return ResourceURI(created_uri, description_uri)
         else:
             raise RESTAPIException(response)
+
+    def create_all(self, container_path, resources, name_function=None):
+        # ensure the container exists
+        if len(resources) > 0 and not self.path_exists(container_path):
+            self.create(path=container_path)
+
+        for obj in resources:
+            if obj.created or obj.exists_in_repo(self):
+                obj.created = True
+                self.logger.debug(f'Object "{obj}" exists. Skipping.')
+            else:
+                slug = name_function() if callable(name_function) else None
+                obj.create(self, container_path=container_path, slug=slug)
+
+    def create_members(self, item):
+        self.creator.create_members(item)
+
+    def create_files(self, item):
+        self.creator.create_files(item)
+
+    def create_proxies(self, item):
+        self.creator.create_proxies(item)
+
+    def create_related(self, item):
+        self.creator.create_related(item)
+
+    def create_annotations(self, item):
+        self.creator.create_annotations(item)
 
     def recursive_get(self, url, traverse=None, **kwargs):
         target = self.get_description_uri(url)
         graph = self.get_graph(target)
-        resource = Resource(
+        resource = ResourceURI(
             uri=self._remove_transaction_uri(url),
             description_uri=self._remove_transaction_uri(target)
         )
@@ -136,10 +298,43 @@ class Repository:
         response = self.head(uri, **kwargs)
         if response.status_code != 200:
             raise RESTAPIException(response)
+        return self.process_description_uri(uri, response)
+
+    def process_description_uri(self, uri, response):
+        result = None
+
         if 'describedby' in response.links:
-            return response.links['describedby']['url']
+            result = response.links['describedby']['url']
         else:
-            return uri
+            result = uri
+
+        result = self.handle_forward(result)
+        return result
+
+    def handle_forward(self, url):
+        if not self.is_forwarded():
+            return url
+
+        # Replace endpoint URL with forwarded host URL
+        parsed_url = urlsplit(url)
+        if self.forwarded_proto:
+            parsed_url = parsed_url._replace(scheme=self.forwarded_proto)
+        if self.forwarded_host:
+            parsed_url = parsed_url._replace(netloc=self.forwarded_host)
+
+        return parsed_url.geturl()
+
+    def undo_forward(self, url):
+        # Replace forwarded host URL with endpoint URL (if needed)
+        result = url
+        if self.is_forwarded() and url.startswith(self.forwarded_endpoint):
+            parsed_url = urlsplit(url)
+            full_path = parsed_url.path
+            subpath = full_path[len(self.endpoint_base_path):]
+            result = self.endpoint + subpath
+            if (parsed_url.fragment is not None) and (len(parsed_url.fragment) > 0):
+                result = self.endpoint + subpath + "#" + parsed_url.fragment
+        return result
 
     def get_graph(self, url, include_server_managed=True):
         description_uri = self.get_description_uri(url)
@@ -156,15 +351,28 @@ class Repository:
         graph.parse(data=response.text, format='nt')
         return graph
 
-    def build_sparql_update(self, delete_graph, insert_graph):
+    def build_sparql_update(self, delete_graph=None, insert_graph=None):
         # go through each graph and update subjects with transaction IDs
-        self._update_subjects_within_transaction(delete_graph)
-        self._update_subjects_within_transaction(insert_graph)
+        if delete_graph is not None:
+            self._update_subjects_within_transaction(delete_graph)
+            deletes = delete_graph.serialize(format='nt').decode('utf-8').strip()
+        else:
+            deletes = None
 
-        deletes = delete_graph.serialize(format='nt').decode('utf-8').strip()
-        inserts = insert_graph.serialize(format='nt').decode('utf-8').strip()
-        sparql_update = f"DELETE {{ {deletes} }} INSERT {{ {inserts} }} WHERE {{}}"
-        return sparql_update
+        if insert_graph is not None:
+            self._update_subjects_within_transaction(insert_graph)
+            inserts = insert_graph.serialize(format='nt').decode('utf-8').strip()
+        else:
+            inserts = None
+
+        if deletes is not None and inserts is not None:
+            return f"DELETE {{ {deletes} }} INSERT {{ {inserts} }} WHERE {{}}"
+        elif deletes is not None:
+            return f"DELETE DATA {{ {deletes} }}"
+        elif inserts is not None:
+            return f"INSERT DATA {{ {inserts} }}"
+        else:
+            return ''
 
     def get_transaction_endpoint(self):
         return os.path.join(self.endpoint, 'fcr:tx')
@@ -185,9 +393,14 @@ class Repository:
     def _insert_transaction_uri(self, uri):
         if not self.in_transaction() or uri.startswith(self.transaction.uri):
             return uri
-        elif uri.startswith(self.endpoint):
+
+        if self.is_forwarded():
+            uri = self.undo_forward(uri)
+
+        if uri.startswith(self.endpoint):
             relpath = uri[len(self.endpoint):]
-            return '/'.join([p.strip('/') for p in (self.transaction.uri, relpath)])
+            uri = '/'.join([p.strip('/') for p in (self.transaction.uri, relpath)])
+            return uri
         else:
             return uri
 
@@ -211,7 +424,10 @@ class Transaction:
         self.uri = None
 
     def __enter__(self):
-        self.begin()
+        try:
+            self.begin()
+        except TransactionError as e:
+            raise FailureException(f'Transaction failed: {e}')
         return self
 
     def __str__(self):
@@ -221,10 +437,20 @@ class Transaction:
         # when we leave the transaction context, always
         # set the stop flag on the keep-alive ping
         self.keep_alive.stop()
+        # on an exception, rollback the transaction
+        if exc_type is not None:
+            if exc_type == TransactionError:
+                raise FailureException(f'Transaction failed: {exc_val}')
+            self.rollback()
+            # return false to propagate the exception upward
+            return False
 
     def begin(self):
         self.logger.info('Creating transaction')
-        response = self.repository.post(self.repository.get_transaction_endpoint())
+        try:
+            response = self.repository.post(self.repository.get_transaction_endpoint())
+        except ConnectionError as e:
+            raise TransactionError(f'Failed to create transaction: {e}') from e
         if response.status_code == 201:
             self.uri = response.headers['Location']
             self.repository.transaction = self
@@ -238,7 +464,10 @@ class Transaction:
     def maintain(self):
         if self.active:
             self.logger.info(f'Maintaining transaction {self}')
-            response = self.repository.post(os.path.join(self.uri, 'fcr:tx'))
+            try:
+                response = self.repository.post(os.path.join(self.uri, 'fcr:tx'))
+            except ConnectionError as e:
+                raise TransactionError(f'Failed to maintain transaction {self}: {e}') from e
             if response.status_code == 204:
                 self.logger.info(f'Transaction {self} is active until {response.headers["Expires"]}')
             else:
@@ -247,24 +476,30 @@ class Transaction:
 
     def commit(self):
         if self.active:
+            self.keep_alive.stop()
+            self.active = False
             self.logger.info(f'Committing transaction {self}')
-            response = self.repository.post(os.path.join(self.uri, 'fcr:tx/fcr:commit'))
+            try:
+                response = self.repository.post(os.path.join(self.uri, 'fcr:tx/fcr:commit'))
+            except ConnectionError as e:
+                raise TransactionError(f'Failed to commit transaction {self}: {e}') from e
             if response.status_code == 204:
                 self.logger.info(f'Committed transaction {self}')
-                self.keep_alive.stop()
-                self.active = False
             else:
                 self.logger.error(f'Failed to commit transaction {self}')
                 raise RESTAPIException(response)
 
     def rollback(self):
         if self.active:
+            self.keep_alive.stop()
+            self.active = False
             self.logger.info(f'Rolling back transaction {self}')
-            response = self.repository.post(os.path.join(self.uri, 'fcr:tx/fcr:rollback'))
+            try:
+                response = self.repository.post(os.path.join(self.uri, 'fcr:tx/fcr:rollback'))
+            except ConnectionError as e:
+                raise TransactionError(f'Failed to roll back transaction {self}: {e}') from e
             if response.status_code == 204:
                 self.logger.info(f'Rolled back transaction {self}')
-                self.keep_alive.stop()
-                self.active = False
             else:
                 self.logger.error(f'Failed to roll back transaction {self}')
                 raise RESTAPIException(response)
@@ -284,3 +519,7 @@ class TransactionKeepAlive(threading.Thread):
 
     def stop(self):
         self.stopped.set()
+
+
+class TransactionError(Exception):
+    pass

@@ -5,6 +5,8 @@ import logging
 from argparse import Namespace
 from distutils.util import strtobool
 from email.utils import parsedate_to_datetime
+
+from plastron.commands import BaseCommand
 from plastron.exceptions import FailureException, RESTAPIException
 from plastron.ldp import Resource
 from plastron.util import get_title_string, ResourceList, parse_predicate_list
@@ -85,8 +87,9 @@ def validate(item):
     return result
 
 
-class Command:
-    def __init__(self, _config=None):
+class Command(BaseCommand):
+    def __init__(self, config=None):
+        super().__init__(config=config)
         self.result = None
         self.repository = None
         self.dry_run = False

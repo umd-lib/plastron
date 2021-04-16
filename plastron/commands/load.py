@@ -6,7 +6,9 @@ from argparse import ArgumentTypeError
 from datetime import datetime
 from importlib import import_module
 from time import sleep
-from plastron.exceptions import ConfigException, DataReadException, RESTAPIException, FailureException
+
+from plastron.commands import BaseCommand
+from plastron.exceptions import ConfigError, DataReadException, RESTAPIException, FailureException
 from plastron.http import Transaction
 from plastron.util import ItemLog
 
@@ -78,13 +80,13 @@ def configure_cli(subparsers):
     parser.set_defaults(cmd_name='load')
 
 
-class Command:
+class Command(BaseCommand):
 
     def __call__(self, fcrepo, args):
         # Load batch configuration
         try:
             batch_config = BatchConfig(args.batch)
-        except ConfigException as e:
+        except ConfigError as e:
             logger.error(e.message)
             logger.error(f'Failed to load batch configuration from {args.batch}')
             raise FailureException(e.message)
@@ -109,7 +111,7 @@ class Command:
 
         try:
             batch = handler.Batch(fcrepo, batch_config)
-        except (ConfigException, DataReadException) as e:
+        except (ConfigError, DataReadException) as e:
             logger.error(e.message)
             logger.error('Failed to initialize batch')
             raise FailureException(e.message)
@@ -218,12 +220,7 @@ def percentage(n):
 
 def load_item_internal(fcrepo, item, args, extra=None):
     logger.info('Creating item')
-    item.recursive_create(fcrepo)
-    logger.info('Creating ordering proxies')
-    item.create_proxies(fcrepo)
-    if args.create_annotations:
-        logger.info('Creating annotations')
-        item.create_annotations(fcrepo)
+    item.create(fcrepo)
 
     if extra:
         logger.info('Adding additional triples')
@@ -232,11 +229,11 @@ def load_item_internal(fcrepo, item, args, extra=None):
         elif re.search(r'\.(rdf|xml)$', extra):
             rdf_format = 'xml'
         else:
-            raise ConfigException("Unrecognized extra triples file format")
+            raise ConfigError("Unrecognized extra triples file format")
         item.add_extra_properties(extra, rdf_format)
 
     logger.info('Updating item and components')
-    item.recursive_update(fcrepo)
+    item.update(fcrepo)
     if args.create_annotations:
         logger.info('Updating annotations')
         item.update_annotations(fcrepo)
@@ -319,4 +316,4 @@ class BatchConfig:
 
         if missing_fields:
             field_names = ', '.join(missing_fields)
-            raise ConfigException(f'Missing required batch configuration field(s): {field_names}')
+            raise ConfigError(f'Missing required batch configuration field(s): {field_names}')

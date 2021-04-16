@@ -1,6 +1,9 @@
 import logging
+
+from plastron.stomp.handlers import AsynchronousResponseHandler
 from watchdog.observers import Observer
-from watchdog.events import FileSystemEventHandler, FileCreatedEvent, FileModifiedEvent
+from watchdog.events import FileSystemEventHandler, FileCreatedEvent
+
 
 logger = logging.getLogger(__name__)
 
@@ -21,8 +24,7 @@ class InboxEventHandler(FileSystemEventHandler):
         if isinstance(event, FileCreatedEvent):
             logger.info(f"Triggering inbox processing due to {event}")
             message = self.message_box.message_class.read(event.src_path)
-            response_handler = self.command_listener.asynchronous_response_handler(message.id)
-            self.command_listener.process_message(message, response_handler)
+            self.command_listener.process_message(message, AsynchronousResponseHandler(self.command_listener, message))
 
 
 class InboxWatcher:

@@ -189,6 +189,11 @@ class Repository:
     def request(self, method, url, headers=None, **kwargs):
         if headers is None:
             headers = {}
+
+        # make sure the transaction keep-alive thread hasn't failed
+        if self.in_transaction() and self.transaction.keep_alive.failed.is_set():
+            raise FailureException('Transaction keep-alive failed') from self.transaction.keep_alive.exception
+
         target_uri = self._insert_transaction_uri(url)
 
         if self.is_forwarded():
@@ -458,8 +463,7 @@ class Transaction:
             self.keep_alive.start()
             self.active = True
         else:
-            self.logger.error('Failed to create transaction')
-            raise RESTAPIException(response)
+            raise TransactionError(f'Failed to create transaction: {response.status_code} {response.reason}')
 
     def maintain(self):
         if self.active:
@@ -471,8 +475,9 @@ class Transaction:
             if response.status_code == 204:
                 self.logger.info(f'Transaction {self} is active until {response.headers["Expires"]}')
             else:
-                self.logger.error(f'Failed to maintain transaction {self}')
-                raise RESTAPIException(response)
+                raise TransactionError(
+                    f'Failed to maintain transaction {self}: {response.status_code} {response.reason}'
+                )
 
     def commit(self):
         if self.active:
@@ -486,8 +491,7 @@ class Transaction:
             if response.status_code == 204:
                 self.logger.info(f'Committed transaction {self}')
             else:
-                self.logger.error(f'Failed to commit transaction {self}')
-                raise RESTAPIException(response)
+                raise TransactionError(f'Failed to commit transaction {self}: {response.status_code} {response.reason}')
 
     def rollback(self):
         if self.active:
@@ -501,8 +505,9 @@ class Transaction:
             if response.status_code == 204:
                 self.logger.info(f'Rolled back transaction {self}')
             else:
-                self.logger.error(f'Failed to roll back transaction {self}')
-                raise RESTAPIException(response)
+                raise TransactionError(
+                    f'Failed to roll back transaction {self}: {response.status_code} {response.reason}'
+                )
 
 
 # based on https://stackoverflow.com/a/12435256/5124907
@@ -512,10 +517,20 @@ class TransactionKeepAlive(threading.Thread):
         self.transaction = transaction
         self.interval = interval
         self.stopped = threading.Event()
+        self.failed = threading.Event()
+        self.exception = None
 
     def run(self):
         while not self.stopped.wait(self.interval):
-            self.transaction.maintain()
+            try:
+                self.transaction.maintain()
+            except TransactionError as e:
+                # stop trying to maintain the transaction
+                self.stop()
+                # set the "failed" flag to communicate back to the main thread
+                # that we were unable to maintain the transaction
+                self.exception = e
+                self.failed.set()
 
     def stop(self):
         self.stopped.set()

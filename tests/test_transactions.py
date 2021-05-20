@@ -8,35 +8,36 @@ from http_server_mock import HttpServerMock
 from plastron.exceptions import FailureException
 from plastron.http import Repository, Transaction
 
-app = HttpServerMock(__name__)
 
+@pytest.fixture
+def repo_app():
+    app = HttpServerMock(__name__)
 
-@app.route('/')
-def root():
-    return 'Mock fcrepo server', 200
+    @app.route('/')
+    def root():
+        return 'Mock fcrepo server', 200
 
+    @app.route('/fcr:tx', methods=['POST'])
+    def create_txn():
+        txn_id = uuid4()
+        return '', 201, {'Location': url_for('txn', _external=True, txn_id=txn_id)}
 
-@app.route('/fcr:tx', methods=['POST'])
-def create_txn():
-    txn_id = uuid4()
-    return '', 201, {'Location': url_for('txn', _external=True, txn_id=txn_id)}
+    @app.route('/tx:<txn_id>', methods=['GET'])
+    def txn(txn_id):
+        return txn_id, 200
 
+    @app.route('/tx:<txn_id>/fcr:tx', methods=['POST'])
+    def maintain_txn(txn_id):
+        """
+        This mock repository server always fails when a client tries to
+        request an extension to the transaction expiration
 
-@app.route('/tx:<txn_id>', methods=['GET'])
-def txn(txn_id):
-    return txn_id, 200
+        :param txn_id:
+        :return:
+        """
+        return f'{txn_id} is no longer alive', 400
 
-
-@app.route('/tx:<txn_id>/fcr:tx', methods=['POST'])
-def maintain_txn(txn_id):
-    """
-    This mock repository server always fails when a client tries to
-    request an extension to the transaction expiration
-
-    :param txn_id:
-    :return:
-    """
-    return f'{txn_id} is no longer alive', 400
+    return app
 
 
 @pytest.fixture
@@ -50,8 +51,8 @@ def repo_base_config():
     }
 
 
-def test_failure_to_maintain_txn(repo_base_config):
-    with app.run('localhost', 9999):
+def test_failure_to_maintain_txn(repo_base_config, repo_app):
+    with repo_app.run('localhost', 9999):
         repo = Repository(repo_base_config)
         # send the keep-alive ping once per second
         with Transaction(repo, keep_alive=1):

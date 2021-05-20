@@ -35,6 +35,9 @@ def configure_cli(subparsers):
 
 class Command(BaseCommand):
     def __call__(self, fcrepo, args):
+        logger.warning('The "mkcol" command is deprecated and will be removed in a future release.')
+        logger.warning(f'Use: plastron create --container "{fcrepo.relpath}" --collection "{args.name}"')
+
         if args.notransactions:
             try:
                 collection = pcdm.Collection()

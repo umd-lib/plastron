@@ -37,6 +37,14 @@ nsm = get_manager()
 logger = logging.getLogger(__name__)
 
 
+# custom argument type for percentage loads
+def percentile(n):
+    p = int(n)
+    if not p > 0 and p < 100:
+        raise ArgumentTypeError("Percent param must be 1-99")
+    return p
+
+
 def configure_cli(subparsers):
     parser = subparsers.add_parser(
         name='import',
@@ -54,6 +62,17 @@ def configure_cli(subparsers):
         action='store'
     )
     parser.add_argument(
+        '-%', '--percent',
+        help=(
+            'select an evenly spaced subset of items to import; '
+            'the size of this set will be as close as possible '
+            'to the specified percentage of the total items'
+        ),
+        type=percentile,
+        dest='percentage',
+        action='store'
+    )
+    parser.add_argument(
         '--validate-only',
         help='only validate, do not do the actual import',
         action='store_true'
@@ -62,6 +81,7 @@ def configure_cli(subparsers):
         '--make-template',
         help='create a CSV template for the given model',
         dest='template_file',
+        metavar='FILENAME',
         type=FileType('w'),
         action='store'
     )
@@ -69,11 +89,13 @@ def configure_cli(subparsers):
         '--access',
         help='URI or CURIE of the access class to apply to new items',
         type=uri_or_curie,
+        metavar='URI|CURIE',
         action='store'
     )
     parser.add_argument(
         '--member-of',
         help='URI of the object that new items are PCDM members of',
+        metavar='URI',
         action='store'
     )
     parser.add_argument(
@@ -84,6 +106,7 @@ def configure_cli(subparsers):
             '"sftp://<user>@<host>/<path to dir>", or a URI in the '
             'form "zip+sftp://<user>@<host>/<path to zipfile>"'
         ),
+        metavar='LOCATION',
         action='store'
     )
     parser.add_argument(
@@ -92,6 +115,7 @@ def configure_cli(subparsers):
             'parent container for new items; defaults to the RELPATH '
             'in the repo configuration file'
         ),
+        metavar='PATH',
         action='store'
     )
     parser.add_argument(
@@ -111,6 +135,7 @@ def configure_cli(subparsers):
             'and add as annotations'
         ),
         dest='extract_text_types',
+        metavar='MIME_TYPES',
         action='store'
     )
     parser.add_argument(
@@ -378,7 +403,7 @@ class MetadataRows:
     """
     Iterable sequence of metadata rows from the source CSV file of an import job.
     """
-    def __init__(self, job: Job, limit: int = None):
+    def __init__(self, job: Job, limit: int = None, percentage: int = None):
         self.job = job
         self.limit = limit
         self.metadata_file = None
@@ -402,6 +427,7 @@ class MetadataRows:
 
         self.validation_reports: List[Mapping] = []
         self.skipped = 0
+        self.subset_to_load = None
 
         self.total = None
         self.rows = 0
@@ -420,6 +446,29 @@ class MetadataRows:
         else:
             # file is not seekable, so we can't get a row count in advance
             self.total = None
+
+        if percentage is not None:
+            if not self.metadata_file.seekable():
+                raise FailureException('Cannot execute a percentage load using a non-seekable file')
+            identifier_column = self.model_class.HEADER_MAP['identifier']
+            identifiers = [
+                row[identifier_column] for row in self.csv_file if row[identifier_column] not in job.completed_log
+            ]
+            self._rewind_csv_file()
+
+            if len(identifiers) == 0:
+                logger.info('No items remaining to load')
+                self.subset_to_load = []
+            else:
+                target_count = int(((percentage / 100) * self.total))
+                logger.info(f'Attempting to load {target_count} items ({percentage}% of {self.total})')
+                if len(identifiers) > target_count:
+                    # evenly space the items to load among the remaining items
+                    step_size = int((100 * (1 - (len(job.completed_log) / self.total))) / percentage)
+                else:
+                    # load all remaining items
+                    step_size = 1
+                self.subset_to_load = identifiers[::step_size]
 
     def _rewind_csv_file(self):
         # rewind the file and re-create the CSV reader
@@ -456,6 +505,9 @@ class MetadataRows:
             if self.limit is not None and row_number > self.limit:
                 logger.info(f'Stopping after {self.limit} rows')
                 break
+
+            if self.subset_to_load is not None and line[self.identifier_column] not in self.subset_to_load:
+                continue
 
             line_reference = f"{self.job.metadata_filename}:{row_number + 1}"
             logger.debug(f'Processing {line_reference}')
@@ -672,6 +724,7 @@ class Command(BaseCommand):
         return Namespace(
             model=message.args.get('model'),
             limit=message.args.get('limit', None),
+            percentage=message.args.get('percent', None),
             validate_only=message.args.get('validate-only', False),
             resume=message.args.get('resume', False),
             import_file=io.StringIO(message.body),
@@ -736,6 +789,8 @@ class Command(BaseCommand):
         if args.import_file is None and not args.resume:
             raise FailureException('An import file is required unless resuming an existing job')
 
+        if args.percentage:
+            logger.info(f'Loading {args.percentage}% of the total items')
         if args.validate_only:
             logger.info('Validation-only mode, skipping imports')
 
@@ -743,7 +798,7 @@ class Command(BaseCommand):
         if args.import_file is not None:
             job.store_metadata_file(args.import_file)
 
-        metadata = job.metadata(limit=args.limit)
+        metadata = job.metadata(limit=args.limit, percentage=args.percentage)
 
         if metadata.has_binaries and job.binaries_location is None:
             raise ConfigError('Must specify --binaries-location if the metadata has a FILES column')
@@ -871,7 +926,9 @@ class Command(BaseCommand):
                 'failed': [outcome for outcome in report.failed()]
             })
 
-            missing_files = [name for name in row.filenames if not self.get_source(job.binaries_location, name).exists()]
+            missing_files = [
+                name for name in row.filenames if not self.get_source(job.binaries_location, name).exists()
+            ]
             if len(missing_files) > 0:
                 logger.warning(f'{len(missing_files)} file(s) for "{item}" not found')
 

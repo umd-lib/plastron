@@ -3,13 +3,15 @@ import csv
 import io
 import logging
 import os
+from typing import List
+
 import plastron.models
 import re
 import yaml
 
 from argparse import FileType, Namespace, ArgumentTypeError
 from bs4 import BeautifulSoup
-from collections import OrderedDict, defaultdict
+from collections import Mapping, OrderedDict, defaultdict
 from datetime import datetime
 from distutils.util import strtobool
 from os.path import basename, splitext
@@ -35,6 +37,14 @@ nsm = get_manager()
 logger = logging.getLogger(__name__)
 
 
+# custom argument type for percentage loads
+def percentile(n):
+    p = int(n)
+    if not p > 0 and p < 100:
+        raise ArgumentTypeError("Percent param must be 1-99")
+    return p
+
+
 def configure_cli(subparsers):
     parser = subparsers.add_parser(
         name='import',
@@ -52,6 +62,17 @@ def configure_cli(subparsers):
         action='store'
     )
     parser.add_argument(
+        '-%', '--percent',
+        help=(
+            'select an evenly spaced subset of items to import; '
+            'the size of this set will be as close as possible '
+            'to the specified percentage of the total items'
+        ),
+        type=percentile,
+        dest='percentage',
+        action='store'
+    )
+    parser.add_argument(
         '--validate-only',
         help='only validate, do not do the actual import',
         action='store_true'
@@ -60,6 +81,7 @@ def configure_cli(subparsers):
         '--make-template',
         help='create a CSV template for the given model',
         dest='template_file',
+        metavar='FILENAME',
         type=FileType('w'),
         action='store'
     )
@@ -67,11 +89,13 @@ def configure_cli(subparsers):
         '--access',
         help='URI or CURIE of the access class to apply to new items',
         type=uri_or_curie,
+        metavar='URI|CURIE',
         action='store'
     )
     parser.add_argument(
         '--member-of',
         help='URI of the object that new items are PCDM members of',
+        metavar='URI',
         action='store'
     )
     parser.add_argument(
@@ -82,6 +106,7 @@ def configure_cli(subparsers):
             '"sftp://<user>@<host>/<path to dir>", or a URI in the '
             'form "zip+sftp://<user>@<host>/<path to zipfile>"'
         ),
+        metavar='LOCATION',
         action='store'
     )
     parser.add_argument(
@@ -90,6 +115,7 @@ def configure_cli(subparsers):
             'parent container for new items; defaults to the RELPATH '
             'in the repo configuration file'
         ),
+        metavar='PATH',
         action='store'
     )
     parser.add_argument(
@@ -109,6 +135,7 @@ def configure_cli(subparsers):
             'and add as annotations'
         ),
         dest='extract_text_types',
+        metavar='MIME_TYPES',
         action='store'
     )
     parser.add_argument(
@@ -298,6 +325,7 @@ class Job:
         self.config_filename = os.path.join(self.dir, 'config.yml')
         self.metadata_filename = os.path.join(self.dir, 'source.csv')
         self.config = {}
+        self._model_class = None
 
         # record of items that are successfully loaded
         completed_fieldnames = ['id', 'timestamp', 'title', 'uri']
@@ -341,10 +369,12 @@ class Job:
             logger.debug(f"Copied input file {getattr(input_file, 'name', '<>')} to {file.name}")
 
     def get_model_class(self):
-        try:
-            return getattr(plastron.models, self.model)
-        except AttributeError as e:
-            raise ModelClassNotFoundError(self.model) from e
+        if self._model_class is None:
+            try:
+                self._model_class = getattr(plastron.models, self.model)
+            except AttributeError as e:
+                raise ModelClassNotFoundError(self.model) from e
+        return self._model_class
 
     def drop(self, item, line_reference, reason=''):
         logger.warning(f'Dropping {line_reference} from import job "{self.id}" run {self.run_timestamp}: {reason}')
@@ -364,6 +394,188 @@ class Job:
             'title': getattr(item, 'title', ''),
             'uri': getattr(item, 'uri', '')
         })
+
+    def metadata(self, **kwargs):
+        return MetadataRows(self, **kwargs)
+
+
+class MetadataRows:
+    """
+    Iterable sequence of metadata rows from the source CSV file of an import job.
+    """
+    def __init__(self, job: Job, limit: int = None, percentage: int = None):
+        self.job = job
+        self.limit = limit
+        self.metadata_file = None
+
+        try:
+            self.model_class = job.get_model_class()
+        except ModelClassNotFoundError as e:
+            raise FailureException(f'Model class {e} not found') from e
+
+        try:
+            self.metadata_file = open(job.metadata_filename, 'r')
+        except FileNotFoundError as e:
+            raise FailureException(f'Cannot read source file "{job.metadata_filename}: {e}') from e
+
+        self.csv_file = csv.DictReader(self.metadata_file)
+
+        try:
+            self.fields = build_fields(self.fieldnames, self.model_class)
+        except DataReadException as e:
+            raise FailureException(str(e)) from e
+
+        self.validation_reports: List[Mapping] = []
+        self.skipped = 0
+        self.subset_to_load = None
+
+        self.total = None
+        self.rows = 0
+        self.errors = 0
+        self.valid = 0
+        self.invalid = 0
+        self.created = 0
+        self.updated = 0
+        self.unchanged = 0
+        self.files = 0
+
+        if self.metadata_file.seekable():
+            # get the row count of the file, then rewind the CSV file
+            self.total = sum(1 for _ in self.csv_file)
+            self._rewind_csv_file()
+        else:
+            # file is not seekable, so we can't get a row count in advance
+            self.total = None
+
+        if percentage is not None:
+            if not self.metadata_file.seekable():
+                raise FailureException('Cannot execute a percentage load using a non-seekable file')
+            identifier_column = self.model_class.HEADER_MAP['identifier']
+            identifiers = [
+                row[identifier_column] for row in self.csv_file if row[identifier_column] not in job.completed_log
+            ]
+            self._rewind_csv_file()
+
+            if len(identifiers) == 0:
+                logger.info('No items remaining to load')
+                self.subset_to_load = []
+            else:
+                target_count = int(((percentage / 100) * self.total))
+                logger.info(f'Attempting to load {target_count} items ({percentage}% of {self.total})')
+                if len(identifiers) > target_count:
+                    # evenly space the items to load among the remaining items
+                    step_size = int((100 * (1 - (len(job.completed_log) / self.total))) / percentage)
+                else:
+                    # load all remaining items
+                    step_size = 1
+                self.subset_to_load = identifiers[::step_size]
+
+    def _rewind_csv_file(self):
+        # rewind the file and re-create the CSV reader
+        self.metadata_file.seek(0)
+        self.csv_file = csv.DictReader(self.metadata_file)
+
+    @property
+    def has_binaries(self):
+        return 'FILES' in self.fieldnames
+
+    @property
+    def fieldnames(self):
+        return self.csv_file.fieldnames
+
+    @property
+    def identifier_column(self):
+        return self.model_class.HEADER_MAP['identifier']
+
+    def stats(self):
+        return {
+            'total': self.total,
+            'rows': self.rows,
+            'errors': self.errors,
+            'valid': self.valid,
+            'invalid': self.invalid,
+            'created': self.created,
+            'updated': self.updated,
+            'unchanged': self.unchanged,
+            'files': self.files
+        }
+
+    def __iter__(self):
+        for row_number, line in enumerate(self.csv_file, 1):
+            if self.limit is not None and row_number > self.limit:
+                logger.info(f'Stopping after {self.limit} rows')
+                break
+
+            if self.subset_to_load is not None and line[self.identifier_column] not in self.subset_to_load:
+                continue
+
+            line_reference = f"{self.job.metadata_filename}:{row_number + 1}"
+            logger.debug(f'Processing {line_reference}')
+            self.rows += 1
+
+            if any(v is None for v in line.values()):
+                self.errors += 1
+                self.validation_reports.append({
+                    'line': line_reference,
+                    'is_valid': False,
+                    'error': f'Line {line_reference} has the wrong number of columns'
+                })
+                self.job.drop(item=None, line_reference=line_reference, reason='Wrong number of columns')
+                continue
+
+            row = Row(line_reference, row_number, line, self.identifier_column)
+
+            if row.identifier in self.job.completed_log:
+                logger.info(f'Already loaded "{row.identifier}" from {line_reference}, skipping')
+                self.skipped += 1
+                continue
+
+            yield row
+
+        if self.total is None:
+            # if we weren't able to get the total count before,
+            # use the final row count as the total count for the
+            # job completion message
+            self.total = self.rows
+
+
+class Row:
+    def __init__(self, line_reference: str, row_number: int, data: Mapping, identifier_column: str):
+        self.line_reference = line_reference
+        self.number = row_number
+        self.data = data
+        self.identifier_column = identifier_column
+        self.index = None
+
+    def __getitem__(self, item):
+        return self.data[item]
+
+    def get(self, key, default=None):
+        return self.data.get(key, default)
+
+    @property
+    def identifier(self):
+        return self.data[self.identifier_column]
+
+    @property
+    def has_uri(self):
+        return 'URI' in self.data and self.data['URI'].strip() != ''
+
+    @property
+    def uri(self) -> URIRef:
+        return URIRef(self.data['URI']) if self.has_uri else None
+
+    @property
+    def has_files(self):
+        return 'FILES' in self.data and self.data['FILES'].strip() != ''
+
+    @property
+    def filenames(self):
+        return self.data['FILES'].strip().split(';') if self.has_files else []
+
+    def build_index(self, item):
+        if self.index is None:
+            self.index = build_lookup_index(item, self.data.get('INDEX'))
 
 
 class Command(BaseCommand):
@@ -512,6 +724,7 @@ class Command(BaseCommand):
         return Namespace(
             model=message.args.get('model'),
             limit=message.args.get('limit', None),
+            percentage=message.args.get('percent', None),
             validate_only=message.args.get('validate-only', False),
             resume=message.args.get('resume', False),
             import_file=io.StringIO(message.body),
@@ -563,12 +776,8 @@ class Command(BaseCommand):
                 'binaries_location': args.binaries_location
             })
 
-        try:
-            model_class = job.get_model_class()
-        except ModelClassNotFoundError as e:
-            raise FailureException(f'Model class {e} not found') from e
-
         if args.template_file is not None:
+            model_class = job.get_model_class()
             if not hasattr(model_class, 'HEADER_MAP'):
                 logger.error(f'{model_class.__name__} has no HEADER_MAP, cannot create template')
                 raise FailureException()
@@ -580,101 +789,38 @@ class Command(BaseCommand):
         if args.import_file is None and not args.resume:
             raise FailureException('An import file is required unless resuming an existing job')
 
+        if args.percentage:
+            logger.info(f'Loading {args.percentage}% of the total items')
         if args.validate_only:
             logger.info('Validation-only mode, skipping imports')
-
-        identifier_column = model_class.HEADER_MAP['identifier']
 
         # if an import file was provided, save that as the new CSV metadata file
         if args.import_file is not None:
             job.store_metadata_file(args.import_file)
 
-        try:
-            metadata_file = open(job.metadata_filename, 'r')
-        except FileNotFoundError as e:
-            raise FailureException(f'Cannot read source file "{job.metadata_filename}: {e}') from e
+        metadata = job.metadata(limit=args.limit, percentage=args.percentage)
 
-        csv_file = csv.DictReader(metadata_file)
-
-        count = {
-            'total': None,
-            'rows': 0,
-            'errors': 0,
-            'valid': 0,
-            'invalid': 0,
-            'created': 0,
-            'updated': 0,
-            'unchanged': 0,
-            'files': 0
-        }
-
-        if metadata_file.seekable():
-            # get the row count of the file
-            count['total'] = sum(1 for _ in csv_file)
-            # rewind the file and re-create the CSV reader
-            metadata_file.seek(0)
-            csv_file = csv.DictReader(metadata_file)
-        else:
-            # file is not seekable, so we can't get a row count in advance
-            count['total'] = None
-
-        has_binaries = 'FILES' in csv_file.fieldnames
-        if has_binaries and job.binaries_location is None:
+        if metadata.has_binaries and job.binaries_location is None:
             raise ConfigError('Must specify --binaries-location if the metadata has a FILES column')
-
-        try:
-            fields = build_fields(csv_file.fieldnames, model_class)
-        except DataReadException as e:
-            raise FailureException(str(e)) from e
 
         initial_completed_item_count = len(job.completed_log)
         logger.info(f'Found {initial_completed_item_count} completed items')
 
-        reports = []
         updated_uris = []
         created_uris = []
-        skipped = 0
-        for row_number, row in enumerate(csv_file, 1):
-            line_reference = f"{getattr(metadata_file, 'name', '<>')}:{row_number + 1}"
-            if args.limit is not None and row_number > args.limit:
-                logger.info(f'Stopping after {args.limit} rows')
-                break
-            logger.debug(f'Processing {line_reference}')
-            count['rows'] += 1
-            if any(v is None for v in row.values()):
-                count['errors'] += 1
-                reports.append({
-                    'line': line_reference,
-                    'is_valid': False,
-                    'error': f'Line {line_reference} has the wrong number of columns'
-                })
-                job.drop(item=None, line_reference=line_reference, reason='Wrong number of columns')
-                continue
-
-            if row[identifier_column] in job.completed_log:
-                logger.info(f'Already loaded "{row[identifier_column]}" from {line_reference}, skipping')
-                skipped += 1
-                continue
-
-            if 'URI' not in row or row['URI'].strip() == '':
-                # no URI in the CSV means we will create a new object
-                logger.info(f'No URI found for {line_reference}; will create new resource')
-                uri = None
-            else:
-                uri = URIRef(row['URI'])
-
+        for row in metadata:
             if args.validate_only:
                 # create an empty object to validate without fetching from the repo
-                item = model_class(uri=uri)
+                item = metadata.model_class(uri=row.uri)
             else:
-                if uri is not None:
+                if row.uri is not None:
                     # read the object from the repo
-                    item = model_class.from_repository(repo, uri, include_server_managed=False)
+                    item = metadata.model_class.from_repository(repo, row.uri, include_server_managed=False)
                 else:
+                    # no URI in the CSV means we will create a new object
+                    logger.info(f'No URI found for {row.line_reference}; will create new resource')
                     # create a new object (will create in the repo later)
-                    item = model_class()
-
-            index = build_lookup_index(item, row.get('INDEX'))
+                    item = metadata.model_class()
 
             # track new embedded objects that are added to the graph
             # so we can ensure that they have at least one statement
@@ -684,7 +830,7 @@ class Command(BaseCommand):
             delete_graph = Graph()
             insert_graph = Graph()
 
-            for attrs, columns in fields.items():
+            for attrs, columns in metadata.fields.items():
                 prop_type = get_property_type(item.__class__, attrs)
                 if '.' not in attrs:
                     # simple, non-embedded values
@@ -706,6 +852,11 @@ class Command(BaseCommand):
 
                 else:
                     # complex, embedded values
+
+                    # build the lookup index to map hash URI objects
+                    # to their correct positional locations
+                    row.build_index(item)
+
                     # if the first portion of the dotted attr notation is a key in the index,
                     # then this column has a different subject than the main uri
                     # correlate positions and urirefs
@@ -716,10 +867,12 @@ class Command(BaseCommand):
                         header = column['header']
                         for i, value_string in enumerate(row[header].split(';')):
                             new_values[i].extend(parse_value_string(value_string, column, prop_type))
-                    if first_attr in index:
+
+                    if first_attr in row.index:
+                        # existing embedded object
                         for i, values in new_values.items():
                             # get the embedded object
-                            obj = index[first_attr][i]
+                            obj = row.index[first_attr][i]
                             prop = getattr(obj, next_attr)
                             deleted_values, inserted_values = prop.update(values)
 
@@ -738,7 +891,7 @@ class Command(BaseCommand):
                                 # TODO: remove hardcoded UUID fragment minting
                                 obj = first_prop_type.obj_class(uri=f'{item.uri}#{uuid4()}')
                                 # add the new object to the index
-                                index[first_attr][i] = obj
+                                row.index[first_attr][i] = obj
                                 setattr(obj, next_attr, values)
                                 next_attr_prop = obj.name_to_prop[next_attr]
                                 for value in values:
@@ -759,41 +912,39 @@ class Command(BaseCommand):
                     insert_graph.remove(statement)
 
             # count the number of files referenced in this row
-            if 'FILES' in row and row['FILES'].strip() != '':
-                filenames = row['FILES'].strip().split(';')
-                count['files'] += len(filenames)
-            else:
-                filenames = []
+            metadata.files += len(row.filenames)
 
             try:
                 report = validate(item)
             except NoValidationRulesetException as e:
                 raise FailureException(f'Unable to run validation: {e}') from e
 
-            reports.append({
-                'line': line_reference,
+            metadata.validation_reports.append({
+                'line': row.line_reference,
                 'is_valid': report.is_valid(),
                 'passed': [outcome for outcome in report.passed()],
                 'failed': [outcome for outcome in report.failed()]
             })
 
-            missing_files = [name for name in filenames if not self.get_source(job.binaries_location, name).exists()]
+            missing_files = [
+                name for name in row.filenames if not self.get_source(job.binaries_location, name).exists()
+            ]
             if len(missing_files) > 0:
                 logger.warning(f'{len(missing_files)} file(s) for "{item}" not found')
 
             if report.is_valid() and len(missing_files) == 0:
-                count['valid'] += 1
+                metadata.valid += 1
                 logger.info(f'"{item}" is valid')
             else:
                 # drop invalid items
-                count['invalid'] += 1
+                metadata.invalid += 1
                 logger.warning(f'"{item}" is invalid, skipping')
                 reasons = [' '.join(str(f) for f in outcome) for outcome in report.failed()]
                 if len(missing_files) > 0:
                     reasons.extend(f'Missing file: {f}' for f in missing_files)
                 job.drop(
                     item=item,
-                    line_reference=line_reference,
+                    line_reference=row.line_reference,
                     reason=f'Validation failures: {"; ".join(reasons)}'
                 )
                 continue
@@ -815,7 +966,7 @@ class Command(BaseCommand):
                     if job.member_of is not None:
                         item.member_of = URIRef(job.member_of)
 
-                    if 'FILES' in row and row['FILES'].strip() != '':
+                    if row.has_files:
                         create_pages = bool(strtobool(row.get('CREATE_PAGES', 'True')))
                         logger.debug('Adding pages and files to new item')
                         self.add_files(
@@ -839,8 +990,8 @@ class Command(BaseCommand):
                     except Exception as e:
                         raise FailureException(f'Creating item failed: {e}') from e
 
-                    job.complete(item, line_reference)
-                    count['created'] += 1
+                    job.complete(item, row.line_reference)
+                    metadata.created += 1
                     created_uris.append(item.uri)
 
                 elif len(delete_graph) > 0 or len(insert_graph) > 0:
@@ -854,19 +1005,19 @@ class Command(BaseCommand):
                     except RESTAPIException as e:
                         raise FailureException(f'Updating item failed: {e}') from e
 
-                    job.complete(item, line_reference)
-                    count['updated'] += 1
+                    job.complete(item, row.line_reference)
+                    metadata.updated += 1
                     updated_uris.append(item.uri)
 
                 else:
-                    count['unchanged'] += 1
-                    logger.info(f'No changes found for "{item}" ({uri}); skipping')
-                    skipped += 1
+                    metadata.unchanged += 1
+                    logger.info(f'No changes found for "{item}" ({row.uri}); skipping')
+                    metadata.skipped += 1
 
             except FailureException as e:
-                count['errors'] += 1
+                metadata.errors += 1
                 logger.error(f'{item} import failed: {e}')
-                job.drop(item, line_reference, reason=str(e))
+                job.drop(item, row.line_reference, reason=str(e))
 
             # update the status
             now = datetime.now().timestamp()
@@ -876,29 +1027,23 @@ class Command(BaseCommand):
                     'now': now,
                     'elapsed': now - start_time
                 },
-                'count': count
+                'count': metadata.stats()
             }
 
-        if count['total'] is None:
-            # if we weren't able to get the total count before,
-            # use the final row count as the total count for the
-            # job completion message
-            count['total'] = count['rows']
-
-        logger.info(f'Skipped {skipped} items')
+        logger.info(f'Skipped {metadata.skipped} items')
         logger.info(f'Completed {len(job.completed_log) - initial_completed_item_count} items')
         logger.info(f'Dropped {len(job.dropped_log)} items')
 
-        logger.info(f"Found {count['valid']} valid items")
-        logger.info(f"Found {count['invalid']} invalid items")
-        logger.info(f"Found {count['errors']} errors")
+        logger.info(f"Found {metadata.valid} valid items")
+        logger.info(f"Found {metadata.invalid} invalid items")
+        logger.info(f"Found {metadata.errors} errors")
         if not args.validate_only:
-            logger.info(f"{count['unchanged']} of {count['total']} items remained unchanged")
-            logger.info(f"Created {count['created']} of {count['total']} items")
-            logger.info(f"Updated {count['updated']} of {count['total']} items")
+            logger.info(f"{metadata.unchanged} of {metadata.total} items remained unchanged")
+            logger.info(f"Created {metadata.created} of {metadata.total} items")
+            logger.info(f"Updated {metadata.updated} of {metadata.total} items")
         self.result = {
-            'count': count,
-            'validation': reports,
+            'count': metadata.stats(),
+            'validation': metadata.validation_reports,
             'uris': {
                 'created': created_uris,
                 'updated': updated_uris

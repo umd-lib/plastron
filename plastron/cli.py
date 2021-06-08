@@ -15,6 +15,7 @@ from plastron.exceptions import FailureException
 from plastron.logging import DEFAULT_LOGGING_OPTIONS
 from plastron.http import Repository
 from plastron.stomp import Broker
+from plastron.util import envsubst
 
 logger = logging.getLogger(__name__)
 now = datetime.utcnow().strftime('%Y%m%d%H%M%S')
@@ -86,7 +87,7 @@ def main():
 
     if args.config_file is not None:
         # new-style, combined config file (a la plastron.daemon)
-        config = yaml.safe_load(args.config_file)
+        config = envsubst(yaml.safe_load(args.config_file))
         repo_config = config['REPOSITORY']
         broker_config = config.get('MESSAGE_BROKER', None)
         command_config = config.get('COMMANDS', {})

@@ -5,13 +5,16 @@
 *.egg-info
 *.key
 *.pem
+.*_cache
 
 docker-compose.yml
 docker-plastron.yml
 
 .pytest_cache/
+data/
 dist/
 exports/
+jobs/
 logs/
 msg/
 plastron.egg-info/

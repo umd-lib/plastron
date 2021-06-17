@@ -73,6 +73,7 @@ config/*
 data/*
 exports/*
 jobs/
+msg/
 !config/templates
 !config/templates/*
 !config/logging.yml

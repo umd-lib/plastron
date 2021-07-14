@@ -212,9 +212,9 @@ class ItemLog:
         self.write_header = header
         self.item_keys = set()
         self.fh = None
-        self.writer = None
+        self._writer = None
         if self.exists():
-            self.read()
+            self.load_keys()
 
     def exists(self):
         return isfile(self.filename)
@@ -225,27 +225,31 @@ class ItemLog:
             if self.write_header:
                 writer.writeheader()
 
-    def read(self):
+    def load_keys(self):
+        for row in iter(self):
+            self.item_keys.add(row[self.keyfield])
+
+    def __iter__(self):
         with open(self.filename, mode='r', buffering=1) as fh:
             reader = csv.DictReader(fh)
             # check the validity of the map file data
             if not reader.fieldnames == self.fieldnames:
                 raise ItemLogError(f'Fieldnames in {self.filename} do not match expected fieldnames')
             # read the data from the existing file
-            for row in reader:
-                self.item_keys.add(row[self.keyfield])
+            yield from reader
 
-    def get_writer(self):
+    @property
+    def writer(self):
         if not self.exists():
             self.create()
         if self.fh is None:
             self.fh = open(self.filename, mode='a', buffering=1)
-        if self.writer is None:
-            self.writer = csv.DictWriter(self.fh, fieldnames=self.fieldnames)
-        return self.writer
+        if self._writer is None:
+            self._writer = csv.DictWriter(self.fh, fieldnames=self.fieldnames)
+        return self._writer
 
     def append(self, row):
-        self.get_writer().writerow(row)
+        self.writer.writerow(row)
         self.item_keys.add(row[self.keyfield])
 
     def writerow(self, row):

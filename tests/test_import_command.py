@@ -1,6 +1,7 @@
 import pytest
 from plastron.commands import importcommand
 from plastron.files import LocalFileSource, RemoteFileSource, ZipFileSource
+from plastron.jobs import build_fields
 from plastron.models import Item, umdtype
 from plastron.pcdm import Object
 from plastron.rdf import RDFDataProperty
@@ -22,12 +23,12 @@ def test_build_file_groups(value, expected_count):
 
 
 def test_build_fields_with_default_datatype():
-    fields = importcommand.build_fields(['Accession Number'], Item)
+    fields = build_fields(['Accession Number'], Item)
     assert fields['accession_number'][0]['datatype'] == umdtype.accessionNumber
 
 
 def test_build_fields_without_default_datatype():
-    fields = importcommand.build_fields(['Identifier'], Item)
+    fields = build_fields(['Identifier'], Item)
     assert fields['identifier'][0]['datatype'] is None
 
 

@@ -23,7 +23,9 @@ logger = logging.getLogger(__name__)
 
 
 class ModelClassNotFoundError(Exception):
-    pass
+    def __init__(self, model_name: str, *args):
+        super().__init__(*args)
+        self.model_name = model_name
 
 
 def build_lookup_index(item: Resource, index_string: str):
@@ -147,6 +149,7 @@ class ImportJob:
         except KeyError:
             raise AttributeError(f'No attribute or config key named {item} found')
 
+    @property
     def dir_exists(self):
         return os.path.isdir(self.dir)
 
@@ -172,7 +175,8 @@ class ImportJob:
             copyfileobj(input_file, file)
             logger.debug(f"Copied input file {getattr(input_file, 'name', '<>')} to {file.name}")
 
-    def get_model_class(self):
+    @property
+    def model_class(self):
         if self._model_class is None:
             try:
                 self._model_class = getattr(plastron.models, self.model)
@@ -205,17 +209,12 @@ class ImportJob:
 
 class MetadataRows:
     """
-    Iterable sequence of metadata rows from the source CSV file of an import job.
+    Iterable sequence of rows from the metadata CSV file of an import job.
     """
     def __init__(self, job: ImportJob, limit: int = None, percentage: int = None):
         self.job = job
         self.limit = limit
         self.metadata_file = None
-
-        try:
-            self.model_class = job.get_model_class()
-        except ModelClassNotFoundError as e:
-            raise FailureException(f'Model class {e} not found') from e
 
         try:
             self.metadata_file = open(job.metadata_filename, 'r')
@@ -278,6 +277,10 @@ class MetadataRows:
         # rewind the file and re-create the CSV reader
         self.metadata_file.seek(0)
         self.csv_file = csv.DictReader(self.metadata_file)
+
+    @property
+    def model_class(self):
+        return self.job.model_class
 
     @property
     def has_binaries(self):
@@ -349,7 +352,6 @@ class Row:
         self.number = row_number
         self.data = data
         self.identifier_column = identifier_column
-        self.index = None
 
     def __getitem__(self, item):
         return self.data[item]
@@ -377,6 +379,6 @@ class Row:
     def filenames(self):
         return self.data['FILES'].strip().split(';') if self.has_files else []
 
-    def build_index(self, item):
-        if self.index is None:
-            self.index = build_lookup_index(item, self.data.get('INDEX'))
+    @property
+    def index_string(self):
+        return self.data.get('INDEX')

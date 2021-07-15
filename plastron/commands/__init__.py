@@ -4,7 +4,7 @@ class BaseCommand:
             config = {}
         self.config = config
 
-    def repo_config(self, repo_config, args={}):
+    def repo_config(self, repo_config, args=None):
         """
         Enable default repository config dictionary to be overridden by the
         command before actually creating the repository.

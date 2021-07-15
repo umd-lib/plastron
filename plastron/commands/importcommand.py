@@ -15,7 +15,7 @@ from plastron.commands import BaseCommand
 from plastron.exceptions import NoValidationRulesetException, RESTAPIException, FailureException, ConfigError
 from plastron.files import HTTPFileSource, LocalFileSource, RemoteFileSource, ZipFileSource
 from plastron.http import Transaction
-from plastron.jobs import ImportJob
+from plastron.jobs import ImportJob, ModelClassNotFoundError, build_lookup_index
 from plastron.namespaces import get_manager, prov, sc
 from plastron.oa import Annotation, TextualBody
 from plastron.pcdm import File, PreservationMasterFile
@@ -227,12 +227,16 @@ class Command(BaseCommand):
         for _ in self.execute(*args, **kwargs):
             pass
 
-    def repo_config(self, repo_config, args):
+    def repo_config(self, repo_config, args=None):
         """
         Returns a deep copy of the provided repo_config, updated with
         layout structure and relpath information from the args
-        (if provided).
+        (if provided). If no args are provided, just run the base command
+        repo_config() method.
         """
+        if args is None:
+            return super().repo_config(repo_config, args)
+
         result_config = copy.deepcopy(repo_config)
 
         if args.structure:
@@ -390,7 +394,7 @@ class Command(BaseCommand):
         job = ImportJob(args.job_id, jobs_dir=self.jobs_dir)
         logger.debug(f'Job directory is {job.dir}')
 
-        if args.resume and not job.dir_exists():
+        if args.resume and not job.dir_exists:
             raise FailureException(f'Cannot resume job {job.id}: no such job directory found in {self.jobs_dir}')
 
         # load or create config
@@ -415,13 +419,12 @@ class Command(BaseCommand):
             })
 
         if args.template_file is not None:
-            model_class = job.get_model_class()
-            if not hasattr(model_class, 'HEADER_MAP'):
-                logger.error(f'{model_class.__name__} has no HEADER_MAP, cannot create template')
+            if not hasattr(job.model_class, 'HEADER_MAP'):
+                logger.error(f'{job.model_class.__name__} has no HEADER_MAP, cannot create template')
                 raise FailureException()
-            logger.info(f'Writing template for the {model_class.__name__} model to {args.template_file.name}')
+            logger.info(f'Writing template for the {job.model_class.__name__} model to {args.template_file.name}')
             writer = csv.writer(args.template_file)
-            writer.writerow(list(model_class.HEADER_MAP.values()) + ['FILES'])
+            writer.writerow(list(job.model_class.HEADER_MAP.values()) + ['FILES'])
             return
 
         if args.import_file is None and not args.resume:
@@ -436,7 +439,10 @@ class Command(BaseCommand):
         if args.import_file is not None:
             job.store_metadata_file(args.import_file)
 
-        metadata = job.metadata(limit=args.limit, percentage=args.percentage)
+        try:
+            metadata = job.metadata(limit=args.limit, percentage=args.percentage)
+        except ModelClassNotFoundError as e:
+            raise FailureException(f'Model class {e.model_name} not found') from e
 
         if metadata.has_binaries and job.binaries_location is None:
             raise ConfigError('Must specify --binaries-location if the metadata has a FILES column')
@@ -493,7 +499,7 @@ class Command(BaseCommand):
 
                     # build the lookup index to map hash URI objects
                     # to their correct positional locations
-                    row.build_index(item)
+                    row_index = build_lookup_index(item, row.index_string)
 
                     # if the first portion of the dotted attr notation is a key in the index,
                     # then this column has a different subject than the main uri
@@ -506,11 +512,11 @@ class Command(BaseCommand):
                         for i, value_string in enumerate(row[header].split(';')):
                             new_values[i].extend(parse_value_string(value_string, column, prop_type))
 
-                    if first_attr in row.index:
+                    if first_attr in row_index:
                         # existing embedded object
                         for i, values in new_values.items():
                             # get the embedded object
-                            obj = row.index[first_attr][i]
+                            obj = row_index[first_attr][i]
                             prop = getattr(obj, next_attr)
                             deleted_values, inserted_values = prop.update(values)
 
@@ -529,7 +535,7 @@ class Command(BaseCommand):
                                 # TODO: remove hardcoded UUID fragment minting
                                 obj = first_prop_type.obj_class(uri=f'{item.uri}#{uuid4()}')
                                 # add the new object to the index
-                                row.index[first_attr][i] = obj
+                                row_index[first_attr][i] = obj
                                 setattr(obj, next_attr, values)
                                 next_attr_prop = obj.name_to_prop[next_attr]
                                 for value in values:

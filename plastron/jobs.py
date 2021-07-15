@@ -2,6 +2,7 @@ import csv
 import logging
 import os
 import re
+import urllib.parse
 from collections import defaultdict
 from shutil import copyfileobj
 from typing import List, Mapping
@@ -125,9 +126,11 @@ def build_fields(fieldnames, model_class):
 class ImportJob:
     def __init__(self, id, jobs_dir):
         self.id = id
+        # URL-escaped ID that can be used as a path segment on a filesystem or URL
+        self.safe_id = urllib.parse.quote(id, safe='')
         # use a timestamp to differentiate different runs of the same import job
         self.run_timestamp = datetimestamp()
-        self.dir = os.path.join(jobs_dir, self.id.replace('/', '-'))
+        self.dir = os.path.join(jobs_dir, self.safe_id)
         self.config_filename = os.path.join(self.dir, 'config.yml')
         self.metadata_filename = os.path.join(self.dir, 'source.csv')
         self.config = {}

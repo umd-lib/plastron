@@ -21,6 +21,25 @@ logger = logging.getLogger(__name__)
 now = datetime.utcnow().strftime('%Y%m%d%H%M%S')
 
 
+def load_commands(subparsers):
+    # load all defined subcommands from the plastron.commands package, using
+    # introspection
+    command_modules = {}
+    for finder, name, ispkg in iter_modules(commands.__path__):
+        module_name = name
+        if module_name == "importcommand":
+            # Special case handling for "importcommand", because "import" is
+            # a Python reserved word that is not usable as a module name,
+            # while we want "import" to be the Plastron command
+            name = "import"
+
+        module = import_module(commands.__name__ + '.' + module_name)
+        if hasattr(module, 'configure_cli'):
+            module.configure_cli(subparsers)
+            command_modules[name] = module
+    return command_modules
+
+
 def main():
     """Parse args and handle options."""
 
@@ -69,13 +88,7 @@ def main():
 
     subparsers = parser.add_subparsers(title='commands')
 
-    # load all defined subcommands from the plastron.commands package
-    command_modules = {}
-    for finder, name, ispkg in iter_modules(commands.__path__):
-        module = import_module(commands.__name__ + '.' + name)
-        if hasattr(module, 'configure_cli'):
-            module.configure_cli(subparsers)
-            command_modules[name] = module
+    command_modules = load_commands(subparsers)
 
     # parse command line args
     args = parser.parse_args()

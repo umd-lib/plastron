@@ -3,33 +3,25 @@ import csv
 import io
 import logging
 import os
-from typing import List
-
-import plastron.models
-import re
-import yaml
 
 from argparse import FileType, Namespace, ArgumentTypeError
 from bs4 import BeautifulSoup
-from collections import Mapping, OrderedDict, defaultdict
+from collections import OrderedDict, defaultdict
 from datetime import datetime
 from distutils.util import strtobool
 from os.path import basename, splitext
 from plastron import rdf
 from plastron.commands import BaseCommand
-from plastron.exceptions import DataReadException, NoValidationRulesetException, RESTAPIException, \
-    FailureException, ConfigError
+from plastron.exceptions import NoValidationRulesetException, RESTAPIException, FailureException, ConfigError
 from plastron.files import HTTPFileSource, LocalFileSource, RemoteFileSource, ZipFileSource
 from plastron.http import Transaction
+from plastron.jobs import ImportJob, ModelClassNotFoundError, build_lookup_index
 from plastron.namespaces import get_manager, prov, sc
 from plastron.oa import Annotation, TextualBody
 from plastron.pcdm import File, PreservationMasterFile
 from plastron.rdf import RDFDataProperty
-from plastron.serializers import CSVSerializer
-from plastron.util import ItemLog, datetimestamp, uri_or_curie
+from plastron.util import datetimestamp, uri_or_curie
 from rdflib import URIRef, Graph, Literal
-from rdflib.util import from_n3
-from shutil import copyfileobj
 from uuid import uuid4
 
 
@@ -147,100 +139,12 @@ def configure_cli(subparsers):
     parser.set_defaults(cmd_name='import')
 
 
-def build_lookup_index(item, index_string):
-    index = defaultdict(dict)
-    if index_string is None:
-        return index
-
-    # build a lookup index for embedded object properties
-    pattern = r'([\w]+)\[(\d+)\]'
-    for entry in index_string.split(';'):
-        key, uriref = entry.split('=')
-        m = re.search(pattern, key)
-        attr = m[1]
-        i = int(m[2])
-        prop = getattr(item, attr)
-        try:
-            index[attr][i] = prop[URIRef(item.uri + uriref)]
-        except IndexError:
-            # need to create an object with that URI
-            obj = prop.obj_class(uri=URIRef(item.uri + uriref))
-            # TODO: what if i > 0?
-            prop.values.append(obj)
-            index[attr][i] = obj
-    return index
-
-
 def get_property_type(model_class: rdf.Resource, attrs):
     if '.' in attrs:
         first, rest = attrs.split('.', 2)
         return get_property_type(model_class.name_to_prop[first].obj_class, rest)
     else:
         return model_class.name_to_prop[attrs]
-
-
-def build_fields(fieldnames, model_class):
-    property_attrs = {header: attrs for attrs, header in model_class.HEADER_MAP.items()}
-    fields = defaultdict(list)
-    # group typed and language-tagged columns by their property attribute
-    for header in fieldnames:
-        if '[' in header:
-            # this field has a language tag
-            # header format is "Header Label [Language Label]"
-            header_label, language_label = re.search(r'^([^[]+)\s+\[(.+)]$', header).groups()
-            try:
-                attrs = property_attrs[header_label]
-            except KeyError as e:
-                raise DataReadException(f'Unknown header "{header}" in import file.') from e
-            # if the language label isn't a name in the LANGUAGE_CODES table,
-            # assume that it is itself a language code
-            lang_code = CSVSerializer.LANGUAGE_CODES.get(language_label, language_label)
-            fields[attrs].append({
-                'header': header,
-                'lang_code': lang_code,
-                'datatype': None
-            })
-        elif '{' in header:
-            # this field has a datatype
-            # header format is "Header Label {Datatype Label}
-            header_label, datatype_label = re.search(r'^([^{]+)\s+{(.+)}$', header).groups()
-            try:
-                attrs = property_attrs[header_label]
-            except KeyError as e:
-                raise DataReadException(f'Unknown header "{header}" in import file.') from e
-            # the datatype label should either be a key in the lookup table,
-            # or an n3-abbreviated URI of a datatype
-            try:
-                datatype_uri = CSVSerializer.DATATYPE_URIS.get(datatype_label, from_n3(datatype_label, nsm=nsm))
-                if not isinstance(datatype_uri, URIRef):
-                    raise DataReadException(f'Unknown datatype "{datatype_label}" in "{header}" in import file.')
-            except KeyError as e:
-                raise DataReadException(f'Unknown datatype "{datatype_label}" in "{header}" in import file.') from e
-
-            fields[attrs].append({
-                'header': header,
-                'lang_code': None,
-                'datatype': datatype_uri
-            })
-        else:
-            # no language tag or datatype
-            # make sure we skip the system columns
-            if header not in CSVSerializer.SYSTEM_HEADERS:
-                if header not in property_attrs:
-                    raise DataReadException(f'Unrecognized header "{header}" in import file.')
-                # check for a default datatype defined in the model
-                attrs = property_attrs[header]
-                prop = model_class.name_to_prop.get(attrs)
-                if prop is not None and issubclass(prop, RDFDataProperty):
-                    datatype_uri = prop.datatype
-                else:
-                    datatype_uri = None
-                fields[attrs].append({
-                    'header': header,
-                    'lang_code': None,
-                    'datatype': datatype_uri
-                })
-    return fields
 
 
 def validate(item):
@@ -312,272 +216,6 @@ def annotate_from_files(item, mime_types):
             member.annotations.append(annotation)
 
 
-class ModelClassNotFoundError(Exception):
-    pass
-
-
-class Job:
-    def __init__(self, id, jobs_dir):
-        self.id = id
-        # use a timestamp to differentiate different runs of the same import job
-        self.run_timestamp = datetimestamp()
-        self.dir = os.path.join(jobs_dir, self.id.replace('/', '-'))
-        self.config_filename = os.path.join(self.dir, 'config.yml')
-        self.metadata_filename = os.path.join(self.dir, 'source.csv')
-        self.config = {}
-        self._model_class = None
-
-        # record of items that are successfully loaded
-        completed_fieldnames = ['id', 'timestamp', 'title', 'uri']
-        self.completed_log = ItemLog(os.path.join(self.dir, 'completed.log.csv'), completed_fieldnames, 'id')
-
-        # record of items that are unable to be loaded during this import run
-        dropped_basename = f'dropped-{self.run_timestamp}'
-        dropped_log_filename = os.path.join(self.dir, f'{dropped_basename}.log.csv')
-        dropped_fieldnames = ['id', 'timestamp', 'title', 'uri', 'reason']
-        self.dropped_log = ItemLog(dropped_log_filename, dropped_fieldnames, 'id')
-
-    def __getattr__(self, item):
-        try:
-            return self.config[item]
-        except KeyError:
-            raise AttributeError(f'No attribute or config key named {item} found')
-
-    def dir_exists(self):
-        return os.path.isdir(self.dir)
-
-    def load_config(self):
-        with open(self.config_filename) as config_file:
-            self.config = yaml.safe_load(config_file)
-        return self.config
-
-    def save_config(self, config):
-        # store the relevant config
-        self.config = config
-
-        # if we are not resuming, make sure the directory exists
-        os.makedirs(self.dir, exist_ok=True)
-        with open(self.config_filename, mode='w') as config_file:
-            yaml.dump(
-                stream=config_file,
-                data={'job_id': self.id, **self.config}
-            )
-
-    def store_metadata_file(self, input_file):
-        with open(self.metadata_filename, mode='w') as file:
-            copyfileobj(input_file, file)
-            logger.debug(f"Copied input file {getattr(input_file, 'name', '<>')} to {file.name}")
-
-    def get_model_class(self):
-        if self._model_class is None:
-            try:
-                self._model_class = getattr(plastron.models, self.model)
-            except AttributeError as e:
-                raise ModelClassNotFoundError(self.model) from e
-        return self._model_class
-
-    def drop(self, item, line_reference, reason=''):
-        logger.warning(f'Dropping {line_reference} from import job "{self.id}" run {self.run_timestamp}: {reason}')
-        self.dropped_log.append({
-            'id': getattr(item, 'identifier', line_reference),
-            'timestamp': datetimestamp(digits_only=False),
-            'title': getattr(item, 'title', ''),
-            'uri': getattr(item, 'uri', ''),
-            'reason': reason
-        })
-
-    def complete(self, item, line_reference):
-        # write to the completed item log
-        self.completed_log.append({
-            'id': getattr(item, 'identifier', line_reference),
-            'timestamp': datetimestamp(digits_only=False),
-            'title': getattr(item, 'title', ''),
-            'uri': getattr(item, 'uri', '')
-        })
-
-    def metadata(self, **kwargs):
-        return MetadataRows(self, **kwargs)
-
-
-class MetadataRows:
-    """
-    Iterable sequence of metadata rows from the source CSV file of an import job.
-    """
-    def __init__(self, job: Job, limit: int = None, percentage: int = None):
-        self.job = job
-        self.limit = limit
-        self.metadata_file = None
-
-        try:
-            self.model_class = job.get_model_class()
-        except ModelClassNotFoundError as e:
-            raise FailureException(f'Model class {e} not found') from e
-
-        try:
-            self.metadata_file = open(job.metadata_filename, 'r')
-        except FileNotFoundError as e:
-            raise FailureException(f'Cannot read source file "{job.metadata_filename}: {e}') from e
-
-        self.csv_file = csv.DictReader(self.metadata_file)
-
-        try:
-            self.fields = build_fields(self.fieldnames, self.model_class)
-        except DataReadException as e:
-            raise FailureException(str(e)) from e
-
-        self.validation_reports: List[Mapping] = []
-        self.skipped = 0
-        self.subset_to_load = None
-
-        self.total = None
-        self.rows = 0
-        self.errors = 0
-        self.valid = 0
-        self.invalid = 0
-        self.created = 0
-        self.updated = 0
-        self.unchanged = 0
-        self.files = 0
-
-        if self.metadata_file.seekable():
-            # get the row count of the file, then rewind the CSV file
-            self.total = sum(1 for _ in self.csv_file)
-            self._rewind_csv_file()
-        else:
-            # file is not seekable, so we can't get a row count in advance
-            self.total = None
-
-        if percentage is not None:
-            if not self.metadata_file.seekable():
-                raise FailureException('Cannot execute a percentage load using a non-seekable file')
-            identifier_column = self.model_class.HEADER_MAP['identifier']
-            identifiers = [
-                row[identifier_column] for row in self.csv_file if row[identifier_column] not in job.completed_log
-            ]
-            self._rewind_csv_file()
-
-            if len(identifiers) == 0:
-                logger.info('No items remaining to load')
-                self.subset_to_load = []
-            else:
-                target_count = int(((percentage / 100) * self.total))
-                logger.info(f'Attempting to load {target_count} items ({percentage}% of {self.total})')
-                if len(identifiers) > target_count:
-                    # evenly space the items to load among the remaining items
-                    step_size = int((100 * (1 - (len(job.completed_log) / self.total))) / percentage)
-                else:
-                    # load all remaining items
-                    step_size = 1
-                self.subset_to_load = identifiers[::step_size]
-
-    def _rewind_csv_file(self):
-        # rewind the file and re-create the CSV reader
-        self.metadata_file.seek(0)
-        self.csv_file = csv.DictReader(self.metadata_file)
-
-    @property
-    def has_binaries(self):
-        return 'FILES' in self.fieldnames
-
-    @property
-    def fieldnames(self):
-        return self.csv_file.fieldnames
-
-    @property
-    def identifier_column(self):
-        return self.model_class.HEADER_MAP['identifier']
-
-    def stats(self):
-        return {
-            'total': self.total,
-            'rows': self.rows,
-            'errors': self.errors,
-            'valid': self.valid,
-            'invalid': self.invalid,
-            'created': self.created,
-            'updated': self.updated,
-            'unchanged': self.unchanged,
-            'files': self.files
-        }
-
-    def __iter__(self):
-        for row_number, line in enumerate(self.csv_file, 1):
-            if self.limit is not None and row_number > self.limit:
-                logger.info(f'Stopping after {self.limit} rows')
-                break
-
-            if self.subset_to_load is not None and line[self.identifier_column] not in self.subset_to_load:
-                continue
-
-            line_reference = f"{self.job.metadata_filename}:{row_number + 1}"
-            logger.debug(f'Processing {line_reference}')
-            self.rows += 1
-
-            if any(v is None for v in line.values()):
-                self.errors += 1
-                self.validation_reports.append({
-                    'line': line_reference,
-                    'is_valid': False,
-                    'error': f'Line {line_reference} has the wrong number of columns'
-                })
-                self.job.drop(item=None, line_reference=line_reference, reason='Wrong number of columns')
-                continue
-
-            row = Row(line_reference, row_number, line, self.identifier_column)
-
-            if row.identifier in self.job.completed_log:
-                logger.info(f'Already loaded "{row.identifier}" from {line_reference}, skipping')
-                self.skipped += 1
-                continue
-
-            yield row
-
-        if self.total is None:
-            # if we weren't able to get the total count before,
-            # use the final row count as the total count for the
-            # job completion message
-            self.total = self.rows
-
-
-class Row:
-    def __init__(self, line_reference: str, row_number: int, data: Mapping, identifier_column: str):
-        self.line_reference = line_reference
-        self.number = row_number
-        self.data = data
-        self.identifier_column = identifier_column
-        self.index = None
-
-    def __getitem__(self, item):
-        return self.data[item]
-
-    def get(self, key, default=None):
-        return self.data.get(key, default)
-
-    @property
-    def identifier(self):
-        return self.data[self.identifier_column]
-
-    @property
-    def has_uri(self):
-        return 'URI' in self.data and self.data['URI'].strip() != ''
-
-    @property
-    def uri(self) -> URIRef:
-        return URIRef(self.data['URI']) if self.has_uri else None
-
-    @property
-    def has_files(self):
-        return 'FILES' in self.data and self.data['FILES'].strip() != ''
-
-    @property
-    def filenames(self):
-        return self.data['FILES'].strip().split(';') if self.has_files else []
-
-    def build_index(self, item):
-        if self.index is None:
-            self.index = build_lookup_index(item, self.data.get('INDEX'))
-
-
 class Command(BaseCommand):
     def __init__(self, config=None):
         super().__init__(config=config)
@@ -589,12 +227,16 @@ class Command(BaseCommand):
         for _ in self.execute(*args, **kwargs):
             pass
 
-    def repo_config(self, repo_config, args):
+    def repo_config(self, repo_config, args=None):
         """
         Returns a deep copy of the provided repo_config, updated with
         layout structure and relpath information from the args
-        (if provided).
+        (if provided). If no args are provided, just run the base command
+        repo_config() method.
         """
+        if args is None:
+            return super().repo_config(repo_config, args)
+
         result_config = copy.deepcopy(repo_config)
 
         if args.structure:
@@ -749,10 +391,10 @@ class Command(BaseCommand):
             # TODO: generate a more unique id? add in user and hostname?
             args.job_id = f"import-{datetimestamp()}"
 
-        job = Job(args.job_id, jobs_dir=self.jobs_dir)
+        job = ImportJob(args.job_id, jobs_dir=self.jobs_dir)
         logger.debug(f'Job directory is {job.dir}')
 
-        if args.resume and not job.dir_exists():
+        if args.resume and not job.dir_exists:
             raise FailureException(f'Cannot resume job {job.id}: no such job directory found in {self.jobs_dir}')
 
         # load or create config
@@ -777,13 +419,12 @@ class Command(BaseCommand):
             })
 
         if args.template_file is not None:
-            model_class = job.get_model_class()
-            if not hasattr(model_class, 'HEADER_MAP'):
-                logger.error(f'{model_class.__name__} has no HEADER_MAP, cannot create template')
+            if not hasattr(job.model_class, 'HEADER_MAP'):
+                logger.error(f'{job.model_class.__name__} has no HEADER_MAP, cannot create template')
                 raise FailureException()
-            logger.info(f'Writing template for the {model_class.__name__} model to {args.template_file.name}')
+            logger.info(f'Writing template for the {job.model_class.__name__} model to {args.template_file.name}')
             writer = csv.writer(args.template_file)
-            writer.writerow(list(model_class.HEADER_MAP.values()) + ['FILES'])
+            writer.writerow(list(job.model_class.HEADER_MAP.values()) + ['FILES'])
             return
 
         if args.import_file is None and not args.resume:
@@ -798,7 +439,10 @@ class Command(BaseCommand):
         if args.import_file is not None:
             job.store_metadata_file(args.import_file)
 
-        metadata = job.metadata(limit=args.limit, percentage=args.percentage)
+        try:
+            metadata = job.metadata(limit=args.limit, percentage=args.percentage)
+        except ModelClassNotFoundError as e:
+            raise FailureException(f'Model class {e.model_name} not found') from e
 
         if metadata.has_binaries and job.binaries_location is None:
             raise ConfigError('Must specify --binaries-location if the metadata has a FILES column')
@@ -855,7 +499,7 @@ class Command(BaseCommand):
 
                     # build the lookup index to map hash URI objects
                     # to their correct positional locations
-                    row.build_index(item)
+                    row_index = build_lookup_index(item, row.index_string)
 
                     # if the first portion of the dotted attr notation is a key in the index,
                     # then this column has a different subject than the main uri
@@ -868,11 +512,11 @@ class Command(BaseCommand):
                         for i, value_string in enumerate(row[header].split(';')):
                             new_values[i].extend(parse_value_string(value_string, column, prop_type))
 
-                    if first_attr in row.index:
+                    if first_attr in row_index:
                         # existing embedded object
                         for i, values in new_values.items():
                             # get the embedded object
-                            obj = row.index[first_attr][i]
+                            obj = row_index[first_attr][i]
                             prop = getattr(obj, next_attr)
                             deleted_values, inserted_values = prop.update(values)
 
@@ -891,7 +535,7 @@ class Command(BaseCommand):
                                 # TODO: remove hardcoded UUID fragment minting
                                 obj = first_prop_type.obj_class(uri=f'{item.uri}#{uuid4()}')
                                 # add the new object to the index
-                                row.index[first_attr][i] = obj
+                                row_index[first_attr][i] = obj
                                 setattr(obj, next_attr, values)
                                 next_attr_prop = obj.name_to_prop[next_attr]
                                 for value in values:

@@ -1,13 +1,13 @@
 import pytest
-from importlib import import_module
+from plastron.commands import importcommand
 from plastron.files import LocalFileSource, RemoteFileSource, ZipFileSource
+from plastron.jobs import build_fields
 from plastron.models import Item, umdtype
 from plastron.pcdm import Object
 from plastron.rdf import RDFDataProperty
 from plastron.stomp.messages import PlastronCommandMessage
 
-imp = import_module('plastron.commands.import')
-cmd = imp.Command()
+cmd = importcommand.Command()
 
 
 @pytest.mark.parametrize(
@@ -19,16 +19,16 @@ cmd = imp.Command()
     ]
 )
 def test_build_file_groups(value, expected_count):
-    assert len(imp.build_file_groups(value)) == expected_count
+    assert len(importcommand.build_file_groups(value)) == expected_count
 
 
 def test_build_fields_with_default_datatype():
-    fields = imp.build_fields(['Accession Number'], Item)
+    fields = build_fields(['Accession Number'], Item)
     assert fields['accession_number'][0]['datatype'] == umdtype.accessionNumber
 
 
 def test_build_fields_without_default_datatype():
-    fields = imp.build_fields(['Identifier'], Item)
+    fields = build_fields(['Identifier'], Item)
     assert fields['identifier'][0]['datatype'] is None
 
 
@@ -50,19 +50,19 @@ def test_parse_value_string():
     prop_type = type('test', (RDFDataProperty,), {'datatype': None})
 
     # the empty string should parse to the empty list
-    assert(len(list(imp.parse_value_string('', column, prop_type))) == 0)
+    assert(len(list(importcommand.parse_value_string('', column, prop_type))) == 0)
     # single value
-    assert(len(list(imp.parse_value_string('foo', column, prop_type))) == 1)
+    assert(len(list(importcommand.parse_value_string('foo', column, prop_type))) == 1)
     # single value, followed by an empty string
-    assert(len(list(imp.parse_value_string('foo|', column, prop_type))) == 1)
+    assert(len(list(importcommand.parse_value_string('foo|', column, prop_type))) == 1)
     # two values
-    assert(len(list(imp.parse_value_string('foo|bar', column, prop_type))) == 2)
+    assert(len(list(importcommand.parse_value_string('foo|bar', column, prop_type))) == 2)
     # two values, with an empty string between
-    assert(len(list(imp.parse_value_string('foo||bar', column, prop_type))) == 2)
+    assert(len(list(importcommand.parse_value_string('foo||bar', column, prop_type))) == 2)
 
 
 # sample file group to use in add_files_* tests
-ADD_FILES_GROUPS = imp.build_file_groups('foo.jpg;foo.tiff;bar.jpg;baz.pdf')
+ADD_FILES_GROUPS = importcommand.build_file_groups('foo.jpg;foo.tiff;bar.jpg;baz.pdf')
 
 
 def test_add_files_paged():

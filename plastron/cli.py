@@ -26,7 +26,14 @@ def load_commands(subparsers):
     # introspection
     command_modules = {}
     for finder, name, ispkg in iter_modules(commands.__path__):
-        module = import_module(commands.__name__ + '.' + name)
+        module_name = name
+        if module_name == "importcommand":
+            # Special case handling for "importcommand", because "import" is
+            # a Python reserved word that is not usable as a module name,
+            # while we want "import" to be the Plastron command
+            name = "import"
+
+        module = import_module(commands.__name__ + '.' + module_name)
         if hasattr(module, 'configure_cli'):
             module.configure_cli(subparsers)
             command_modules[name] = module

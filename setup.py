@@ -88,6 +88,7 @@ setup(
         'requests',
         'setuptools',
         'stomp.py',
+        'waitress',
         'watchdog==0.10.3'
     ],
     python_requires='>=3.6',

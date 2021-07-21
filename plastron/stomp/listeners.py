@@ -4,6 +4,7 @@ import os
 from concurrent.futures import ThreadPoolExecutor
 from importlib import import_module
 from plastron import version
+from plastron.commands import get_command_class
 from plastron.exceptions import FailureException
 from plastron.http import Repository
 from plastron.stomp import Destination
@@ -101,18 +102,12 @@ class MessageProcessor:
 
     def get_command(self, command_name):
         if command_name not in self.commands:
-            try:
-                command_module = import_module('plastron.commands.' + command_name)
-            except ModuleNotFoundError as e:
-                raise FailureException(f'Unable to load a command with the name {command_name}') from e
-            command_class = getattr(command_module, 'Command')
-            if command_class is None:
-                raise FailureException(f'Command class not found in module {command_module}')
-            if getattr(command_class, 'parse_message') is None:
-                raise FailureException(f'Command class in {command_module} does not support message processing')
-
             # get the configuration options for this command
             config = self.command_config.get(command_name.upper(), {})
+
+            command_class = get_command_class(command_name)
+            if getattr(command_class, 'parse_message') is None:
+                raise FailureException(f'Command class {command_class} does not support message processing')
 
             # cache an instance of this command
             self.commands[command_name] = command_class(config)

@@ -504,7 +504,7 @@ class Command(BaseCommand):
                 reasons = [' '.join(str(f) for f in outcome) for outcome in report.failed()]
                 if len(missing_files) > 0:
                     reasons.extend(f'Missing file: {f}' for f in missing_files)
-                job.drop(
+                job.drop_failed(
                     item=item,
                     line_reference=row.line_reference,
                     reason=f'Validation failures: {"; ".join(reasons)}'
@@ -521,7 +521,7 @@ class Command(BaseCommand):
             except FailureException as e:
                 metadata.errors += 1
                 logger.error(f'{item} import failed: {e}')
-                job.drop(item, row.line_reference, reason=str(e))
+                job.drop_failed(item, row.line_reference, reason=str(e))
 
             # update the status
             now = datetime.now().timestamp()
@@ -536,7 +536,7 @@ class Command(BaseCommand):
 
         logger.info(f'Skipped {metadata.skipped} items')
         logger.info(f'Completed {len(job.completed_log) - initial_completed_item_count} items')
-        logger.info(f'Dropped {len(job.dropped_log)} items')
+        logger.info(f'Dropped {len(job.dropped_failed_log)} items')
 
         logger.info(f"Found {metadata.valid} valid items")
         logger.info(f"Found {metadata.invalid} invalid items")

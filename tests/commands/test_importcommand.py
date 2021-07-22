@@ -155,14 +155,14 @@ def test_invalid_item_added_to_drop_log():
 
     command.create_repo_changeset = MagicMock(return_value=repo_changeset)
     command.update_repo = MagicMock()
-    mock_job.drop = MagicMock()
+    mock_job.drop_failed = MagicMock()
 
     for _ in command.execute(repo, args):
         pass
 
     command.create_repo_changeset.assert_called_once()
     command.update_repo.assert_not_called()
-    mock_job.drop.assert_called_once()
+    mock_job.drop_failed.assert_called_once()
 
 
 def test_failed_item_added_to_drop_log():
@@ -184,14 +184,14 @@ def test_failed_item_added_to_drop_log():
     command.get_source.exists = MagicMock(return_value=True)
     command.update_repo = MagicMock(side_effect=FailureException)
 
-    mock_job.drop = MagicMock()
+    mock_job.drop_failed = MagicMock()
 
     for _ in command.execute(repo, args):
         pass
 
     command.create_repo_changeset.assert_called_once()
     command.update_repo.assert_called_once()
-    mock_job.drop.assert_called_once()
+    mock_job.drop_failed.assert_called_once()
 
 
 def create_args(job_id):

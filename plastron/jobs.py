@@ -140,11 +140,11 @@ class ImportJob:
         completed_fieldnames = ['id', 'timestamp', 'title', 'uri']
         self.completed_log = ItemLog(os.path.join(self.dir, 'completed.log.csv'), completed_fieldnames, 'id')
 
-        # record of items that are unable to be loaded during this import run
-        dropped_basename = f'dropped-{self.run_timestamp}'
-        dropped_log_filename = os.path.join(self.dir, f'{dropped_basename}.log.csv')
-        dropped_fieldnames = ['id', 'timestamp', 'title', 'uri', 'reason']
-        self.dropped_log = ItemLog(dropped_log_filename, dropped_fieldnames, 'id')
+        # record of items that failed when loading into the repository during this import run
+        dropped_failed_basename = f'dropped-{self.run_timestamp}'
+        dropped_failed_log_filename = os.path.join(self.dir, f'{dropped_failed_basename}.log.csv')
+        dropped_failed_fieldnames = ['id', 'timestamp', 'title', 'uri', 'reason']
+        self.dropped_failed_log = ItemLog(dropped_failed_log_filename, dropped_failed_fieldnames, 'id')
 
     def __getattr__(self, item):
         try:
@@ -187,9 +187,11 @@ class ImportJob:
                 raise ModelClassNotFoundError(self.model) from e
         return self._model_class
 
-    def drop(self, item, line_reference, reason=''):
-        logger.warning(f'Dropping {line_reference} from import job "{self.id}" run {self.run_timestamp}: {reason}')
-        self.dropped_log.append({
+    def drop_failed(self, item, line_reference, reason=''):
+        logger.warning(
+            f'Dropping failed {line_reference} from import job "{self.id}" run {self.run_timestamp}: {reason}'
+        )
+        self.dropped_failed_log.append({
             'id': getattr(item, 'identifier', line_reference),
             'timestamp': datetimestamp(digits_only=False),
             'title': getattr(item, 'title', ''),
@@ -330,7 +332,7 @@ class MetadataRows:
                     'is_valid': False,
                     'error': f'Line {line_reference} has the wrong number of columns'
                 })
-                self.job.drop(item=None, line_reference=line_reference, reason='Wrong number of columns')
+                self.job.drop_failed(item=None, line_reference=line_reference, reason='Wrong number of columns')
                 continue
 
             row = Row(line_reference, row_number, line, self.identifier_column)

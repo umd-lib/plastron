@@ -352,7 +352,6 @@ class Command(BaseCommand):
 
         return count
 
-
     @staticmethod
     def parse_message(message):
         access = message.args.get('access')
@@ -729,6 +728,7 @@ class RepoChangeset:
     @property
     def delete_graph(self):
         return self._delete_graph
+
 
 @rdf.object_property('derived_from', prov.wasDerivedFrom)
 class FullTextAnnotation(Annotation):

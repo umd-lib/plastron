@@ -383,9 +383,22 @@ class Command(BaseCommand):
 
     @staticmethod
     def create_import_job(job_id, jobs_dir):
+        """
+        Returns an ImportJob with the given parameters
+
+        :param job_id: the job id for the import job
+        :param jobs_dir: the base directory where job information is stored
+        :return: An ImportJob with the given parameters
+        """
         return ImportJob(job_id, jobs_dir=jobs_dir)
 
     def execute(self, repo, args):
+        """
+        Performs the import
+
+        :param repo: the repository configuration
+        :param args: the command-line arguments
+        """
         start_time = datetime.now().timestamp()
 
         if args.resume and args.job_id is None:
@@ -542,6 +555,18 @@ class Command(BaseCommand):
         }
 
     def create_repo_changeset(self, args, repo, metadata, row):
+        """
+        Returns a RepoChangeset of the changes to make to the repository
+
+        :param args: the arguments from the command-line
+        :param repo: the repository configuration
+        :param metadata: A plastron.jobs.MetadataRows object representing the
+                          CSV file for the import
+        :param row: A single plastron.jobs.Row object representing the row
+                     to import
+        :return: A RepoChangeSet encapsulating the changes to make to the
+                repository.
+        """
         if args.validate_only:
             # create an empty object to validate without fetching from the repo
             item = metadata.model_class(uri=row.uri)
@@ -647,6 +672,23 @@ class Command(BaseCommand):
         return RepoChangeset(item, insert_graph, delete_graph)
 
     def update_repo(self, args, job, repo, metadata, row, repo_changeset, created_uris, updated_uris):
+        """
+        Updates the repository with the given RepoChangeSet
+
+        :param args: the arguments from the command-line
+        :param job: The ImportJob
+        :param repo: the repository configuration
+        :param metadata: A plastron.jobs.MetadataRows object representing the
+                          CSV file being imported
+        :param row: A single plastron.jobs.Row object representing the row
+                     being imported
+        :param repo_changeset: The RepoChangeSet object describing the changes
+                                 to make to the repository.
+        :param created_uris: Accumulator storing a list of created URIS. This
+                              variable is MODIFIED by this method.
+        :param updated_uris: Accumulator storing a list of updated URIS. This
+                              variable is MODIFIED by this method.
+        """
         item = repo_changeset.item
         delete_graph = repo_changeset.delete_graph
         insert_graph = repo_changeset.insert_graph
@@ -713,6 +755,15 @@ class Command(BaseCommand):
 
 
 class RepoChangeset:
+    """
+    Data object encapsulating the set of changes that need to be made to
+    the repository for a single import
+
+    :param item: a repository model object (i.e. from plastron.models) from
+                 the repository (or an empty object if validation only)
+    :param insert_graph: an RDF Graph object to insert into the repository
+    :param delete_graph: an RDF Graph object to delete from the repository
+    """
     def __init__(self, item, insert_graph, delete_graph):
         self._item = item
         self._insert_graph = insert_graph

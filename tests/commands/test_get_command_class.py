@@ -19,4 +19,3 @@ def test_get_import_command_class():
 def test_non_existent_command_class():
     with pytest.raises(FailureException):
         _cls = get_command_class('foo')
-

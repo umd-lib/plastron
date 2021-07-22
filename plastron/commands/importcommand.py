@@ -506,66 +506,9 @@ class Command(BaseCommand):
                 continue
 
             try:
-                if not item.created:
-                    # if an item is new, don't construct a SPARQL Update query
-                    # instead, just create and update normally
-                    # create new item in the repo
-                    logger.debug('Creating a new item')
-                    # add the access class
-                    if job.access is not None:
-                        item.rdf_type.append(job.access)
-                    # add the collection membership
-                    if job.member_of is not None:
-                        item.member_of = URIRef(job.member_of)
-
-                    if row.has_files:
-                        create_pages = bool(strtobool(row.get('CREATE_PAGES', 'True')))
-                        logger.debug('Adding pages and files to new item')
-                        self.add_files(
-                            item,
-                            build_file_groups(row['FILES']),
-                            base_location=job.binaries_location,
-                            access=job.access,
-                            create_pages=create_pages
-                        )
-
-                    if args.extract_text_types is not None:
-                        annotate_from_files(item, args.extract_text_types.split(','))
-
-                    logger.debug(f"Creating resources in container: {job.container}")
-
-                    try:
-                        with Transaction(repo) as txn:
-                            item.create(repo, container_path=job.container)
-                            item.update(repo)
-                            txn.commit()
-                    except Exception as e:
-                        raise FailureException(f'Creating item failed: {e}') from e
-
-                    job.complete(item, row.line_reference)
-                    metadata.created += 1
-                    created_uris.append(item.uri)
-
-                elif len(delete_graph) > 0 or len(insert_graph) > 0:
-                    # construct the SPARQL Update query if there are any deletions or insertions
-                    # then do a PATCH update of an existing item
-                    logger.info(f'Sending update for {item}')
-                    sparql_update = repo.build_sparql_update(delete_graph, insert_graph)
-                    logger.debug(sparql_update)
-                    try:
-                        item.patch(repo, sparql_update)
-                    except RESTAPIException as e:
-                        raise FailureException(f'Updating item failed: {e}') from e
-
-                    job.complete(item, row.line_reference)
-                    metadata.updated += 1
-                    updated_uris.append(item.uri)
-
-                else:
-                    metadata.unchanged += 1
-                    logger.info(f'No changes found for "{item}" ({row.uri}); skipping')
-                    metadata.skipped += 1
-
+                self.update_repo(args, job, repo, metadata, row, item,
+                                 insert_graph, delete_graph, created_uris,
+                                 updated_uris)
             except FailureException as e:
                 metadata.errors += 1
                 logger.error(f'{item} import failed: {e}')
@@ -706,6 +649,67 @@ class Command(BaseCommand):
                 insert_graph.remove(statement)
 
         return RepoChangeset(item, insert_graph, delete_graph)
+
+    def update_repo(self, args, job, repo, metadata, row, item, insert_graph, delete_graph, created_uris, updated_uris):
+        if not item.created:
+            # if an item is new, don't construct a SPARQL Update query
+            # instead, just create and update normally
+            # create new item in the repo
+            logger.debug('Creating a new item')
+            # add the access class
+            if job.access is not None:
+                item.rdf_type.append(job.access)
+            # add the collection membership
+            if job.member_of is not None:
+                item.member_of = URIRef(job.member_of)
+
+            if row.has_files:
+                create_pages = bool(strtobool(row.get('CREATE_PAGES', 'True')))
+                logger.debug('Adding pages and files to new item')
+                self.add_files(
+                    item,
+                    build_file_groups(row['FILES']),
+                    base_location=job.binaries_location,
+                    access=job.access,
+                    create_pages=create_pages
+                )
+
+            if args.extract_text_types is not None:
+                annotate_from_files(item, args.extract_text_types.split(','))
+
+            logger.debug(f"Creating resources in container: {job.container}")
+
+            try:
+                with Transaction(repo) as txn:
+                    item.create(repo, container_path=job.container)
+                    item.update(repo)
+                    txn.commit()
+            except Exception as e:
+                raise FailureException(f'Creating item failed: {e}') from e
+
+            job.complete(item, row.line_reference)
+            metadata.created += 1
+            created_uris.append(item.uri)
+
+        elif len(delete_graph) > 0 or len(insert_graph) > 0:
+            # construct the SPARQL Update query if there are any deletions or insertions
+            # then do a PATCH update of an existing item
+            logger.info(f'Sending update for {item}')
+            sparql_update = repo.build_sparql_update(delete_graph, insert_graph)
+            logger.debug(sparql_update)
+            try:
+                item.patch(repo, sparql_update)
+            except RESTAPIException as e:
+                raise FailureException(f'Updating item failed: {e}') from e
+
+            job.complete(item, row.line_reference)
+            metadata.updated += 1
+            updated_uris.append(item.uri)
+
+        else:
+            metadata.unchanged += 1
+            logger.info(f'No changes found for "{item}" ({row.uri}); skipping')
+            metadata.skipped += 1
 
 
 class RepoChangeset:

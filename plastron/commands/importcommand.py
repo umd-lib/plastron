@@ -352,6 +352,7 @@ class Command(BaseCommand):
 
         return count
 
+
     @staticmethod
     def parse_message(message):
         access = message.args.get('access')
@@ -381,6 +382,10 @@ class Command(BaseCommand):
             relpath=message.args.get('relpath', None)
         )
 
+    @staticmethod
+    def create_import_job(job_id, jobs_dir):
+        return ImportJob(job_id, jobs_dir=jobs_dir)
+
     def execute(self, repo, args):
         start_time = datetime.now().timestamp()
 
@@ -391,7 +396,7 @@ class Command(BaseCommand):
             # TODO: generate a more unique id? add in user and hostname?
             args.job_id = f"import-{datetimestamp()}"
 
-        job = ImportJob(args.job_id, jobs_dir=self.jobs_dir)
+        job = Command.create_import_job(args.job_id, jobs_dir=self.jobs_dir)
         logger.debug(f'Job directory is {job.dir}')
 
         if args.resume and not job.dir_exists:

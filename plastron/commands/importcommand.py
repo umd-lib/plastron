@@ -504,7 +504,7 @@ class Command(BaseCommand):
                 reasons = [' '.join(str(f) for f in outcome) for outcome in report.failed()]
                 if len(missing_files) > 0:
                     reasons.extend(f'Missing file: {f}' for f in missing_files)
-                job.drop_failed(
+                job.drop_invalid(
                     item=item,
                     line_reference=row.line_reference,
                     reason=f'Validation failures: {"; ".join(reasons)}'
@@ -536,7 +536,8 @@ class Command(BaseCommand):
 
         logger.info(f'Skipped {metadata.skipped} items')
         logger.info(f'Completed {len(job.completed_log) - initial_completed_item_count} items')
-        logger.info(f'Dropped {len(job.dropped_failed_log)} items')
+        logger.info(f'Dropped {len(job.dropped_invalid_log)} invalid items')
+        logger.info(f'Dropped {len(job.dropped_failed_log)} failed items')
 
         logger.info(f"Found {metadata.valid} valid items")
         logger.info(f"Found {metadata.invalid} invalid items")

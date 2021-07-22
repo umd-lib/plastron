@@ -138,8 +138,9 @@ def test_exception_when_no_validation_ruleset():
     assert "Unable to run validation" in str(excinfo.value)
 
 
-def test_invalid_item_added_to_drop_log():
-    # Verifies that the import command adds an invalid item to the drop log
+def test_invalid_item_added_to_drop_invalid_log():
+    # Verifies that the import command adds an invalid item to the
+    # drop-invalid log
     mock_job = create_mock_job()
     args = create_args(mock_job.id)
 
@@ -155,18 +156,19 @@ def test_invalid_item_added_to_drop_log():
 
     command.create_repo_changeset = MagicMock(return_value=repo_changeset)
     command.update_repo = MagicMock()
-    mock_job.drop_failed = MagicMock()
+    mock_job.drop_invalid = MagicMock()
 
     for _ in command.execute(repo, args):
         pass
 
     command.create_repo_changeset.assert_called_once()
     command.update_repo.assert_not_called()
-    mock_job.drop_failed.assert_called_once()
+    mock_job.drop_invalid.assert_called_once()
 
 
-def test_failed_item_added_to_drop_log():
-    # Verifies that the import command adds a failed item to the drop log
+def test_failed_item_added_to_drop_failed_log():
+    # Verifies that the import command adds a failed item to the
+    # drop-failed log
     mock_job = create_mock_job()
     args = create_args(mock_job.id)
     failed_item = create_mock_item(is_valid=True)

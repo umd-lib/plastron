@@ -453,107 +453,10 @@ class Command(BaseCommand):
         updated_uris = []
         created_uris = []
         for row in metadata:
-            if args.validate_only:
-                # create an empty object to validate without fetching from the repo
-                item = metadata.model_class(uri=row.uri)
-            else:
-                if row.uri is not None:
-                    # read the object from the repo
-                    item = metadata.model_class.from_repository(repo, row.uri, include_server_managed=False)
-                else:
-                    # no URI in the CSV means we will create a new object
-                    logger.info(f'No URI found for {row.line_reference}; will create new resource')
-                    # create a new object (will create in the repo later)
-                    item = metadata.model_class()
-
-            # track new embedded objects that are added to the graph
-            # so we can ensure that they have at least one statement
-            # where they appear as the subject
-            new_objects = defaultdict(Graph)
-
-            delete_graph = Graph()
-            insert_graph = Graph()
-
-            for attrs, columns in metadata.fields.items():
-                prop_type = get_property_type(item.__class__, attrs)
-                if '.' not in attrs:
-                    # simple, non-embedded values
-                    # attrs is the entire property name
-                    new_values = []
-                    for column in columns:
-                        header = column['header']
-                        new_values.extend(parse_value_string(row[header], column, prop_type))
-
-                    # construct a SPARQL update by diffing for deletions and insertions
-                    # update the property and get the sets of values deleted and inserted
-                    prop = getattr(item, attrs)
-                    deleted_values, inserted_values = prop.update(new_values)
-
-                    for deleted_value in deleted_values:
-                        delete_graph.add((item.uri, prop.uri, prop.get_term(deleted_value)))
-                    for inserted_value in inserted_values:
-                        insert_graph.add((item.uri, prop.uri, prop.get_term(inserted_value)))
-
-                else:
-                    # complex, embedded values
-
-                    # build the lookup index to map hash URI objects
-                    # to their correct positional locations
-                    row_index = build_lookup_index(item, row.index_string)
-
-                    # if the first portion of the dotted attr notation is a key in the index,
-                    # then this column has a different subject than the main uri
-                    # correlate positions and urirefs
-                    # XXX: for now, assuming only 2 levels of chaining
-                    first_attr, next_attr = attrs.split('.', 2)
-                    new_values = defaultdict(list)
-                    for column in columns:
-                        header = column['header']
-                        for i, value_string in enumerate(row[header].split(';')):
-                            new_values[i].extend(parse_value_string(value_string, column, prop_type))
-
-                    if first_attr in row_index:
-                        # existing embedded object
-                        for i, values in new_values.items():
-                            # get the embedded object
-                            obj = row_index[first_attr][i]
-                            prop = getattr(obj, next_attr)
-                            deleted_values, inserted_values = prop.update(values)
-
-                            for deleted_value in deleted_values:
-                                delete_graph.add((item.uri, prop.uri, prop.get_term(deleted_value)))
-                            for inserted_value in inserted_values:
-                                insert_graph.add((item.uri, prop.uri, prop.get_term(inserted_value)))
-                    else:
-                        # create new embedded objects (a.k.a hash resources) that are not in the index
-                        first_prop_type = item.name_to_prop[first_attr]
-                        for i, values in new_values.items():
-                            # we can assume that for any properties with dotted notation,
-                            # all attributes except for the last one are object properties
-                            if first_prop_type.obj_class is not None:
-                                # create a new object
-                                # TODO: remove hardcoded UUID fragment minting
-                                obj = first_prop_type.obj_class(uri=f'{item.uri}#{uuid4()}')
-                                # add the new object to the index
-                                row_index[first_attr][i] = obj
-                                setattr(obj, next_attr, values)
-                                next_attr_prop = obj.name_to_prop[next_attr]
-                                for value in values:
-                                    new_objects[(first_attr, obj)].add((obj.uri, next_attr_prop.uri, value))
-
-            # add new embedded objects to the insert graph
-            for (attr, obj), graph in new_objects.items():
-                # add that object to the main item
-                getattr(item, attr).append(obj)
-                # add to the insert graph
-                insert_graph.add((item.uri, item.name_to_prop[attr].uri, obj.uri))
-                insert_graph += graph
-
-            # do a pass to remove statements that are both deleted and then re-inserted
-            for statement in delete_graph:
-                if statement in insert_graph:
-                    delete_graph.remove(statement)
-                    insert_graph.remove(statement)
+            repo_changeset = self.create_repo_changeset(args, repo, metadata, row)
+            item = repo_changeset.item
+            delete_graph = repo_changeset.delete_graph
+            insert_graph = repo_changeset.insert_graph
 
             # count the number of files referenced in this row
             metadata.files += len(row.filenames)
@@ -694,6 +597,129 @@ class Command(BaseCommand):
             }
         }
 
+    def create_repo_changeset(self, args, repo, metadata, row):
+        if args.validate_only:
+            # create an empty object to validate without fetching from the repo
+            item = metadata.model_class(uri=row.uri)
+        else:
+            if row.uri is not None:
+                # read the object from the repo
+                item = metadata.model_class.from_repository(repo, row.uri, include_server_managed=False)
+            else:
+                # no URI in the CSV means we will create a new object
+                logger.info(f'No URI found for {row.line_reference}; will create new resource')
+                # create a new object (will create in the repo later)
+                item = metadata.model_class()
+
+        # track new embedded objects that are added to the graph
+        # so we can ensure that they have at least one statement
+        # where they appear as the subject
+        new_objects = defaultdict(Graph)
+
+        delete_graph = Graph()
+        insert_graph = Graph()
+
+        for attrs, columns in metadata.fields.items():
+            prop_type = get_property_type(item.__class__, attrs)
+            if '.' not in attrs:
+                # simple, non-embedded values
+                # attrs is the entire property name
+                new_values = []
+                for column in columns:
+                    header = column['header']
+                    new_values.extend(parse_value_string(row[header], column, prop_type))
+
+                # construct a SPARQL update by diffing for deletions and insertions
+                # update the property and get the sets of values deleted and inserted
+                prop = getattr(item, attrs)
+                deleted_values, inserted_values = prop.update(new_values)
+
+                for deleted_value in deleted_values:
+                    delete_graph.add((item.uri, prop.uri, prop.get_term(deleted_value)))
+                for inserted_value in inserted_values:
+                    insert_graph.add((item.uri, prop.uri, prop.get_term(inserted_value)))
+
+            else:
+                # complex, embedded values
+
+                # build the lookup index to map hash URI objects
+                # to their correct positional locations
+                row_index = build_lookup_index(item, row.index_string)
+
+                # if the first portion of the dotted attr notation is a key in the index,
+                # then this column has a different subject than the main uri
+                # correlate positions and urirefs
+                # XXX: for now, assuming only 2 levels of chaining
+                first_attr, next_attr = attrs.split('.', 2)
+                new_values = defaultdict(list)
+                for column in columns:
+                    header = column['header']
+                    for i, value_string in enumerate(row[header].split(';')):
+                        new_values[i].extend(parse_value_string(value_string, column, prop_type))
+
+                if first_attr in row_index:
+                    # existing embedded object
+                    for i, values in new_values.items():
+                        # get the embedded object
+                        obj = row_index[first_attr][i]
+                        prop = getattr(obj, next_attr)
+                        deleted_values, inserted_values = prop.update(values)
+
+                        for deleted_value in deleted_values:
+                            delete_graph.add((item.uri, prop.uri, prop.get_term(deleted_value)))
+                        for inserted_value in inserted_values:
+                            insert_graph.add((item.uri, prop.uri, prop.get_term(inserted_value)))
+                else:
+                    # create new embedded objects (a.k.a hash resources) that are not in the index
+                    first_prop_type = item.name_to_prop[first_attr]
+                    for i, values in new_values.items():
+                        # we can assume that for any properties with dotted notation,
+                        # all attributes except for the last one are object properties
+                        if first_prop_type.obj_class is not None:
+                            # create a new object
+                            # TODO: remove hardcoded UUID fragment minting
+                            obj = first_prop_type.obj_class(uri=f'{item.uri}#{uuid4()}')
+                            # add the new object to the index
+                            row_index[first_attr][i] = obj
+                            setattr(obj, next_attr, values)
+                            next_attr_prop = obj.name_to_prop[next_attr]
+                            for value in values:
+                                new_objects[(first_attr, obj)].add((obj.uri, next_attr_prop.uri, value))
+
+        # add new embedded objects to the insert graph
+        for (attr, obj), graph in new_objects.items():
+            # add that object to the main item
+            getattr(item, attr).append(obj)
+            # add to the insert graph
+            insert_graph.add((item.uri, item.name_to_prop[attr].uri, obj.uri))
+            insert_graph += graph
+
+        # do a pass to remove statements that are both deleted and then re-inserted
+        for statement in delete_graph:
+            if statement in insert_graph:
+                delete_graph.remove(statement)
+                insert_graph.remove(statement)
+
+        return RepoChangeset(item, insert_graph, delete_graph)
+
+
+class RepoChangeset:
+    def __init__(self, item, insert_graph, delete_graph):
+        self._item = item
+        self._insert_graph = insert_graph
+        self._delete_graph = delete_graph
+
+    @property
+    def item(self):
+        return self._item
+
+    @property
+    def insert_graph(self):
+        return self._insert_graph
+
+    @property
+    def delete_graph(self):
+        return self._delete_graph
 
 @rdf.object_property('derived_from', prov.wasDerivedFrom)
 class FullTextAnnotation(Annotation):

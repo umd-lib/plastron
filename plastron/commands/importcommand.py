@@ -459,8 +459,6 @@ class Command(BaseCommand):
         for row in metadata:
             repo_changeset = self.create_repo_changeset(args, repo, metadata, row)
             item = repo_changeset.item
-            delete_graph = repo_changeset.delete_graph
-            insert_graph = repo_changeset.insert_graph
 
             # count the number of files referenced in this row
             metadata.files += len(row.filenames)
@@ -505,9 +503,8 @@ class Command(BaseCommand):
                 continue
 
             try:
-                self.update_repo(args, job, repo, metadata, row, item,
-                                 insert_graph, delete_graph, created_uris,
-                                 updated_uris)
+                self.update_repo(args, job, repo, metadata, row, repo_changeset,
+                                 created_uris, updated_uris)
             except FailureException as e:
                 metadata.errors += 1
                 logger.error(f'{item} import failed: {e}')
@@ -649,7 +646,11 @@ class Command(BaseCommand):
 
         return RepoChangeset(item, insert_graph, delete_graph)
 
-    def update_repo(self, args, job, repo, metadata, row, item, insert_graph, delete_graph, created_uris, updated_uris):
+    def update_repo(self, args, job, repo, metadata, row, repo_changeset, created_uris, updated_uris):
+        item = repo_changeset.item
+        delete_graph = repo_changeset.delete_graph
+        insert_graph = repo_changeset.insert_graph
+
         if not item.created:
             # if an item is new, don't construct a SPARQL Update query
             # instead, just create and update normally

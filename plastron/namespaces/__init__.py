@@ -2,6 +2,7 @@ from rdflib import Namespace, Graph
 from rdflib.namespace import NamespaceManager
 
 # useful namespaces for use with rdflib code
+acl       = Namespace('http://www.w3.org/ns/auth/acl#')
 bibo      = Namespace('http://purl.org/ontology/bibo/')
 carriers  = Namespace('http://id.loc.gov/vocabulary/carriers/')
 dc        = Namespace('http://purl.org/dc/elements/1.1/')
@@ -30,6 +31,7 @@ rel       = Namespace('http://id.loc.gov/vocabulary/relators/')
 sc        = Namespace('http://www.shared-canvas.org/ns/')
 skos      = Namespace('http://www.w3.org/2004/02/skos/core#')
 umdaccess = Namespace('http://vocab.lib.umd.edu/access#')
+webac     = Namespace('http://fedora.info/definitions/v4/webac#')
 xsd       = Namespace('http://www.w3.org/2001/XMLSchema#')
 
 
@@ -37,6 +39,7 @@ def get_manager(graph=None):
     if graph is None:
         graph = Graph()
     m = NamespaceManager(graph)
+    m.bind('acl', acl)
     m.bind('bibo', bibo)
     m.bind('carriers', carriers)
     m.bind('dc', dc)
@@ -65,5 +68,6 @@ def get_manager(graph=None):
     m.bind('sc', sc)
     m.bind('skos', skos)
     m.bind('umdaccess', umdaccess)
+    m.bind('webac', webac)
     m.bind('xsd', xsd)
     return m

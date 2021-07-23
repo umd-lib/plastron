@@ -101,10 +101,32 @@ The `completed.log.csv` has the following columns:
 You may specify a job ID on the command line using the `--job-id` argument. If
 you do not provide one, Plastron will generate one using the current timestamp.
 
-If, during a run, an item cannot be loaded for any reason, that item is recorded
-to a dropped item log for that run, along with the reason for the failure.
+### Import Failures
 
-Dropped item logs have the following columns:
+Items that cannot be imported during a run are categorized as either
+"invalid" or "failed".
+
+#### Invalid Items
+
+Invalid items are items that fail metadata validation, and are recorded in
+the "dropped-invalid" log for that run, along with the reason for the failure.
+
+Invalid items will likely require changes to the source CSV file, or some other
+action on the part of the user (such as adding missing files).
+
+#### Failed Items
+
+Failed items are items that could not be imported due to problems adding
+records to the repository, and are recorded in the "dropped-failed" log for that
+run, along with the reason for the failure.
+
+Some failures may occcur due to transient network issues. In those cases,
+resuming the import should allow those items to tbe added.
+
+### Dropped Item Logs
+
+Both the "dropped-invalid" and "dropped-failed" item logs have the following
+columns:
 
 | Name      | Purpose |
 |-----------|---------|
@@ -146,8 +168,10 @@ plastron -c repo.yml import \
     --resume
 ```
 
-Any dropped items from a particular run will be recorded in
-`{JOBS_DIR}/import-foo-1/dropped-{run_timestamp}.csv`.
+Any dropped items from a particular run will be recorded in:
+
+* `{JOBS_DIR}/import-foo-1/dropped-failed-{run_timestamp}.csv`
+* `{JOBS_DIR}/import-foo-1/dropped-invalid-{run_timestamp}.csv`
 
 ## Percentage Imports
 

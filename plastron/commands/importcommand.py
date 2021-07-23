@@ -381,7 +381,24 @@ class Command(BaseCommand):
             relpath=message.args.get('relpath', None)
         )
 
+    @staticmethod
+    def create_import_job(job_id, jobs_dir):
+        """
+        Returns an ImportJob with the given parameters
+
+        :param job_id: the job id for the import job
+        :param jobs_dir: the base directory where job information is stored
+        :return: An ImportJob with the given parameters
+        """
+        return ImportJob(job_id, jobs_dir=jobs_dir)
+
     def execute(self, repo, args):
+        """
+        Performs the import
+
+        :param repo: the repository configuration
+        :param args: the command-line arguments
+        """
         start_time = datetime.now().timestamp()
 
         if args.resume and args.job_id is None:
@@ -391,7 +408,7 @@ class Command(BaseCommand):
             # TODO: generate a more unique id? add in user and hostname?
             args.job_id = f"import-{datetimestamp()}"
 
-        job = ImportJob(args.job_id, jobs_dir=self.jobs_dir)
+        job = Command.create_import_job(args.job_id, jobs_dir=self.jobs_dir)
         logger.debug(f'Job directory is {job.dir}')
 
         if args.resume and not job.dir_exists:
@@ -453,107 +470,8 @@ class Command(BaseCommand):
         updated_uris = []
         created_uris = []
         for row in metadata:
-            if args.validate_only:
-                # create an empty object to validate without fetching from the repo
-                item = metadata.model_class(uri=row.uri)
-            else:
-                if row.uri is not None:
-                    # read the object from the repo
-                    item = metadata.model_class.from_repository(repo, row.uri, include_server_managed=False)
-                else:
-                    # no URI in the CSV means we will create a new object
-                    logger.info(f'No URI found for {row.line_reference}; will create new resource')
-                    # create a new object (will create in the repo later)
-                    item = metadata.model_class()
-
-            # track new embedded objects that are added to the graph
-            # so we can ensure that they have at least one statement
-            # where they appear as the subject
-            new_objects = defaultdict(Graph)
-
-            delete_graph = Graph()
-            insert_graph = Graph()
-
-            for attrs, columns in metadata.fields.items():
-                prop_type = get_property_type(item.__class__, attrs)
-                if '.' not in attrs:
-                    # simple, non-embedded values
-                    # attrs is the entire property name
-                    new_values = []
-                    for column in columns:
-                        header = column['header']
-                        new_values.extend(parse_value_string(row[header], column, prop_type))
-
-                    # construct a SPARQL update by diffing for deletions and insertions
-                    # update the property and get the sets of values deleted and inserted
-                    prop = getattr(item, attrs)
-                    deleted_values, inserted_values = prop.update(new_values)
-
-                    for deleted_value in deleted_values:
-                        delete_graph.add((item.uri, prop.uri, prop.get_term(deleted_value)))
-                    for inserted_value in inserted_values:
-                        insert_graph.add((item.uri, prop.uri, prop.get_term(inserted_value)))
-
-                else:
-                    # complex, embedded values
-
-                    # build the lookup index to map hash URI objects
-                    # to their correct positional locations
-                    row_index = build_lookup_index(item, row.index_string)
-
-                    # if the first portion of the dotted attr notation is a key in the index,
-                    # then this column has a different subject than the main uri
-                    # correlate positions and urirefs
-                    # XXX: for now, assuming only 2 levels of chaining
-                    first_attr, next_attr = attrs.split('.', 2)
-                    new_values = defaultdict(list)
-                    for column in columns:
-                        header = column['header']
-                        for i, value_string in enumerate(row[header].split(';')):
-                            new_values[i].extend(parse_value_string(value_string, column, prop_type))
-
-                    if first_attr in row_index:
-                        # existing embedded object
-                        for i, values in new_values.items():
-                            # get the embedded object
-                            obj = row_index[first_attr][i]
-                            prop = getattr(obj, next_attr)
-                            deleted_values, inserted_values = prop.update(values)
-
-                            for deleted_value in deleted_values:
-                                delete_graph.add((item.uri, prop.uri, prop.get_term(deleted_value)))
-                            for inserted_value in inserted_values:
-                                insert_graph.add((item.uri, prop.uri, prop.get_term(inserted_value)))
-                    else:
-                        # create new embedded objects (a.k.a hash resources) that are not in the index
-                        first_prop_type = item.name_to_prop[first_attr]
-                        for i, values in new_values.items():
-                            # we can assume that for any properties with dotted notation,
-                            # all attributes except for the last one are object properties
-                            if first_prop_type.obj_class is not None:
-                                # create a new object
-                                # TODO: remove hardcoded UUID fragment minting
-                                obj = first_prop_type.obj_class(uri=f'{item.uri}#{uuid4()}')
-                                # add the new object to the index
-                                row_index[first_attr][i] = obj
-                                setattr(obj, next_attr, values)
-                                next_attr_prop = obj.name_to_prop[next_attr]
-                                for value in values:
-                                    new_objects[(first_attr, obj)].add((obj.uri, next_attr_prop.uri, value))
-
-            # add new embedded objects to the insert graph
-            for (attr, obj), graph in new_objects.items():
-                # add that object to the main item
-                getattr(item, attr).append(obj)
-                # add to the insert graph
-                insert_graph.add((item.uri, item.name_to_prop[attr].uri, obj.uri))
-                insert_graph += graph
-
-            # do a pass to remove statements that are both deleted and then re-inserted
-            for statement in delete_graph:
-                if statement in insert_graph:
-                    delete_graph.remove(statement)
-                    insert_graph.remove(statement)
+            repo_changeset = self.create_repo_changeset(args, repo, metadata, row)
+            item = repo_changeset.item
 
             # count the number of files referenced in this row
             metadata.files += len(row.filenames)
@@ -586,7 +504,7 @@ class Command(BaseCommand):
                 reasons = [' '.join(str(f) for f in outcome) for outcome in report.failed()]
                 if len(missing_files) > 0:
                     reasons.extend(f'Missing file: {f}' for f in missing_files)
-                job.drop(
+                job.drop_invalid(
                     item=item,
                     line_reference=row.line_reference,
                     reason=f'Validation failures: {"; ".join(reasons)}'
@@ -598,70 +516,12 @@ class Command(BaseCommand):
                 continue
 
             try:
-                if not item.created:
-                    # if an item is new, don't construct a SPARQL Update query
-                    # instead, just create and update normally
-                    # create new item in the repo
-                    logger.debug('Creating a new item')
-                    # add the access class
-                    if job.access is not None:
-                        item.rdf_type.append(job.access)
-                    # add the collection membership
-                    if job.member_of is not None:
-                        item.member_of = URIRef(job.member_of)
-
-                    if row.has_files:
-                        create_pages = bool(strtobool(row.get('CREATE_PAGES', 'True')))
-                        logger.debug('Adding pages and files to new item')
-                        self.add_files(
-                            item,
-                            build_file_groups(row['FILES']),
-                            base_location=job.binaries_location,
-                            access=job.access,
-                            create_pages=create_pages
-                        )
-
-                    if args.extract_text_types is not None:
-                        annotate_from_files(item, args.extract_text_types.split(','))
-
-                    logger.debug(f"Creating resources in container: {job.container}")
-
-                    try:
-                        with Transaction(repo) as txn:
-                            item.create(repo, container_path=job.container)
-                            item.update(repo)
-                            txn.commit()
-                    except Exception as e:
-                        raise FailureException(f'Creating item failed: {e}') from e
-
-                    job.complete(item, row.line_reference)
-                    metadata.created += 1
-                    created_uris.append(item.uri)
-
-                elif len(delete_graph) > 0 or len(insert_graph) > 0:
-                    # construct the SPARQL Update query if there are any deletions or insertions
-                    # then do a PATCH update of an existing item
-                    logger.info(f'Sending update for {item}')
-                    sparql_update = repo.build_sparql_update(delete_graph, insert_graph)
-                    logger.debug(sparql_update)
-                    try:
-                        item.patch(repo, sparql_update)
-                    except RESTAPIException as e:
-                        raise FailureException(f'Updating item failed: {e}') from e
-
-                    job.complete(item, row.line_reference)
-                    metadata.updated += 1
-                    updated_uris.append(item.uri)
-
-                else:
-                    metadata.unchanged += 1
-                    logger.info(f'No changes found for "{item}" ({row.uri}); skipping')
-                    metadata.skipped += 1
-
+                self.update_repo(args, job, repo, metadata, row, repo_changeset,
+                                 created_uris, updated_uris)
             except FailureException as e:
                 metadata.errors += 1
                 logger.error(f'{item} import failed: {e}')
-                job.drop(item, row.line_reference, reason=str(e))
+                job.drop_failed(item, row.line_reference, reason=str(e))
 
             # update the status
             now = datetime.now().timestamp()
@@ -676,7 +536,8 @@ class Command(BaseCommand):
 
         logger.info(f'Skipped {metadata.skipped} items')
         logger.info(f'Completed {len(job.completed_log) - initial_completed_item_count} items')
-        logger.info(f'Dropped {len(job.dropped_log)} items')
+        logger.info(f'Dropped {len(job.dropped_invalid_log)} invalid items')
+        logger.info(f'Dropped {len(job.dropped_failed_log)} failed items')
 
         logger.info(f"Found {metadata.valid} valid items")
         logger.info(f"Found {metadata.invalid} invalid items")
@@ -693,6 +554,233 @@ class Command(BaseCommand):
                 'updated': updated_uris
             }
         }
+
+    def create_repo_changeset(self, args, repo, metadata, row):
+        """
+        Returns a RepoChangeset of the changes to make to the repository
+
+        :param args: the arguments from the command-line
+        :param repo: the repository configuration
+        :param metadata: A plastron.jobs.MetadataRows object representing the
+                          CSV file for the import
+        :param row: A single plastron.jobs.Row object representing the row
+                     to import
+        :return: A RepoChangeSet encapsulating the changes to make to the
+                repository.
+        """
+        if args.validate_only:
+            # create an empty object to validate without fetching from the repo
+            item = metadata.model_class(uri=row.uri)
+        else:
+            if row.uri is not None:
+                # read the object from the repo
+                item = metadata.model_class.from_repository(repo, row.uri, include_server_managed=False)
+            else:
+                # no URI in the CSV means we will create a new object
+                logger.info(f'No URI found for {row.line_reference}; will create new resource')
+                # create a new object (will create in the repo later)
+                item = metadata.model_class()
+
+        # track new embedded objects that are added to the graph
+        # so we can ensure that they have at least one statement
+        # where they appear as the subject
+        new_objects = defaultdict(Graph)
+
+        delete_graph = Graph()
+        insert_graph = Graph()
+
+        for attrs, columns in metadata.fields.items():
+            prop_type = get_property_type(item.__class__, attrs)
+            if '.' not in attrs:
+                # simple, non-embedded values
+                # attrs is the entire property name
+                new_values = []
+                for column in columns:
+                    header = column['header']
+                    new_values.extend(parse_value_string(row[header], column, prop_type))
+
+                # construct a SPARQL update by diffing for deletions and insertions
+                # update the property and get the sets of values deleted and inserted
+                prop = getattr(item, attrs)
+                deleted_values, inserted_values = prop.update(new_values)
+
+                for deleted_value in deleted_values:
+                    delete_graph.add((item.uri, prop.uri, prop.get_term(deleted_value)))
+                for inserted_value in inserted_values:
+                    insert_graph.add((item.uri, prop.uri, prop.get_term(inserted_value)))
+
+            else:
+                # complex, embedded values
+
+                # build the lookup index to map hash URI objects
+                # to their correct positional locations
+                row_index = build_lookup_index(item, row.index_string)
+
+                # if the first portion of the dotted attr notation is a key in the index,
+                # then this column has a different subject than the main uri
+                # correlate positions and urirefs
+                # XXX: for now, assuming only 2 levels of chaining
+                first_attr, next_attr = attrs.split('.', 2)
+                new_values = defaultdict(list)
+                for column in columns:
+                    header = column['header']
+                    for i, value_string in enumerate(row[header].split(';')):
+                        new_values[i].extend(parse_value_string(value_string, column, prop_type))
+
+                if first_attr in row_index:
+                    # existing embedded object
+                    for i, values in new_values.items():
+                        # get the embedded object
+                        obj = row_index[first_attr][i]
+                        prop = getattr(obj, next_attr)
+                        deleted_values, inserted_values = prop.update(values)
+
+                        for deleted_value in deleted_values:
+                            delete_graph.add((item.uri, prop.uri, prop.get_term(deleted_value)))
+                        for inserted_value in inserted_values:
+                            insert_graph.add((item.uri, prop.uri, prop.get_term(inserted_value)))
+                else:
+                    # create new embedded objects (a.k.a hash resources) that are not in the index
+                    first_prop_type = item.name_to_prop[first_attr]
+                    for i, values in new_values.items():
+                        # we can assume that for any properties with dotted notation,
+                        # all attributes except for the last one are object properties
+                        if first_prop_type.obj_class is not None:
+                            # create a new object
+                            # TODO: remove hardcoded UUID fragment minting
+                            obj = first_prop_type.obj_class(uri=f'{item.uri}#{uuid4()}')
+                            # add the new object to the index
+                            row_index[first_attr][i] = obj
+                            setattr(obj, next_attr, values)
+                            next_attr_prop = obj.name_to_prop[next_attr]
+                            for value in values:
+                                new_objects[(first_attr, obj)].add((obj.uri, next_attr_prop.uri, value))
+
+        # add new embedded objects to the insert graph
+        for (attr, obj), graph in new_objects.items():
+            # add that object to the main item
+            getattr(item, attr).append(obj)
+            # add to the insert graph
+            insert_graph.add((item.uri, item.name_to_prop[attr].uri, obj.uri))
+            insert_graph += graph
+
+        # do a pass to remove statements that are both deleted and then re-inserted
+        for statement in delete_graph:
+            if statement in insert_graph:
+                delete_graph.remove(statement)
+                insert_graph.remove(statement)
+
+        return RepoChangeset(item, insert_graph, delete_graph)
+
+    def update_repo(self, args, job, repo, metadata, row, repo_changeset, created_uris, updated_uris):
+        """
+        Updates the repository with the given RepoChangeSet
+
+        :param args: the arguments from the command-line
+        :param job: The ImportJob
+        :param repo: the repository configuration
+        :param metadata: A plastron.jobs.MetadataRows object representing the
+                          CSV file being imported
+        :param row: A single plastron.jobs.Row object representing the row
+                     being imported
+        :param repo_changeset: The RepoChangeSet object describing the changes
+                                 to make to the repository.
+        :param created_uris: Accumulator storing a list of created URIS. This
+                              variable is MODIFIED by this method.
+        :param updated_uris: Accumulator storing a list of updated URIS. This
+                              variable is MODIFIED by this method.
+        """
+        item = repo_changeset.item
+        delete_graph = repo_changeset.delete_graph
+        insert_graph = repo_changeset.insert_graph
+
+        if not item.created:
+            # if an item is new, don't construct a SPARQL Update query
+            # instead, just create and update normally
+            # create new item in the repo
+            logger.debug('Creating a new item')
+            # add the access class
+            if job.access is not None:
+                item.rdf_type.append(job.access)
+            # add the collection membership
+            if job.member_of is not None:
+                item.member_of = URIRef(job.member_of)
+
+            if row.has_files:
+                create_pages = bool(strtobool(row.get('CREATE_PAGES', 'True')))
+                logger.debug('Adding pages and files to new item')
+                self.add_files(
+                    item,
+                    build_file_groups(row['FILES']),
+                    base_location=job.binaries_location,
+                    access=job.access,
+                    create_pages=create_pages
+                )
+
+            if args.extract_text_types is not None:
+                annotate_from_files(item, args.extract_text_types.split(','))
+
+            logger.debug(f"Creating resources in container: {job.container}")
+
+            try:
+                with Transaction(repo) as txn:
+                    item.create(repo, container_path=job.container)
+                    item.update(repo)
+                    txn.commit()
+            except Exception as e:
+                raise FailureException(f'Creating item failed: {e}') from e
+
+            job.complete(item, row.line_reference)
+            metadata.created += 1
+            created_uris.append(item.uri)
+
+        elif len(delete_graph) > 0 or len(insert_graph) > 0:
+            # construct the SPARQL Update query if there are any deletions or insertions
+            # then do a PATCH update of an existing item
+            logger.info(f'Sending update for {item}')
+            sparql_update = repo.build_sparql_update(delete_graph, insert_graph)
+            logger.debug(sparql_update)
+            try:
+                item.patch(repo, sparql_update)
+            except RESTAPIException as e:
+                raise FailureException(f'Updating item failed: {e}') from e
+
+            job.complete(item, row.line_reference)
+            metadata.updated += 1
+            updated_uris.append(item.uri)
+
+        else:
+            metadata.unchanged += 1
+            logger.info(f'No changes found for "{item}" ({row.uri}); skipping')
+            metadata.skipped += 1
+
+
+class RepoChangeset:
+    """
+    Data object encapsulating the set of changes that need to be made to
+    the repository for a single import
+
+    :param item: a repository model object (i.e. from plastron.models) from
+                 the repository (or an empty object if validation only)
+    :param insert_graph: an RDF Graph object to insert into the repository
+    :param delete_graph: an RDF Graph object to delete from the repository
+    """
+    def __init__(self, item, insert_graph, delete_graph):
+        self._item = item
+        self._insert_graph = insert_graph
+        self._delete_graph = delete_graph
+
+    @property
+    def item(self):
+        return self._item
+
+    @property
+    def insert_graph(self):
+        return self._insert_graph
+
+    @property
+    def delete_graph(self):
+        return self._delete_graph
 
 
 @rdf.object_property('derived_from', prov.wasDerivedFrom)

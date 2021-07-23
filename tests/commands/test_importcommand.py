@@ -21,7 +21,7 @@ def test_create_import_job():
     import_job = Command.create_import_job(job_id, jobs_dir)
     assert import_job.id == job_id
     assert import_job.safe_id == job_id
-    assert import_job.dir == os.path.join(jobs_dir, job_id)
+    assert str(import_job.dir) == os.path.join(jobs_dir, job_id)
 
 
 def test_cannot_resume_without_job_id():
@@ -142,6 +142,8 @@ def test_invalid_item_added_to_drop_invalid_log():
     # Verifies that the import command adds an invalid item to the
     # drop-invalid log
     mock_job = create_mock_job()
+    mock_run = create_mock_run(mock_job)
+    mock_job.new_run = MagicMock(return_value=mock_run)
     args = create_args(mock_job.id)
 
     invalid_item = create_mock_item(is_valid=False)
@@ -156,20 +158,21 @@ def test_invalid_item_added_to_drop_invalid_log():
 
     command.create_repo_changeset = MagicMock(return_value=repo_changeset)
     command.update_repo = MagicMock()
-    mock_job.drop_invalid = MagicMock()
 
     for _ in command.execute(repo, args):
         pass
 
     command.create_repo_changeset.assert_called_once()
     command.update_repo.assert_not_called()
-    mock_job.drop_invalid.assert_called_once()
+    mock_run.drop_invalid.assert_called_once()
 
 
 def test_failed_item_added_to_drop_failed_log():
     # Verifies that the import command adds a failed item to the
     # drop-failed log
     mock_job = create_mock_job()
+    mock_run = create_mock_run(mock_job)
+    mock_job.new_run = MagicMock(return_value=mock_run)
     args = create_args(mock_job.id)
     failed_item = create_mock_item(is_valid=True)
 
@@ -186,14 +189,12 @@ def test_failed_item_added_to_drop_failed_log():
     command.get_source.exists = MagicMock(return_value=True)
     command.update_repo = MagicMock(side_effect=FailureException)
 
-    mock_job.drop_failed = MagicMock()
-
     for _ in command.execute(repo, args):
         pass
 
     command.create_repo_changeset.assert_called_once()
     command.update_repo.assert_called_once()
-    mock_job.drop_failed.assert_called_once()
+    mock_run.drop_failed.assert_called_once()
 
 
 def create_args(job_id):
@@ -234,13 +235,23 @@ def create_mock_job():
     mock_job.store_metadata_file = MagicMock()
     mock_metadata = MagicMock()
     row = Row(line_reference='line_reference', row_number=1,
-              data=OrderedDict([{'FILES', 'test_file'}, {'Identifier', 'test-1'}]),
+              data=OrderedDict([('FILES', 'test_file'), ('Identifier', 'test-1')]),
               identifier_column='Identifier')
     mock_metadata.__iter__.return_value = [row]
 
     mock_job.metadata = MagicMock(return_value=mock_metadata)
     mock_job.binaries_location = 'test_binaries_location'
     return mock_job
+
+
+def create_mock_run(job):
+    mock_run = MagicMock()
+    mock_run.job = job
+    mock_run.start = MagicMock(return_value=mock_run)
+    mock_run.drop_failed = MagicMock()
+    mock_run.drop_invalid = MagicMock()
+
+    return mock_run
 
 
 def create_mock_item(is_valid=True):

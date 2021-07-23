@@ -12,6 +12,7 @@ MESSAGE_BROKER:
     JOB_PROGRESS: /topic/plastron.jobs.progress
     JOB_STATUS: /queue/plastron.jobs.status
     SYNCHRONOUS_JOBS: /queue/plastron.jobs.synchronous
+    REINDEXING: /queue/reindex
 COMMANDS:
   EXPORT:
     SSH_PRIVATE_KEY: /etc/plastron/auth/archelon_id

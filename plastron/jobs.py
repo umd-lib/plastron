@@ -176,7 +176,7 @@ class ImportJob:
         with open(self.config_filename, mode='w') as config_file:
             yaml.dump(
                 stream=config_file,
-                data={'job_id': self.id, **self.config}
+                data={'job_id': self.id, **{k: str(v) for k, v in self.config.items()}}
             )
 
     def store_metadata_file(self, input_file):

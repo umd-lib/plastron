@@ -5,6 +5,10 @@ import logging.config
 import os
 import signal
 import sys
+from pathlib import Path
+from threading import Thread
+
+import waitress
 import yaml
 
 from datetime import datetime
@@ -13,6 +17,7 @@ from plastron.logging import DEFAULT_LOGGING_OPTIONS
 from plastron.stomp import Broker
 from plastron.stomp.listeners import ReconnectListener, CommandListener
 from plastron.util import envsubst
+from plastron.web import create_app
 
 logger = logging.getLogger(__name__)
 now = datetime.utcnow().strftime('%Y%m%d%H%M%S')
@@ -42,8 +47,6 @@ def main():
         config = envsubst(yaml.safe_load(config_file))
 
     repo_config = config['REPOSITORY']
-    broker_config = config['MESSAGE_BROKER']
-    command_config = config.get('COMMANDS', {})
 
     logging_options = DEFAULT_LOGGING_OPTIONS
 
@@ -62,23 +65,63 @@ def main():
     # configure logging
     logging.config.dictConfig(logging_options)
 
-    # configure STOMP message broker
-    broker = Broker(broker_config)
-
     logger.info(f'plastrond {version}')
 
-    # setup listeners
-    # Order of listeners is important -- ReconnectListener should be the
-    # last listener
-    broker.connection.set_listener('command', CommandListener(broker, repo_config, command_config))
-    broker.connection.set_listener('reconnect', ReconnectListener(broker))
+    threads = [
+        STOMPDaemon(config=config),
+        HTTPDaemon(config=config)
+    ]
 
     try:
+        # start all daemons
+        for thread in threads:
+            thread.start()
+        # block until all threads have exited
+        for thread in threads:
+            thread.join()
+    except KeyboardInterrupt:
+        # exit on Ctrl+C
+        sys.exit()
+
+
+class STOMPDaemon(Thread):
+    def __init__(self, config=None, **kwargs):
+        super().__init__(daemon=True, **kwargs)
+        if config is None:
+            config = {}
+        self.repo_config = config['REPOSITORY']
+        self.broker_config = config['MESSAGE_BROKER']
+        self.command_config = config.get('COMMANDS', {})
+
+    def run(self):
+        # configure STOMP message broker
+        broker = Broker(self.broker_config)
+
+        # setup listeners
+        # Order of listeners is important -- ReconnectListener should be the
+        # last listener
+        broker.connection.set_listener('command', CommandListener(broker, self.repo_config, self.command_config))
+        broker.connection.set_listener('reconnect', ReconnectListener(broker))
+
+        # connect and listen indefinitely
         broker.connect()
         while True:
             signal.pause()
-    except KeyboardInterrupt:
-        sys.exit()
+
+
+class HTTPDaemon(Thread):
+    def __init__(self, config=None, **kwargs):
+        super().__init__(daemon=True, **kwargs)
+        repo_config = config['REPOSITORY']
+        self.jobs_dir = repo_config.get('JOBS_DIR', 'jobs')
+        server_config = config.get('HTTP_SERVER', {})
+        self.host = server_config.get('HOST', '0.0.0.0')
+        self.port = int(server_config.get('PORT', 5000))
+
+    def run(self):
+        app = create_app({'JOBS_DIR': Path(self.jobs_dir)})
+        logger.info(f'HTTP server listening on {self.host}:{self.port}')
+        waitress.serve(app, host=self.host, port=self.port)
 
 
 if __name__ == "__main__":

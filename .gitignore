@@ -94,3 +94,5 @@ venv/
 archelon_id
 archelon_id.pub
 
+# Docker Plastron Configuration file
+docker-plastron.yml

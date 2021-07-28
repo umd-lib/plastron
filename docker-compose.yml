@@ -2,8 +2,6 @@ version: "3.7"
 services:
   plastrond:
     image: docker.lib.umd.edu/plastrond
-    ports:
-      - 5000:5000
     configs:
       - source: plastrond
         target: /etc/plastrond.yml
@@ -11,7 +9,10 @@ services:
         target: /etc/plastron/auth/archelon_id
         mode: 0400
     volumes:
-      - plastrond:/var/opt/plastron
+      - plastrond-jobs:/var/opt/plastron/jobs
+      - plastrond-messages:/var/opt/plastron/msg
+    ports:
+      - 5000:5000
 configs:
   plastrond:
     file: docker-plastron.yml
@@ -20,7 +21,8 @@ configs:
     # The corresponding public key should be added to Archelon
     file: archelon_id
 volumes:
-  plastrond:
+  plastrond-jobs:
+  plastrond-messages:
 networks:
   default:
     external: true

@@ -4,6 +4,7 @@ REPOSITORY:
   RELPATH: /pcdm
   JWT_SECRET: <REPLACE WITH JWT_SECRET FROM umd-fcrepo>
   LOG_DIR: /var/log/plastron
+  JOBS_DIR: /var/opt/plastron/jobs
 MESSAGE_BROKER:
   SERVER: activemq:61613
   MESSAGE_STORE_DIR: /var/opt/plastron/msg/export

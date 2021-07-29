@@ -4,6 +4,7 @@ import os
 import re
 import urllib.parse
 from collections import defaultdict
+from pathlib import Path
 from shutil import copyfileobj
 from typing import List, Mapping
 
@@ -123,6 +124,10 @@ def build_fields(fieldnames, model_class):
     return fields
 
 
+def is_run_dir(path: Path) -> bool:
+    return path.is_dir() and re.match(r'^\d{14}$', path.name)
+
+
 class ImportJob:
     def __init__(self, id, jobs_dir):
         self.id = id
@@ -130,27 +135,18 @@ class ImportJob:
         self.safe_id = urllib.parse.quote(id, safe='')
         # use a timestamp to differentiate different runs of the same import job
         self.run_timestamp = datetimestamp()
-        self.dir = os.path.join(jobs_dir, self.safe_id)
-        self.config_filename = os.path.join(self.dir, 'config.yml')
-        self.metadata_filename = os.path.join(self.dir, 'source.csv')
+        self.dir = Path(jobs_dir) / self.safe_id
+        self.config_filename = self.dir / 'config.yml'
+        self.metadata_filename = self.dir / 'source.csv'
         self.config = {}
         self._model_class = None
 
         # record of items that are successfully loaded
         completed_fieldnames = ['id', 'timestamp', 'title', 'uri']
-        self.completed_log = ItemLog(os.path.join(self.dir, 'completed.log.csv'), completed_fieldnames, 'id')
+        self.completed_log = ItemLog(self.dir / 'completed.log.csv', completed_fieldnames, 'id')
 
-        # record of items that failed metadata validation
-        dropped_invalid_basename = f'dropped-invalid-{self.run_timestamp}'
-        dropped_invalid_log_filename = os.path.join(self.dir, f'{dropped_invalid_basename}.log.csv')
-        dropped_invalid_fieldnames = ['id', 'timestamp', 'title', 'uri', 'reason']
-        self.dropped_invalid_log = ItemLog(dropped_invalid_log_filename, dropped_invalid_fieldnames, 'id')
-
-        # record of items that failed when loading into the repository during this import run
-        dropped_failed_basename = f'dropped-failed-{self.run_timestamp}'
-        dropped_failed_log_filename = os.path.join(self.dir, f'{dropped_failed_basename}.log.csv')
-        dropped_failed_fieldnames = ['id', 'timestamp', 'title', 'uri', 'reason']
-        self.dropped_failed_log = ItemLog(dropped_failed_log_filename, dropped_failed_fieldnames, 'id')
+    def __str__(self):
+        return self.id
 
     def __getattr__(self, item):
         try:
@@ -160,7 +156,7 @@ class ImportJob:
 
     @property
     def dir_exists(self):
-        return os.path.isdir(self.dir)
+        return self.dir.is_dir()
 
     def load_config(self):
         with open(self.config_filename) as config_file:
@@ -193,30 +189,6 @@ class ImportJob:
                 raise ModelClassNotFoundError(self.model) from e
         return self._model_class
 
-    def drop_failed(self, item, line_reference, reason=''):
-        logger.warning(
-            f'Dropping failed {line_reference} from import job "{self.id}" run {self.run_timestamp}: {reason}'
-        )
-        self.dropped_failed_log.append({
-            'id': getattr(item, 'identifier', line_reference),
-            'timestamp': datetimestamp(digits_only=False),
-            'title': getattr(item, 'title', ''),
-            'uri': getattr(item, 'uri', ''),
-            'reason': reason
-        })
-
-    def drop_invalid(self, item, line_reference, reason=''):
-        logger.warning(
-            f'Dropping invalid {line_reference} from import job "{self.id}" run {self.run_timestamp}: {reason}'
-        )
-        self.dropped_invalid_log.append({
-            'id': getattr(item, 'identifier', line_reference),
-            'timestamp': datetimestamp(digits_only=False),
-            'title': getattr(item, 'title', ''),
-            'uri': getattr(item, 'uri', ''),
-            'reason': reason
-        })
-
     def complete(self, item, line_reference):
         # write to the completed item log
         self.completed_log.append({
@@ -228,6 +200,130 @@ class ImportJob:
 
     def metadata(self, **kwargs):
         return MetadataRows(self, **kwargs)
+
+    def new_run(self):
+        return ImportRun(self)
+
+    @property
+    def run_dirs(self):
+        return sorted(filter(is_run_dir, self.dir.iterdir()), reverse=True)
+
+    def latest_run(self):
+        run_dirs = self.run_dirs
+        if len(run_dirs) > 0:
+            return ImportRun(self).load(run_dirs[0].name)
+        else:
+            return None
+
+
+DROPPED_INVALID_FIELDNAMES = ['id', 'timestamp', 'title', 'uri', 'reason']
+DROPPED_FAILED_FIELDNAMES = ['id', 'timestamp', 'title', 'uri', 'reason']
+
+
+class ImportRun:
+    """
+    A single run of an import job. Records the logs of invalid and failed items (if any).
+    """
+    def __init__(self, job: ImportJob):
+        self.job = job
+        self.dir = None
+        self.timestamp = None
+        self._invalid_items = None
+        self._failed_items = None
+
+    def load(self, timestamp: str):
+        """
+        Load an existing import run by its timestamp.
+
+        :param timestamp: should be 14 digits expressing YYYYMMDDHHMMSS
+        :return:
+        """
+        self.timestamp = timestamp
+        self.dir = self.job.dir / self.timestamp
+        if not self.dir.is_dir():
+            raise FailureException(f'Import run {self.timestamp} not found')
+        return self
+
+    @property
+    def invalid_items(self) -> ItemLog:
+        """
+        Log of items that failed metadata validation during this import run.
+        """
+        if self._invalid_items is None:
+            self._invalid_items = ItemLog(self.dir / 'dropped-invalid.log.csv', DROPPED_INVALID_FIELDNAMES, 'id')
+        return self._invalid_items
+
+    @property
+    def failed_items(self) -> ItemLog:
+        """
+        Log of items that failed when loading into the repository during this import run.
+        """
+        if self._failed_items is None:
+            self._failed_items = ItemLog(self.dir / 'dropped-failed.log.csv', DROPPED_FAILED_FIELDNAMES, 'id')
+        return self._failed_items
+
+    def start(self):
+        """
+        Sets the timestamp for this run, and creates the log directory for it.
+
+        :return:
+        """
+        if self.dir is not None:
+            raise FailureException('Run completed, cannot start again')
+        self.timestamp = datetimestamp()
+        self.dir = self.job.dir / self.timestamp
+        os.makedirs(self.dir)
+        return self
+
+    def drop_failed(self, item, line_reference, reason=''):
+        """
+        Add the item to the log of failed items for this run.
+
+        :param item: the failed item
+        :param line_reference: string in the form <filename>:<line number>
+        :param reason: cause of the failure; usually the message from the underlying exception
+        :return:
+        """
+        logger.warning(
+            f'Dropping failed {line_reference} from import job "{self.job}" run {self.timestamp}: {reason}'
+        )
+        self.failed_items.append({
+            'id': getattr(item, 'identifier', line_reference),
+            'timestamp': datetimestamp(digits_only=False),
+            'title': getattr(item, 'title', ''),
+            'uri': getattr(item, 'uri', ''),
+            'reason': reason
+        })
+
+    def drop_invalid(self, item, line_reference, reason=''):
+        """
+        Add the item to the log of invalid items for this run.
+
+        :param item: the invalid item
+        :param line_reference: string in the form <filename>:<line number>
+        :param reason: validation failure message(s)
+        :return:
+        """
+        logger.warning(
+            f'Dropping invalid {line_reference} from import job "{self.job}" run {self.timestamp}: {reason}'
+        )
+        self.invalid_items.append({
+            'id': getattr(item, 'identifier', line_reference),
+            'timestamp': datetimestamp(digits_only=False),
+            'title': getattr(item, 'title', ''),
+            'uri': getattr(item, 'uri', ''),
+            'reason': reason
+        })
+
+    def complete(self, item, line_reference):
+        """
+        Delegates to the `plastron.jobs.ImportJob.complete()` method.
+
+        :param item:
+        :param line_reference:
+        :return:
+        """
+        self.job.complete(item, line_reference)
 
 
 class MetadataRows:

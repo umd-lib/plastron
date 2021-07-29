@@ -15,7 +15,7 @@ from plastron.commands import BaseCommand
 from plastron.exceptions import NoValidationRulesetException, RESTAPIException, FailureException, ConfigError
 from plastron.files import HTTPFileSource, LocalFileSource, RemoteFileSource, ZipFileSource
 from plastron.http import Transaction
-from plastron.jobs import ImportJob, ModelClassNotFoundError, build_lookup_index
+from plastron.jobs import ImportJob, ImportRun, ModelClassNotFoundError, build_lookup_index
 from plastron.namespaces import get_manager, prov, sc
 from plastron.oa import Annotation, TextualBody
 from plastron.pcdm import File, PreservationMasterFile
@@ -408,7 +408,7 @@ class Command(BaseCommand):
             # TODO: generate a more unique id? add in user and hostname?
             args.job_id = f"import-{datetimestamp()}"
 
-        job = Command.create_import_job(args.job_id, jobs_dir=self.jobs_dir)
+        job: ImportJob = Command.create_import_job(args.job_id, jobs_dir=self.jobs_dir)
         logger.debug(f'Job directory is {job.dir}')
 
         if args.resume and not job.dir_exists:
@@ -469,6 +469,7 @@ class Command(BaseCommand):
 
         updated_uris = []
         created_uris = []
+        import_run = job.new_run().start()
         for row in metadata:
             repo_changeset = self.create_repo_changeset(args, repo, metadata, row)
             item = repo_changeset.item
@@ -504,7 +505,7 @@ class Command(BaseCommand):
                 reasons = [' '.join(str(f) for f in outcome) for outcome in report.failed()]
                 if len(missing_files) > 0:
                     reasons.extend(f'Missing file: {f}' for f in missing_files)
-                job.drop_invalid(
+                import_run.drop_invalid(
                     item=item,
                     line_reference=row.line_reference,
                     reason=f'Validation failures: {"; ".join(reasons)}'
@@ -521,7 +522,7 @@ class Command(BaseCommand):
             except FailureException as e:
                 metadata.errors += 1
                 logger.error(f'{item} import failed: {e}')
-                job.drop_failed(item, row.line_reference, reason=str(e))
+                import_run.drop_failed(item, row.line_reference, reason=str(e))
 
             # update the status
             now = datetime.now().timestamp()
@@ -536,8 +537,8 @@ class Command(BaseCommand):
 
         logger.info(f'Skipped {metadata.skipped} items')
         logger.info(f'Completed {len(job.completed_log) - initial_completed_item_count} items')
-        logger.info(f'Dropped {len(job.dropped_invalid_log)} invalid items')
-        logger.info(f'Dropped {len(job.dropped_failed_log)} failed items')
+        logger.info(f'Dropped {len(import_run.invalid_items)} invalid items')
+        logger.info(f'Dropped {len(import_run.failed_items)} failed items')
 
         logger.info(f"Found {metadata.valid} valid items")
         logger.info(f"Found {metadata.invalid} invalid items")

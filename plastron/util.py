@@ -230,13 +230,17 @@ class ItemLog:
             self.item_keys.add(row[self.keyfield])
 
     def __iter__(self):
-        with open(self.filename, mode='r', buffering=1) as fh:
-            reader = csv.DictReader(fh)
-            # check the validity of the map file data
-            if not reader.fieldnames == self.fieldnames:
-                raise ItemLogError(f'Fieldnames in {self.filename} do not match expected fieldnames')
-            # read the data from the existing file
-            yield from reader
+        try:
+            with open(self.filename, mode='r', buffering=1) as fh:
+                reader = csv.DictReader(fh)
+                # check the validity of the map file data
+                if not reader.fieldnames == self.fieldnames:
+                    raise ItemLogError(f'Fieldnames in {self.filename} do not match expected fieldnames')
+                # read the data from the existing file
+                yield from reader
+        except FileNotFoundError:
+            # log file not found, so stop the iteration
+            raise StopIteration
 
     @property
     def writer(self):

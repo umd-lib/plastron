@@ -240,7 +240,7 @@ class ItemLog:
                 yield from reader
         except FileNotFoundError:
             # log file not found, so stop the iteration
-            raise StopIteration
+            return
 
     @property
     def writer(self):

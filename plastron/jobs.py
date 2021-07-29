@@ -204,15 +204,21 @@ class ImportJob:
     def new_run(self):
         return ImportRun(self)
 
+    def get_run(self, timestamp=None):
+        if timestamp is None:
+            # get the latest run
+            return self.latest_run()
+        else:
+            return ImportRun(self).load(timestamp)
+
     @property
-    def run_dirs(self):
-        return sorted(filter(is_run_dir, self.dir.iterdir()), reverse=True)
+    def runs(self):
+        return sorted((d.name for d in filter(is_run_dir, self.dir.iterdir())), reverse=True)
 
     def latest_run(self):
-        run_dirs = self.run_dirs
-        if len(run_dirs) > 0:
-            return ImportRun(self).load(run_dirs[0].name)
-        else:
+        try:
+            return ImportRun(self).load(self.runs[0])
+        except IndexError:
             return None
 
 

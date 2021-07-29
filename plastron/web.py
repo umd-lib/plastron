@@ -1,3 +1,4 @@
+import logging
 import urllib.parse
 from pathlib import Path
 
@@ -6,6 +7,9 @@ from werkzeug.exceptions import InternalServerError, NotFound
 
 from plastron.jobs import ImportJob
 from plastron.util import ItemLog
+
+
+logger = logging.getLogger(__name__)
 
 
 def job_url(job_id):
@@ -28,16 +32,20 @@ def completed_items(job):
 def create_app(config):
     app = Flask(__name__)
     app.config.from_mapping(config)
+    jobs_dir: Path = app.config['JOBS_DIR']
 
     def get_job(job_id: str):
-        job = ImportJob(urllib.parse.unquote(job_id), str(app.config['JOBS_DIR']))
+        job = ImportJob(urllib.parse.unquote(job_id), str(jobs_dir))
         if not job.dir_exists:
             raise NotFound
         return job
 
     @app.route('/jobs')
     def list_jobs():
-        job_ids = sorted(f.name for f in app.config['JOBS_DIR'].iterdir() if f.is_dir())
+        if not jobs_dir.exists():
+            logger.warning(f'Jobs directory "{jobs_dir.absolute()}" does not exist; returning empty list')
+            return {'jobs': []}
+        job_ids = sorted(f.name for f in jobs_dir.iterdir() if f.is_dir())
         return {'jobs': [{'@id': job_url(job_id), 'job_id': job_id} for job_id in job_ids]}
 
     @app.route('/jobs/<path:job_id>')

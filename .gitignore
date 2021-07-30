@@ -85,6 +85,9 @@ msg/
 # PyCharm IDE work directory
 .idea/
 
+# VS Code metadata directory
+.vscode/
+
 # virtualenv directory
 venv/
 

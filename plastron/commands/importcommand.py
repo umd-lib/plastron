@@ -15,7 +15,7 @@ from plastron.commands import BaseCommand
 from plastron.exceptions import NoValidationRulesetException, RESTAPIException, FailureException, ConfigError
 from plastron.files import HTTPFileSource, LocalFileSource, RemoteFileSource, ZipFileSource
 from plastron.http import Transaction
-from plastron.jobs import ImportJob, ImportRun, ModelClassNotFoundError, build_lookup_index
+from plastron.jobs import ImportJob, ImportRun, JobError, ModelClassNotFoundError, build_lookup_index
 from plastron.namespaces import get_manager, prov, sc
 from plastron.oa import Annotation, TextualBody
 from plastron.pcdm import File, PreservationMasterFile
@@ -460,6 +460,8 @@ class Command(BaseCommand):
             metadata = job.metadata(limit=args.limit, percentage=args.percentage)
         except ModelClassNotFoundError as e:
             raise FailureException(f'Model class {e.model_name} not found') from e
+        except JobError as e:
+            raise FailureException(str(e)) from e
 
         if metadata.has_binaries and job.binaries_location is None:
             raise ConfigError('Must specify --binaries-location if the metadata has a FILES column')

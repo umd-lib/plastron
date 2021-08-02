@@ -5,9 +5,7 @@ from pathlib import Path
 from flask import Flask, url_for
 from werkzeug.exceptions import InternalServerError, NotFound
 
-from plastron.jobs import ImportJob
-from plastron.util import ItemLog
-
+from plastron.jobs import ConfigMissingError, ImportJob, JobError
 
 logger = logging.getLogger(__name__)
 
@@ -16,23 +14,29 @@ def job_url(job_id):
     return url_for('show_job', _external=True, job_id=job_id)
 
 
-def get_dropped_logs(job_dir):
-    dropped_fieldnames = ['id', 'timestamp', 'title', 'uri', 'reason']
-    return {f.name[f.name.index('-') + 1:f.name.index('.')]: ItemLog(f, dropped_fieldnames, 'id')
-            for f in Path(job_dir).iterdir() if f.name.startswith('dropped-')}
-
-
-def completed_items(job):
+def items(log):
     return {
-        'count': len(job.completed_log),
-        'items': [c for c in job.completed_log]
+        'count': len(log),
+        'items': [c for c in log]
+    }
+
+
+def latest_dropped_items(job: ImportJob):
+    latest_run = job.latest_run()
+    if latest_run is None:
+        return {}
+
+    return {
+        'timestamp': latest_run.timestamp,
+        'failed': items(latest_run.failed_items),
+        'invalid': items(latest_run.invalid_items)
     }
 
 
 def create_app(config):
     app = Flask(__name__)
     app.config.from_mapping(config)
-    jobs_dir: Path = app.config['JOBS_DIR']
+    jobs_dir = Path(app.config['JOBS_DIR'])
 
     def get_job(job_id: str):
         job = ImportJob(urllib.parse.unquote(job_id), str(jobs_dir))
@@ -51,24 +55,23 @@ def create_app(config):
     @app.route('/jobs/<path:job_id>')
     def show_job(job_id):
         job = get_job(job_id)
-        job.load_config()
+        try:
+            job.load_config()
+        except ConfigMissingError as e:
+            logger.warning(f'Cannot open config file {job.config_filename} for job {job}')
+            # TODO: more complete information in the response body?
+            raise NotFound
+
         try:
             return {
                 '@id': job_url(job_id),
                 **job.config,
-                'completed': completed_items(job),
+                'runs': job.runs,
+                'completed': items(job.completed_log),
+                'dropped': latest_dropped_items(job),
                 'total': job.metadata().total
             }
-        except FileNotFoundError as e:
-            raise InternalServerError from e
-
-    @app.route('/jobs/<path:job_id>/completed')
-    def show_completed_items(job_id):
-        job = get_job(job_id)
-        job.load_config()
-        try:
-            return completed_items(job), {'Content-Type': 'application/json'}
-        except FileNotFoundError as e:
-            raise InternalServerError from e
+        except JobError as e:
+            raise NotFound from e
 
     return app

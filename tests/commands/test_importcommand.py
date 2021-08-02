@@ -5,7 +5,7 @@ import tempfile
 from collections import OrderedDict
 from plastron.commands.importcommand import Command, RepoChangeset
 from plastron.exceptions import FailureException, NoValidationRulesetException
-from plastron.jobs import Row
+from plastron.jobs import ConfigMissingError, Row
 from plastron.models.umd import Item
 from plastron.validation import ResourceValidationResult
 from rdflib.graph import Graph
@@ -56,7 +56,7 @@ def test_cannot_resume_without_job_directory():
 
 
 def test_cannot_resume_without_config_file():
-    # Verifies that the import command throws FailureException when resuming a
+    # Verifies that the import command throws ConfigMissingError when resuming a
     # job and a config file is not found
     job_id = 'test_id'
     args = create_args(job_id)
@@ -72,11 +72,11 @@ def test_cannot_resume_without_config_file():
         command = Command(config)
         repo = None
 
-        with pytest.raises(FailureException) as excinfo:
+        with pytest.raises(ConfigMissingError) as excinfo:
             for _ in command.execute(repo, args):
                 pass
 
-        assert "no config.yml found" in str(excinfo.value)
+        assert "config.yml is missing" in str(excinfo.value)
 
 
 def test_model_is_required_unless_resuming():

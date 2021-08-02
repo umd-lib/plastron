@@ -1,0 +1,6 @@
+access: null
+binaries_location: data
+container: /dc/2021/2
+job_id: import-20210505143008
+member_of: https://fcrepo.lib.umd.edu/fcrepo/rest/dc/2021/2
+model: Item

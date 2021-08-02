@@ -72,7 +72,7 @@ logs.*
 config/*
 data/*
 exports/*
-jobs/
+/jobs/
 msg/
 !config/templates
 !config/templates/*

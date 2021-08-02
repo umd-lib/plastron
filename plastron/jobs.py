@@ -128,6 +128,23 @@ def is_run_dir(path: Path) -> bool:
     return path.is_dir() and re.match(r'^\d{14}$', path.name)
 
 
+class JobError(Exception):
+    def __init__(self, job, *args):
+        super().__init__(*args)
+        self.job = job
+
+    def __str__(self):
+        return f'Job {self.job} error: {super().__str__()}'
+
+
+class ConfigMissingError(JobError):
+    pass
+
+
+class MetadataError(JobError):
+    pass
+
+
 class ImportJob:
     def __init__(self, id, jobs_dir):
         self.id = id
@@ -159,9 +176,15 @@ class ImportJob:
         return self.dir.is_dir()
 
     def load_config(self):
-        with open(self.config_filename) as config_file:
-            self.config = yaml.safe_load(config_file)
-        return self.config
+        try:
+            with open(self.config_filename) as config_file:
+                config = yaml.safe_load(config_file)
+            if config is None:
+                raise ConfigMissingError(self, f'Config file {self.config_filename} is empty')
+            self.config = config
+            return self.config
+        except FileNotFoundError as e:
+            raise ConfigMissingError(self, f'Config file {self.config_filename} is missing') from e
 
     def save_config(self, config):
         # store the relevant config
@@ -344,7 +367,7 @@ class MetadataRows:
         try:
             self.metadata_file = open(job.metadata_filename, 'r')
         except FileNotFoundError as e:
-            raise FailureException(f'Cannot read source file "{job.metadata_filename}: {e}') from e
+            raise MetadataError(job, f'Cannot read source file "{job.metadata_filename}: {e}') from e
 
         self.csv_file = csv.DictReader(self.metadata_file)
 

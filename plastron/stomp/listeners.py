@@ -2,7 +2,7 @@ import json
 import logging
 import os
 from concurrent.futures import ThreadPoolExecutor
-from importlib import import_module
+
 from plastron import version
 from plastron.commands import get_command_class
 from plastron.exceptions import FailureException
@@ -149,7 +149,7 @@ class MessageProcessor:
         return Message(
             headers={
                 'PlastronJobId': message.job_id,
-                'PlastronJobStatus': 'Done',
+                'PlastronJobState': command.result.get('type', ''),
                 'persistent': 'true'
             },
             body=json.dumps(command.result)

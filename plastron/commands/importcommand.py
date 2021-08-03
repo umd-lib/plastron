@@ -549,14 +549,33 @@ class Command(BaseCommand):
             logger.info(f"{metadata.unchanged} of {metadata.total} items remained unchanged")
             logger.info(f"Created {metadata.created} of {metadata.total} items")
             logger.info(f"Updated {metadata.updated} of {metadata.total} items")
-        self.result = {
-            'count': metadata.stats(),
-            'validation': metadata.validation_reports,
-            'uris': {
-                'created': created_uris,
-                'updated': updated_uris
-            }
-        }
+
+        if args.validate_only:
+            # validate phase
+            if metadata.invalid == 0:
+                self.result = {
+                    'type': 'validate_success',
+                    'validation': metadata.validation_reports,
+                    'count': metadata.stats()
+                }
+            else:
+                self.result = {
+                    'type': 'validate_failed',
+                    'validation': metadata.validation_reports,
+                    'count': metadata.stats()
+                }
+        else:
+            # import phase
+            if len(job.completed_log) == metadata.total:
+                self.result = {
+                    'type': 'import_complete',
+                    'count': metadata.stats()
+                }
+            else:
+                self.result = {
+                    'type': 'import_incomplete',
+                    'count': metadata.stats()
+                }
 
     def create_repo_changeset(self, args, repo, metadata, row):
         """
@@ -704,7 +723,7 @@ class Command(BaseCommand):
             logger.debug('Creating a new item')
             # add the access class
             if job.access is not None:
-                item.rdf_type.append(job.access)
+                item.rdf_type.append(URIRef(job.access))
             # add the collection membership
             if job.member_of is not None:
                 item.member_of = URIRef(job.member_of)

@@ -113,6 +113,8 @@ class RDFObjectProperty(RDFProperty):
             return URIRef(value.uri)
         elif isinstance(value, URIRef):
             return value
+        elif isinstance(value, str):
+            return URIRef(value)
         else:
             raise ValueError('Expecting a URIRef or an object with a uri attribute')
 

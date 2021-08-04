@@ -170,6 +170,20 @@ class Repository:
         except Exception:
             return False
 
+    def repo_path(self, resource_uri):
+        """
+        Returns the repository path for the given resource URI, i.e. the
+        path with either the "REST_ENDPOINT" or "REPO_EXTERNAL_URL"
+        removed.
+        """
+        if resource_uri is None:
+            return None
+
+        repo_path = resource_uri.replace(self.endpoint, '')
+        if self.repo_external_url:
+            repo_path = repo_path.replace(self.repo_external_url, '')
+        return repo_path
+
     def __enter__(self):
         pass
 

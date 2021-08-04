@@ -53,7 +53,7 @@ class Command(BaseCommand):
             destination=self.reindexing_queue,
             headers={
                 'CamelFcrepoUri': resource.uri,
-                'CamelFcrepoPath': resource.uri.replace(self.repo.endpoint, ''),
+                'CamelFcrepoPath': self.repo.repo_path(resource.uri),
                 'CamelFcrepoResourceType': types,
                 'CamelFcrepoUser': self.username,
                 'persistent': 'true'

@@ -210,3 +210,60 @@ def test_repository_auth(repo_base_config):
     session = repository.session
     assert session.headers.get('Authorization')
     assert session.headers['Authorization'] == 'Bearer abcd-1234'
+
+
+def test_repository_contains_uri(repo_base_config):
+    repo_base_config['REPO_EXTERNAL_URL'] = 'http://external-host.com:8080/fcrepo/rest'
+    repository = Repository(repo_base_config)
+
+    assert repository.contains(None) is False
+    assert repository.contains('') is False
+    assert repository.contains('/not_in_repo') is False
+
+    assert repository.contains(repository.endpoint) is True
+
+    in_repo_uri = repository.endpoint + '/foo/bar'
+    assert repository.contains(in_repo_uri) is True
+
+    external_repo_uri = repo_base_config['REPO_EXTERNAL_URL']
+    assert repository.contains(external_repo_uri) is True
+
+    in_external_repo_uri = external_repo_uri + '/foo/bar'
+    assert repository.contains(in_external_repo_uri) is True
+
+
+def test_repository_contains_uri_without_repo_external_url(repo_base_config):
+    repository = Repository(repo_base_config)
+
+    assert repository.contains(None) is False
+    assert repository.contains('') is False
+    assert repository.contains('/not_in_repo') is False
+
+    assert repository.contains(repository.endpoint) is True
+
+    in_repo_uri = repository.endpoint + '/foo/bar'
+    assert repository.contains(in_repo_uri) is True
+
+
+def test_repository_repo_path(repo_base_config):
+    # Without REPO_EXTERNAL_URL
+    repository = Repository(repo_base_config)
+
+    assert repository.repo_path(None) is None
+    assert '' == repository.repo_path('')
+
+    # URLs not in repository are returned unchanged (shouldn't happen)
+    assert 'http://example.com/foo/bar' == repository.repo_path('http://example.com/foo/bar')
+
+    # URLs starting with REST endpoint should be have endpoint prefix removed
+    rest_endpoint = repo_base_config['REST_ENDPOINT']
+    resource_uri = rest_endpoint + '/foo/bar'
+    assert '/foo/bar' == repository.repo_path(resource_uri)
+
+    # With REPO_EXTERNAL_URL
+    repo_external_url = 'http://external-host.com:8080/fcrepo/rest'
+    repo_base_config['REPO_EXTERNAL_URL'] = repo_external_url
+    repository = Repository(repo_base_config)
+
+    external_resource_uri = repo_external_url + '/baz/quuz'
+    assert '/baz/quuz' == repository.repo_path(external_resource_uri)

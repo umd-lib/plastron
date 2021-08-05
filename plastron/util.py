@@ -146,7 +146,7 @@ class ResourceList:
 
     def get_resources(self, traverse=None):
         for uri in self.get_uris():
-            if not uri.startswith(self.repository.endpoint):
+            if not self.repository.contains(uri):
                 logger.warning(f'Resource {uri} is not contained within the repository {self.repository.endpoint}')
                 continue
             for resource, graph in self.repository.recursive_get(uri, traverse=traverse):

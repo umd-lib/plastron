@@ -118,12 +118,12 @@ class Repository:
         self.ua_string = ua_string
         self.delegated_user = on_behalf_of
 
-        repo_external_url = config.get('REPO_EXTERNAL_URL')
+        self.repo_external_url = config.get('REPO_EXTERNAL_URL')
         self.forwarded_host = None
         self.forwarded_proto = None
         self.forwarded_endpoint = None
-        if repo_external_url is not None:
-            parsed_repo_external_url = urlsplit(repo_external_url)
+        if self.repo_external_url is not None:
+            parsed_repo_external_url = urlsplit(self.repo_external_url)
             proto = parsed_repo_external_url.scheme
             host = parsed_repo_external_url.netloc
             if (proto != endpoint_proto) or (host != endpoint_host):
@@ -158,6 +158,31 @@ class Repository:
         self._path_stack.append(self.relpath)
         self.relpath = relpath
         return self
+
+    def contains(self, uri):
+        """
+        Returns True if the given URI string is contained within this
+        repository, False otherwise
+        """
+        try:
+            return uri.startswith(self.endpoint) or \
+                uri.startswith(self.repo_external_url)
+        except Exception:
+            return False
+
+    def repo_path(self, resource_uri):
+        """
+        Returns the repository path for the given resource URI, i.e. the
+        path with either the "REST_ENDPOINT" or "REPO_EXTERNAL_URL"
+        removed.
+        """
+        if resource_uri is None:
+            return None
+
+        repo_path = resource_uri.replace(self.endpoint, '')
+        if self.repo_external_url:
+            repo_path = repo_path.replace(self.repo_external_url, '')
+        return repo_path
 
     def __enter__(self):
         pass

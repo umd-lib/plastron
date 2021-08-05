@@ -553,29 +553,21 @@ class Command(BaseCommand):
         if args.validate_only:
             # validate phase
             if metadata.invalid == 0:
-                self.result = {
-                    'type': 'validate_success',
-                    'validation': metadata.validation_reports,
-                    'count': metadata.stats()
-                }
+                result_type = 'validate_success'
             else:
-                self.result = {
-                    'type': 'validate_failed',
-                    'validation': metadata.validation_reports,
-                    'count': metadata.stats()
-                }
+                result_type = 'validate_failed'
         else:
             # import phase
             if len(job.completed_log) == metadata.total:
-                self.result = {
-                    'type': 'import_complete',
-                    'count': metadata.stats()
-                }
+                result_type = 'import_complete'
             else:
-                self.result = {
-                    'type': 'import_incomplete',
-                    'count': metadata.stats()
-                }
+                result_type = 'import_incomplete'
+
+        self.result = {
+            'type': result_type,
+            'validation': metadata.validation_reports,
+            'count': metadata.stats()
+        }
 
     def create_repo_changeset(self, args, repo, metadata, row):
         """

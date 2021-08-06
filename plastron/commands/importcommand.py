@@ -549,13 +549,24 @@ class Command(BaseCommand):
             logger.info(f"{metadata.unchanged} of {metadata.total} items remained unchanged")
             logger.info(f"Created {metadata.created} of {metadata.total} items")
             logger.info(f"Updated {metadata.updated} of {metadata.total} items")
+
+        if args.validate_only:
+            # validate phase
+            if metadata.invalid == 0:
+                result_type = 'validate_success'
+            else:
+                result_type = 'validate_failed'
+        else:
+            # import phase
+            if len(job.completed_log) == metadata.total:
+                result_type = 'import_complete'
+            else:
+                result_type = 'import_incomplete'
+
         self.result = {
-            'count': metadata.stats(),
+            'type': result_type,
             'validation': metadata.validation_reports,
-            'uris': {
-                'created': created_uris,
-                'updated': updated_uris
-            }
+            'count': metadata.stats()
         }
 
     def create_repo_changeset(self, args, repo, metadata, row):
@@ -704,7 +715,7 @@ class Command(BaseCommand):
             logger.debug('Creating a new item')
             # add the access class
             if job.access is not None:
-                item.rdf_type.append(job.access)
+                item.rdf_type.append(URIRef(job.access))
             # add the collection membership
             if job.member_of is not None:
                 item.member_of = URIRef(job.member_of)

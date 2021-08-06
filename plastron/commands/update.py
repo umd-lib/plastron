@@ -140,6 +140,7 @@ class Command(BaseCommand):
             traverse=parse_predicate_list(args.recursive),
             use_transaction=args.use_transactions
         )
+        self.result = {}
 
     def update_item(self, resource, graph):
         if self.resources.completed and resource.uri in self.resources.completed:

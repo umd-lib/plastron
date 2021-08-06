@@ -247,6 +247,7 @@ class Command(BaseCommand):
         compress_bag(bag, destination, root)
 
         self.result = {
+            'type': 'export_complete' if count == total else 'partial_export',
             'content_type': serializer.content_type,
             'file_extension': serializer.file_extension,
             'count': {

@@ -1,17 +1,16 @@
 # Message Formats
 
-The Plastron Daemon emits both incremental progress messages
-as well as a final job completion message. The headers of
-these messages are standardized across commands, but the bodies
-have command-specific formats.
+The Plastron Daemon emits both incremental progress messages, and a final job
+completion message. The headers of these messages are standardized across
+commands, but the bodies have command-specific formats.
 
 ## Headers
 
 | Header            | Message Type       | Usage |
 |-------------------|--------------------|-------|
 |`PlastronJobId`    |progress, completion|URI that identifies the job|
-|`PlastronJobStatus`|completion          |Final job status; one of `Done` or `Failed`|
-|`PlastronJobError` |completion          |Reason for failure if the status is `Failed`|
+|`PlastronJobState` |completion          |Job state as of the end of this run|
+|`PlastronJobError` |completion          |Error message, if the job had a fatal exception|
 
 ## Bodies
 
@@ -38,8 +37,11 @@ All message bodies are JSON-formatted.
 
 #### Completion message
 
+The `PlastronJobState` header is copied from the `"type"` field in the message body.
+
 ```
 {
+    "type": "export_complete" | "partial_export",
     "content_type": /* MIME type of the export file: text/turtle, text/csv, or application/zip */,
     "file_extension": /* file extension of the export output file: .ttl, .csv, or .zip */,
     "download_uri": /* repository URI of the export file */
@@ -86,8 +88,11 @@ counted during the import processing.
 
 #### Completion message
 
+The `PlastronJobState` header is copied from the `"type"` field in the message body.
+
 ```
 {
+    "type": "validate_success" | "validate_failed" | "import_complete" | "import_incomplete",
     "count": {
         "total": /* total number of resources to import */,
         "updated": /* number of resources with changes that were updated */,

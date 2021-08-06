@@ -17,7 +17,6 @@ class AsynchronousResponseHandler:
             self.listener.status_queue.send(
                 headers={
                     'PlastronJobId': self.message.job_id,
-                    'PlastronJobStatus': 'Error',
                     'PlastronJobError': str(e),
                     'persistent': 'true'
                 }
@@ -54,7 +53,6 @@ class SynchronousResponseHandler:
             self.reply_to.send(
                 headers={
                     'PlastronJobId': self.message.job_id,
-                    'PlastronJobStatus': 'Error',
                     'PlastronJobError': str(e),
                     'persistent': 'true'
                 }

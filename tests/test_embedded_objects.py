@@ -42,3 +42,9 @@ def test_multiple_embeds(metadata, rows):
     changeset = create_repo_changeset(None, metadata, rows[0])
 
     assert len(changeset.item.creator) == 11
+
+
+def test_single_embedded_contributor(metadata, rows):
+    changeset = create_repo_changeset(None, metadata, rows[2])
+
+    assert len(changeset.item.contributor) == 1

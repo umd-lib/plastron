@@ -3,27 +3,27 @@ import csv
 import io
 import logging
 import os
-
-from argparse import FileType, Namespace, ArgumentTypeError
-from bs4 import BeautifulSoup
+from argparse import ArgumentTypeError, FileType, Namespace
 from collections import OrderedDict, defaultdict
 from datetime import datetime
 from distutils.util import strtobool
 from os.path import basename, splitext
+from uuid import uuid4
+
+from bs4 import BeautifulSoup
+from rdflib import Graph, Literal, URIRef
+
 from plastron import rdf
 from plastron.commands import BaseCommand
-from plastron.exceptions import NoValidationRulesetException, RESTAPIException, FailureException, ConfigError
+from plastron.exceptions import ConfigError, FailureException, NoValidationRulesetException, RESTAPIException
 from plastron.files import HTTPFileSource, LocalFileSource, RemoteFileSource, ZipFileSource
 from plastron.http import Transaction
-from plastron.jobs import ImportJob, JobError, ModelClassNotFoundError, build_lookup_index
+from plastron.jobs import ImportJob, ImportedItemStatus, JobError, ModelClassNotFoundError, build_lookup_index
 from plastron.namespaces import get_manager, prov, sc
 from plastron.oa import Annotation, TextualBody
 from plastron.pcdm import File, PreservationMasterFile
 from plastron.rdf import RDFDataProperty
 from plastron.util import datetimestamp, uri_or_curie
-from rdflib import URIRef, Graph, Literal
-from uuid import uuid4
-
 
 nsm = get_manager()
 logger = logging.getLogger(__name__)
@@ -744,7 +744,7 @@ class Command(BaseCommand):
             except Exception as e:
                 raise FailureException(f'Creating item failed: {e}') from e
 
-            job.complete(item, row.line_reference)
+            job.complete(item, row.line_reference, ImportedItemStatus.CREATED)
             metadata.created += 1
             created_uris.append(item.uri)
 
@@ -759,11 +759,12 @@ class Command(BaseCommand):
             except RESTAPIException as e:
                 raise FailureException(f'Updating item failed: {e}') from e
 
-            job.complete(item, row.line_reference)
+            job.complete(item, row.line_reference, ImportedItemStatus.MODIFIED)
             metadata.updated += 1
             updated_uris.append(item.uri)
 
         else:
+            job.complete(item, row.line_reference, ImportedItemStatus.UNCHANGED)
             metadata.unchanged += 1
             logger.info(f'No changes found for "{item}" ({row.uri}); skipping')
             metadata.skipped += 1

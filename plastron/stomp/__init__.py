@@ -2,7 +2,7 @@ import logging
 import os
 
 from stomp import Connection
-from stomp.exception import ConnectFailedException
+from stomp.exception import ConnectFailedException, NotConnectedException
 from time import sleep
 
 
@@ -23,7 +23,7 @@ class Broker:
             logger.info('Attempting to connect to the STOMP message broker')
             try:
                 self.connection.connect(wait=True)
-            except ConnectFailedException:
+            except (NotConnectedException, ConnectFailedException, OSError):
                 logger.warning('Connection attempt failed')
                 sleep(1)
 

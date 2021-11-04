@@ -1,8 +1,7 @@
 import plastron.validation.rules
 import sys
-from plastron.exceptions import NoValidationRulesetException
 from plastron.namespaces import rdf
-from plastron.validation import ResourceValidationResult
+from plastron.validation import ResourceValidationResult, ValidationError
 from rdflib import Graph, URIRef, Literal
 
 # alias the rdflib Namespace
@@ -278,7 +277,7 @@ class Resource(metaclass=Meta):
             try:
                 ruleset = self.VALIDATION_RULESET
             except AttributeError:
-                raise NoValidationRulesetException(f'No ruleset given, and "{self}" does not have a default ruleset')
+                raise ValidationError(f'No ruleset given, and "{self}" does not have a default ruleset')
         result = ResourceValidationResult(self)
         for field, rules in ruleset.items():
             for rule_name, arg in rules.items():

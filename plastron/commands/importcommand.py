@@ -15,7 +15,7 @@ from rdflib import Graph, Literal, URIRef
 
 from plastron import rdf
 from plastron.commands import BaseCommand
-from plastron.exceptions import ConfigError, FailureException, NoValidationRulesetException, RESTAPIException
+from plastron.exceptions import ConfigError, FailureException, RESTAPIException
 from plastron.files import HTTPFileSource, LocalFileSource, RemoteFileSource, ZipFileSource
 from plastron.http import Transaction
 from plastron.jobs import ImportJob, ImportedItemStatus, JobError, ModelClassNotFoundError, build_lookup_index
@@ -24,6 +24,7 @@ from plastron.oa import Annotation, TextualBody
 from plastron.pcdm import File, PreservationMasterFile
 from plastron.rdf import RDFDataProperty
 from plastron.util import datetimestamp, uri_or_curie
+from plastron.validation import ValidationError
 
 nsm = get_manager()
 logger = logging.getLogger(__name__)
@@ -600,7 +601,7 @@ class Command(BaseCommand):
 
             try:
                 report = validate(item)
-            except NoValidationRulesetException as e:
+            except ValidationError as e:
                 raise FailureException(f'Unable to run validation: {e}') from e
 
             metadata.validation_reports.append({

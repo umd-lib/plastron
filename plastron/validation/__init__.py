@@ -41,3 +41,7 @@ class ResourceValidationResult:
             if status != 'failed':
                 continue
             yield prop.name, status, rule.__name__, getattr(expected, '__name__', expected)
+
+
+class ValidationError(Exception):
+    pass

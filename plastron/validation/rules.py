@@ -1,8 +1,7 @@
 import re
-
-from functools import lru_cache
-from rdflib import Graph
 from typing import Callable
+
+from plastron.validation.vocabularies import get_subjects
 
 
 def non_empty(values):
@@ -27,12 +26,6 @@ def exactly(prop, length):
 
 def allowed_values(prop, values):
     return not any(True for v in prop.values if str(v) not in values)
-
-
-@lru_cache()
-def get_subjects(vocab_uri):
-    graph = Graph().parse(vocab_uri)
-    return [str(s) for s in set(graph.subjects())]
 
 
 def from_vocabulary(prop, vocab_uri):

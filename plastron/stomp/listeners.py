@@ -145,13 +145,16 @@ class MessageProcessor:
             )
 
         logger.info(f'Job {message.job_id} complete')
+        headers = {
+            'PlastronJobId': message.job_id,
+            'persistent': 'true',
+            'PlastronJobStatus': 'Done'
+        }
+        if 'type' in command.result:
+            headers['PlastronJobState'] = command.result.get('type')
 
         return Message(
-            headers={
-                'PlastronJobId': message.job_id,
-                'PlastronJobState': command.result.get('type', ''),
-                'persistent': 'true'
-            },
+            headers=headers,
             body=json.dumps(command.result)
         )
 

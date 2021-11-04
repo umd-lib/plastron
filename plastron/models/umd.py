@@ -55,11 +55,11 @@ class Item(pcdm.Object):
         'accession_number': 'Accession Number'
     }
     VALIDATION_RULESET = {
-        'object_type': {
-            'required': True,
-            'exactly': 1,
-            'from_vocabulary': 'http://purl.org/dc/dcmitype/',
-        },
+        # 'object_type': {
+        #     'required': True,
+        #     'exactly': 1,
+        #     'from_vocabulary': 'http://purl.org/dc/dcmitype/',
+        # },
         'identifier': {
             'required': True
         },

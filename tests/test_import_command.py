@@ -114,27 +114,27 @@ hierarchical_repo_config = {
 }
 
 # Import message does not specify structure
-no_structure_message = PlastronCommandMessage({
-    'message-id': 'TEST-no-structure',
-    'PlastronJobId': '1',
-    'PlastronCommand': 'import',
-})
+no_structure_message = PlastronCommandMessage(
+    message_id='TEST-no-structure',
+    job_id='1',
+    command='import'
+)
 
 # Import message specifies "flat" structure
-flat_structure_message = PlastronCommandMessage({
-    'message-id': 'TEST-flat-structure',
-    'PlastronJobId': '1',
-    'PlastronCommand': 'import',
-    'PlastronArg-structure': 'flat'
-})
+flat_structure_message = PlastronCommandMessage(
+    message_id='TEST-flat-structure',
+    job_id='1',
+    command='import',
+    args={'structure': 'flat'}
+)
 
 # Import message specified "hierarchical" structure
-hierarchical_structure_message = PlastronCommandMessage({
-    'message-id': 'TEST-hierarchical-structure',
-    'PlastronJobId': '1',
-    'PlastronCommand': 'import',
-    'PlastronArg-structure': 'hierarchical'
-})
+hierarchical_structure_message = PlastronCommandMessage(
+    message_id='TEST-hierarchical-structure',
+    job_id='1',
+    command='import',
+    args={'structure': 'hierarchical'}
+)
 
 
 def test_repo_config_uses_structure_from_repo_config_if_no_structure_specified():
@@ -174,20 +174,22 @@ relpath_repo_config = {
 }
 
 # Import message without relpath
-no_relpath_message = PlastronCommandMessage({
-    'message-id': 'TEST-without-relpath',
-    'PlastronJobId': '1',
-    'PlastronCommand': 'import',
-    'PlastronArg-structure': 'flat'
-})
+no_relpath_message = PlastronCommandMessage(
+    message_id='TEST-without-relpath',
+    job_id='1',
+    command='import',
+    args={'structure': 'flat'},
+)
 
-relpath_message = PlastronCommandMessage({
-    'message-id': 'TEST-with-relpath',
-    'PlastronJobId': '1',
-    'PlastronCommand': 'import',
-    'PlastronArg-structure': 'flat',
-    'PlastronArg-relpath': '/test-relpath'
-})
+relpath_message = PlastronCommandMessage(
+    message_id='TEST-with-relpath',
+    job_id='1',
+    command='import',
+    args={
+        'structure': 'flat',
+        'relpath': '/test-relpath'
+    },
+)
 
 
 def test_repo_config_uses_relpath_from_repo_config_if_no_relpath_specified():

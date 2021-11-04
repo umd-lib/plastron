@@ -1,10 +1,11 @@
 import logging
 import os
+from time import sleep
 
 from stomp import Connection
 from stomp.exception import ConnectFailedException, NotConnectedException
-from time import sleep
 
+from plastron.stomp.messages import Message
 
 logger = logging.getLogger(__name__)
 
@@ -26,6 +27,15 @@ class Broker:
             except (NotConnectedException, ConnectFailedException, OSError):
                 logger.warning('Connection attempt failed')
                 sleep(1)
+
+    def set_listener(self, *args):
+        self.connection.set_listener(*args)
+
+    def subscribe(self, *args, **kwargs):
+        self.connection.subscribe(*args, **kwargs)
+
+    def ack(self, *args):
+        self.connection.ack(*args)
 
     def destination(self, name: str):
         return self.destinations[name.upper()]
@@ -52,5 +62,5 @@ class Destination:
     def __str__(self):
         return self.destination
 
-    def send(self, **kwargs):
-        self.broker.send_message(self.destination, **kwargs)
+    def send(self, message: Message):
+        self.broker.send_message(self.destination, headers=message.headers, body=message.body)

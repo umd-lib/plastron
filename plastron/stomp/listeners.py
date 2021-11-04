@@ -1,24 +1,23 @@
-import json
 import logging
 import os
 from concurrent.futures import ThreadPoolExecutor
+
+from stomp.listener import ConnectionListener
 
 from plastron import version
 from plastron.commands import get_command_class
 from plastron.exceptions import FailureException
 from plastron.http import Repository
-from plastron.stomp import Destination
+from plastron.stomp import Broker, Destination
 from plastron.stomp.handlers import AsynchronousResponseHandler, SynchronousResponseHandler
 from plastron.stomp.inbox_watcher import InboxWatcher
-from plastron.stomp.messages import MessageBox, PlastronCommandMessage, PlastronMessage, Message
-from stomp.listener import ConnectionListener
-
+from plastron.stomp.messages import MessageBox, PlastronCommandMessage, PlastronMessage
 
 logger = logging.getLogger(__name__)
 
 
 class CommandListener(ConnectionListener):
-    def __init__(self, broker, repo_config, command_config):
+    def __init__(self, broker: Broker, repo_config, command_config):
         self.broker = broker
         self.repo_config = repo_config
         self.queue = self.broker.destinations['JOBS']
@@ -38,7 +37,7 @@ class CommandListener(ConnectionListener):
         for message in self.outbox(PlastronMessage):
             logger.info(f"Found response message for job {message.job_id} in outbox")
             # send the job completed message
-            self.status_queue.send(headers=message.headers, body=message.body)
+            self.status_queue.send(message)
             logger.info(f'Sent response message for job {message.job_id}')
             # remove the message from the outbox now that sending has completed
             self.outbox.remove(message.job_id)
@@ -48,7 +47,7 @@ class CommandListener(ConnectionListener):
             self.process_message(message, AsynchronousResponseHandler(self, message))
 
         # then subscribe to the queue to receive incoming messages
-        self.broker.connection.subscribe(
+        self.broker.subscribe(
             destination=self.queue,
             id='plastron',
             ack='client-individual'
@@ -56,7 +55,7 @@ class CommandListener(ConnectionListener):
         logger.info(f"Subscribed to {self.queue}")
 
         # Subscribe for synchronous jobs
-        self.broker.connection.subscribe(
+        self.broker.subscribe(
             destination=self.synchronous_queue,
             id='plastron-synchronous',
             ack='client-individual'
@@ -71,7 +70,7 @@ class CommandListener(ConnectionListener):
             logger.debug(f'Received synchronous job message on {self.synchronous_queue} with headers: {headers}')
             message = PlastronCommandMessage(headers=headers, body=body)
             self.process_message(message, SynchronousResponseHandler(self, message))
-            self.broker.connection.ack(message.id, 'plastron-synchronous')
+            self.broker.ack(message.id, 'plastron-synchronous')
 
         elif headers['destination'] == self.queue:
             logger.debug(f'Received message on {self.queue} with headers: {headers}')
@@ -82,7 +81,7 @@ class CommandListener(ConnectionListener):
             # containing the message
             message = PlastronCommandMessage(headers=headers, body=body)
             self.inbox.add(message.id, message)
-            self.broker.connection.ack(message.id, 'plastron')
+            self.broker.ack(message.id, 'plastron')
 
     def process_message(self, message, response_handler):
         # send to a message processor thread
@@ -100,7 +99,7 @@ class MessageProcessor:
         # cache for command instances
         self.commands = {}
 
-    def get_command(self, command_name):
+    def get_command(self, command_name: str):
         if command_name not in self.commands:
             # get the configuration options for this command
             config = self.command_config.get(command_name.upper(), {})
@@ -114,7 +113,7 @@ class MessageProcessor:
 
         return self.commands[command_name]
 
-    def __call__(self, message, progress_topic):
+    def __call__(self, message: PlastronCommandMessage, progress_topic: Destination):
         # determine which command to load to process the message
         command = self.get_command(message.command)
 
@@ -137,23 +136,12 @@ class MessageProcessor:
             logger.info(f'Running repository operations on behalf of {repo.delegated_user}')
 
         for status in (command.execute(repo, args) or []):
-            progress_topic.send(
-                headers={
-                    'PlastronJobId': message.job_id
-                },
-                body=json.dumps(status)
-            )
+            progress_topic.send(PlastronMessage(job_id=message.job_id, body=status))
 
         logger.info(f'Job {message.job_id} complete')
 
-        return Message(
-            headers={
-                'PlastronJobId': message.job_id,
-                'PlastronJobState': command.result.get('type', ''),
-                'persistent': 'true'
-            },
-            body=json.dumps(command.result)
-        )
+        # default message state is "Done"
+        return message.response(state=command.result.get('type', 'Done'), body=command.result)
 
 
 class ReconnectListener(ConnectionListener):

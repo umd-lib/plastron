@@ -1,8 +1,13 @@
+from unittest.mock import Mock, patch
+from urllib.error import HTTPError
+
 import pytest
-from plastron.rdf import RDFObjectProperty
-from plastron.validation import is_edtf_formatted
-from plastron.validation.rules import from_vocabulary, required
 from rdflib import URIRef
+
+from plastron.rdf import RDFObjectProperty
+from plastron.validation import ValidationError, is_edtf_formatted
+from plastron.validation.rules import from_vocabulary, required
+from plastron.validation.vocabularies import get_vocabulary
 
 
 @pytest.mark.parametrize(
@@ -63,3 +68,25 @@ def test_from_vocabulary(value, vocab_uri, expected):
     prop = RDFObjectProperty()
     prop.values = [URIRef(value)]
     assert from_vocabulary(prop, vocab_uri) is expected
+
+
+@patch('plastron.validation.vocabularies.Graph')
+def test_vocabulary_file_not_found(MockGraph):
+    mock_graph = Mock()
+    mock_graph.parse.side_effect = [FileNotFoundError, None]
+    MockGraph.return_value = mock_graph
+    vocab_graph = get_vocabulary('http://purl.org/dc/dcmitype/')
+    # parse should be called twice, once with the file location,
+    # and once with the remote URI
+    assert mock_graph.parse.call_count == 2
+    assert vocab_graph == mock_graph
+
+
+@patch('plastron.validation.vocabularies.Graph')
+def test_remote_vocab_error(MockGraph):
+    mock_graph = Mock()
+    mock_graph.parse.side_effect = HTTPError('http://example.org/foo/', 503, '', {}, None)
+    MockGraph.return_value = mock_graph
+    # failure to retrieve the vocabulary over HTTP should
+    # raise a ValidationError
+    pytest.raises(ValidationError, get_vocabulary, 'http://example.org/foo/')

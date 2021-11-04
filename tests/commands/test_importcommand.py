@@ -6,10 +6,10 @@ from collections import OrderedDict
 
 import plastron
 from plastron.commands.importcommand import Command, RepoChangeset
-from plastron.exceptions import FailureException, NoValidationRulesetException
+from plastron.exceptions import FailureException
 from plastron.jobs import ConfigMissingError, Row
 from plastron.models.umd import Item
-from plastron.validation import ResourceValidationResult
+from plastron.validation import ResourceValidationResult, ValidationError
 from rdflib.graph import Graph
 from unittest.mock import MagicMock
 
@@ -128,7 +128,7 @@ def test_exception_when_no_validation_ruleset():
     repo = None
 
     item = MagicMock(Item)
-    item.validate = MagicMock(side_effect=NoValidationRulesetException("test"))
+    item.validate = MagicMock(side_effect=ValidationError("test"))
     repo_changeset = RepoChangeset(item, None, None)
 
     plastron.commands.importcommand.create_repo_changeset = MagicMock(return_value=repo_changeset)

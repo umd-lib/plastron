@@ -1,5 +1,6 @@
 import logging
 
+from plastron.stomp.messages import Message
 from plastron.stomp import Destination
 
 logger = logging.getLogger(__name__)
@@ -14,30 +15,32 @@ class AsynchronousResponseHandler:
         e = future.exception()
         if e:
             logger.error(f"Job {self.message.job_id} failed: {e}")
-            self.listener.status_queue.send(
-                headers={
-                    'PlastronJobId': self.message.job_id,
-                    'PlastronJobError': str(e),
-                    'persistent': 'true'
-                }
-            )
+            response = self.create_exception_response(self.message.job_id, e)
         else:
             # assume no errors, return the response
             response = future.result()
 
-            # save a copy of the response message in the outbox
-            job_id = response.headers['PlastronJobId']
-            self.listener.outbox.add(job_id, response)
+        # save a copy of the response message in the outbox
+        job_id = response.headers['PlastronJobId']
+        self.listener.outbox.add(job_id, response)
 
-            # remove the message from the inbox now that processing has completed
-            self.listener.inbox.remove(self.message.id)
+        # remove the message from the inbox now that processing has completed
+        self.listener.inbox.remove(self.message.id)
 
-            # send the job completed message
-            self.listener.status_queue.send(headers=response.headers, body=response.body)
-            logger.debug(f'Response message sent to {self.listener.status_queue} with headers: {response.headers}')
+        # send the response message
+        self.listener.status_queue.send(headers=response.headers, body=response.body)
+        logger.debug(f'Response message sent to {self.listener.status_queue} with headers: {response.headers}')
 
-            # remove the message from the outbox now that sending has completed
-            self.listener.outbox.remove(job_id)
+        # remove the message from the outbox now that sending has completed
+        self.listener.outbox.remove(job_id)
+
+    def create_exception_response(self, job_id, e):
+        """Returns the Message to send when an exception has occurred."""
+        return Message(headers={
+            'PlastronJobId': job_id,
+            'PlastronJobError': str(e),
+            'persistent': 'true'
+        })
 
 
 class SynchronousResponseHandler:

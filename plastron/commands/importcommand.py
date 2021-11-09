@@ -24,7 +24,7 @@ from plastron.oa import Annotation, TextualBody
 from plastron.pcdm import File, PreservationMasterFile
 from plastron.rdf import RDFDataProperty
 from plastron.util import datetimestamp, uri_or_curie
-from plastron.validation import ValidationError
+from plastron.validation import ValidationError, validate
 
 nsm = get_manager()
 logger = logging.getLogger(__name__)
@@ -146,23 +146,6 @@ def get_property_type(model_class: rdf.Resource, attrs):
         return get_property_type(model_class.name_to_prop[first].obj_class, rest)
     else:
         return model_class.name_to_prop[attrs]
-
-
-def validate(item):
-    result = item.validate()
-
-    if result.is_valid():
-        logger.info(f'"{item}" passed metadata validation')
-        for outcome in result.passed():
-            logger.debug(f'  ✓ {outcome}')
-    else:
-        logger.warning(f'"{item}" failed metadata validation')
-        for outcome in result.failed():
-            logger.warning(f'  ✗ {outcome}')
-        for outcome in result.passed():
-            logger.debug(f'  ✓ {outcome}')
-
-    return result
 
 
 def build_file_groups(filenames_string):

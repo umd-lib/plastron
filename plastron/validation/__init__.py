@@ -1,5 +1,26 @@
+import logging
+
 from edtf_validate.valid_edtf import is_valid as is_valid_edtf
 from iso639 import is_valid639_1, is_valid639_2
+
+logger = logging.getLogger(__name__)
+
+
+def validate(item):
+    result = item.validate()
+
+    if result.is_valid():
+        logger.info(f'"{item}" passed metadata validation')
+        for outcome in result.passed():
+            logger.debug(f'  ✓ {outcome}')
+    else:
+        logger.warning(f'"{item}" failed metadata validation')
+        for outcome in result.failed():
+            logger.warning(f'  ✗ {outcome}')
+        for outcome in result.passed():
+            logger.debug(f'  ✓ {outcome}')
+
+    return result
 
 
 def is_edtf_formatted(value):

@@ -100,8 +100,8 @@ class STOMPDaemon(Thread):
         # setup listeners
         # Order of listeners is important -- ReconnectListener should be the
         # last listener
-        broker.connection.set_listener('command', CommandListener(broker, self.repo_config, self.command_config))
-        broker.connection.set_listener('reconnect', ReconnectListener(broker))
+        broker.set_listener('command', CommandListener(broker, self.repo_config, self.command_config))
+        broker.set_listener('reconnect', ReconnectListener(broker))
 
         # connect and listen indefinitely
         broker.connect()

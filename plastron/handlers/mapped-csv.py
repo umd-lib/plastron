@@ -57,26 +57,6 @@ class Batch:
         else:
             self.length = len(self.rows)
 
-    def get_column_value(self, row, column):
-        conf = self.mapping[column]
-        value = row.get(column, None)
-        if value is None:
-            # this is a "dummy" column that is not actually in the
-            # source CSV file but should be generated, either from
-            # a format-string pattern or a static value
-            if 'pattern' in conf:
-                value = conf['pattern'].format(**row)
-            elif 'value' in conf:
-                value = conf['value']
-        if conf.get('uriref', False):
-            try:
-                return URIRef(from_n3(value, nsm=nsm))
-            except KeyError:
-                # prefix not found, assume it is not a prefixed form
-                return URIRef(value)
-        else:
-            return value
-
     def get_items(self, lines, mapping):
         cls = create_class_from_mapping(mapping, self.item_rdf_type)
 
@@ -92,7 +72,7 @@ class Batch:
             for key in keys:
                 # add an item for each unique key
                 sub_lines = [line for line in lines if line[key_column] == key]
-                attrs = {column: self.get_column_value(sub_lines[0], column) for column in mapping.keys()}
+                attrs = {column: get_column_value(sub_lines[0], column, mapping) for column in mapping.keys()}
                 item = cls(**attrs)
                 item.path = key
                 item.ordered = False
@@ -180,7 +160,7 @@ class Batch:
             # each line is its own (implicit) subject
             # for an Item resource
             for line in lines:
-                attrs = {column: self.get_column_value(line, column) for column in mapping.keys()}
+                attrs = {column: get_column_value(line, column, mapping) for column in mapping.keys()}
                 item = cls(**attrs)
                 yield item
 
@@ -259,3 +239,24 @@ def get_flagged_column(mapping, flag):
         return cols[0]
     else:
         return None
+
+
+def get_column_value(row, column, mapping):
+    conf = mapping[column]
+    value = row.get(column, None)
+    if value is None:
+        # this is a "dummy" column that is not actually in the
+        # source CSV file but should be generated, either from
+        # a format-string pattern or a static value
+        if 'pattern' in conf:
+            value = conf['pattern'].format(**row)
+        elif 'value' in conf:
+            value = conf['value']
+    if conf.get('uriref', False):
+        try:
+            return URIRef(from_n3(value, nsm=nsm))
+        except KeyError:
+            # prefix not found, assume it is not a prefixed form
+            return URIRef(value)
+    else:
+        return value

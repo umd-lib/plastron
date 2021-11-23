@@ -3,6 +3,7 @@ import csv
 import io
 import logging
 import os
+import re
 
 from argparse import FileType, Namespace, ArgumentTypeError
 from bs4 import BeautifulSoup
@@ -15,7 +16,7 @@ from plastron.commands import BaseCommand
 from plastron.exceptions import NoValidationRulesetException, RESTAPIException, FailureException, ConfigError
 from plastron.files import HTTPFileSource, LocalFileSource, RemoteFileSource, ZipFileSource
 from plastron.http import Transaction
-from plastron.jobs import ImportJob, ImportRun, JobError, ModelClassNotFoundError, build_lookup_index
+from plastron.jobs import ImportJob, JobError, ModelClassNotFoundError, build_lookup_index
 from plastron.namespaces import get_manager, prov, sc
 from plastron.oa import Annotation, TextualBody
 from plastron.pcdm import File, PreservationMasterFile
@@ -181,9 +182,18 @@ def not_empty(value):
     return value is not None and value != ''
 
 
+def split_escaped(string: str, separator: str = '|'):
+    # uses a negative look-behind to only split on separator characters
+    # that are NOT preceded by an escape character (the backslash)
+    pattern = re.compile(r'(?<!\\)' + re.escape(separator))
+    values = pattern.split(string)
+    # remove the escape character
+    return [re.sub(r'\\(.)', r'\1', v) for v in values]
+
+
 def parse_value_string(value_string, column, prop_type):
     # filter out empty strings, so we don't get spurious empty values in the properties
-    for value in filter(not_empty, value_string.split('|')):
+    for value in filter(not_empty, split_escaped(value_string, separator='|')):
         if issubclass(prop_type, RDFDataProperty):
             # default to the property's defined datatype
             # if it was not specified in the column header

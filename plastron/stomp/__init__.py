@@ -1,10 +1,10 @@
 import logging
 import os
-from time import sleep
 
-from stomp import Connection
-from stomp.exception import ConnectFailedException, NotConnectedException
+from stomp import Connection12
+from stomp.exception import StompException
 
+from plastron import version
 from plastron.stomp.messages import Message
 
 logger = logging.getLogger(__name__)
@@ -13,20 +13,30 @@ logger = logging.getLogger(__name__)
 class Broker:
     def __init__(self, config):
         # set up STOMP client
-        broker_server = tuple(config['SERVER'].split(':', 2))
-        self.connection = Connection([broker_server])
+        self.server = tuple(config['SERVER'].split(':', 2))
+        self.connection = Connection12([self.server])
+        self.client_id = f'plastrond/{version}-{os.uname().nodename}-{os.getpid()}'
         self.destinations = config.get('DESTINATIONS', {})
         self.message_store_dir = config['MESSAGE_STORE_DIR']
         self.public_uri_template = config.get('PUBLIC_URI_TEMPLATE', os.environ.get('PUBLIC_URI_TEMPLATE', None))
 
+    def __str__(self):
+        return f'{":".join(self.server)} (client-id: {self.client_id})'
+
     def connect(self):
-        while not self.connection.is_connected():
-            logger.info('Attempting to connect to the STOMP message broker')
+        if not self.connection.is_connected():
+            logger.info(
+                f'Attempting to connect to STOMP message broker ('
+                f'Host: {self.server[0]}, '
+                f'Port: {self.server[1]}, '
+                f'Client ID: {self.client_id})'
+            )
             try:
-                self.connection.connect(wait=True)
-            except (NotConnectedException, ConnectFailedException, OSError):
-                logger.warning('Connection attempt failed')
-                sleep(1)
+                self.connection.connect(wait=True, headers={'client-id': self.client_id})
+            except StompException:
+                logger.error(f'STOMP connection failed for {self}')
+                return False
+        return self.connection.is_connected()
 
     def set_listener(self, *args):
         self.connection.set_listener(*args)

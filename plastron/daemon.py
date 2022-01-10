@@ -13,7 +13,7 @@ import yaml
 from plastron import version
 from plastron.logging import DEFAULT_LOGGING_OPTIONS
 from plastron.stomp import Broker
-from plastron.stomp.listeners import CommandListener, ReconnectListener
+from plastron.stomp.listeners import CommandListener
 from plastron.util import envsubst
 from plastron.web import create_app
 
@@ -25,28 +25,27 @@ class STOMPDaemon(Thread):
         super().__init__(**kwargs)
         if config is None:
             config = {}
-        self.repo_config = config['REPOSITORY']
-        self.broker_config = config['MESSAGE_BROKER']
-        self.command_config = config.get('COMMANDS', {})
+        self.config = config
         self.running = Event()
+        # configure STOMP message broker
+        self.broker = Broker(self.config['MESSAGE_BROKER'])
 
     def run(self):
-        # configure STOMP message broker
-        broker = Broker(self.broker_config)
-
         # setup listeners
-        # Order of listeners is important -- ReconnectListener should be the
-        # last listener
-        broker.set_listener('command', CommandListener(broker, self.repo_config, self.command_config))
-        broker.set_listener('reconnect', ReconnectListener(broker))
+        listener = CommandListener(self)
+        self.broker.set_listener('command', listener)
 
-        # connect and listen indefinitely
-        broker.connect()
-        self.running.set()
-        while self.running.is_set():
-            self.running.wait(1)
+        # connect and listen as long as the running Event is set
+        if self.broker.connect():
+            self.running.set()
+            while self.running.is_set():
+                self.running.wait(1)
 
-        broker.disconnect()
+            self.broker.disconnect()
+            if listener.inbox_watcher:
+                listener.inbox_watcher.stop()
+        else:
+            logger.error('Unable to connect to STOMP broker')
 
 
 class HTTPDaemon(Thread):
@@ -142,9 +141,9 @@ def main():
         logger.warning(f'Shutting down {daemon_description}')
         if hasattr(thread, 'running'):
             thread.running.clear()
-        thread.join(1)
+            thread.join()
 
-    logger.info(f'Exiting {daemon_description}')
+    logger.info(f'{daemon_description} shut down successfully')
     sys.exit()
 
 

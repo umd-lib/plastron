@@ -8,7 +8,7 @@ from plastron import version
 from plastron.commands import get_command_class
 from plastron.exceptions import FailureException
 from plastron.http import Repository
-from plastron.stomp import Broker, Destination
+from plastron.stomp import Destination
 from plastron.stomp.handlers import AsynchronousResponseHandler, SynchronousResponseHandler
 from plastron.stomp.inbox_watcher import InboxWatcher
 from plastron.stomp.messages import MessageBox, PlastronCommandMessage, PlastronMessage
@@ -17,9 +17,10 @@ logger = logging.getLogger(__name__)
 
 
 class CommandListener(ConnectionListener):
-    def __init__(self, broker: Broker, repo_config, command_config):
-        self.broker = broker
-        self.repo_config = repo_config
+    def __init__(self, thread):
+        self.thread = thread
+        self.broker = thread.broker
+        self.repo_config = thread.config['REPOSITORY']
         self.queue = self.broker.destinations['JOBS']
         self.status_queue = Destination(self.broker, self.broker.destinations['JOB_STATUS'])
         self.progress_topic = Destination(self.broker, self.broker.destinations['JOB_PROGRESS'])
@@ -29,10 +30,15 @@ class CommandListener(ConnectionListener):
         self.executor = ThreadPoolExecutor(thread_name_prefix=__name__)
         self.public_uri_template = self.broker.public_uri_template
         self.inbox_watcher = None
-        self.command_config = command_config
-        self.processor = MessageProcessor(command_config, repo_config)
+        self.command_config = thread.config['COMMANDS']
+        self.processor = MessageProcessor(self.command_config, self.repo_config)
+
+    def on_connecting(self, host_and_port):
+        logger.info(f'Connecting to STOMP message broker {self.broker}')
 
     def on_connected(self, headers, body):
+        logger.info(f'Connected to STOMP message broker {self.broker}')
+
         # first attempt to send anything in the outbox
         for message in self.outbox(PlastronMessage):
             logger.info(f"Found response message for job {message.job_id} in outbox")
@@ -88,8 +94,11 @@ class CommandListener(ConnectionListener):
         self.executor.submit(self.processor, message, self.progress_topic).add_done_callback(response_handler)
 
     def on_disconnected(self):
+        logger.warning('Disconnected from the STOMP message broker')
         if self.inbox_watcher:
             self.inbox_watcher.stop()
+        if self.thread.running.is_set():
+            self.thread.running.clear()
 
 
 class MessageProcessor:
@@ -142,22 +151,3 @@ class MessageProcessor:
 
         # default message state is "Done"
         return message.response(state=command.result.get('type', 'Done'), body=command.result)
-
-
-class ReconnectListener(ConnectionListener):
-    def __init__(self, broker):
-        self.broker = broker
-
-    def on_connecting(self, host_and_port):
-        logger.info(f'Connecting to STOMP message broker at {":".join(host_and_port)}')
-
-    def on_connected(self, headers, body):
-        logger.info('Connected to STOMP message broker')
-
-    def on_heartbeat_timeout(self):
-        logger.warning('Missed a heartbeat, assuming disconnection from the STOMP message broker')
-        self.broker.connect()
-
-    def on_disconnected(self):
-        logger.warning('Disconnected from the STOMP message broker')
-        self.broker.connect()

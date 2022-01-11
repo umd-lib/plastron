@@ -1,7 +1,7 @@
 import csv
 import logging
 import sys
-from argparse import FileType
+from argparse import FileType, Namespace
 
 from plastron.commands import BaseCommand
 from plastron.exceptions import FailureException, RESTAPIException
@@ -36,6 +36,14 @@ def configure_cli(subparsers):
             'Relative file paths are relative to where the command is run.'
         ),
         required=True,
+        action='store'
+    )
+    parser.add_argument(
+        '--rename-binary-column',
+        help=(
+            'Renames the binary column in the CSV output to '
+            'the provided name.'
+        ),
         action='store'
     )
     parser.add_argument(
@@ -96,6 +104,22 @@ class Command(BaseCommand):
             source = None
         return source
 
+    @staticmethod
+    def write_csv_header(csv_file: csv.DictReader, args: Namespace, csv_writer: csv.DictWriter) -> None:
+        """
+        Writes the CSV header line to the output, possibly replacing the
+        binary_column header with a different value.
+
+        This is needed because the binary_column in the output will always
+        be a URL, while the binary_column in the input may be a filepath
+        (and thus have a column name that is not descriptive of the output).
+        """
+        csv_header_dict = dict(zip(csv_file.fieldnames, csv_file.fieldnames))
+        if args.rename_binary_column is not None:
+            csv_header_dict[args.binary_column] = args.rename_binary_column
+        # csv_writer.writeheader()
+        csv_writer.writerow(csv_header_dict)
+
     def __call__(self, repo, args):
         csv_file = csv.DictReader(args.source_file)
 
@@ -104,7 +128,9 @@ class Command(BaseCommand):
         else:
             output_file = sys.stdout
         csv_writer = csv.DictWriter(output_file, fieldnames=csv_file.fieldnames)
-        csv_writer.writeheader()
+
+        Command.write_csv_header(csv_file, args, csv_writer)
+
         for n, row in enumerate(csv_file, start=1):
             id = row[args.identifier_column]
             source = Command.get_source(row[args.binary_column])

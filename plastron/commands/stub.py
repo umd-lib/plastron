@@ -107,7 +107,7 @@ class Command(BaseCommand):
                 with Transaction(repo) as txn:
                     try:
                         item.create(repo, container_path=args.container_path)
-                        item.recursive_update(repo)
+                        item.update(repo)
                         # update the CSV with the new URI
                         row[args.binary_column] = file.uri
                         csv_writer.writerow(row)

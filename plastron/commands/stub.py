@@ -5,7 +5,7 @@ from argparse import FileType
 
 from plastron.commands import BaseCommand
 from plastron.exceptions import FailureException, RESTAPIException
-from plastron.files import HTTPFileSource
+from plastron.files import HTTPFileSource, LocalFileSource
 from plastron.http import Transaction
 from plastron.models import Item
 from plastron.pcdm import File
@@ -30,8 +30,10 @@ def configure_cli(subparsers):
     parser.add_argument(
         '--binary-column',
         help=(
-            'column in the source CSV file with the URI of the binary to load; '
-            'only supports http: and https: resources at this time'
+            'column in the source CSV file with the location of the binary to '
+            'load. Supports http: and https: (must begin with "http:" or '
+            '"https:"), and file resources (relative or absolute file path). '
+            'Relative file paths are relative to where the command is run.'
         ),
         required=True,
         action='store'
@@ -79,8 +81,24 @@ def configure_cli(subparsers):
 
 
 class Command(BaseCommand):
+    @staticmethod
+    def get_source(binary_column_value):
+        """
+        Returns the approriate BinarySource implementation to use, based on the
+        value in the binary column, or None if an appropriate BinarySource
+        implementation cannot be determined.
+        """
+        if binary_column_value.startswith("http:") or binary_column_value.startswith("https:"):
+            source = HTTPFileSource(binary_column_value)
+        elif binary_column_value is not None:
+            source = LocalFileSource(binary_column_value)
+        else:
+            source = None
+        return source
+
     def __call__(self, repo, args):
         csv_file = csv.DictReader(args.source_file)
+
         if args.output_file is not None:
             output_file = open(args.output_file, 'w')
         else:
@@ -89,11 +107,12 @@ class Command(BaseCommand):
         csv_writer.writeheader()
         for n, row in enumerate(csv_file, start=1):
             id = row[args.identifier_column]
-            if not row[args.binary_column]:
-                logger.warning(f'No binary source URI found for {id}; skipping')
+            source = Command.get_source(row[args.binary_column])
+            if not source:
+                logger.warning(f'No source found for {id}; skipping')
                 csv_writer.writerow(row)
                 continue
-            source = HTTPFileSource(row[args.binary_column])
+
             item = Item(identifier=id, title=f'Stub for {id}')
             file = File()
             file.source = source

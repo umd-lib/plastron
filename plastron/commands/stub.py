@@ -1,17 +1,17 @@
 import csv
 import logging
 import sys
-from argparse import FileType, Namespace
 
+from argparse import FileType, Namespace
 from plastron.commands import BaseCommand
 from plastron.exceptions import FailureException, RESTAPIException
-from plastron.files import HTTPFileSource, LocalFileSource
-from plastron.http import Transaction
+from plastron.files import BinarySource, HTTPFileSource, LocalFileSource
+from plastron.http import Repository, Transaction
 from plastron.models import Item
 from plastron.pcdm import File
 from plastron.util import uri_or_curie
 from rdflib import URIRef
-
+from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -89,39 +89,39 @@ def configure_cli(subparsers):
 
 
 class Command(BaseCommand):
-    @staticmethod
-    def get_source(binary_column_value):
+    def get_source(self, binary_column_value: str) -> Optional[BinarySource]:
         """
         Returns the approriate BinarySource implementation to use, based on the
         value in the binary column, or None if an appropriate BinarySource
         implementation cannot be determined.
         """
+        source: Optional[BinarySource] = None
         if binary_column_value.startswith("http:") or binary_column_value.startswith("https:"):
             source = HTTPFileSource(binary_column_value)
         elif binary_column_value is not None:
             source = LocalFileSource(binary_column_value)
-        else:
-            source = None
         return source
 
-    @staticmethod
-    def write_csv_header(csv_file: csv.DictReader, args: Namespace, csv_writer: csv.DictWriter) -> None:
+    def write_csv_header(self, csv_file: csv.DictReader, args: Namespace, csv_writer: csv.DictWriter) -> None:
         """
         Writes the CSV header line to the output, possibly replacing the
-        binary_column header with a different value.
+        binary_column header with a renamed header.
 
         This is needed because the binary_column in the output will always
         be a URL, while the binary_column in the input may be a filepath
         (and thus have a column name that is not descriptive of the output).
         """
-        csv_header_dict = dict(zip(csv_file.fieldnames, csv_file.fieldnames))
-        if args.rename_binary_column is not None:
-            csv_header_dict[args.binary_column] = args.rename_binary_column
-        # csv_writer.writeheader()
-        csv_writer.writerow(csv_header_dict)
+        if csv_file.fieldnames is not None:
+            csv_header_dict = dict(zip(csv_file.fieldnames, csv_file.fieldnames))
+            if args.rename_binary_column is not None:
+                csv_header_dict[args.binary_column] = args.rename_binary_column
+            csv_writer.writerow(csv_header_dict)
 
-    def __call__(self, repo, args):
+    def __call__(self, repo: Repository, args: Namespace) -> None:
         csv_file = csv.DictReader(args.source_file)
+        if csv_file.fieldnames is None:
+            logger.error(f'No fields found in {csv_file}. Exiting.')
+            sys.exit(1)
 
         if args.output_file is not None:
             output_file = open(args.output_file, 'w')
@@ -129,11 +129,11 @@ class Command(BaseCommand):
             output_file = sys.stdout
         csv_writer = csv.DictWriter(output_file, fieldnames=csv_file.fieldnames)
 
-        Command.write_csv_header(csv_file, args, csv_writer)
+        self.write_csv_header(csv_file, args, csv_writer)
 
         for n, row in enumerate(csv_file, start=1):
             id = row[args.identifier_column]
-            source = Command.get_source(row[args.binary_column])
+            source = self.get_source(row[args.binary_column])
             if not source:
                 logger.warning(f'No source found for {id}; skipping')
                 csv_writer.writerow(row)

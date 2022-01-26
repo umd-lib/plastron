@@ -148,8 +148,8 @@ class Command(BaseCommand):
             if args.member_of is not None:
                 item.member_of = URIRef(args.member_of)
             if args.access is not None:
-                item.rdf_types.add(args.access)
-                file.rdf_types.add(args.access)
+                item.rdf_type.append(args.access)
+                file.rdf_type.append(args.access)
             try:
                 with Transaction(repo) as txn:
                     try:

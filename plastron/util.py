@@ -35,7 +35,10 @@ def parse_predicate_list(string, delimiter=','):
     return [from_n3(p, nsm=manager) for p in string.split(delimiter)]
 
 
-def uri_or_curie(arg):
+def uri_or_curie(arg: str):
+    if arg and (arg.startswith('http://') or arg.startswith('https://')):
+        # looks like an absolute HTTP URI
+        return URIRef(arg)
     try:
         term = from_n3(arg, nsm=namespaces.get_manager())
     except KeyError:

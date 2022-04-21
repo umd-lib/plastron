@@ -11,20 +11,23 @@ from collections import OrderedDict, defaultdict
 from datetime import datetime
 from distutils.util import strtobool
 from os.path import basename, splitext
+from uuid import uuid4
+
+from bs4 import BeautifulSoup
+from rdflib import Graph, Literal, URIRef
+
 from plastron import rdf
 from plastron.commands import BaseCommand
-from plastron.exceptions import NoValidationRulesetException, RESTAPIException, FailureException, ConfigError
+from plastron.exceptions import ConfigError, FailureException, RESTAPIException
 from plastron.files import HTTPFileSource, LocalFileSource, RemoteFileSource, ZipFileSource
 from plastron.http import Transaction
-from plastron.jobs import ImportJob, JobError, ModelClassNotFoundError, build_lookup_index
+from plastron.jobs import ImportJob, ImportedItemStatus, JobError, ModelClassNotFoundError, build_lookup_index
 from plastron.namespaces import get_manager, prov, sc
 from plastron.oa import Annotation, TextualBody
 from plastron.pcdm import File, PreservationMasterFile
 from plastron.rdf import RDFDataProperty
 from plastron.util import datetimestamp, uri_or_curie
-from rdflib import URIRef, Graph, Literal
-from uuid import uuid4
-
+from plastron.validation import ValidationError, validate
 
 nsm = get_manager()
 logger = logging.getLogger(__name__)
@@ -148,23 +151,6 @@ def get_property_type(model_class: rdf.Resource, attrs):
         return model_class.name_to_prop[attrs]
 
 
-def validate(item):
-    result = item.validate()
-
-    if result.is_valid():
-        logger.info(f'"{item}" passed metadata validation')
-        for outcome in result.passed():
-            logger.debug(f'  ✓ {outcome}')
-    else:
-        logger.warning(f'"{item}" failed metadata validation')
-        for outcome in result.failed():
-            logger.warning(f'  ✗ {outcome}')
-        for outcome in result.passed():
-            logger.debug(f'  ✓ {outcome}')
-
-    return result
-
-
 def build_file_groups(filenames_string):
     file_groups = OrderedDict()
     if filenames_string.strip() == '':
@@ -224,6 +210,125 @@ def annotate_from_files(item, mime_types):
             annotation.props['target'].is_embedded = False
 
             member.annotations.append(annotation)
+
+
+def create_repo_changeset(repo, metadata, row, validate_only=False):
+    """
+    Returns a RepoChangeset of the changes to make to the repository
+
+    :param repo: the repository configuration
+    :param metadata: A plastron.jobs.MetadataRows object representing the
+                      CSV file for the import
+    :param row: A single plastron.jobs.Row object representing the row
+                 to import
+    :param validate_only: If true, will not fetch existing object from the
+                repository.
+    :return: A RepoChangeSet encapsulating the changes to make to the
+            repository.
+    """
+    if validate_only:
+        # create an empty object to validate without fetching from the repo
+        item = metadata.model_class(uri=row.uri)
+    else:
+        if row.uri is not None:
+            # read the object from the repo
+            item = metadata.model_class.from_repository(repo, row.uri, include_server_managed=False)
+        else:
+            # no URI in the CSV means we will create a new object
+            logger.info(f'No URI found for {row.line_reference}; will create new resource')
+            # create a new object (will create in the repo later)
+            item = metadata.model_class()
+
+    # track new embedded objects that are added to the graph
+    # so we can ensure that they have at least one statement
+    # where they appear as the subject
+    new_objects = defaultdict(Graph)
+
+    delete_graph = Graph()
+    insert_graph = Graph()
+
+    # build the lookup index to map hash URI objects
+    # to their correct positional locations
+    row_index = build_lookup_index(item, row.index_string)
+
+    for attrs, columns in metadata.fields.items():
+        prop_type = get_property_type(item.__class__, attrs)
+        if '.' not in attrs:
+            # simple, non-embedded values
+            # attrs is the entire property name
+            new_values = []
+            for column in columns:
+                header = column['header']
+                new_values.extend(parse_value_string(row[header], column, prop_type))
+
+            # construct a SPARQL update by diffing for deletions and insertions
+            # update the property and get the sets of values deleted and inserted
+            prop = getattr(item, attrs)
+            deleted_values, inserted_values = prop.update(new_values)
+
+            for deleted_value in deleted_values:
+                delete_graph.add((item.uri, prop.uri, prop.get_term(deleted_value)))
+            for inserted_value in inserted_values:
+                insert_graph.add((item.uri, prop.uri, prop.get_term(inserted_value)))
+
+        else:
+            # complex, embedded values
+
+            # if the first portion of the dotted attr notation is a key in the index,
+            # then this column has a different subject than the main uri
+            # correlate positions and urirefs
+            # XXX: for now, assuming only 2 levels of chaining
+            first_attr, next_attr = attrs.split('.', 2)
+            new_values = defaultdict(list)
+            for column in columns:
+                header = column['header']
+                for i, value_string in enumerate(row[header].split(';')):
+                    new_values[i].extend(parse_value_string(value_string, column, prop_type))
+
+            if first_attr in row_index:
+                # existing embedded object
+                for i, values in new_values.items():
+                    # get the embedded object
+                    obj = row_index[first_attr][i]
+                    prop = getattr(obj, next_attr)
+                    deleted_values, inserted_values = prop.update(values)
+
+                    for deleted_value in deleted_values:
+                        delete_graph.add((item.uri, prop.uri, prop.get_term(deleted_value)))
+                    for inserted_value in inserted_values:
+                        insert_graph.add((item.uri, prop.uri, prop.get_term(inserted_value)))
+            else:
+                # create new embedded objects (a.k.a hash resources) that are not in the index
+                first_prop_type = item.name_to_prop[first_attr]
+                for i, values in new_values.items():
+                    # we can assume that for any properties with dotted notation,
+                    # all attributes except for the last one are object properties
+                    if first_prop_type.obj_class is not None:
+                        # create a new object
+                        # TODO: remove hardcoded UUID fragment minting
+                        obj = first_prop_type.obj_class(uri=f'{item.uri}#{uuid4()}')
+                        # add the new object to the index
+                        row_index[first_attr][i] = obj
+                        setattr(obj, next_attr, values)
+                        next_attr_prop = obj.name_to_prop[next_attr]
+                        for value in values:
+                            new_objects[(first_attr, obj)].add((obj.uri, next_attr_prop.uri, value))
+
+    # add new embedded objects to the insert graph
+    for (attr, obj), graph in new_objects.items():
+        # add that object to the main item
+        getattr(item, attr).append(obj)
+        # add to the insert graph
+        insert_graph.add((item.uri, item.name_to_prop[attr].uri, obj.uri))
+        insert_graph += graph
+
+    # do a pass to remove statements that are both deleted and then re-inserted
+    for statement in delete_graph:
+        if statement in insert_graph:
+            delete_graph.remove(statement)
+            insert_graph.remove(statement)
+
+    return RepoChangeset(item, insert_graph, delete_graph)
 
 
 class Command(BaseCommand):
@@ -483,7 +588,7 @@ class Command(BaseCommand):
         created_uris = []
         import_run = job.new_run().start()
         for row in metadata:
-            repo_changeset = self.create_repo_changeset(args, repo, metadata, row)
+            repo_changeset = create_repo_changeset(repo, metadata, row)
             item = repo_changeset.item
 
             # count the number of files referenced in this row
@@ -491,7 +596,7 @@ class Command(BaseCommand):
 
             try:
                 report = validate(item)
-            except NoValidationRulesetException as e:
+            except ValidationError as e:
                 raise FailureException(f'Unable to run validation: {e}') from e
 
             metadata.validation_reports.append({
@@ -579,123 +684,6 @@ class Command(BaseCommand):
             'count': metadata.stats()
         }
 
-    def create_repo_changeset(self, args, repo, metadata, row):
-        """
-        Returns a RepoChangeset of the changes to make to the repository
-
-        :param args: the arguments from the command-line
-        :param repo: the repository configuration
-        :param metadata: A plastron.jobs.MetadataRows object representing the
-                          CSV file for the import
-        :param row: A single plastron.jobs.Row object representing the row
-                     to import
-        :return: A RepoChangeSet encapsulating the changes to make to the
-                repository.
-        """
-        if args.validate_only:
-            # create an empty object to validate without fetching from the repo
-            item = metadata.model_class(uri=row.uri)
-        else:
-            if row.uri is not None:
-                # read the object from the repo
-                item = metadata.model_class.from_repository(repo, row.uri, include_server_managed=False)
-            else:
-                # no URI in the CSV means we will create a new object
-                logger.info(f'No URI found for {row.line_reference}; will create new resource')
-                # create a new object (will create in the repo later)
-                item = metadata.model_class()
-
-        # track new embedded objects that are added to the graph
-        # so we can ensure that they have at least one statement
-        # where they appear as the subject
-        new_objects = defaultdict(Graph)
-
-        delete_graph = Graph()
-        insert_graph = Graph()
-
-        for attrs, columns in metadata.fields.items():
-            prop_type = get_property_type(item.__class__, attrs)
-            if '.' not in attrs:
-                # simple, non-embedded values
-                # attrs is the entire property name
-                new_values = []
-                for column in columns:
-                    header = column['header']
-                    new_values.extend(parse_value_string(row[header], column, prop_type))
-
-                # construct a SPARQL update by diffing for deletions and insertions
-                # update the property and get the sets of values deleted and inserted
-                prop = getattr(item, attrs)
-                deleted_values, inserted_values = prop.update(new_values)
-
-                for deleted_value in deleted_values:
-                    delete_graph.add((item.uri, prop.uri, prop.get_term(deleted_value)))
-                for inserted_value in inserted_values:
-                    insert_graph.add((item.uri, prop.uri, prop.get_term(inserted_value)))
-
-            else:
-                # complex, embedded values
-
-                # build the lookup index to map hash URI objects
-                # to their correct positional locations
-                row_index = build_lookup_index(item, row.index_string)
-
-                # if the first portion of the dotted attr notation is a key in the index,
-                # then this column has a different subject than the main uri
-                # correlate positions and urirefs
-                # XXX: for now, assuming only 2 levels of chaining
-                first_attr, next_attr = attrs.split('.', 2)
-                new_values = defaultdict(list)
-                for column in columns:
-                    header = column['header']
-                    for i, value_string in enumerate(row[header].split(';')):
-                        new_values[i].extend(parse_value_string(value_string, column, prop_type))
-
-                if first_attr in row_index:
-                    # existing embedded object
-                    for i, values in new_values.items():
-                        # get the embedded object
-                        obj = row_index[first_attr][i]
-                        prop = getattr(obj, next_attr)
-                        deleted_values, inserted_values = prop.update(values)
-
-                        for deleted_value in deleted_values:
-                            delete_graph.add((item.uri, prop.uri, prop.get_term(deleted_value)))
-                        for inserted_value in inserted_values:
-                            insert_graph.add((item.uri, prop.uri, prop.get_term(inserted_value)))
-                else:
-                    # create new embedded objects (a.k.a hash resources) that are not in the index
-                    first_prop_type = item.name_to_prop[first_attr]
-                    for i, values in new_values.items():
-                        # we can assume that for any properties with dotted notation,
-                        # all attributes except for the last one are object properties
-                        if first_prop_type.obj_class is not None:
-                            # create a new object
-                            # TODO: remove hardcoded UUID fragment minting
-                            obj = first_prop_type.obj_class(uri=f'{item.uri}#{uuid4()}')
-                            # add the new object to the index
-                            row_index[first_attr][i] = obj
-                            setattr(obj, next_attr, values)
-                            next_attr_prop = obj.name_to_prop[next_attr]
-                            for value in values:
-                                new_objects[(first_attr, obj)].add((obj.uri, next_attr_prop.uri, value))
-
-        # add new embedded objects to the insert graph
-        for (attr, obj), graph in new_objects.items():
-            # add that object to the main item
-            getattr(item, attr).append(obj)
-            # add to the insert graph
-            insert_graph.add((item.uri, item.name_to_prop[attr].uri, obj.uri))
-            insert_graph += graph
-
-        # do a pass to remove statements that are both deleted and then re-inserted
-        for statement in delete_graph:
-            if statement in insert_graph:
-                delete_graph.remove(statement)
-                insert_graph.remove(statement)
-
-        return RepoChangeset(item, insert_graph, delete_graph)
-
     def update_repo(self, args, job, repo, metadata, row, repo_changeset, created_uris, updated_uris):
         """
         Updates the repository with the given RepoChangeSet
@@ -715,8 +703,6 @@ class Command(BaseCommand):
                               variable is MODIFIED by this method.
         """
         item = repo_changeset.item
-        delete_graph = repo_changeset.delete_graph
-        insert_graph = repo_changeset.insert_graph
 
         if not item.created:
             # if an item is new, don't construct a SPARQL Update query
@@ -754,26 +740,27 @@ class Command(BaseCommand):
             except Exception as e:
                 raise FailureException(f'Creating item failed: {e}') from e
 
-            job.complete(item, row.line_reference)
+            job.complete(item, row.line_reference, ImportedItemStatus.CREATED)
             metadata.created += 1
             created_uris.append(item.uri)
 
-        elif len(delete_graph) > 0 or len(insert_graph) > 0:
+        elif repo_changeset:
             # construct the SPARQL Update query if there are any deletions or insertions
             # then do a PATCH update of an existing item
             logger.info(f'Sending update for {item}')
-            sparql_update = repo.build_sparql_update(delete_graph, insert_graph)
+            sparql_update = repo_changeset.build_sparql_update(repo)
             logger.debug(sparql_update)
             try:
                 item.patch(repo, sparql_update)
             except RESTAPIException as e:
                 raise FailureException(f'Updating item failed: {e}') from e
 
-            job.complete(item, row.line_reference)
+            job.complete(item, row.line_reference, ImportedItemStatus.MODIFIED)
             metadata.updated += 1
             updated_uris.append(item.uri)
 
         else:
+            job.complete(item, row.line_reference, ImportedItemStatus.UNCHANGED)
             metadata.unchanged += 1
             logger.info(f'No changes found for "{item}" ({row.uri}); skipping')
             metadata.skipped += 1
@@ -805,6 +792,16 @@ class RepoChangeset:
     @property
     def delete_graph(self):
         return self._delete_graph
+
+    @property
+    def is_empty(self):
+        return len(self.insert_graph) == 0 and len(self.delete_graph) == 0
+
+    def __bool__(self):
+        return not self.is_empty
+
+    def build_sparql_update(self, repo):
+        return repo.build_sparql_update(self.delete_graph, self.insert_graph)
 
 
 @rdf.object_property('derived_from', prov.wasDerivedFrom)

@@ -3,7 +3,7 @@ import urllib.parse
 from pathlib import Path
 
 from flask import Flask, url_for
-from werkzeug.exceptions import InternalServerError, NotFound
+from werkzeug.exceptions import NotFound
 
 from plastron.jobs import ConfigMissingError, ImportJob, JobError
 
@@ -57,7 +57,7 @@ def create_app(config):
         job = get_job(job_id)
         try:
             job.load_config()
-        except ConfigMissingError as e:
+        except ConfigMissingError:
             logger.warning(f'Cannot open config file {job.config_filename} for job {job}')
             # TODO: more complete information in the response body?
             raise NotFound

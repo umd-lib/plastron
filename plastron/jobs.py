@@ -4,6 +4,7 @@ import os
 import re
 import urllib.parse
 from collections import defaultdict
+from enum import Enum
 from pathlib import Path
 from shutil import copyfileobj
 from typing import List, Mapping
@@ -145,11 +146,17 @@ class MetadataError(JobError):
     pass
 
 
+class ImportedItemStatus(Enum):
+    CREATED = 'created'
+    MODIFIED = 'modified'
+    UNCHANGED = 'unchanged'
+
+
 class ImportJob:
-    def __init__(self, id, jobs_dir):
-        self.id = id
+    def __init__(self, job_id, jobs_dir):
+        self.id = job_id
         # URL-escaped ID that can be used as a path segment on a filesystem or URL
-        self.safe_id = urllib.parse.quote(id, safe='')
+        self.safe_id = urllib.parse.quote(job_id, safe='')
         # use a timestamp to differentiate different runs of the same import job
         self.run_timestamp = datetimestamp()
         self.dir = Path(jobs_dir) / self.safe_id
@@ -159,7 +166,7 @@ class ImportJob:
         self._model_class = None
 
         # record of items that are successfully loaded
-        completed_fieldnames = ['id', 'timestamp', 'title', 'uri']
+        completed_fieldnames = ['id', 'timestamp', 'title', 'uri', 'status']
         self.completed_log = ItemLog(self.dir / 'completed.log.csv', completed_fieldnames, 'id')
 
     def __str__(self):
@@ -212,13 +219,14 @@ class ImportJob:
                 raise ModelClassNotFoundError(self.model) from e
         return self._model_class
 
-    def complete(self, item, line_reference):
+    def complete(self, item: Resource, line_reference: str, status: ImportedItemStatus):
         # write to the completed item log
         self.completed_log.append({
             'id': getattr(item, 'identifier', line_reference),
             'timestamp': datetimestamp(digits_only=False),
             'title': getattr(item, 'title', ''),
-            'uri': getattr(item, 'uri', '')
+            'uri': getattr(item, 'uri', ''),
+            'status': status.value
         })
 
     def metadata(self, **kwargs):
@@ -344,15 +352,16 @@ class ImportRun:
             'reason': reason
         })
 
-    def complete(self, item, line_reference):
+    def complete(self, item, line_reference, status):
         """
         Delegates to the `plastron.jobs.ImportJob.complete()` method.
 
         :param item:
         :param line_reference:
+        :param status:
         :return:
         """
-        self.job.complete(item, line_reference)
+        self.job.complete(item, line_reference, status)
 
 
 class MetadataRows:

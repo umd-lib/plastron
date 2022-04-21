@@ -1,17 +1,27 @@
 # Plastron Server
 
 The Plastron server (a.k.a., "plastrond") is implemented by the
-[plastron.daemon](../plastron/daemon.py) module, and there is a
-*plastrond* entry point provided by [setup.py](../setup.py).
+[plastron.daemon](../plastron/daemon.py) module, and there is a *plastrond*
+entry point provided by [setup.py](../setup.py).
 
 ## Running with Python
 
-```
+```bash
+# Install dependencies
 pip install -e .
-plastrond -c <config_file>
 ```
 
-## Running with Docker
+The Plastron Daemon itself can run in one of two modes:
+
+* As a STOMP client: `plastrond -c <config file> stomp`
+* An HTTP server: `plastrond -c <config file> http`
+
+## Running with Docker Swarm
+
+This repository contains a [docker-compose.yml](../docker-compose.yml) file 
+that defines a Docker stack that can be run alongside the [umd-fcrepo-docker]
+stack. This stack runs two containers, `plastrond-stomp` and `plastrond-http`,
+each running the Plastron Daemon in their respective mode.
 
 ```
 # if you are not already running in swarm mode
@@ -25,6 +35,10 @@ docker build -t plastrond .
 # PLASTRON_PUBLIC_KEY
 ssh-keygen -q -t rsa -N '' -f archelon_id
 
+# Copy the docker-plastron-template.yml and edit the configuration
+cp docker-plastron-template.yml docker-plastron.yml
+vim docker-plastron.yml
+
 # deploy the stack
 docker stack deploy -c docker-compose.yml plastrond
 ```
@@ -32,15 +46,19 @@ docker stack deploy -c docker-compose.yml plastrond
 To watch the logs:
 
 ```
-docker logs -f plastrond_plastrond.1.<generated_id>
+# STOMP
+docker service logs -f plastrond_plastrond-stomp
+
+# HTTP
+docker service logs -f plastrond_plastrond-http
 ```
 
 ## Configuration
 
 See [Configuration](configuration.md).
 
-See [docker-plastron.yml](../docker-plastron.yml) for an example
-of the config file.
+See [docker-plastron-template.yml](../docker-plastron-template.yml) for an 
+example of the config file.
 
 ## STOMP Message Headers
 
@@ -60,3 +78,5 @@ all commands:
 
 See the [messages documentation](messages.md) for details on the headers and bodies
 of the messages the Plastron Daemon emits.
+
+[umd-fcrepo-docker]: https://github.com/umd-lib/umd-fcrepo-docker

@@ -7,17 +7,19 @@ import sys
 import urllib
 from argparse import ArgumentTypeError
 from datetime import datetime
-from os.path import isfile
-from paramiko import AutoAddPolicy, SSHClient, SSHException
-from paramiko.config import SSH_PORT
-from plastron import namespaces
-from plastron.exceptions import RESTAPIException, FailureException
-from plastron.http import Transaction
-from plastron.namespaces import dcterms
-from rdflib import URIRef
-from rdflib.util import from_n3
+from pathlib import Path
 from tempfile import NamedTemporaryFile
 from urllib.parse import urlsplit
+
+from paramiko import AutoAddPolicy, SSHClient, SSHException
+from paramiko.config import SSH_PORT
+from rdflib import URIRef
+from rdflib.util import from_n3
+
+from plastron import namespaces
+from plastron.exceptions import FailureException, RESTAPIException
+from plastron.http import Transaction
+from plastron.namespaces import dcterms
 
 logger = logging.getLogger(__name__)
 
@@ -33,7 +35,10 @@ def parse_predicate_list(string, delimiter=','):
     return [from_n3(p, nsm=manager) for p in string.split(delimiter)]
 
 
-def uri_or_curie(arg):
+def uri_or_curie(arg: str):
+    if arg and (arg.startswith('http://') or arg.startswith('https://')):
+        # looks like an absolute HTTP URI
+        return URIRef(arg)
     try:
         term = from_n3(arg, nsm=namespaces.get_manager())
     except KeyError:
@@ -206,7 +211,7 @@ class ResourceList:
 
 class ItemLog:
     def __init__(self, filename, fieldnames, keyfield, header=True):
-        self.filename = filename
+        self.filename = Path(filename)
         self.fieldnames = fieldnames
         self.keyfield = keyfield
         self.write_header = header
@@ -217,10 +222,10 @@ class ItemLog:
             self.load_keys()
 
     def exists(self):
-        return isfile(self.filename)
+        return self.filename.is_file()
 
     def create(self):
-        with open(self.filename, mode='w', buffering=1) as fh:
+        with self.filename.open(mode='w', buffering=1) as fh:
             writer = csv.DictWriter(fh, fieldnames=self.fieldnames)
             if self.write_header:
                 writer.writeheader()
@@ -231,11 +236,14 @@ class ItemLog:
 
     def __iter__(self):
         try:
-            with open(self.filename, mode='r', buffering=1) as fh:
+            with self.filename.open(mode='r', buffering=1) as fh:
                 reader = csv.DictReader(fh)
                 # check the validity of the map file data
                 if not reader.fieldnames == self.fieldnames:
-                    raise ItemLogError(f'Fieldnames in {self.filename} do not match expected fieldnames')
+                    logger.warning(
+                        f'Fieldnames in {self.filename} do not match expected fieldnames; '
+                        f'expected: {self.fieldnames}; found: {reader.fieldnames}'
+                    )
                 # read the data from the existing file
                 yield from reader
         except FileNotFoundError:
@@ -247,7 +255,7 @@ class ItemLog:
         if not self.exists():
             self.create()
         if self.fh is None:
-            self.fh = open(self.filename, mode='a', buffering=1)
+            self.fh = self.filename.open(mode='a', buffering=1)
         if self._writer is None:
             self._writer = csv.DictWriter(self.fh, fieldnames=self.fieldnames)
         return self._writer

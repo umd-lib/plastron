@@ -17,4 +17,4 @@ VOLUME /var/opt/plastron/jobs
 
 EXPOSE 5000
 
-CMD ["plastrond", "-c", "/etc/plastrond.yml"]
+ENTRYPOINT ["plastrond", "-c", "/etc/plastrond.yml"]

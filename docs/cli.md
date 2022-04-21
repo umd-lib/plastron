@@ -2,11 +2,11 @@
 
 ## Common Options
 
-```
+```text
 $ plastron --help
 usage: plastron [-h] (-r REPO | -c CONFIG_FILE | -V) [-v] [-q]
                 [--on-behalf-of DELEGATED_USER]
-                {annotate,delete,del,rm,echo,export,extractocr,imgsize,import,list,ls,load,mkcol,ping,reindex,stub,update}
+                {annotate,create,delete,del,rm,echo,export,extractocr,imgsize,import,list,ls,load,mkcol,ping,reindex,stub,update}
                 ...
 
 Batch operation tool for Fedora 4.
@@ -23,12 +23,12 @@ optional arguments:
                         delegate repository operations to this username
 
 commands:
-  {annotate,delete,del,rm,echo,export,extractocr,imgsize,import,list,ls,load,mkcol,ping,reindex,stub,update}
+  {annotate,create,delete,del,rm,echo,export,extractocr,imgsize,import,list,ls,load,mkcol,ping,reindex,stub,update}
 ```
 
 ### Check version
 
-```
+```bash
 $ plastron --version
 3.5.0
 ```
@@ -41,7 +41,7 @@ All commands require you to specify a configuration file using either the
 
 ### Annotate (annotate)
 
-```
+```text
 $ plastron annotate --help
 usage: plastron annotate [-h] [uris [uris ...]]
 
@@ -54,9 +54,44 @@ optional arguments:
   -h, --help  show this help message and exit
 ```
 
+### Create (create)
+
+```text
+$ plastron create -h
+usage: plastron create [-h] [-D PREDICATE VALUE] [-O PREDICATE VALUE]
+                       [-T TYPE] [--collection NAME] [--container PATH]
+                       [path]
+
+Create a resource in the repository
+
+positional arguments:
+  path                  path to the new resource
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -D PREDICATE VALUE, --data-property PREDICATE VALUE
+                        an RDF data property to set on the newly created
+                        resource; VALUE is treated as a Literal; repeatable
+  -O PREDICATE VALUE, --object-property PREDICATE VALUE
+                        an RDF object property to set on the newly created
+                        resource; VALUE is treated as a CURIE or URIRef;
+                        repeatable
+  -T TYPE, --rdf-type TYPE
+                        RDF type to add to the newly created resource;
+                        equivalent to "-O rdf:type TYPE"; TYPE is treated as a
+                        CURIE or URIRef; repeatable
+  --collection NAME     shortcut for "-T pcdm:collection -D dcterms:title
+                        NAME"
+  --container PATH      parent container for the new resource; use this to
+                        create a new resource with a repository-generated
+                        identifier
+```
+
 ### Create Collection (mkcol)
 
-```
+**DEPRECATED:** Use `plastron create --collection` instead.
+
+```text
 $ plastron mkcol --help
 usage: plastron mkcol [-h] -n NAME [-b BATCH] [--notransactions]
 
@@ -76,7 +111,7 @@ See [Delete Command](delete.md)
 
 ### Echo (echo)
 
-```
+```text
 $ plastron echo --help
 usage: plastron echo [-h] [-e ECHO_DELAY] -b BODY
 
@@ -92,7 +127,7 @@ optional arguments:
 
 ### Export (export)
 
-```
+```text
 $ plastron export --help
 usage: plastron export [-h] -o OUTPUT_DEST [--key KEY] -f
                        {text/turtle,turtle,ttl,text/csv,csv}
@@ -123,7 +158,7 @@ optional arguments:
 
 ### Extract OCR (extractocr)
 
-```
+```text
 $ plastron extractocr --help
 usage: plastron extractocr [-h] [--ignore IGNORE]
 
@@ -137,7 +172,7 @@ optional arguments:
 
 ### Image Size (imgsize)
 
-```
+```text
 $ plastron imgsize --help
 usage: plastron imgsize [-h] [uris [uris ...]]
 
@@ -156,7 +191,7 @@ See [Import Command](import.md)
 
 ### List (list, ls)
 
-```
+```text
 $ plastron list --help
 usage: plastron list [-h] [-l] [-R RECURSIVE] [uris [uris ...]]
 
@@ -175,7 +210,7 @@ optional arguments:
 
 ### Load (load)
 
-```
+```text
 $ plastron load --help
 usage: plastron load [-h] -b BATCH [-d] [-n] [-l LIMIT] [-% PERCENT]
                      [--no-annotations] [--no-transactions] [--ignore IGNORE]
@@ -206,7 +241,7 @@ required arguments:
 
 ### Ping (ping)
 
-```
+```text
 $ plastron ping --help
 usage: plastron ping [-h]
 
@@ -218,7 +253,7 @@ optional arguments:
 
 ### Reindex (reindex)
 
-```
+```text
 $ plastron reindex --help
 usage: plastron reindex [-h] [-R RECURSIVE] [uris [uris ...]]
 
@@ -234,9 +269,53 @@ optional arguments:
                         given predicate(s)
 ```
 
+### Stub (stub)
+
+```text
+$ plastron stub --help
+usage: plastron stub [-h] --identifier-column IDENTIFIER_COLUMN
+                     --binary-column BINARY_COLUMN
+                     [--rename-binary-column RENAME_BINARY_COLUMN]
+                     [--member-of MEMBER_OF] [--access ACCESS]
+                     [--container CONTAINER_PATH] [-o OUTPUT_FILE]
+                     source_file
+
+create stub resources with just an identifier and binary
+
+positional arguments:
+  source_file           name of the CSV file to create stubs from; use "-" to
+                        read from STDIN
+
+optional arguments:
+  -h, --help            show this help message and exit
+  --identifier-column IDENTIFIER_COLUMN
+                        column in the source CSV file with a unique identifier
+                        for each item
+  --binary-column BINARY_COLUMN
+                        column in the source CSV file with the location of the
+                        binary to load. Supports http: and https: (must begin
+                        with "http:" or "https:"), and file resources
+                        (relative or absolute file path). Relative file paths
+                        are relative to where the command is run.
+  --rename-binary-column RENAME_BINARY_COLUMN
+                        Renames the binary column in the CSV output to the
+                        provided name.
+  --member-of MEMBER_OF
+                        URI of the object that new items are PCDM members of
+  --access ACCESS       URI or CURIE of the access class to apply to new items
+  --container CONTAINER_PATH
+                        parent container for new items; defaults to the
+                        RELPATH in the repo configuration file
+  -o OUTPUT_FILE, --output-file OUTPUT_FILE
+                        destination for a copy of the source CSV file with the
+                        binary-column value replaced with the newly created
+                        repository URI for the binary; defaults to STDOUT if
+                        not given
+```
+
 ### Update (update)
 
-```
+```text
 $ plastron update --help
 usage: plastron update [-h] -u UPDATE_FILE [-R RECURSIVE] [-d]
                        [--no-transactions] [--validate] [-m MODEL]
@@ -273,7 +352,6 @@ optional arguments:
 
 The repository connection is configured in a YAML file and passed to `plastron`
 with the `-r` or `--repo` option. These are the recognized configuration keys:
-
 
 ### Batch Configuration
 

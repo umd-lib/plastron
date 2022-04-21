@@ -4,11 +4,12 @@
 
 ```
 $ plastron import -h
-usage: plastron import [-h] [-m MODEL] [-l LIMIT] [--validate-only]
-                       [--make-template TEMPLATE_FILE] [--access ACCESS]
-                       [--member-of MEMBER_OF]
-                       [--binaries-location BINARIES_LOCATION]
-                       [--container CONTAINER] [--job-id JOB_ID] [--resume]
+usage: plastron import [-h] [-m MODEL] [-l LIMIT] [-% PERCENTAGE]
+                       [--validate-only] [--make-template FILENAME]
+                       [--access URI|CURIE] [--member-of URI]
+                       [--binaries-location LOCATION] [--container PATH]
+                       [--job-id JOB_ID] [--resume]
+                       [--extract-text-from MIME_TYPES]
                        [import_file]
 
 Import data to the repository
@@ -22,24 +23,29 @@ optional arguments:
                         data model to use
   -l LIMIT, --limit LIMIT
                         limit the number of rows to read from the import file
+  -% PERCENTAGE, --percent PERCENTAGE
+                        select an evenly spaced subset of items to import; the
+                        size of this set will be as close as possible to the
+                        specified percentage of the total items
   --validate-only       only validate, do not do the actual import
-  --make-template TEMPLATE_FILE
+  --make-template FILENAME
                         create a CSV template for the given model
-  --access ACCESS       URI or CURIE of the access class to apply to new items
-  --member-of MEMBER_OF
-                        URI of the object that new items are PCDM members of
-  --binaries-location BINARIES_LOCATION
+  --access URI|CURIE    URI or CURIE of the access class to apply to new items
+  --member-of URI       URI of the object that new items are PCDM members of
+  --binaries-location LOCATION
                         where to find binaries; either a path to a directory,
                         a "zip:<path to zipfile>" URI, an SFTP URI in the form
                         "sftp://<user>@<host>/<path to dir>", or a URI in the
                         form "zip+sftp://<user>@<host>/<path to zipfile>"
-  --container CONTAINER
-                        parent container for new items; defaults to the
+  --container PATH      parent container for new items; defaults to the
                         RELPATH in the repo configuration file
   --job-id JOB_ID       unique identifier for this job; defaults to
                         "import-{timestamp}"
   --resume              resume a job that has been started; requires --job-id
                         {id} to be present
+  --extract-text-from MIME_TYPES, -x MIME_TYPES
+                        extract text from binaries of the given MIME types,
+                        and add as annotations
 ```
 
 ## Daemon Usage
@@ -50,13 +56,17 @@ STOMP message headers:
 PlastronCommand: import
 PlastronJobId: JOB_ID
 PlastronArg-model: MODEL
-PlastronArg-limit: LIMIT 
+PlastronArg-limit: LIMIT
+PlastronArg-percent: PERCENTAGE
 PlastronArg-validate-only: {true|false}
 PlastronArg-resume: {true|false}
 PlastronArg-access: ACCESS
 PlastronArg-member-of: MEMBER_OF
 PlastronArg-binaries-location: BINARIES_LOCATION
 PlastronArg-container: CONTAINER
+PlastronArg-extract-text: MIME_TYPES
+PlastronArg-structure: {flat|hierarchical}
+PlastronArg-relpath: PATH
 ```
 
 ## Configuration
@@ -91,10 +101,32 @@ The `completed.log.csv` has the following columns:
 You may specify a job ID on the command line using the `--job-id` argument. If
 you do not provide one, Plastron will generate one using the current timestamp.
 
-If, during a run, an item cannot be loaded for any reason, that item is recorded
-to a dropped item log for that run, along with the reason for the failure.
+### Import Failures
 
-Dropped item logs have the following columns:
+Items that cannot be imported during a run are categorized as either
+"invalid" or "failed".
+
+#### Invalid Items
+
+Invalid items are items that fail metadata validation, and are recorded in
+the "dropped-invalid" log for that run, along with the reason for the failure.
+
+Invalid items will likely require changes to the source CSV file, or some other
+action on the part of the user (such as adding missing files).
+
+#### Failed Items
+
+Failed items are items that could not be imported due to problems adding
+records to the repository, and are recorded in the "dropped-failed" log for that
+run, along with the reason for the failure.
+
+Some failures may occcur due to transient network issues. In those cases,
+resuming the import should allow those items to tbe added.
+
+### Dropped Item Logs
+
+Both the "dropped-invalid" and "dropped-failed" item logs have the following
+columns:
 
 | Name      | Purpose |
 |-----------|---------|
@@ -132,9 +164,47 @@ Resume that job later:
 
 ```bash
 plastron -c repo.yml import \
-    --job-id import-foo-1
+    --job-id import-foo-1 \
     --resume
 ```
 
-Any dropped items from a particular run will be recorded in
-`{JOBS_DIR}/import-foo-1/dropped-{run_timestamp}.csv`.
+Any dropped items from a particular run will be recorded in:
+
+* `{JOBS_DIR}/import-foo-1/dropped-failed-{run_timestamp}.csv`
+* `{JOBS_DIR}/import-foo-1/dropped-invalid-{run_timestamp}.csv`
+
+## Percentage Imports
+
+You may use the `-%` or `--percent` option to import only a subset of the items
+in the import metadata CSV. Repeated use of this option with the same job will
+select new subsets of items that have not yet been imported.
+
+For example, start a job that has 50 items total, but only load 10% at first:
+
+```bash
+plastron -c repo.yml import \
+    --model Item \
+    --binaries-location /path/to/binaries \
+    --member-of http://localhost:8080/rest/collections/foo \
+    --container /objects \
+    --job-id percentile-job \
+    --percent 10
+```
+
+Plastron will only import 5 items (10% of 50), as evenly spaced within the set of
+uncompleted items as possible.
+
+If you resume the job with the `--percent 10` option again:
+
+```bash
+plastron -c repo.yml import \
+    --job-id percentile-job \
+    --resume \
+    --percent 10
+```
+
+Plastron will import 5 more items, selected from the 45 items that were not
+imported during the first run of the job.
+
+If you specify a percentage that would generate a subset larger than the number
+of remaining items, Plastron will import all the remaining items.

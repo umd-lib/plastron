@@ -2,25 +2,25 @@ import logging
 import os
 import re
 from argparse import Namespace
-from bagit import make_bag
 from datetime import datetime
 from distutils.util import strtobool
 from email.utils import parsedate
 from os.path import basename, normpath, relpath, splitext
-from paramiko import SFTPClient, SSHException
-
-from plastron.commands import BaseCommand
-from plastron.exceptions import FailureException, DataReadException, RESTAPIException
-from plastron.models import Item
-from plastron.namespaces import get_manager
-from plastron.pcdm import Object
-from plastron.serializers import EmptyItemListError, SERIALIZER_CLASSES, detect_resource_class
-from plastron.util import get_ssh_client
 from tempfile import TemporaryDirectory
 from time import mktime
 from urllib.parse import urlsplit
 from zipfile import ZipFile
 
+from bagit import make_bag
+from paramiko import SFTPClient, SSHException
+from requests import ConnectionError
+
+from plastron.commands import BaseCommand
+from plastron.exceptions import DataReadException, FailureException, RESTAPIException
+from plastron.models import Item
+from plastron.namespaces import get_manager
+from plastron.serializers import EmptyItemListError, SERIALIZER_CLASSES, detect_resource_class
+from plastron.util import get_ssh_client
 
 logger = logging.getLogger(__name__)
 nsm = get_manager()
@@ -185,7 +185,7 @@ class Command(BaseCommand):
                                 for chunk in stream:
                                     binary.write(chunk)
 
-                        # update the atime a mtime of the file to reflect the time of the
+                        # update the atime and mtime of the file to reflect the time of the
                         # HTTP request and the resource's last-modified time in the repo
                         os.utime(binary_filename, times=(mktime(accessed), mktime(modified)))
                         logger.debug(f'Copied {file.uri} to {binary.name}')
@@ -196,7 +196,7 @@ class Command(BaseCommand):
                 # log the failure, but continue to attempt to export the rest of the URIs
                 logger.error(f'Export of {uri} failed: {e}')
                 errors += 1
-            except RESTAPIException as e:
+            except (RESTAPIException, ConnectionError) as e:
                 # log the failure, but continue to attempt to export the rest of the URIs
                 logger.error(f'Unable to retrieve {uri}: {e}')
                 errors += 1
@@ -247,6 +247,7 @@ class Command(BaseCommand):
         compress_bag(bag, destination, root)
 
         self.result = {
+            'type': 'export_complete' if count == total else 'partial_export',
             'content_type': serializer.content_type,
             'file_extension': serializer.file_extension,
             'count': {

@@ -1,25 +1,26 @@
-import json
 import logging
 import os
 from concurrent.futures import ThreadPoolExecutor
-from importlib import import_module
+
+from stomp.listener import ConnectionListener
+
 from plastron import version
+from plastron.commands import get_command_class
 from plastron.exceptions import FailureException
 from plastron.http import Repository
 from plastron.stomp import Destination
 from plastron.stomp.handlers import AsynchronousResponseHandler, SynchronousResponseHandler
 from plastron.stomp.inbox_watcher import InboxWatcher
-from plastron.stomp.messages import MessageBox, PlastronCommandMessage, PlastronMessage, Message
-from stomp.listener import ConnectionListener
-
+from plastron.stomp.messages import MessageBox, PlastronCommandMessage, PlastronMessage
 
 logger = logging.getLogger(__name__)
 
 
 class CommandListener(ConnectionListener):
-    def __init__(self, broker, repo_config, command_config):
-        self.broker = broker
-        self.repo_config = repo_config
+    def __init__(self, thread):
+        self.thread = thread
+        self.broker = thread.broker
+        self.repo_config = thread.config['REPOSITORY']
         self.queue = self.broker.destinations['JOBS']
         self.status_queue = Destination(self.broker, self.broker.destinations['JOB_STATUS'])
         self.progress_topic = Destination(self.broker, self.broker.destinations['JOB_PROGRESS'])
@@ -29,15 +30,20 @@ class CommandListener(ConnectionListener):
         self.executor = ThreadPoolExecutor(thread_name_prefix=__name__)
         self.public_uri_template = self.broker.public_uri_template
         self.inbox_watcher = None
-        self.command_config = command_config
-        self.processor = MessageProcessor(command_config, repo_config)
+        self.command_config = thread.config['COMMANDS']
+        self.processor = MessageProcessor(self.command_config, self.repo_config)
+
+    def on_connecting(self, host_and_port):
+        logger.info(f'Connecting to STOMP message broker {self.broker}')
 
     def on_connected(self, headers, body):
+        logger.info(f'Connected to STOMP message broker {self.broker}')
+
         # first attempt to send anything in the outbox
         for message in self.outbox(PlastronMessage):
             logger.info(f"Found response message for job {message.job_id} in outbox")
             # send the job completed message
-            self.status_queue.send(headers=message.headers, body=message.body)
+            self.status_queue.send(message)
             logger.info(f'Sent response message for job {message.job_id}')
             # remove the message from the outbox now that sending has completed
             self.outbox.remove(message.job_id)
@@ -47,7 +53,7 @@ class CommandListener(ConnectionListener):
             self.process_message(message, AsynchronousResponseHandler(self, message))
 
         # then subscribe to the queue to receive incoming messages
-        self.broker.connection.subscribe(
+        self.broker.subscribe(
             destination=self.queue,
             id='plastron',
             ack='client-individual'
@@ -55,7 +61,7 @@ class CommandListener(ConnectionListener):
         logger.info(f"Subscribed to {self.queue}")
 
         # Subscribe for synchronous jobs
-        self.broker.connection.subscribe(
+        self.broker.subscribe(
             destination=self.synchronous_queue,
             id='plastron-synchronous',
             ack='client-individual'
@@ -70,7 +76,7 @@ class CommandListener(ConnectionListener):
             logger.debug(f'Received synchronous job message on {self.synchronous_queue} with headers: {headers}')
             message = PlastronCommandMessage(headers=headers, body=body)
             self.process_message(message, SynchronousResponseHandler(self, message))
-            self.broker.connection.ack(message.id, 'plastron-synchronous')
+            self.broker.ack(message.id, 'plastron-synchronous')
 
         elif headers['destination'] == self.queue:
             logger.debug(f'Received message on {self.queue} with headers: {headers}')
@@ -81,15 +87,18 @@ class CommandListener(ConnectionListener):
             # containing the message
             message = PlastronCommandMessage(headers=headers, body=body)
             self.inbox.add(message.id, message)
-            self.broker.connection.ack(message.id, 'plastron')
+            self.broker.ack(message.id, 'plastron')
 
     def process_message(self, message, response_handler):
         # send to a message processor thread
         self.executor.submit(self.processor, message, self.progress_topic).add_done_callback(response_handler)
 
     def on_disconnected(self):
+        logger.warning('Disconnected from the STOMP message broker')
         if self.inbox_watcher:
             self.inbox_watcher.stop()
+        if self.thread.running.is_set():
+            self.thread.running.clear()
 
 
 class MessageProcessor:
@@ -99,27 +108,21 @@ class MessageProcessor:
         # cache for command instances
         self.commands = {}
 
-    def get_command(self, command_name):
+    def get_command(self, command_name: str):
         if command_name not in self.commands:
-            try:
-                command_module = import_module('plastron.commands.' + command_name)
-            except ModuleNotFoundError as e:
-                raise FailureException(f'Unable to load a command with the name {command_name}') from e
-            command_class = getattr(command_module, 'Command')
-            if command_class is None:
-                raise FailureException(f'Command class not found in module {command_module}')
-            if getattr(command_class, 'parse_message') is None:
-                raise FailureException(f'Command class in {command_module} does not support message processing')
-
             # get the configuration options for this command
             config = self.command_config.get(command_name.upper(), {})
+
+            command_class = get_command_class(command_name)
+            if getattr(command_class, 'parse_message') is None:
+                raise FailureException(f'Command class {command_class} does not support message processing')
 
             # cache an instance of this command
             self.commands[command_name] = command_class(config)
 
         return self.commands[command_name]
 
-    def __call__(self, message, progress_topic):
+    def __call__(self, message: PlastronCommandMessage, progress_topic: Destination):
         # determine which command to load to process the message
         command = self.get_command(message.command)
 
@@ -142,39 +145,9 @@ class MessageProcessor:
             logger.info(f'Running repository operations on behalf of {repo.delegated_user}')
 
         for status in (command.execute(repo, args) or []):
-            progress_topic.send(
-                headers={
-                    'PlastronJobId': message.job_id
-                },
-                body=json.dumps(status)
-            )
+            progress_topic.send(PlastronMessage(job_id=message.job_id, body=status))
 
         logger.info(f'Job {message.job_id} complete')
 
-        return Message(
-            headers={
-                'PlastronJobId': message.job_id,
-                'PlastronJobStatus': 'Done',
-                'persistent': 'true'
-            },
-            body=json.dumps(command.result)
-        )
-
-
-class ReconnectListener(ConnectionListener):
-    def __init__(self, broker):
-        self.broker = broker
-
-    def on_connecting(self, host_and_port):
-        logger.info(f'Connecting to STOMP message broker at {":".join(host_and_port)}')
-
-    def on_connected(self, headers, body):
-        logger.info('Connected to STOMP message broker')
-
-    def on_heartbeat_timeout(self):
-        logger.warning('Missed a heartbeat, assuming disconnection from the STOMP message broker')
-        self.broker.connect()
-
-    def on_disconnected(self):
-        logger.warning('Disconnected from the STOMP message broker')
-        self.broker.connect()
+        # default message state is "Done"
+        return message.response(state=command.result.get('type', 'Done'), body=command.result)

@@ -98,7 +98,7 @@ class Repository:
         # Extract endpoint URL components for managing forward host
         parsed_endpoint_url = urlsplit(self.endpoint)
         endpoint_proto = parsed_endpoint_url.scheme
-        endpoint_host = parsed_endpoint_url.hostname
+        endpoint_host = parsed_endpoint_url.netloc
         self.endpoint_base_path = parsed_endpoint_url.path
 
         # default container path
@@ -118,14 +118,14 @@ class Repository:
         self.ua_string = ua_string
         self.delegated_user = on_behalf_of
 
-        repo_external_url = config.get('REPO_EXTERNAL_URL')
+        self.repo_external_url = config.get('REPO_EXTERNAL_URL')
         self.forwarded_host = None
         self.forwarded_proto = None
         self.forwarded_endpoint = None
-        if repo_external_url is not None:
-            parsed_repo_external_url = urlsplit(repo_external_url)
+        if self.repo_external_url is not None:
+            parsed_repo_external_url = urlsplit(self.repo_external_url)
             proto = parsed_repo_external_url.scheme
-            host = parsed_repo_external_url.hostname
+            host = parsed_repo_external_url.netloc
             if (proto != endpoint_proto) or (host != endpoint_host):
                 # We are forwarding
                 self.forwarded_host = host
@@ -159,6 +159,31 @@ class Repository:
         self.relpath = relpath
         return self
 
+    def contains(self, uri):
+        """
+        Returns True if the given URI string is contained within this
+        repository, False otherwise
+        """
+        try:
+            return uri.startswith(self.endpoint) or \
+                uri.startswith(self.repo_external_url)
+        except Exception:
+            return False
+
+    def repo_path(self, resource_uri):
+        """
+        Returns the repository path for the given resource URI, i.e. the
+        path with either the "REST_ENDPOINT" or "REPO_EXTERNAL_URL"
+        removed.
+        """
+        if resource_uri is None:
+            return None
+
+        repo_path = resource_uri.replace(self.endpoint, '')
+        if self.repo_external_url:
+            repo_path = repo_path.replace(self.repo_external_url, '')
+        return repo_path
+
     def __enter__(self):
         pass
 
@@ -189,6 +214,11 @@ class Repository:
     def request(self, method, url, headers=None, **kwargs):
         if headers is None:
             headers = {}
+
+        # make sure the transaction keep-alive thread hasn't failed
+        if self.in_transaction() and self.transaction.keep_alive.failed.is_set():
+            raise FailureException('Transaction keep-alive failed') from self.transaction.keep_alive.exception
+
         target_uri = self._insert_transaction_uri(url)
 
         if self.is_forwarded():
@@ -458,8 +488,7 @@ class Transaction:
             self.keep_alive.start()
             self.active = True
         else:
-            self.logger.error('Failed to create transaction')
-            raise RESTAPIException(response)
+            raise TransactionError(f'Failed to create transaction: {response.status_code} {response.reason}')
 
     def maintain(self):
         if self.active:
@@ -471,8 +500,9 @@ class Transaction:
             if response.status_code == 204:
                 self.logger.info(f'Transaction {self} is active until {response.headers["Expires"]}')
             else:
-                self.logger.error(f'Failed to maintain transaction {self}')
-                raise RESTAPIException(response)
+                raise TransactionError(
+                    f'Failed to maintain transaction {self}: {response.status_code} {response.reason}'
+                )
 
     def commit(self):
         if self.active:
@@ -486,8 +516,7 @@ class Transaction:
             if response.status_code == 204:
                 self.logger.info(f'Committed transaction {self}')
             else:
-                self.logger.error(f'Failed to commit transaction {self}')
-                raise RESTAPIException(response)
+                raise TransactionError(f'Failed to commit transaction {self}: {response.status_code} {response.reason}')
 
     def rollback(self):
         if self.active:
@@ -501,8 +530,9 @@ class Transaction:
             if response.status_code == 204:
                 self.logger.info(f'Rolled back transaction {self}')
             else:
-                self.logger.error(f'Failed to roll back transaction {self}')
-                raise RESTAPIException(response)
+                raise TransactionError(
+                    f'Failed to roll back transaction {self}: {response.status_code} {response.reason}'
+                )
 
 
 # based on https://stackoverflow.com/a/12435256/5124907
@@ -512,10 +542,20 @@ class TransactionKeepAlive(threading.Thread):
         self.transaction = transaction
         self.interval = interval
         self.stopped = threading.Event()
+        self.failed = threading.Event()
+        self.exception = None
 
     def run(self):
         while not self.stopped.wait(self.interval):
-            self.transaction.maintain()
+            try:
+                self.transaction.maintain()
+            except TransactionError as e:
+                # stop trying to maintain the transaction
+                self.stop()
+                # set the "failed" flag to communicate back to the main thread
+                # that we were unable to maintain the transaction
+                self.exception = e
+                self.failed.set()
 
     def stop(self):
         self.stopped.set()

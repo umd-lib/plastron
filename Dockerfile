@@ -12,6 +12,9 @@ COPY . /opt/plastron
 WORKDIR /opt/plastron
 RUN pip install -r requirements.txt .
 ENV PYTHONUNBUFFERED=1
-VOLUME /var/opt/plastron
+VOLUME /var/opt/plastron/msg
+VOLUME /var/opt/plastron/jobs
 
-CMD ["plastrond", "-c", "/etc/plastrond.yml"]
+EXPOSE 5000
+
+ENTRYPOINT ["plastrond", "-c", "/etc/plastrond.yml"]

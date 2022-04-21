@@ -72,7 +72,8 @@ logs.*
 config/*
 data/*
 exports/*
-jobs/
+/jobs/
+msg/
 !config/templates
 !config/templates/*
 !config/logging.yml
@@ -84,8 +85,17 @@ jobs/
 # PyCharm IDE work directory
 .idea/
 
+# VS Code metadata directory
+.vscode/
+
 # virtualenv directory
 venv/
 
 .python-version
 
+# SSH Keys
+archelon_id
+archelon_id.pub
+
+# Docker Plastron Configuration file
+docker-plastron.yml

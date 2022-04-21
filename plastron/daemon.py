@@ -1,31 +1,102 @@
-#!/usr/bin/env python3
-import argparse
 import logging
 import logging.config
-import os
-import signal
 import sys
+from argparse import ArgumentParser, FileType
+from datetime import datetime
+from pathlib import Path
+from threading import Event, Thread
+from typing import Any, Mapping, Tuple, Type
+
+import waitress
 import yaml
 
-from datetime import datetime
 from plastron import version
 from plastron.logging import DEFAULT_LOGGING_OPTIONS
 from plastron.stomp import Broker
-from plastron.stomp.listeners import ReconnectListener, CommandListener
+from plastron.stomp.listeners import CommandListener
 from plastron.util import envsubst
+from plastron.web import create_app
 
 logger = logging.getLogger(__name__)
-now = datetime.utcnow().strftime('%Y%m%d%H%M%S')
 
 
-def main():
-    parser = argparse.ArgumentParser(
-        prog='plastron',
+class STOMPDaemon(Thread):
+    def __init__(self, config=None, **kwargs):
+        super().__init__(**kwargs)
+        if config is None:
+            config = {}
+        self.config = config
+        self.running = Event()
+        # configure STOMP message broker
+        self.broker = Broker(self.config['MESSAGE_BROKER'])
+
+    def run(self):
+        # setup listeners
+        listener = CommandListener(self)
+        self.broker.set_listener('command', listener)
+
+        # connect and listen as long as the running Event is set
+        if self.broker.connect():
+            self.running.set()
+            while self.running.is_set():
+                self.running.wait(1)
+
+            self.broker.disconnect()
+            if listener.inbox_watcher:
+                listener.inbox_watcher.stop()
+        else:
+            logger.error('Unable to connect to STOMP broker')
+
+
+class HTTPDaemon(Thread):
+    def __init__(self, config=None, **kwargs):
+        super().__init__(daemon=True, **kwargs)
+        self.jobs_dir = config.get('COMMANDS', {}).get('IMPORT', {}).get('JOBS_DIR', 'jobs')
+        server_config = config.get('HTTP_SERVER', {})
+        self.host = server_config.get('HOST', '0.0.0.0')
+        self.port = int(server_config.get('PORT', 5000))
+
+    def run(self):
+        app = create_app({'JOBS_DIR': Path(self.jobs_dir)})
+        logger.info(f'HTTP server listening on {self.host}:{self.port}')
+        waitress.serve(app, host=self.host, port=self.port)
+
+
+INTERFACES = {
+    'stomp': STOMPDaemon,
+    'http': HTTPDaemon
+}
+
+
+def configure_logging(log_filename_base: str, log_dir: str = 'logs', verbose: bool = False) -> None:
+    logging_options = DEFAULT_LOGGING_OPTIONS
+
+    # log file configuration
+    log_dirname = Path(log_dir)
+    log_dirname.mkdir(parents=True, exist_ok=True)
+    now = datetime.utcnow().strftime('%Y%m%d%H%M%S')
+    log_filename = '.'.join((log_filename_base, now, 'log'))
+    logfile = log_dirname / log_filename
+    logging_options['handlers']['file']['filename'] = str(logfile)
+
+    # manipulate console verbosity
+    if verbose:
+        logging_options['handlers']['console']['level'] = 'DEBUG'
+
+    # configure logging
+    logging.config.dictConfig(logging_options)
+
+
+def get_daemon_config() -> Tuple[Type[Any], Mapping[str, Any]]:
+    parser = ArgumentParser(
+        prog='plastrond',
         description='Batch operations daemon for Fedora 4.'
     )
     parser.add_argument(
         '-c', '--config',
-        help='Path to configuration file.',
+        dest='config_file',
+        help='path to configuration file',
+        type=FileType(),
         action='store',
         required=True
     )
@@ -34,51 +105,46 @@ def main():
         help='increase the verbosity of the status output',
         action='store_true'
     )
+    parser.add_argument(
+        'interface',
+        help='interface to run',
+        choices=INTERFACES.keys()
+    )
 
     # parse command line args
     args = parser.parse_args()
 
-    with open(args.config, 'r') as config_file:
-        config = envsubst(yaml.safe_load(config_file))
+    config = envsubst(yaml.safe_load(args.config_file))
 
-    repo_config = config['REPOSITORY']
-    broker_config = config['MESSAGE_BROKER']
-    command_config = config.get('COMMANDS', {})
+    configure_logging(
+        log_filename_base='plastron.daemon',
+        log_dir=config.get('REPOSITORY', {}).get('LOG_DIR', 'logs'),
+        verbose=args.verbose
+    )
 
-    logging_options = DEFAULT_LOGGING_OPTIONS
+    return INTERFACES[args.interface], config
 
-    # log file configuration
-    log_dirname = repo_config.get('LOG_DIR')
-    if not os.path.isdir(log_dirname):
-        os.makedirs(log_dirname)
-    log_filename = f'plastron.daemon.{now}.log'
-    logfile = os.path.join(log_dirname, log_filename)
-    logging_options['handlers']['file']['filename'] = logfile
 
-    # manipulate console verbosity
-    if args.verbose:
-        logging_options['handlers']['console']['level'] = 'DEBUG'
+def main():
+    daemon_class, config = get_daemon_config()
+    daemon_description = f'plastrond/{version} ({daemon_class.__name__})'
 
-    # configure logging
-    logging.config.dictConfig(logging_options)
+    logger.info(f'Starting {daemon_description}')
 
-    # configure STOMP message broker
-    broker = Broker(broker_config)
-
-    logger.info(f'plastrond {version}')
-
-    # setup listeners
-    # Order of listeners is important -- ReconnectListener should be the
-    # last listener
-    broker.connection.set_listener('command', CommandListener(broker, repo_config, command_config))
-    broker.connection.set_listener('reconnect', ReconnectListener(broker))
+    thread = daemon_class(config=config)
 
     try:
-        broker.connect()
-        while True:
-            signal.pause()
+        thread.start()
+        while thread.is_alive():
+            thread.join(1)
     except KeyboardInterrupt:
-        sys.exit()
+        logger.warning(f'Shutting down {daemon_description}')
+        if hasattr(thread, 'running'):
+            thread.running.clear()
+            thread.join()
+
+    logger.info(f'{daemon_description} shut down successfully')
+    sys.exit()
 
 
 if __name__ == "__main__":

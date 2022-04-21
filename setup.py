@@ -74,6 +74,7 @@ setup(
         'bagit',
         'BeautifulSoup4',
         'edtf-validate',
+        'Flask',
         'iso639',
         'jwcrypto',
         'lxml>3.6.0',
@@ -86,7 +87,8 @@ setup(
         'rdflib-jsonld',
         'requests',
         'setuptools',
-        'stomp.py',
+        'stomp.py==6.1.0',
+        'waitress',
         'watchdog==0.10.3'
     ],
     python_requires='>=3.6',
@@ -99,7 +101,7 @@ setup(
     # projects.
     extras_require={  # Optional
         'dev': ['pycodestyle'],
-        'test': ['pytest', 'freezegun'],
+        'test': ['pytest', 'freezegun', 'http-server-mock'],
     },
 
     # TODO: config/templates/*.yml?

@@ -47,12 +47,13 @@ class Command(BaseCommand):
         self.broker.disconnect()
 
     def reindex_item(self, resource, graph):
+        logger.info(f'Reindexing {resource.uri}')
         types = ','.join(graph.objects(subject=URIRef(resource.uri), predicate=rdf.type))
         self.broker.send_message(
             destination=self.reindexing_queue,
             headers={
                 'CamelFcrepoUri': resource.uri,
-                'CamelFcrepoPath': resource.uri.replace(self.repo.endpoint, ''),
+                'CamelFcrepoPath': self.repo.repo_path(resource.uri),
                 'CamelFcrepoResourceType': types,
                 'CamelFcrepoUser': self.username,
                 'persistent': 'true'

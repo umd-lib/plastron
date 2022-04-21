@@ -6,7 +6,7 @@ from pytest import raises
 
 
 def test_parse_message():
-    message_body = '{\"uri\": [\"test\"], \"sparql_update\": \"\" }'
+    message_body = '{\"uris\": [\"test\"], \"sparql_update\": \"\" }'
 
     headers = {
         'PlastronJobId': 'test',

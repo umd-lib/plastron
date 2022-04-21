@@ -6,45 +6,62 @@ Utility for batch operations on a Fedora 4 repository.
 
 Requires Python 3.6+
 
+### Install from GitHub
+
+```bash
+pip install git+https://github.com/umd-lib/plastron.git
 ```
-**TODO**
-add end-user instructions here once this is available via PyPI/pip
-**TODO**
+
+To install a particular tag, branch, or commit, append the desired identifier
+after an `@`:
+
+```bash
+# installs version tagged 3.5.1
+pip install git+https://github.com/umd-lib/plastron.git@3.5.1
+
+# installs from the develop branch
+pip install git+https://github.com/umd-lib/plastron.git@develop
+
+# installs from commit a2b398648266f57d96a94d90392da71a47f4d0aa
+pip install git+https://github.com/umd-lib/plastron.git@a2b398648266f57d96a94d90392da71a47f4d0aa
 ```
 
 ### Installing Python 3 with pyenv (Optional)
 
-If you don't already have a Python 3 environment, or would like to install Plastron
-into its own isolated environment, a very convenient way to do this is to use the
-[pyenv] Python version manager.
+If you don't already have a Python 3 environment, or would like to install
+Plastron into its own isolated environment, a very convenient way to do this is
+to use the [pyenv] Python version manager.
 
 See these instructions for [installing pyenv](https://github.com/pyenv/pyenv#installation),
 then run the following:
 
-```
+```bash
 # install Python 3.6.12
 pyenv install 3.6.12
 
-# create a new virtual environment based on 3.6.2 for Plastron
+# create a new virtual environment based on 3.6.12 for Plastron
 pyenv virtualenv 3.6.12 plastron
 
 # switch to that environment in your current shell
 pyenv shell plastron
+
+# or for the current directory
+pyenv shell local plastron
 ```
 
 ### Installation for development
 
 To install Plastron in [development mode], do the following:
 
-```
+```bash
 git clone git@github.com:umd-lib/plastron.git
 cd plastron
 pip install -e .[dev,test]
 ```
 
-This allows for in-place editing of Plastron's source code in the
-git repository (i.e., it is not locked away in a Python site-packages
-directory structure).
+This allows for in-place editing of Plastron's source code in the git
+repository (i.e., it is not locked away in a Python site-packages directory
+structure).
 
 ## Running
 
@@ -53,8 +70,7 @@ directory structure).
 
 ## Architecture
 
-Plastron is designed in a modular fashion. Its major
-components are:
+Plastron is designed in a modular fashion. Its major components are:
 
 * Fedora repository REST API client ([http.py](plastron/http.py))
 * RDF-to-Python object modeling ([rdf.py](plastron/rdf.py), [content models](plastron/models))
@@ -63,10 +79,9 @@ components are:
 * Entrypoint interfaces (currently a command-line tool and
   a daemon) ([cli.py](plastron/cli.py), [daemon.py](plastron/daemon.py))
 
-The intent is that the runnable commands be useful units
-of work that are able to be called interchangeably from
-any of the entrypoint interfaces, or be directly included
-and called via import into other Python code.
+The intent is that the runnable commands be useful units of work that can be
+called interchangeably from any of the entrypoint interfaces, or be directly
+included and called via import into other Python code.
 
 ## Name
 

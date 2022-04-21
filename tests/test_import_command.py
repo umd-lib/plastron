@@ -1,13 +1,13 @@
 import pytest
-from importlib import import_module
+from plastron.commands import importcommand
 from plastron.files import LocalFileSource, RemoteFileSource, ZipFileSource
+from plastron.jobs import build_fields
 from plastron.models import Item, umdtype
 from plastron.pcdm import Object
 from plastron.rdf import RDFDataProperty
 from plastron.stomp.messages import PlastronCommandMessage
 
-imp = import_module('plastron.commands.import')
-cmd = imp.Command()
+cmd = importcommand.Command()
 
 
 @pytest.mark.parametrize(
@@ -19,16 +19,16 @@ cmd = imp.Command()
     ]
 )
 def test_build_file_groups(value, expected_count):
-    assert len(imp.build_file_groups(value)) == expected_count
+    assert len(importcommand.build_file_groups(value)) == expected_count
 
 
 def test_build_fields_with_default_datatype():
-    fields = imp.build_fields(['Accession Number'], Item)
+    fields = build_fields(['Accession Number'], Item)
     assert fields['accession_number'][0]['datatype'] == umdtype.accessionNumber
 
 
 def test_build_fields_without_default_datatype():
-    fields = imp.build_fields(['Identifier'], Item)
+    fields = build_fields(['Identifier'], Item)
     assert fields['identifier'][0]['datatype'] is None
 
 
@@ -50,19 +50,19 @@ def test_parse_value_string():
     prop_type = type('test', (RDFDataProperty,), {'datatype': None})
 
     # the empty string should parse to the empty list
-    assert(len(list(imp.parse_value_string('', column, prop_type))) == 0)
+    assert(len(list(importcommand.parse_value_string('', column, prop_type))) == 0)
     # single value
-    assert(len(list(imp.parse_value_string('foo', column, prop_type))) == 1)
+    assert(len(list(importcommand.parse_value_string('foo', column, prop_type))) == 1)
     # single value, followed by an empty string
-    assert(len(list(imp.parse_value_string('foo|', column, prop_type))) == 1)
+    assert(len(list(importcommand.parse_value_string('foo|', column, prop_type))) == 1)
     # two values
-    assert(len(list(imp.parse_value_string('foo|bar', column, prop_type))) == 2)
+    assert(len(list(importcommand.parse_value_string('foo|bar', column, prop_type))) == 2)
     # two values, with an empty string between
-    assert(len(list(imp.parse_value_string('foo||bar', column, prop_type))) == 2)
+    assert(len(list(importcommand.parse_value_string('foo||bar', column, prop_type))) == 2)
 
 
 # sample file group to use in add_files_* tests
-ADD_FILES_GROUPS = imp.build_file_groups('foo.jpg;foo.tiff;bar.jpg;baz.pdf')
+ADD_FILES_GROUPS = importcommand.build_file_groups('foo.jpg;foo.tiff;bar.jpg;baz.pdf')
 
 
 def test_add_files_paged():
@@ -114,27 +114,27 @@ hierarchical_repo_config = {
 }
 
 # Import message does not specify structure
-no_structure_message = PlastronCommandMessage({
-    'message-id': 'TEST-no-structure',
-    'PlastronJobId': '1',
-    'PlastronCommand': 'import',
-})
+no_structure_message = PlastronCommandMessage(
+    message_id='TEST-no-structure',
+    job_id='1',
+    command='import'
+)
 
 # Import message specifies "flat" structure
-flat_structure_message = PlastronCommandMessage({
-    'message-id': 'TEST-flat-structure',
-    'PlastronJobId': '1',
-    'PlastronCommand': 'import',
-    'PlastronArg-structure': 'flat'
-})
+flat_structure_message = PlastronCommandMessage(
+    message_id='TEST-flat-structure',
+    job_id='1',
+    command='import',
+    args={'structure': 'flat'}
+)
 
 # Import message specified "hierarchical" structure
-hierarchical_structure_message = PlastronCommandMessage({
-    'message-id': 'TEST-hierarchical-structure',
-    'PlastronJobId': '1',
-    'PlastronCommand': 'import',
-    'PlastronArg-structure': 'hierarchical'
-})
+hierarchical_structure_message = PlastronCommandMessage(
+    message_id='TEST-hierarchical-structure',
+    job_id='1',
+    command='import',
+    args={'structure': 'hierarchical'}
+)
 
 
 def test_repo_config_uses_structure_from_repo_config_if_no_structure_specified():
@@ -174,20 +174,22 @@ relpath_repo_config = {
 }
 
 # Import message without relpath
-no_relpath_message = PlastronCommandMessage({
-    'message-id': 'TEST-without-relpath',
-    'PlastronJobId': '1',
-    'PlastronCommand': 'import',
-    'PlastronArg-structure': 'flat'
-})
+no_relpath_message = PlastronCommandMessage(
+    message_id='TEST-without-relpath',
+    job_id='1',
+    command='import',
+    args={'structure': 'flat'},
+)
 
-relpath_message = PlastronCommandMessage({
-    'message-id': 'TEST-with-relpath',
-    'PlastronJobId': '1',
-    'PlastronCommand': 'import',
-    'PlastronArg-structure': 'flat',
-    'PlastronArg-relpath': '/test-relpath'
-})
+relpath_message = PlastronCommandMessage(
+    message_id='TEST-with-relpath',
+    job_id='1',
+    command='import',
+    args={
+        'structure': 'flat',
+        'relpath': '/test-relpath'
+    },
+)
 
 
 def test_repo_config_uses_relpath_from_repo_config_if_no_relpath_specified():

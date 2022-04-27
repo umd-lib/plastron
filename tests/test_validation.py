@@ -1,7 +1,9 @@
 from unittest.mock import Mock, patch
 from urllib.error import HTTPError
 
+import httpretty
 import pytest
+from httpretty import GET
 from rdflib import URIRef
 
 from plastron.rdf import RDFObjectProperty
@@ -90,3 +92,34 @@ def test_remote_vocab_error(MockGraph):
     # failure to retrieve the vocabulary over HTTP should
     # raise a ValidationError
     pytest.raises(ValidationError, get_vocabulary, 'http://example.org/foo/')
+
+
+@httpretty.activate
+def test_remote_vocab_308_redirect(shared_datadir):
+    # simulate a 308 -> 303 -> 200 redirection chain to emulate nginx
+    httpretty.register_uri(
+        uri='http://vocab.lib.umd.edu/form',
+        method=GET,
+        status=308,
+        adding_headers={
+            'Location': 'https://vocab.lib.umd.edu/form'
+        }
+    )
+    httpretty.register_uri(
+        uri='https://vocab.lib.umd.edu/form',
+        method=GET,
+        status=303,
+        adding_headers={
+            'Location': 'https://vocab.lib.umd.edu/form.json'
+        }
+    )
+    httpretty.register_uri(
+        uri='https://vocab.lib.umd.edu/form.json',
+        method=GET,
+        status=200,
+        body=(shared_datadir / 'form.json').read_text(),
+        content_type='application/ld+json'
+    )
+    prop = RDFObjectProperty()
+    prop.values = [URIRef('http://vocab.lib.umd.edu/form#slides_photographs')]
+    assert from_vocabulary(prop, 'http://vocab.lib.umd.edu/form')

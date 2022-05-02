@@ -3,7 +3,6 @@ from functools import lru_cache
 from os.path import abspath, dirname
 from pathlib import Path
 from typing import List
-from urllib.error import HTTPError
 
 import requests
 from rdflib import Graph

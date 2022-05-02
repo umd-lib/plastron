@@ -83,10 +83,10 @@ setup(
         'Pillow>=6.2.2',
         'pyparsing',
         'PyYAML>3.12',
-        'rdflib',
+        'rdflib<6.0.0',
         'rdflib-jsonld==0.5.0',
         'requests',
-        'setuptools',
+        'setuptools<58.0.0',
         'stomp.py==6.1.0',
         'waitress',
         'watchdog==0.10.3'

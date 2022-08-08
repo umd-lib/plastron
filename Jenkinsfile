@@ -100,6 +100,7 @@ pipeline {
           python -m pip install virtualenv
           virtualenv venv
           . venv/bin/activate
+          pip install --force-reinstall 'setuptools<58.0.0'
 
           pip install -e .[test]
         '''

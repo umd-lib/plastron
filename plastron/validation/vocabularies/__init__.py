@@ -3,8 +3,8 @@ from functools import lru_cache
 from os.path import abspath, dirname
 from pathlib import Path
 from typing import List
-from urllib.error import HTTPError
 
+import requests
 from rdflib import Graph
 
 from plastron.validation import ValidationError
@@ -32,10 +32,14 @@ def get_vocabulary(vocab_uri: str) -> Graph:
             logger.info('Falling back to remote retrieval')
 
     # otherwise, fall back to remote retrieval
-    try:
-        graph.parse(location=vocab_uri)
-    except HTTPError as e:
-        raise ValidationError(f'Unable to retrieve vocabulary from {vocab_uri}: {e}') from e
+    # LIBFCREPO-1093: use requests to fetch the vocab_uri, since rdflib < 6.0.0
+    # does not support "308 Permanent Redirect" responses as redirection and
+    # instead treats them as errors. This is fixed in rdflib 6.0.0, but that
+    # requires Python > 3.7, and Plastron currently uses 3.6
+    response = requests.get(vocab_uri, headers={'Accept': 'application/ld+json, text/turtle'})
+    if not response.ok:
+        raise ValidationError(f'Unable to retrieve vocabulary from {vocab_uri}: {response}')
+    graph.parse(data=response.text, format=response.headers['Content-Type'])
 
     return graph
 

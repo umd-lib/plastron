@@ -83,10 +83,10 @@ setup(
         'Pillow>=6.2.2',
         'pyparsing',
         'PyYAML>3.12',
-        'rdflib',
-        'rdflib-jsonld',
+        'rdflib<6.0.0',
+        'rdflib-jsonld==0.5.0',
         'requests',
-        'setuptools',
+        'setuptools<58.0.0',
         'stomp.py==6.1.0',
         'waitress',
         'watchdog==0.10.3'
@@ -101,7 +101,7 @@ setup(
     # projects.
     extras_require={  # Optional
         'dev': ['pycodestyle'],
-        'test': ['pytest', 'freezegun', 'http-server-mock'],
+        'test': ['pytest', 'pytest-datadir', 'freezegun', 'http-server-mock', 'httpretty'],
     },
 
     # TODO: config/templates/*.yml?

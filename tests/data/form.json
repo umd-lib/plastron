@@ -1,0 +1,17 @@
+{
+  "@context": {
+    "owl": "http://www.w3.org/2002/07/owl#",
+    "rdfs": "http://www.w3.org/2000/01/rdf-schema#",
+    "dc": "http://purl.org/dc/elements/1.1/"
+  },
+  "@graph": [
+    {
+      "@id": "http://vocab.lib.umd.edu/form#slides_photographs",
+      "dc:identifier": "slides_photographs",
+      "rdfs:label": "Slides (photographs)",
+      "owl:sameAs": {
+        "@id": "http://vocab.getty.edu/page/aat/300128371"
+      }
+    }
+  ]
+}

@@ -33,7 +33,7 @@ class Message:
             self.headers[header_name] = value
 
         def deleter(self):
-            del(self.headers[header_name])
+            del self.headers[header_name]
 
         setattr(cls, attr_name, property(getter, setter, deleter))
 

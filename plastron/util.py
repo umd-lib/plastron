@@ -115,6 +115,27 @@ def envsubst(value, env=None):
         return value
 
 
+def strtobool(val):
+    """Convert a string representation of truth to true (1) or false (0).
+
+    True values are 'y', 'yes', 't', 'true', 'on', and '1'; false values
+    are 'n', 'no', 'f', 'false', 'off', and '0'.  Raises ValueError if
+    'val' is anything else.
+
+    This implementation is copied from distutils/util.py in Python 3.10.4,
+    in order to retain this functionality once distutils is removed in
+    Python 3.12. See also https://peps.python.org/pep-0632/#migration-advice
+    and https://docs.python.org/3.10/whatsnew/3.10.html#distutils-deprecated.
+    """
+    val = val.lower()
+    if val in ('y', 'yes', 't', 'true', 'on', '1'):
+        return 1
+    elif val in ('n', 'no', 'f', 'false', 'off', '0'):
+        return 0
+    else:
+        raise ValueError("invalid truth value %r" % (val,))
+
+
 class ResourceList:
     def __init__(self, repository, uri_list=None, file=None, completed_file=None):
         self.repository = repository

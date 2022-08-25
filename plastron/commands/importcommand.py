@@ -6,10 +6,8 @@ import os
 import re
 
 from argparse import FileType, Namespace, ArgumentTypeError
-from bs4 import BeautifulSoup
 from collections import OrderedDict, defaultdict
 from datetime import datetime
-from distutils.util import strtobool
 from os.path import basename, splitext
 from uuid import uuid4
 
@@ -26,7 +24,7 @@ from plastron.namespaces import get_manager, prov, sc
 from plastron.oa import Annotation, TextualBody
 from plastron.pcdm import File, PreservationMasterFile
 from plastron.rdf import RDFDataProperty
-from plastron.util import datetimestamp, uri_or_curie
+from plastron.util import datetimestamp, strtobool, uri_or_curie
 from plastron.validation import ValidationError, validate
 
 nsm = get_manager()

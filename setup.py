@@ -99,9 +99,16 @@ setup(
     #
     # Similar to `install_requires` above, these must be valid existing
     # projects.
-    extras_require={  # Optional
+    extras_require={
         'dev': ['pycodestyle'],
-        'test': ['pytest', 'pytest-datadir', 'freezegun', 'http-server-mock', 'httpretty'],
+        'test': [
+            'CoilMQ',
+            'freezegun',
+            'httpretty',
+            'http-server-mock',
+            'pytest',
+            'pytest-datadir',
+        ],
     },
 
     # TODO: config/templates/*.yml?

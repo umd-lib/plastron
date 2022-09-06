@@ -1,7 +1,7 @@
 import logging
 import os
 
-from stomp import Connection12
+from stomp import Connection11
 from stomp.exception import StompException
 
 from plastron import version
@@ -14,7 +14,7 @@ class Broker:
     def __init__(self, config):
         # set up STOMP client
         self.server = tuple(config['SERVER'].split(':', 2))
-        self.connection = Connection12([self.server])
+        self.connection = Connection11([self.server])
         self.client_id = f'plastrond/{version}-{os.uname().nodename}-{os.getpid()}'
         self.destinations = config.get('DESTINATIONS', {})
         self.message_store_dir = config['MESSAGE_STORE_DIR']

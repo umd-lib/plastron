@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 
 
 class CommandListener(ConnectionListener):
-    def __init__(self, thread):
+    def __init__(self, thread: 'STOMPDaemon'):
         self.thread = thread
         self.broker = thread.broker
         self.repo_config = thread.config['REPOSITORY']
@@ -71,6 +71,9 @@ class CommandListener(ConnectionListener):
         self.inbox_watcher = InboxWatcher(self, self.inbox)
         self.inbox_watcher.start()
 
+        self.thread.stopped.clear()
+        self.thread.started.set()
+
     def on_message(self, frame):
         headers = frame.headers
         body = frame.body
@@ -99,8 +102,8 @@ class CommandListener(ConnectionListener):
         logger.warning('Disconnected from the STOMP message broker')
         if self.inbox_watcher:
             self.inbox_watcher.stop()
-        if self.thread.running.is_set():
-            self.thread.running.clear()
+        self.thread.started.clear()
+        self.thread.stopped.set()
 
 
 class MessageProcessor:

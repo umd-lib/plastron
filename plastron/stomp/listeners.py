@@ -36,7 +36,7 @@ class CommandListener(ConnectionListener):
     def on_connecting(self, host_and_port):
         logger.info(f'Connecting to STOMP message broker {self.broker}')
 
-    def on_connected(self, headers, body):
+    def on_connected(self, frame):
         logger.info(f'Connected to STOMP message broker {self.broker}')
 
         # first attempt to send anything in the outbox
@@ -71,7 +71,9 @@ class CommandListener(ConnectionListener):
         self.inbox_watcher = InboxWatcher(self, self.inbox)
         self.inbox_watcher.start()
 
-    def on_message(self, headers, body):
+    def on_message(self, frame):
+        headers = frame.headers
+        body = frame.body
         if headers['destination'] == self.synchronous_queue:
             logger.debug(f'Received synchronous job message on {self.synchronous_queue} with headers: {headers}')
             message = PlastronCommandMessage(headers=headers, body=body)

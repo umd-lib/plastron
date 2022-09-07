@@ -39,7 +39,7 @@ requests==2.26.0
 setuptools==57.4.0
 six==1.16.0
 soupsieve==2.2.1
-stomp.py==6.1.0
+stomp.py==8.0.1
 typing-extensions==3.10.0.0
 urllib3==1.26.6
 waitress==2.0.0

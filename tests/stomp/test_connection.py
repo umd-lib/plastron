@@ -73,6 +73,6 @@ def test_stomp_server_closed(stomp_server, plastrond_stomp):
     stomp_server.shutdown()
 
     # wait for the daemon to shut down
-    plastrond_stomp.stopped.wait(5)
+    plastrond_stomp.stopped.wait(10)
 
     assert not plastrond_stomp.is_alive()

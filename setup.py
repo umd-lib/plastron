@@ -87,7 +87,7 @@ setup(
         'rdflib-jsonld==0.5.0',
         'requests',
         'setuptools<58.0.0',
-        'stomp.py==6.1.0',
+        'stomp.py',
         'waitress',
         'watchdog==0.10.3'
     ],
@@ -99,9 +99,16 @@ setup(
     #
     # Similar to `install_requires` above, these must be valid existing
     # projects.
-    extras_require={  # Optional
+    extras_require={
         'dev': ['pycodestyle'],
-        'test': ['pytest', 'pytest-datadir', 'freezegun', 'http-server-mock', 'httpretty'],
+        'test': [
+            'CoilMQ',
+            'freezegun',
+            'httpretty',
+            'http-server-mock',
+            'pytest',
+            'pytest-datadir',
+        ],
     },
 
     # TODO: config/templates/*.yml?

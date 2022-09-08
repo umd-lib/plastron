@@ -10,7 +10,9 @@
 docker-compose.yml
 docker-plastron.yml
 
+.mypy_cache/
 .pytest_cache/
+.tox/
 data/
 dist/
 exports/
@@ -18,6 +20,7 @@ jobs/
 logs/
 msg/
 plastron.egg-info/
+site/
 
 # SSH Keys
 archelon_id

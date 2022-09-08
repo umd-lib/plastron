@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 
 
 class CommandListener(ConnectionListener):
-    def __init__(self, thread):
+    def __init__(self, thread: 'STOMPDaemon'):
         self.thread = thread
         self.broker = thread.broker
         self.repo_config = thread.config['REPOSITORY']
@@ -36,7 +36,7 @@ class CommandListener(ConnectionListener):
     def on_connecting(self, host_and_port):
         logger.info(f'Connecting to STOMP message broker {self.broker}')
 
-    def on_connected(self, headers, body):
+    def on_connected(self, frame):
         logger.info(f'Connected to STOMP message broker {self.broker}')
 
         # first attempt to send anything in the outbox
@@ -71,7 +71,12 @@ class CommandListener(ConnectionListener):
         self.inbox_watcher = InboxWatcher(self, self.inbox)
         self.inbox_watcher.start()
 
-    def on_message(self, headers, body):
+        self.thread.stopped.clear()
+        self.thread.started.set()
+
+    def on_message(self, frame):
+        headers = frame.headers
+        body = frame.body
         if headers['destination'] == self.synchronous_queue:
             logger.debug(f'Received synchronous job message on {self.synchronous_queue} with headers: {headers}')
             message = PlastronCommandMessage(headers=headers, body=body)
@@ -97,8 +102,8 @@ class CommandListener(ConnectionListener):
         logger.warning('Disconnected from the STOMP message broker')
         if self.inbox_watcher:
             self.inbox_watcher.stop()
-        if self.thread.running.is_set():
-            self.thread.running.clear()
+        self.thread.started.clear()
+        self.thread.stopped.set()
 
 
 class MessageProcessor:

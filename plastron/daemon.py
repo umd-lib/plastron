@@ -26,24 +26,23 @@ class STOMPDaemon(Thread):
         if config is None:
             config = {}
         self.config = config
-        self.running = Event()
+        self.started = Event()
+        self.stopped = Event()
         # configure STOMP message broker
         self.broker = Broker(self.config['MESSAGE_BROKER'])
+        self.command_listener = CommandListener(self)
 
     def run(self):
         # setup listeners
-        listener = CommandListener(self)
-        self.broker.set_listener('command', listener)
+        self.broker.set_listener('command', self.command_listener)
 
-        # connect and listen as long as the running Event is set
+        # connect and listen until the stopped Event is set
         if self.broker.connect():
-            self.running.set()
-            while self.running.is_set():
-                self.running.wait(1)
+            self.stopped.wait()
 
             self.broker.disconnect()
-            if listener.inbox_watcher:
-                listener.inbox_watcher.stop()
+            if self.command_listener.inbox_watcher:
+                self.command_listener.inbox_watcher.stop()
         else:
             logger.error('Unable to connect to STOMP broker')
 
@@ -139,9 +138,9 @@ def main():
             thread.join(1)
     except KeyboardInterrupt:
         logger.warning(f'Shutting down {daemon_description}')
-        if hasattr(thread, 'running'):
-            thread.running.clear()
-            thread.join()
+        if hasattr(thread, 'stopped'):
+            thread.stopped.set()
+            thread.stopped.wait()
 
     logger.info(f'{daemon_description} shut down successfully')
     sys.exit()

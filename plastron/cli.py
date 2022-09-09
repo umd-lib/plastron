@@ -5,20 +5,20 @@ import logging
 import logging.config
 import os
 import sys
-import yaml
-import pysolr
-
-
 from argparse import ArgumentParser, FileType
 from datetime import datetime
 from importlib import import_module
 from pkgutil import iter_modules
+
+import pysolr
+import yaml
+
 from plastron import commands, version
 from plastron.exceptions import FailureException, ConfigError
-from plastron.logging import DEFAULT_LOGGING_OPTIONS
 from plastron.http import Repository
+from plastron.logging import DEFAULT_LOGGING_OPTIONS
 from plastron.stomp import Broker
-from plastron.util import envsubst
+from plastron.util import envsubst, check_python_version
 
 logger = logging.getLogger(__name__)
 now = datetime.utcnow().strftime('%Y%m%d%H%M%S')
@@ -158,6 +158,8 @@ def main():
 
     # configure logging
     logging.config.dictConfig(logging_options)
+
+    check_python_version()
 
     # get the selected subcommand
     command_module = command_modules[args.cmd_name]

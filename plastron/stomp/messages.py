@@ -129,11 +129,10 @@ class PlastronCommandMessage(PlastronMessage):
 
 
 class MessageBox:
-    def __init__(self, directory):
+    def __init__(self, directory, message_class=None):
         self.dir = directory
         os.makedirs(directory, exist_ok=True)
-        # default to using a basic message class
-        self.message_class = Message
+        self.message_class = message_class
 
     def add(self, message_id, message):
         filename = os.path.join(self.dir, message_id.replace('/', '-'))
@@ -154,10 +153,10 @@ class MessageBox:
         if self.index < self.count:
             filename = os.path.join(self.dir, self.filenames[self.index])
             self.index += 1
-            return self.message_class.read(filename)
+            if self.message_class is not None:
+                return self.message_class.read(filename)
+            else:
+                # just return the filename if no message class was defined
+                return filename
         else:
             raise StopIteration
-
-    def __call__(self, message_class):
-        self.message_class = message_class
-        return iter(self)

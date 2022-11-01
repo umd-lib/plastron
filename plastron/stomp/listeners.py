@@ -25,8 +25,8 @@ class CommandListener(ConnectionListener):
         self.status_queue = Destination(self.broker, self.broker.destinations['JOB_STATUS'])
         self.progress_topic = Destination(self.broker, self.broker.destinations['JOB_PROGRESS'])
         self.synchronous_queue = self.broker.destinations['SYNCHRONOUS_JOBS']
-        self.inbox = MessageBox(os.path.join(self.broker.message_store_dir, 'inbox'))
-        self.outbox = MessageBox(os.path.join(self.broker.message_store_dir, 'outbox'))
+        self.inbox = MessageBox(os.path.join(self.broker.message_store_dir, 'inbox'), PlastronCommandMessage)
+        self.outbox = MessageBox(os.path.join(self.broker.message_store_dir, 'outbox'), PlastronMessage)
         self.executor = ThreadPoolExecutor(thread_name_prefix=__name__)
         self.public_uri_template = self.broker.public_uri_template
         self.inbox_watcher = None
@@ -40,7 +40,7 @@ class CommandListener(ConnectionListener):
         logger.info(f'Connected to STOMP message broker {self.broker}')
 
         # first attempt to send anything in the outbox
-        for message in self.outbox(PlastronMessage):
+        for message in self.outbox:
             logger.info(f"Found response message for job {message.job_id} in outbox")
             # send the job completed message
             self.status_queue.send(message)
@@ -49,7 +49,7 @@ class CommandListener(ConnectionListener):
             self.outbox.remove(message.job_id)
 
         # then process anything in the inbox
-        for message in self.inbox(PlastronCommandMessage):
+        for message in self.inbox:
             self.process_message(message, AsynchronousResponseHandler(self, message))
 
         # then subscribe to the queue to receive incoming messages

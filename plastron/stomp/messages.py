@@ -27,13 +27,14 @@ class Message:
     @classmethod
     def add_header_mapping(cls, header_name: str, attr_name: str):
         def getter(self):
-            return self.headers[header_name]
+            return self.headers.get(header_name)
 
         def setter(self, value):
             self.headers[header_name] = value
 
         def deleter(self):
-            del self.headers[header_name]
+            if header_name in self.headers:
+                del self.headers[header_name]
 
         setattr(cls, attr_name, property(getter, setter, deleter))
 

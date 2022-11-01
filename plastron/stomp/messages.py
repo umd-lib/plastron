@@ -5,7 +5,36 @@ import os
 logger = logging.getLogger(__name__)
 
 
+class MessageHeader:
+    """
+    Descriptor to map a STOMP message header name to a Python attribute.
+    """
+    def __init__(self, header_name: str):
+        self.header_name = header_name
+
+    def __get__(self, instance, owner):
+        if instance is None:
+            return self
+        if not hasattr(instance, 'headers'):
+            raise TypeError(f'Expected {instance} to have a "headers" attribute')
+        return instance.headers.get(self.header_name)
+
+    def __set__(self, instance, value):
+        if not hasattr(instance, 'headers'):
+            raise TypeError(f'Expected {instance} to have a "headers" attribute')
+        instance.headers[self.header_name] = value
+
+    def __delete__(self, instance):
+        if not hasattr(instance, 'headers'):
+            raise TypeError(f'Expected {instance} to have a "headers" attribute')
+        if self.header_name in instance.headers:
+            del instance.headers[self.header_name]
+
+
 class Message:
+    id = MessageHeader('message-id')
+    persistent = MessageHeader('persistent')
+
     @classmethod
     def read(cls, filename):
         headers = {}
@@ -24,20 +53,6 @@ class Message:
                         headers[key] = value.strip()
         return cls(headers=headers, body=body)
 
-    @classmethod
-    def add_header_mapping(cls, header_name: str, attr_name: str):
-        def getter(self):
-            return self.headers.get(header_name)
-
-        def setter(self, value):
-            self.headers[header_name] = value
-
-        def deleter(self):
-            if header_name in self.headers:
-                del self.headers[header_name]
-
-        setattr(cls, attr_name, property(getter, setter, deleter))
-
     def __init__(self, message_id=None, persistent=None, headers=None, body=''):
         if headers is not None:
             self.headers = headers
@@ -51,8 +66,6 @@ class Message:
             # treat all other bodies as strings
             self.body = str(body)
 
-        self.add_header_mapping('message-id', 'id')
-        self.add_header_mapping('persistent', 'persistent')
         if message_id is not None:
             self.id = message_id
         if persistent is not None:
@@ -63,9 +76,10 @@ class Message:
 
 
 class PlastronMessage(Message):
+    job_id = MessageHeader('PlastronJobId')
+
     def __init__(self, job_id: str = None, **kwargs):
         super().__init__(**kwargs)
-        self.add_header_mapping('PlastronJobId', 'job_id')
         # Plastron message are persistent by default
         if 'persistent' not in self.headers:
             self.persistent = 'true'
@@ -74,25 +88,28 @@ class PlastronMessage(Message):
 
 
 class PlastronResponseMessage(PlastronMessage):
+    state = MessageHeader('PlastronJobState')
+
     def __init__(self, state: str = None, **kwargs):
         super().__init__(**kwargs)
-        self.add_header_mapping('PlastronJobState', 'state')
         if state is not None:
             self.state = state
 
 
 class PlastronErrorMessage(PlastronMessage):
+    error = MessageHeader('PlastronJobError')
+
     def __init__(self, error: str = None, **kwargs):
         super().__init__(**kwargs)
-        self.add_header_mapping('PlastronJobError', 'error')
         if error is not None:
             self.error = error
 
 
 class PlastronCommandMessage(PlastronMessage):
+    command = MessageHeader('PlastronCommand')
+
     def __init__(self, command: str = None, args: dict = None, **kwargs):
         super().__init__(**kwargs)
-        self.add_header_mapping('PlastronCommand', 'command')
         if command is not None:
             self.command = command
         if args is not None:

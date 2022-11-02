@@ -1,5 +1,5 @@
 from plastron.stomp.inbox_watcher import InboxWatcher
-from plastron.stomp.messages import MessageBox
+from plastron.stomp.messages import MessageBox, PlastronMessage
 
 from unittest.mock import patch
 import tempfile
@@ -28,14 +28,14 @@ def test_new_file_in_inbox():
 
 @contextmanager
 def inbox_watcher(inbox_dirname, mock_command_listener):
-    inbox = MessageBox(inbox_dirname)
-    inbox_watcher = InboxWatcher(mock_command_listener, inbox)
-    inbox_watcher.start()
+    inbox = MessageBox(inbox_dirname, PlastronMessage)
+    watcher = InboxWatcher(mock_command_listener, inbox)
+    watcher.start()
 
     try:
         yield
     finally:
-        inbox_watcher.stop()
+        watcher.stop()
 
 
 def create_test_file(inbox_dirname):

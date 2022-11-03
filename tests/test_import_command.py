@@ -50,15 +50,15 @@ def test_parse_value_string():
     prop_type = type('test', (RDFDataProperty,), {'datatype': None})
 
     # the empty string should parse to the empty list
-    assert(len(list(importcommand.parse_value_string('', column, prop_type))) == 0)
+    assert len(list(importcommand.parse_value_string('', column, prop_type))) == 0
     # single value
-    assert(len(list(importcommand.parse_value_string('foo', column, prop_type))) == 1)
+    assert len(list(importcommand.parse_value_string('foo', column, prop_type))) == 1
     # single value, followed by an empty string
-    assert(len(list(importcommand.parse_value_string('foo|', column, prop_type))) == 1)
+    assert len(list(importcommand.parse_value_string('foo|', column, prop_type))) == 1
     # two values
-    assert(len(list(importcommand.parse_value_string('foo|bar', column, prop_type))) == 2)
+    assert len(list(importcommand.parse_value_string('foo|bar', column, prop_type))) == 2
     # two values, with an empty string between
-    assert(len(list(importcommand.parse_value_string('foo||bar', column, prop_type))) == 2)
+    assert len(list(importcommand.parse_value_string('foo||bar', column, prop_type))) == 2
 
 
 # sample file group to use in add_files_* tests

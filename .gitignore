@@ -88,8 +88,9 @@ msg/
 # VS Code metadata directory
 .vscode/
 
-# virtualenv directory
+# virtualenv directories
 venv/
+.venv/
 
 .python-version
 

@@ -42,7 +42,7 @@ def stomp_server(server_address):
         topic_manager=TopicManager(),
         protocol=STOMP11,
     )
-    
+
     yield server
 
     server.server_close()

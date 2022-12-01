@@ -4,14 +4,13 @@ import json
 import logging
 from argparse import FileType, Namespace
 from collections import defaultdict
-from distutils.util import strtobool
 from email.utils import parsedate_to_datetime
 
 from pyparsing import ParseException
 
 from plastron.commands import BaseCommand
 from plastron.exceptions import FailureException
-from plastron.util import ResourceList, get_title_string, parse_predicate_list
+from plastron.util import ResourceList, get_title_string, parse_predicate_list, strtobool
 from plastron.validation import validate
 
 logger = logging.getLogger(__name__)

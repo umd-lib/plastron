@@ -63,6 +63,16 @@ This allows for in-place editing of Plastron's source code in the git
 repository (i.e., it is not locked away in a Python site-packages directory
 structure).
 
+### Testing
+
+Plastron uses the [pytest] test framework for its [tests](tests).
+
+```bash
+pytest
+```
+
+See the [testing documentation](docs/testing.md) for more information.
+
 ## Running
 
 * [Command-line client](docs/cli.md) ([plastron.cli](plastron/cli.py))
@@ -96,3 +106,4 @@ See the [LICENSE](LICENSE.md) file for license rights and limitations (Apache 2.
 
 [pyenv]: https://github.com/pyenv/pyenv
 [development mode]: https://packaging.python.org/tutorials/installing-packages/#installing-from-vcs
+[pytest]: https://pypi.org/project/pytest/

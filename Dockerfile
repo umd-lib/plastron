@@ -5,7 +5,7 @@
 # docker build -t docker.lib.umd.edu/plastrond:<VERSION> -f Dockerfile .
 #
 # where <VERSION> is the Docker image version to create.
-FROM python:3.6.12-slim
+FROM python:3.7.15-slim
 
 RUN mkdir -p /opt/plastron
 COPY . /opt/plastron

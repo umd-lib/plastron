@@ -47,9 +47,9 @@ def test_nonexistent_local_file_source():
 def test_nonexistent_zip_file_source():
     # create an empty zip file
     with TemporaryFile() as tmp_file:
-        zip_file = ZipFile(tmp_file, mode='w')
-        f = ZipFileSource(zip_file, 'foo.jpg')
-        assert f.exists() is False
+        with ZipFile(tmp_file, mode='w') as zip_file:
+            f = ZipFileSource(zip_file, 'foo.jpg')
+            assert f.exists() is False
 
 
 def test_nonexistent_http_file_source():

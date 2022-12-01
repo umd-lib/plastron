@@ -3,7 +3,6 @@ import os
 import re
 from argparse import Namespace
 from datetime import datetime
-from distutils.util import strtobool
 from email.utils import parsedate
 from os.path import basename, normpath, relpath, splitext
 from tempfile import TemporaryDirectory
@@ -20,7 +19,7 @@ from plastron.exceptions import DataReadException, FailureException, RESTAPIExce
 from plastron.models import Item
 from plastron.namespaces import get_manager
 from plastron.serializers import EmptyItemListError, SERIALIZER_CLASSES, detect_resource_class
-from plastron.util import get_ssh_client
+from plastron.util import get_ssh_client, strtobool
 
 logger = logging.getLogger(__name__)
 nsm = get_manager()

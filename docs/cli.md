@@ -30,7 +30,7 @@ commands:
 
 ```bash
 $ plastron --version
-3.5.0
+3.7.0
 ```
 
 ## Commands

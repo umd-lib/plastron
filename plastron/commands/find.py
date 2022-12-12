@@ -1,6 +1,6 @@
-from typing import List, Tuple, Union, Literal
+from typing import List, Tuple, Union
 
-from rdflib import URIRef
+from rdflib import URIRef, Literal
 
 import logging
 from plastron.commands import BaseCommand

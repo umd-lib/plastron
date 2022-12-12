@@ -9,11 +9,12 @@ from argparse import ArgumentTypeError
 from datetime import datetime
 from pathlib import Path
 from tempfile import NamedTemporaryFile
+from typing import Tuple
 from urllib.parse import urlsplit
 
 from paramiko import AutoAddPolicy, SSHClient, SSHException
 from paramiko.config import SSH_PORT
-from rdflib import URIRef
+from rdflib import URIRef, Literal
 from rdflib.util import from_n3
 
 from plastron import namespaces
@@ -35,7 +36,7 @@ def parse_predicate_list(string, delimiter=','):
     return [from_n3(p, nsm=manager) for p in string.split(delimiter)]
 
 
-def uri_or_curie(arg: str):
+def uri_or_curie(arg: str) -> URIRef:
     if arg and (arg.startswith('http://') or arg.startswith('https://')):
         # looks like an absolute HTTP URI
         return URIRef(arg)
@@ -44,8 +45,18 @@ def uri_or_curie(arg: str):
     except KeyError:
         raise ArgumentTypeError(f'"{arg[:arg.index(":") + 1]}" is not a known prefix')
     if not isinstance(term, URIRef):
-        raise ArgumentTypeError('must be a URI or CURIE')
+        raise ArgumentTypeError(f'"{arg}" must be a URI or CURIE')
     return term
+
+
+def parse_data_property(p: str, o: str) -> Tuple[URIRef, Literal]:
+    return from_n3(p, nsm=namespaces.get_manager()), Literal(from_n3(o))
+
+
+def parse_object_property(p: str, o: str) -> Tuple[URIRef, URIRef]:
+    predicate = from_n3(p, nsm=namespaces.get_manager())
+    obj = uri_or_curie(o)
+    return predicate, obj
 
 
 def get_ssh_client(sftp_uri, **kwargs):
@@ -199,7 +210,7 @@ class ResourceList:
                     except RESTAPIException as e:
                         logger.error(f'{method.__name__} failed for {resource}: {e}: {e.response.text}')
                         # if anything fails while processing of the list of uris, attempt to
-                        # rollback the transaction. Failures here will be caught by the main
+                        # roll back the transaction. Failures here will be caught by the main
                         # loop's exception handler and should trigger a system exit
                         try:
                             transaction.rollback()

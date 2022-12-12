@@ -6,7 +6,7 @@
 $ plastron --help
 usage: plastron [-h] (-r REPO | -c CONFIG_FILE | -V) [-v] [-q]
                 [--on-behalf-of DELEGATED_USER]
-                {annotate,create,delete,del,rm,echo,export,extractocr,imgsize,import,list,ls,load,mkcol,ping,reindex,stub,update}
+                {annotate,create,delete,del,rm,echo,export,extractocr,find,imgsize,import,list,ls,load,mkcol,ping,reindex,stub,update}
                 ...
 
 Batch operation tool for Fedora 4.
@@ -23,7 +23,7 @@ optional arguments:
                         delegate repository operations to this username
 
 commands:
-  {annotate,create,delete,del,rm,echo,export,extractocr,imgsize,import,list,ls,load,mkcol,ping,reindex,stub,update}
+  {annotate,create,delete,del,rm,echo,export,extractocr,find,imgsize,import,list,ls,load,mkcol,ping,reindex,stub,update}
 ```
 
 ### Check version
@@ -89,7 +89,7 @@ optional arguments:
 
 ### Create Collection (mkcol)
 
-**DEPRECATED:** Use `plastron create --collection` instead.
+**DEPRECATED:** Use [`plastron create --collection`](#create-create) instead.
 
 ```text
 $ plastron mkcol --help
@@ -168,6 +168,40 @@ optional arguments:
   -h, --help            show this help message and exit
   --ignore IGNORE, -i IGNORE
                         file listing items to ignore
+```
+
+### Find (find)
+
+```text
+$ plastron find --help
+usage: plastron find [-h] [-R RECURSIVE] [-D PREDICATE VALUE]
+                     [-O PREDICATE VALUE] [-T TYPE]
+                     [--match-all | --match-any]
+                     [URI [URI ...]]
+
+Find objects in the repository
+
+positional arguments:
+  URI                   search at this URI in the repository
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -R RECURSIVE, --recursive RECURSIVE
+                        search additional objects found by traversing the
+                        given predicate(s)
+  -D PREDICATE VALUE, --data-property PREDICATE VALUE
+                        an RDF data property to match; VALUE is treated as a
+                        Literal; repeatable
+  -O PREDICATE VALUE, --object-property PREDICATE VALUE
+                        an RDF object property to match; VALUE is treated as a
+                        CURIE or URIRef; repeatable
+  -T TYPE, --rdf-type TYPE
+                        RDF type to match; equivalent to "-O rdf:type TYPE";
+                        TYPE is treated as a CURIE or URIRef; repeatable
+  --match-all           require all properties to match to include a resource
+                        in the result list; this is the default behavior
+  --match-any           require at least one property to match to include a
+                        resource in the result list
 ```
 
 ### Image Size (imgsize)

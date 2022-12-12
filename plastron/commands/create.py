@@ -1,12 +1,14 @@
 import logging
 from argparse import Namespace
 from pathlib import Path
+from typing import List, Tuple, Union
+
+from rdflib import Graph, Literal, URIRef
+
 from plastron.commands import BaseCommand
 from plastron.http import Repository
 from plastron.namespaces import dcterms, get_manager, pcdm, rdf
-from rdflib import Graph, Literal, URIRef
-from rdflib.util import from_n3
-from typing import List
+from plastron.util import uri_or_curie, parse_data_property, parse_object_property
 
 logger = logging.getLogger(__name__)
 
@@ -90,24 +92,6 @@ def paths_to_create(repo: Repository, path: Path) -> List[Path]:
     return to_create
 
 
-def parse_data_property(p: str, o: str):
-    return [from_n3(p, nsm=manager), Literal(o)]
-
-
-def parse_object_property(p: str, o: str):
-    predicate = from_n3(p, nsm=manager)
-    obj = from_curie_or_uri(o)
-    return [predicate, obj]
-
-
-def from_curie_or_uri(o: str):
-    try:
-        return from_n3(o, nsm=manager)
-    except KeyError:
-        # not a known prefix, assume it is a URI
-        return URIRef(o)
-
-
 def serialize(graph: Graph, **kwargs):
     logger.info('Including properties:')
     for _, p, o in graph:
@@ -119,16 +103,17 @@ class Command(BaseCommand):
     def __call__(self, repo: Repository, args: Namespace):
         self.repo = repo
 
-        properties = [parse_data_property(p, o) for p, o in args.data_properties] \
-            + [parse_object_property(p, o) for p, o in args.object_properties]
+        properties: List[Tuple[URIRef, Union[Literal, URIRef]]] = [
+            *(parse_data_property(p, o) for p, o in args.data_properties),
+            *(parse_object_property(p, o) for p, o in args.object_properties)
+        ]
 
         if args.collection_name is not None:
-            properties.append([rdf.type, pcdm.Collection])
-            properties.append([dcterms.title, Literal(args.collection_name)])
+            properties.append((rdf.type, pcdm.Collection))
+            properties.append((dcterms.title, Literal(args.collection_name)))
 
-        if len(args.types) > 0:
-            for type in args.types:
-                properties.append([rdf.type, from_curie_or_uri(type)])
+        for rdf_type in args.types:
+            properties.append((rdf.type, uri_or_curie(rdf_type)))
 
         graph = Graph(namespace_manager=manager)
         for p, o in properties:

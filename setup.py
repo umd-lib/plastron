@@ -86,7 +86,7 @@ setup(
         'rdflib<6.0.0',
         'rdflib-jsonld==0.5.0',
         'requests',
-        'setuptools<58.0.0',
+        'setuptools<66.0.0',
         'stomp.py',
         'waitress',
         'watchdog==0.10.3'

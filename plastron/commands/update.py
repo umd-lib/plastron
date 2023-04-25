@@ -98,12 +98,6 @@ class Command(BaseCommand):
         self.dry_run = args.dry_run
         self.validate = args.validate
         self.model = args.model
-        # Retrieve the model to use for validation
-        logger.debug(f'Loading model class "{self.model}"')
-        try:
-            self.model_class = getattr(importlib.import_module("plastron.models"), self.model)
-        except AttributeError as e:
-            raise FailureException(f'Unable to load model "{self.model}"') from e
         self.stats = {
             'updated': [],
             'invalid': defaultdict(list),
@@ -112,6 +106,14 @@ class Command(BaseCommand):
 
         if self.validate and not self.model:
             raise FailureException("Model must be provided when performing validation")
+
+        if self.model:
+            # Retrieve the model to use for validation
+            logger.debug(f'Loading model class "{self.model}"')
+            try:
+                self.model_class = getattr(importlib.import_module("plastron.models"), self.model)
+            except AttributeError as e:
+                raise FailureException(f'Unable to load model "{self.model}"') from e
 
         self.sparql_update = args.update_file.read().encode('utf-8')
 

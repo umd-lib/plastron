@@ -82,7 +82,7 @@ class Command(BaseCommand):
         self.resources = None
         self.validate = False
         self.model = None
-        self._model_class = None
+        self.model_class = None
         self.stats = {
             'updated': [],
             'invalid': defaultdict(list),
@@ -92,22 +92,18 @@ class Command(BaseCommand):
     def __call__(self, fcrepo, args):
         self.execute(fcrepo, args)
 
-    @property
-    def model_class(self):
-        if self._model_class is None:
-            # Retrieve the model to use for validation
-            try:
-                self._model_class = getattr(importlib.import_module("plastron.models"), self.model)
-            except AttributeError as e:
-                raise FailureException(f'Unable to load model "{self.model}"') from e
-        return self._model_class
-
     def execute(self, fcrepo, args):
         self.repository = fcrepo
         self.repository.test_connection()
         self.dry_run = args.dry_run
         self.validate = args.validate
         self.model = args.model
+        # Retrieve the model to use for validation
+        logger.debug(f'Loading model class "{self.model}"')
+        try:
+            self.model_class = getattr(importlib.import_module("plastron.models"), self.model)
+        except AttributeError as e:
+            raise FailureException(f'Unable to load model "{self.model}"') from e
         self.stats = {
             'updated': [],
             'invalid': defaultdict(list),

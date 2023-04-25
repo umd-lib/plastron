@@ -1,13 +1,22 @@
 from argparse import Namespace
+from unittest.mock import MagicMock
+
+import pytest
+
 from plastron.commands.update import Command
 from plastron.exceptions import FailureException
+from plastron.http import Repository
+from plastron.models import Letter, Item
 from plastron.stomp.messages import PlastronCommandMessage
 from pytest import raises
 
 
-def test_parse_message():
-    message_body = '{\"uris\": [\"test\"], \"sparql_update\": \"\" }'
+@pytest.fixture()
+def message_body():
+    return '{"uris": ["test"], "sparql_update": "" }'
 
+
+def test_parse_message(message_body):
     headers = {
         'PlastronJobId': 'test',
         'PlastronCommand': 'update',
@@ -51,9 +60,57 @@ def test_parse_message():
     assert (namespace.use_transactions is False)  # Opposite of value in header
 
 
-class TinyRepoMock:
-    def test_connection(self):
-        return True
+def test_parse_message_model(message_body):
+    headers = {
+        'PlastronJobId': 'test',
+        'PlastronCommand': 'update',
+        'PlastronArg-model': 'Letter',
+    }
+    message = PlastronCommandMessage(headers=headers, body=message_body)
+    namespace = Command.parse_message(message)
+
+    assert namespace.model == 'Letter'
+
+    mock_repo = MagicMock(spec=Repository)
+    cmd = Command()
+    cmd.execute(mock_repo, namespace)
+    assert cmd.model_class is Letter
+
+
+def test_model_class_loaded_on_each_execution(message_body):
+    """
+    Testing the case where we have a single command instance, but execute() is
+    run multiple times with different content models. The expected behavior is
+    to pick the correct content model class each time.
+
+    See https://umd-dit.atlassian.net/browse/LIBFCREPO-1121
+    """
+    cmd = Command()
+    mock_repo = MagicMock(spec=Repository)
+
+    headers = {
+        'PlastronJobId': 'test',
+        'PlastronCommand': 'update',
+        'PlastronArg-model': 'Letter',
+    }
+    message = PlastronCommandMessage(headers=headers, body=message_body)
+    namespace = Command.parse_message(message)
+    assert namespace.model == 'Letter'
+
+    cmd.execute(mock_repo, namespace)
+    assert cmd.model_class is Letter
+
+    headers = {
+        'PlastronJobId': 'test',
+        'PlastronCommand': 'update',
+        'PlastronArg-model': 'Item',
+    }
+    message = PlastronCommandMessage(headers=headers, body=message_body)
+    namespace = Command.parse_message(message)
+    assert namespace.model == 'Item'
+
+    cmd.execute(mock_repo, namespace)
+    assert cmd.model_class is Item
 
 
 def test_validate_requires_model():
@@ -64,6 +121,7 @@ def test_validate_requires_model():
         validate=True,
         model=''
     )
+    mock_repo = MagicMock(spec=Repository)
     with raises(FailureException) as exc_info:
-        cmd.execute(TinyRepoMock(), args)
+        cmd.execute(mock_repo, args)
     assert exc_info.value.args[0] == "Model must be provided when performing validation"

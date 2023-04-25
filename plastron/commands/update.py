@@ -82,7 +82,7 @@ class Command(BaseCommand):
         self.resources = None
         self.validate = False
         self.model = None
-        self._model_class = None
+        self.model_class = None
         self.stats = {
             'updated': [],
             'invalid': defaultdict(list),
@@ -91,16 +91,6 @@ class Command(BaseCommand):
 
     def __call__(self, fcrepo, args):
         self.execute(fcrepo, args)
-
-    @property
-    def model_class(self):
-        if self._model_class is None:
-            # Retrieve the model to use for validation
-            try:
-                self._model_class = getattr(importlib.import_module("plastron.models"), self.model)
-            except AttributeError as e:
-                raise FailureException(f'Unable to load model "{self.model}"') from e
-        return self._model_class
 
     def execute(self, fcrepo, args):
         self.repository = fcrepo
@@ -116,6 +106,14 @@ class Command(BaseCommand):
 
         if self.validate and not self.model:
             raise FailureException("Model must be provided when performing validation")
+
+        if self.model:
+            # Retrieve the model to use for validation
+            logger.debug(f'Loading model class "{self.model}"')
+            try:
+                self.model_class = getattr(importlib.import_module("plastron.models"), self.model)
+            except AttributeError as e:
+                raise FailureException(f'Unable to load model "{self.model}"') from e
 
         self.sparql_update = args.update_file.read().encode('utf-8')
 

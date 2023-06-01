@@ -6,6 +6,9 @@ import logging.config
 import os
 import sys
 import yaml
+import pysolr
+
+
 from argparse import ArgumentParser, FileType
 from datetime import datetime
 from importlib import import_module
@@ -152,6 +155,9 @@ def main():
             command = command_module.Command(config=command_config.get(args.cmd_name.upper()))
             command.repo = fcrepo
             command.broker = broker
+            
+            address = config['SOLR']['URL']
+            command.solr = pysolr.Solr(address, always_commit=True, timeout=10)
         else:
             raise FailureException(f'Unable to execute command {args.cmd_name}')
         # dispatch to the selected subcommand

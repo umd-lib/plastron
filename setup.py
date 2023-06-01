@@ -89,7 +89,8 @@ setup(
         'setuptools<58.0.0',
         'stomp.py',
         'waitress',
-        'watchdog==0.10.3'
+        'watchdog==0.10.3',
+        'pysolr'
     ],
     python_requires='>=3.6',
 

@@ -151,15 +151,19 @@ def main():
     command_module = command_modules[args.cmd_name]
 
     try:
-        if hasattr(command_module, 'Command'):
-            command = command_module.Command(config=command_config.get(args.cmd_name.upper()))
-            command.repo = fcrepo
-            command.broker = broker
-            
+        if not hasattr(command_module, 'Command'):
+            raise FailureException(f'Unable to execute command {args.cmd_name}')
+        
+        command = command_module.Command(config=command_config.get(args.cmd_name.upper()))
+        command.repo = fcrepo
+        command.broker = broker
+        
+        # The SOLR configuration would only be necessary for the verify command, so it can be optional
+        # Verify will check if solr got initalized and fail if it wasn't.
+        if 'SOLR' in config.keys() and 'URL' in config['SOLR'].keys():
             address = config['SOLR']['URL']
             command.solr = pysolr.Solr(address, always_commit=True, timeout=10)
-        else:
-            raise FailureException(f'Unable to execute command {args.cmd_name}')
+
         # dispatch to the selected subcommand
         print_header(args)
         logger.info(f'Loaded repo configuration from {args.repo or args.config_file.name}')

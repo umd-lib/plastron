@@ -34,6 +34,9 @@ class Command(BaseCommand):
     def __call__(self, fcrepo, args: Namespace):
         if not os.path.isfile(args.log):
             raise FailureException('Path to log file is not valid')
+        
+        if not hasattr(self, 'solr'):
+            raise FailureException('A URL for the Solr connection was not provided in the configuration file')
 
         with open(args.log) as csvfile:
             reader = csv.DictReader(csvfile)

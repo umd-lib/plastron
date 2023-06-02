@@ -28,21 +28,21 @@ def configure_cli(subparsers):
 
 class Command(BaseCommand):
     def __call__(self, fcrepo, args: Namespace):
-        if not os.path.isfile(args.log):
-            raise FailureException('Path to log file is not valid')
-
         if not self.solr:
             raise FailureException('A URL for the Solr connection was not provided in the configuration file')
 
         invalid_items = []
-        with open(args.log) as csvfile:
-            reader = csv.DictReader(csvfile)
+        try:
+            with open(args.log) as csvfile:
+                reader = csv.DictReader(csvfile)
 
-            for item in reader:
-                query = self.solr.search(f'id:\"{item["uri"]}\"')
+                for item in reader:
+                    query = self.solr.search(f'id:\"{item["uri"]}\"')
 
-                if len(query) == 0:
-                    invalid_items.append(item["uri"])
+                    if len(query) == 0:
+                        invalid_items.append(item["uri"])
+        except OSError as e:
+            raise FailureException(f'Unable to read {args.log}: {e}')
 
         if len(invalid_items) > 0:
             logging.info(f"There are {len(invalid_items)} items in the mapfile whose URIs aren't indexed:")

@@ -1,14 +1,9 @@
 import csv
 import logging
-import pysolr
-import os
-import yaml
-
 from argparse import Namespace
-from dataclasses import dataclass, field
-from plastron.exceptions import FailureException
-from plastron.jobs import ItemLog
+
 from plastron.commands import BaseCommand
+from plastron.exceptions import FailureException
 
 
 def configure_cli(subparsers):

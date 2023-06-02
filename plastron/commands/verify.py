@@ -48,6 +48,8 @@ class Command(BaseCommand):
                     self.invalid_items.append(item["uri"])
 
         if len(self.invalid_items) > 0:
-            logging.info("There are items in the mapfile whose URI's aren't indexed")
+            logging.info("There are items in the mapfile whose URI's aren't indexed:")
             for item in self.invalid_items:
                 print(item)
+        else:
+            logging.info("All URI's in the mapfile are indexed!")

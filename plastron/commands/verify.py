@@ -34,7 +34,7 @@ class Command(BaseCommand):
     def __call__(self, fcrepo, args: Namespace):
         if not os.path.isfile(args.log):
             raise FailureException('Path to log file is not valid')
-        
+
         if not hasattr(self, 'solr'):
             raise FailureException('A URL for the Solr connection was not provided in the configuration file')
 
@@ -46,7 +46,7 @@ class Command(BaseCommand):
 
                 if len(query) == 0:
                     self.invalid_items.append(item["uri"])
-        
+
         if len(self.invalid_items) > 0:
             logging.info("There are items in the mapfile whose URI's aren't indexed")
             for item in self.invalid_items:

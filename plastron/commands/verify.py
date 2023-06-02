@@ -35,7 +35,7 @@ class Command(BaseCommand):
         if not os.path.isfile(args.log):
             raise FailureException('Path to log file is not valid')
 
-        if not hasattr(self, 'solr'):
+        if not self.solr:
             raise FailureException('A URL for the Solr connection was not provided in the configuration file')
 
         with open(args.log) as csvfile:

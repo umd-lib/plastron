@@ -159,10 +159,12 @@ def main():
         command.broker = broker
 
         # The SOLR configuration would only be necessary for the verify command, so it can be optional
-        # Verify will check if solr got initalized and fail if it wasn't.
-        if 'SOLR' in config.keys() and 'URL' in config['SOLR'].keys():
+        # Verify will check if solr got initialized and fail if it wasn't.
+        if 'SOLR' in config and 'URL' in config['SOLR']:
             address = config['SOLR']['URL']
             command.solr = pysolr.Solr(address, always_commit=True, timeout=10)
+        else:
+            command.solr = None
 
         # dispatch to the selected subcommand
         print_header(args)

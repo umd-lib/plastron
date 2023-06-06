@@ -531,6 +531,10 @@ class Row:
     @property
     def has_files(self):
         return 'FILES' in self.data and self.data['FILES'].strip() != ''
+    
+    @property
+    def has_item_files(self):
+        return 'ITEM_FILES' in self.data and self.data['ITEM_FILES'].strip() != ''
 
     @property
     def filenames(self):

@@ -103,7 +103,7 @@ def write_csv_file(row_info, file):
 
 
 class CSVSerializer:
-    SYSTEM_HEADERS = ['URI', 'PUBLIC URI', 'CREATED', 'MODIFIED', 'INDEX', 'FILES']
+    SYSTEM_HEADERS = ['URI', 'PUBLIC URI', 'CREATED', 'MODIFIED', 'INDEX', 'FILES', 'ITEM_FILES']
 
     def __init__(self, directory=None, public_uri_template=None):
         self.directory_name = directory or os.path.curdir

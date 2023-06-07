@@ -554,7 +554,7 @@ class Command(BaseCommand):
                 raise FailureException()
             logger.info(f'Writing template for the {job.model_class.__name__} model to {args.template_file.name}')
             writer = csv.writer(args.template_file)
-            writer.writerow(list(job.model_class.HEADER_MAP.values()) + ['FILES'])
+            writer.writerow(list(job.model_class.HEADER_MAP.values()) + ['FILES', 'ITEM_FILES'])
             return
 
         if args.import_file is None and not args.resume:
@@ -723,6 +723,15 @@ class Command(BaseCommand):
                     base_location=job.binaries_location,
                     access=job.access,
                     create_pages=create_pages
+                )
+
+            if row.has_item_files:
+                self.add_files(
+                    item,
+                    build_file_groups(row['ITEM_FILES']),
+                    base_location=job.binaries_location,
+                    access=job.access,
+                    create_pages=False
                 )
 
             if args.extract_text_types is not None:

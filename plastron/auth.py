@@ -6,6 +6,7 @@ from jwcrypto.jwt import JWT  # type: ignore
 import logging
 from requests import Session
 from typing import Dict, List, Type
+from .exceptions import ConfigError
 
 
 class Auth(ABC):
@@ -64,14 +65,25 @@ class ProvidedJwtTokenAuth(Auth):
     '''Auth for AUTH_TOKEN provided in config'''
     def __init__(self, config: Dict[str, str]):
         super().__init__(config)
+        self.logger = logging.getLogger(type(self).__name__)
         self.jwt_token = config['AUTH_TOKEN']
+        self.batch_jwt_token = config.get('BATCH_MODE', {}).get('PLASTRON_BATCH', None)
 
     @classmethod
     def handles(cls, config: Dict[str, str]) -> bool:
         return 'AUTH_TOKEN' in config
 
     def configure_session(self, session: Session) -> None:
-        session.headers.update({'Authorization': f"Bearer {self.jwt_token}"})
+        if not session.batch_mode:
+            self.logger.info('Using Default Mode')
+            session.headers.update({'Authorization': f"Bearer {self.jwt_token}"})
+
+        elif self.batch_jwt_token is None:
+            raise ConfigError("Batch mode was set, but batch credentials were not configured properly")
+
+        else:
+            self.logger.info('Using Batch Mode')
+            session.headers.update({'Authorization': f"Bearer {self.batch_jwt_token}"})
 
     def __repr__(self) -> str:
         return (f'{self.__class__.__name__}('

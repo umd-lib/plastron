@@ -1,5 +1,7 @@
 {
     "python.testing.pytestArgs": [
+        "--cov",
+        "--cov-report", "xml",
         "."
     ],
     "python.testing.pytestEnabled": true,

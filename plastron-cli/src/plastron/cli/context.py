@@ -8,6 +8,7 @@ import pysolr
 
 from plastron.client import Endpoint, Client, RepositoryStructure
 from plastron.client.auth import get_authenticator
+from plastron.handles import HandleServiceClient
 from plastron.repo import Repository
 from plastron.stomp.broker import Broker, ServerTuple
 
@@ -21,6 +22,7 @@ class PlastronContext:
     _client: Client = None
     _broker: Broker = None
     _solr: pysolr.Solr = None
+    _handle_client: HandleServiceClient = None
 
     @property
     def version(self):
@@ -90,6 +92,23 @@ class PlastronContext:
                 raise RuntimeError(f"Missing configuration key {e} in section 'SOLR'")
 
         return self._solr
+
+    @property
+    def handle_client(self) -> HandleServiceClient:
+        if self._handle_client is None:
+            # try to instantiate a handle client
+            config = self.config.get('PUBLICATION_WORKFLOW', {})
+            try:
+                self._handle_client = HandleServiceClient(
+                    endpoint_url=config['HANDLE_ENDPOINT'],
+                    jwt_token=config['HANDLE_JWT_TOKEN'],
+                    default_prefix=config['HANDLE_PREFIX'],
+                    default_repo=config['HANDLE_REPO'],
+                )
+            except KeyError as e:
+                raise RuntimeError(f"Missing configuration key {e} in section 'PUBLICATION_WORKFLOW'")
+
+        return self._handle_client
 
     def get_public_url(self, repo_uri: str) -> str:
         try:

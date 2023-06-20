@@ -487,6 +487,7 @@ objects, configured using the current config file and arguments:
 | `client`        | plastron.client.Client               |
 | `repo`          | plastron.repo.Repository             |
 | `broker`        | plastron.stomp.broker.Broker         |
+| `handle_client` | plastron.handles.HandleServiceClient |
 
 Any `RuntimeError` exceptions are caught by the `plastron` script and 
 cause it to exit with a status code of 1. Any `KeyboardInterrupt` 

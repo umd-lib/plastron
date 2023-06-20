@@ -1,8 +1,9 @@
+from plastron.handles import HandleBearingResource
 from plastron.namespaces import dc, dcterms, edm, rdfs, owl, ldp, fabio, pcdm, iana, ore, ebucore, premis, xsd, umdtype
 from plastron.rdfmapping.decorators import rdf_type
 from plastron.rdfmapping.descriptors import ObjectProperty, DataProperty
 from plastron.rdfmapping.resources import RDFResource, RDFResourceBase
-from plastron.validation import is_edtf_formatted, is_valid_iso639_code, is_handle
+from plastron.validation import is_edtf_formatted, is_valid_iso639_code
 from plastron.validation.vocabularies import get_subjects
 
 
@@ -62,7 +63,7 @@ class PCDMImageFile(PCDMFile):
     width = DataProperty(ebucore.width)
 
 
-class Item(PCDMObject):
+class Item(PCDMObject, HandleBearingResource):
     object_type = ObjectProperty(
         dcterms.type,
         required=True,
@@ -93,7 +94,6 @@ class Item(PCDMObject):
     rights_holder = ObjectProperty(dcterms.rightsHolder, repeatable=True, embed=True, cls=LabeledThing)
     bibliographic_citation = DataProperty(dcterms.bibliographicCitation)
     accession_number = DataProperty(dcterms.identifier, datatype=umdtype.accessionNumber)
-    handle = DataProperty(dcterms.identifier, datatype=umdtype.handle, validate=is_handle)
 
     _ORIGINAL_HEADER_MAP = {
         'object_type': 'Object Type',

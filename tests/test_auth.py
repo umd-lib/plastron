@@ -55,10 +55,8 @@ def test_auth_factory_provided_jwt_no_batch_credentials():
     session = Session()
     session.batch_mode = True
 
-    try:
+    with pytest.raises(ConfigError):
         auth.configure_session(session)
-    except ConfigError:
-        pass
 
 
 def test_auth_factory_jwt_secret():

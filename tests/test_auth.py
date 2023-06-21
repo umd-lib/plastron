@@ -8,6 +8,7 @@ from freezegun import freeze_time
 from jwcrypto.jwk import JWK
 from jwcrypto.jwt import JWT
 from requests import Session
+from plastron.exceptions import ConfigError
 
 from plastron.auth import AuthFactory, ProvidedJwtTokenAuth, JwtSecretAuth, ClientCertAuth, FedoraUserAuth
 
@@ -24,16 +25,38 @@ def test_auth_factory_bad_config():
         auth = AuthFactory.create(config)
 
 
-def test_auth_factory_provided_jwt():
+def test_auth_factory_provided_jwt_default_credentials():
     config = {'AUTH_TOKEN': 'abcd-1234'}
     auth = AuthFactory.create(config)
     assert isinstance(auth, ProvidedJwtTokenAuth)
 
     session = Session()
+    session.batch_mode = False
     auth.configure_session(session)
 
     assert session.headers.get('Authorization')
     assert session.headers['Authorization'] == 'Bearer abcd-1234'
+
+
+def test_auth_factory_provided_jwt_batch_credentials():
+    config = {'AUTH_TOKEN': 'abcd-1234', 'BATCH_MODE': {'AUTH_TOKEN': 'batch-abcd-1234'}}
+    auth = AuthFactory.create(config)
+    session = Session()
+    session.batch_mode = True
+    auth.configure_session(session)
+
+    assert session.headers.get('Authorization')
+    assert session.headers['Authorization'] == 'Bearer batch-abcd-1234'
+
+
+def test_auth_factory_provided_jwt_no_batch_credentials():
+    config = {'AUTH_TOKEN': 'abcd-1234'}
+    auth = AuthFactory.create(config)
+    session = Session()
+    session.batch_mode = True
+
+    with pytest.raises(ConfigError):
+        auth.configure_session(session)
 
 
 def test_auth_factory_jwt_secret():

@@ -14,7 +14,7 @@ from datetime import datetime
 from importlib import import_module
 from pkgutil import iter_modules
 from plastron import commands, version
-from plastron.exceptions import FailureException
+from plastron.exceptions import FailureException, ConfigError
 from plastron.logging import DEFAULT_LOGGING_OPTIONS
 from plastron.http import Repository
 from plastron.stomp import Broker
@@ -89,6 +89,14 @@ def main():
         action='store'
     )
 
+    parser.add_argument(
+        '--batch-mode', '-b',
+        help='specifies the use of batch user for interaction with fcrepo',
+        dest='batch_mode',
+        action='store',
+        default=False
+    )
+
     subparsers = parser.add_subparsers(title='commands')
 
     command_modules = load_commands(subparsers)
@@ -114,9 +122,13 @@ def main():
         broker_config = None
         command_config = {}
 
-    fcrepo = Repository(
-        repo_config, ua_string=f'plastron/{version}', on_behalf_of=args.delegated_user
-    )
+    try:
+        fcrepo = Repository(
+            repo_config, ua_string=f'plastron/{version}', on_behalf_of=args.delegated_user, batch_mode=args.batch_mode
+        )
+    except ConfigError as e:
+        logger.error(str(e))
+        sys.exit(1)
 
     if broker_config is not None:
         broker = Broker(broker_config)

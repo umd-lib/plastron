@@ -39,7 +39,7 @@ def test_auth_factory_provided_jwt_default_credentials():
 
 
 def test_auth_factory_provided_jwt_batch_credentials():
-    config = {'AUTH_TOKEN': 'abcd-1234', 'BATCH_MODE': {'PLASTRON_BATCH': 'batch-abcd-1234'}}
+    config = {'AUTH_TOKEN': 'abcd-1234', 'BATCH_MODE': {'AUTH_TOKEN': 'batch-abcd-1234'}}
     auth = AuthFactory.create(config)
     session = Session()
     session.batch_mode = True

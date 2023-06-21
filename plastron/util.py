@@ -25,6 +25,10 @@ from plastron.namespaces import dcterms
 logger = logging.getLogger(__name__)
 
 
+def is_handle(value: str) -> bool:
+    return bool(re.match('hdl:[^/]+/.*', value))
+
+
 def get_title_string(graph, separator='; '):
     return separator.join([t for t in graph.objects(predicate=dcterms.title)])
 

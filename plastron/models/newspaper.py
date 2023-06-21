@@ -3,6 +3,11 @@ from rdflib import URIRef
 from plastron import pcdm, ocr, oa, rdf
 from plastron.exceptions import DataReadException
 from plastron.namespaces import bibo, carriers, dc, dcterms, ebucore, fabio, ndnp, pcdmuse, prov, sc
+from plastron.util import is_handle
+from rdflib import Namespace
+
+
+umdtype = Namespace('http://vocab.lib.umd.edu/datatype#')
 
 
 @rdf.data_property('title', dcterms.title)
@@ -10,6 +15,7 @@ from plastron.namespaces import bibo, carriers, dc, dcterms, ebucore, fabio, ndn
 @rdf.data_property('volume', bibo.volume)
 @rdf.data_property('issue', bibo.issue)
 @rdf.data_property('edition', bibo.edition)
+@rdf.data_property('handle', dcterms.identifer, datatype=umdtype.handle)
 @rdf.rdf_class(bibo.Issue)
 class Issue(pcdm.Object):
     """Newspaper issue"""
@@ -18,7 +24,8 @@ class Issue(pcdm.Object):
         'date': 'Date',
         'volume': 'Volume',
         'issue': 'Issue',
-        'edition': 'Edition'
+        'edition': 'Edition',
+        'handle': 'Handle'
     }
     VALIDATION_RULESET = {
         'title': {
@@ -41,7 +48,12 @@ class Issue(pcdm.Object):
         'edition': {
             'required': True,
             'exactly': 1
-        }
+        },
+        'handle': {
+            'required': False,
+            'exactly': 1,
+            'function': is_handle
+        },
     }
 
 

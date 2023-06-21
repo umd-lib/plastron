@@ -6,7 +6,7 @@ from jwcrypto.jwt import JWT  # type: ignore
 import logging
 from requests import Session
 from typing import Dict, List, Type
-from .exceptions import ConfigError
+from plastron.exceptions import ConfigError
 
 
 class Auth(ABC):
@@ -67,7 +67,7 @@ class ProvidedJwtTokenAuth(Auth):
         super().__init__(config)
         self.logger = logging.getLogger(type(self).__name__)
         self.jwt_token = config['AUTH_TOKEN']
-        self.batch_jwt_token = config.get('BATCH_MODE', {}).get('PLASTRON_BATCH', None)
+        self.batch_jwt_token = config.get('BATCH_MODE', {}).get('AUTH_TOKEN', None)
 
     @classmethod
     def handles(cls, config: Dict[str, str]) -> bool:

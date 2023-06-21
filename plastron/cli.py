@@ -90,7 +90,7 @@ def main():
     )
 
     parser.add_argument(
-        '--batch-mode', '-bm',
+        '--batch-mode', '-b',
         help='specifies the use of batch user for interaction with fcrepo',
         dest='batch_mode',
         action='store',

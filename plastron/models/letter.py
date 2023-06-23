@@ -1,7 +1,11 @@
 from plastron import rdf, pcdm
 from plastron.authority import LabeledThing
 from plastron.namespaces import bibo, dc, dcmitype, dcterms, edm, geo, rel, skos
-from plastron.validation import is_edtf_formatted
+from plastron.validation import is_edtf_formatted, is_handle
+from rdflib import Namespace
+
+
+umdtype = Namespace('http://vocab.lib.umd.edu/datatype#')
 
 
 @rdf.rdf_class(edm.Agent)
@@ -45,6 +49,7 @@ class Collection(LabeledThing):
 @rdf.data_property('bibliographic_citation', dcterms.bibliographicCitation)
 @rdf.data_property('extent', dcterms.extent)
 @rdf.data_property('rights_holder', dcterms.rightsHolder)
+@rdf.data_property('handle', dcterms.identifer, datatype=umdtype.handle)
 @rdf.rdf_class(bibo.Letter)
 class Letter(pcdm.Object):
     HEADER_MAP = {
@@ -65,7 +70,8 @@ class Letter(pcdm.Object):
         'part_of.same_as': 'Handle/Link',
         'identifier': 'Identifier',
         'recipient.label': 'Recipient',
-        'author.label': 'Author'
+        'author.label': 'Author',
+        'handle': 'Handle'
     }
     VALIDATION_RULESET = {
         'author': {
@@ -119,5 +125,10 @@ class Letter(pcdm.Object):
         'title': {
             'required': True,
             'exactly': 1
+        },
+        'handle': {
+            'required': False,
+            'exactly': 1,
+            'function': is_handle
         },
     }

@@ -1,6 +1,10 @@
 from plastron import pcdm, rdf
 from plastron.namespaces import dcterms, dc, edm, bibo, geo
-from plastron.validation import is_edtf_formatted
+from plastron.validation import is_edtf_formatted, is_handle
+from rdflib import Namespace
+
+
+umdtype = Namespace('http://vocab.lib.umd.edu/datatype#')
 
 
 @rdf.object_property('place', dcterms.spatial)
@@ -22,6 +26,7 @@ from plastron.validation import is_edtf_formatted
 @rdf.data_property('part_of', dcterms.isPartOf)
 @rdf.data_property('publisher', dc.publisher)
 @rdf.data_property('alternative', dcterms.alternative)
+@rdf.data_property('handle', dcterms.identifer, datatype=umdtype.handle)
 @rdf.rdf_class(bibo.Image)
 class Poster(pcdm.Object):
     HEADER_MAP = {
@@ -43,6 +48,7 @@ class Poster(pcdm.Object):
         'subject': 'Subject',
         'rights': 'Rights',
         'identifier': 'Identifier',
+        'handle': 'Handle'
     }
     VALIDATION_RULESET = {
         'title': {
@@ -109,5 +115,10 @@ class Poster(pcdm.Object):
             'required': True
         },
         'publisher': {
-        }
+        },
+        'handle': {
+            'required': False,
+            'exactly': 1,
+            'function': is_handle
+        },
     }

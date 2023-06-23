@@ -1,7 +1,6 @@
 from plastron import pcdm, rdf
 from plastron.namespaces import dcterms, dc, edm, bibo, geo
-from plastron.validation import is_edtf_formatted
-from plastron.util import is_handle
+from plastron.validation import is_edtf_formatted, is_handle
 from rdflib import Namespace
 
 

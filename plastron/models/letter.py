@@ -1,8 +1,7 @@
 from plastron import rdf, pcdm
 from plastron.authority import LabeledThing
 from plastron.namespaces import bibo, dc, dcmitype, dcterms, edm, geo, rel, skos
-from plastron.validation import is_edtf_formatted
-from plastron.util import is_handle
+from plastron.validation import is_edtf_formatted, is_handle
 from rdflib import Namespace
 
 

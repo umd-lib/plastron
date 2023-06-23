@@ -1,10 +1,9 @@
 from lxml.etree import parse, XMLSyntaxError
-from rdflib import URIRef
+from rdflib import URIRef, Namespace
 from plastron import pcdm, ocr, oa, rdf
 from plastron.exceptions import DataReadException
 from plastron.namespaces import bibo, carriers, dc, dcterms, ebucore, fabio, ndnp, pcdmuse, prov, sc
-from plastron.util import is_handle
-from rdflib import Namespace
+from plastron.validation import is_handle
 
 
 umdtype = Namespace('http://vocab.lib.umd.edu/datatype#')

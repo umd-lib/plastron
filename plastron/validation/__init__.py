@@ -36,6 +36,9 @@ def is_valid_iso639_code(value):
 
 
 def is_handle(value: str) -> bool:
+    # Allow blank values
+    if str(value).strip() == "":
+        return True
     return bool(re.match('hdl:[^/]+/.*', value))
 
 

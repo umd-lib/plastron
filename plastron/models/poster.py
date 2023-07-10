@@ -118,7 +118,7 @@ class Poster(pcdm.Object):
         },
         'handle': {
             'required': False,
-            'exactly': 1,
+            # 'exactly': 1,
             'function': is_handle
         },
     }

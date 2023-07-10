@@ -14,7 +14,7 @@ umdtype = Namespace('http://vocab.lib.umd.edu/datatype#')
 @rdf.data_property('volume', bibo.volume)
 @rdf.data_property('issue', bibo.issue)
 @rdf.data_property('edition', bibo.edition)
-@rdf.data_property('handle', dcterms.identifer, datatype=umdtype.handle)
+@rdf.data_property('handle', dcterms.identifier, datatype=umdtype.handle)
 @rdf.rdf_class(bibo.Issue)
 class Issue(pcdm.Object):
     """Newspaper issue"""

@@ -7,7 +7,7 @@ from httpretty import GET
 from rdflib import URIRef
 
 from plastron.rdf import RDFObjectProperty
-from plastron.validation import ValidationError, is_edtf_formatted
+from plastron.validation import ValidationError, is_edtf_formatted, is_handle
 from plastron.validation.rules import from_vocabulary, required
 from plastron.validation.vocabularies import get_vocabulary
 
@@ -56,6 +56,18 @@ def test_not_required():
     ])
 def test_is_edtf_formatted(datetime_string):
     assert is_edtf_formatted(datetime_string) is True
+
+
+@pytest.mark.parametrize(
+    'handle', [
+        'hdl:1903.1/foobar',
+        'hdl:1903.1/327',
+        'hdl:1903.1/asdf',
+        'hdl:1234.5/example'
+    ]
+)
+def test_is_handle(handle):
+    assert is_handle(handle) is True
 
 
 @pytest.mark.parametrize(

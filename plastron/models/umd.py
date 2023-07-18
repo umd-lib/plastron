@@ -29,7 +29,7 @@ umdform = Namespace('http://vocab.lib.umd.edu/form#')
 @rdf.object_property('rights_holder', dcterms.rightsHolder, embed=True, obj_class=LabeledThing)
 @rdf.data_property('bibliographic_citation', dcterms.bibliographicCitation)
 @rdf.data_property('accession_number', dcterms.identifier, datatype=umdtype.accessionNumber)
-@rdf.data_property('handle', dcterms.identifer, datatype=umdtype.handle)
+@rdf.data_property('handle', dcterms.identifier, datatype=umdtype.handle)
 class Item(pcdm.Object):
     HEADER_MAP = {
         'object_type': 'Object Type',

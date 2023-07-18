@@ -26,7 +26,7 @@ umdtype = Namespace('http://vocab.lib.umd.edu/datatype#')
 @rdf.data_property('part_of', dcterms.isPartOf)
 @rdf.data_property('publisher', dc.publisher)
 @rdf.data_property('alternative', dcterms.alternative)
-@rdf.data_property('handle', dcterms.identifer, datatype=umdtype.handle)
+@rdf.data_property('handle', dcterms.identifier, datatype=umdtype.handle)
 @rdf.rdf_class(bibo.Image)
 class Poster(pcdm.Object):
     HEADER_MAP = {

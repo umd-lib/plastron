@@ -71,6 +71,19 @@ def test_is_handle(handle):
 
 
 @pytest.mark.parametrize(
+    'handle', [
+        '',
+        '     ',
+        '1903.1/foobar',
+        'not_a_handle',
+        'HDL:1903.1/foobar'
+    ]
+)
+def test_not_handle(handle):
+    assert is_handle(handle) is not True
+
+
+@pytest.mark.parametrize(
     ('value', 'vocab_uri', 'expected'),
     [
         ('http://purl.org/dc/dcmitype/Image', 'http://purl.org/dc/dcmitype/', True),

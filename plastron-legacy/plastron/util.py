@@ -18,8 +18,8 @@ from rdflib import URIRef, Literal
 from rdflib.util import from_n3
 
 from plastron import namespaces
+from plastron.client import Client, TransactionClient
 from plastron.exceptions import FailureException, RESTAPIException
-from plastron.http import Transaction
 from plastron.namespaces import dcterms
 
 logger = logging.getLogger(__name__)
@@ -148,8 +148,8 @@ def strtobool(val):
 
 
 class ResourceList:
-    def __init__(self, repository, uri_list=None, file=None, completed_file=None):
-        self.repository = repository
+    def __init__(self, client: Client, uri_list=None, file=None, completed_file=None):
+        self.client = client
         self.uri_list = uri_list
         self.file = file
         self.use_transaction = True
@@ -181,12 +181,13 @@ class ResourceList:
             for uri in self.uri_list:
                 yield uri
 
-    def get_resources(self, traverse=None):
+    def get_resources(self, client: Client, traverse=None):
+        repo = client.repo
         for uri in self.get_uris():
-            if not self.repository.contains(uri):
-                logger.warning(f'Resource {uri} is not contained within the repository {self.repository.endpoint}')
+            if not repo.contains(uri):
+                logger.warning(f'Resource {uri} is not contained within the repository {repo.endpoint}')
                 continue
-            for resource, graph in self.repository.recursive_get(uri, traverse=traverse):
+            for resource, graph in client.recursive_get(uri, traverse=traverse):
                 yield resource, graph
 
     def process(self, method, use_transaction=True, traverse=None):
@@ -203,8 +204,8 @@ class ResourceList:
                 'uri',
                 header=False
             )
-            with Transaction(self.repository, keep_alive=90) as transaction:
-                for resource, graph in self.get_resources(traverse=traverse):
+            with self.client.transaction(keep_alive=90) as txn_client:  # type: TransactionClient
+                for resource, graph in self.get_resources(client=txn_client, traverse=traverse):
                     try:
                         method(resource, graph)
                     except RESTAPIException as e:
@@ -213,18 +214,18 @@ class ResourceList:
                         # roll back the transaction. Failures here will be caught by the main
                         # loop's exception handler and should trigger a system exit
                         try:
-                            transaction.rollback()
+                            txn_client.rollback()
                             logger.warning('Transaction rolled back.')
                             return False
                         except RESTAPIException:
                             logger.error('Unable to roll back transaction, aborting')
                             raise FailureException()
-                transaction.commit()
+                txn_client.commit()
                 if self.completed and self.completed.filename:
                     shutil.copyfile(self.completed_buffer.filename, self.completed.filename)
                 return True
         else:
-            for resource, graph in self.get_resources(traverse=traverse):
+            for resource, graph in self.get_resources(client=self.client, traverse=traverse):
                 try:
                     method(resource, graph)
                 except RESTAPIException as e:

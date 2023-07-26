@@ -38,9 +38,9 @@ class Object(ore.Aggregation):
                 yield file
 
     # recursively create an object and components and that don't yet exist
-    def create(self, repository, container_path=None, slug=None, headers=None, recursive=True, **kwargs):
+    def create(self, client, container_path=None, slug=None, headers=None, recursive=True, **kwargs):
         super().create(
-            repository=repository,
+            client=client,
             container_path=container_path,
             slug=slug,
             headers=headers,
@@ -48,9 +48,9 @@ class Object(ore.Aggregation):
             **kwargs
         )
         if recursive:
-            repository.create_members(self)
-            repository.create_files(self)
-            repository.create_related(self)
+            client.create_members(self)
+            client.create_files(self)
+            client.create_related(self)
 
     def get_new_member(self, rootname, number):
         return Page(title=f'Page {number}', number=number)
@@ -67,9 +67,9 @@ class Object(ore.Aggregation):
 @rdf.rdf_class(pcdm.File)
 class File(ldp.NonRdfSource):
     @classmethod
-    def from_repository(cls, repo, uri, include_server_managed=True):
-        obj = super().from_repository(repo, uri, include_server_managed)
-        obj.source = RepositoryFileSource(repo, uri)
+    def from_repository(cls, client, uri, include_server_managed=True):
+        obj = super().from_repository(client, uri, include_server_managed)
+        obj.source = RepositoryFileSource(client, uri)
         return obj
 
     @classmethod
@@ -86,13 +86,13 @@ class File(ldp.NonRdfSource):
         self.height = None
 
     # upload a binary resource
-    def create(self, repository, container_path=None, slug=None, headers=None, **kwargs):
-        if not repository.load_binaries:
+    def create(self, client, container_path=None, slug=None, headers=None, **kwargs):
+        if not client.load_binaries:
             self.logger.info(f'Skipping loading for binary {self.source.filename}')
             return True
         elif self.created:
             return False
-        elif self.exists_in_repo(repository):
+        elif self.exists_in_repo(client):
             self.created = True
             return False
 
@@ -107,12 +107,12 @@ class File(ldp.NonRdfSource):
         })
 
         with self.source as stream:
-            super().create(repository, container_path=container_path, slug=slug, headers=headers, data=stream, **kwargs)
+            super().create(client, container_path=container_path, slug=slug, headers=headers, data=stream, **kwargs)
         self.created = True
         return True
 
-    def update(self, repository, recursive=True):
-        if not repository.load_binaries:
+    def update(self, client, recursive=True):
+        if not client.load_binaries:
             self.logger.info(f'Skipping update for binary {self.source.filename}')
             return True
 
@@ -128,7 +128,7 @@ class File(ldp.NonRdfSource):
                 except IOError as e:
                     self.logger.warn(f'Cannot read image file: {e}')
 
-        return super().update(repository, recursive=recursive)
+        return super().update(client, recursive=recursive)
 
 
 @rdf.rdf_class(pcdmuse.PreservationMasterFile)

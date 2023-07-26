@@ -104,7 +104,7 @@ class Command(BaseCommand):
         self.resource_count = 0
 
         resources = ResourceList(
-            repository=fcrepo,
+            client=fcrepo,
             uri_list=args.uris
         )
 

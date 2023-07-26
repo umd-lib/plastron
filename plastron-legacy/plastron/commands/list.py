@@ -35,7 +35,7 @@ class Command(BaseCommand):
         self.long = args.long
 
         resources = ResourceList(
-            repository=fcrepo,
+            client=fcrepo,
             uri_list=args.uris
         )
 

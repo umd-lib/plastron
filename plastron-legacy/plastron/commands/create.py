@@ -5,8 +5,8 @@ from typing import List, Tuple, Union
 
 from rdflib import Graph, Literal, URIRef
 
+from plastron.client import Client
 from plastron.commands import BaseCommand
-from plastron.http import Repository
 from plastron.namespaces import dcterms, get_manager, pcdm, rdf
 from plastron.util import uri_or_curie, parse_data_property, parse_object_property
 
@@ -82,12 +82,12 @@ def configure_cli(subparsers):
     parser.set_defaults(cmd_name='create')
 
 
-def paths_to_create(repo: Repository, path: Path) -> List[Path]:
-    if repo.path_exists(str(path)):
+def paths_to_create(client: Client, path: Path) -> List[Path]:
+    if client.path_exists(str(path)):
         return []
     to_create = [path]
     for ancestor in path.parents:
-        if not repo.path_exists(str(ancestor)):
+        if not client.path_exists(str(ancestor)):
             to_create.insert(0, ancestor)
     return to_create
 
@@ -100,8 +100,8 @@ def serialize(graph: Graph, **kwargs):
 
 
 class Command(BaseCommand):
-    def __call__(self, repo: Repository, args: Namespace):
-        self.repo = repo
+    def __call__(self, client: Client, args: Namespace):
+        self.repo = client
 
         properties: List[Tuple[URIRef, Union[Literal, URIRef]]] = [
             *(parse_data_property(p, o) for p, o in args.data_properties),

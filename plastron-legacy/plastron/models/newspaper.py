@@ -110,14 +110,14 @@ class Page(pcdm.Object):
     """Newspaper page"""
 
     @classmethod
-    def from_repository(cls, repo, page_uri):
-        page = cls.from_graph(repo.get_graph(page_uri))
+    def from_repository(cls, client, page_uri):
+        page = cls.from_graph(client.get_graph(page_uri))
         page.uri = page_uri
         page.created = True
         page.updated = True
 
         # map file URIs to File objects
-        page.files = list(map(lambda f: File.from_repository(repo, f), page.files))
+        page.files = list(map(lambda f: File.from_repository(client, f), page.files))
 
         page.parse_ocr()
 
@@ -168,8 +168,8 @@ class File(pcdm.File):
     """Newspaper file"""
 
     @classmethod
-    def from_repository(cls, repo, uri, include_server_managed=True):
-        obj = super().from_repository(repo, uri, include_server_managed)
+    def from_repository(cls, client, uri, include_server_managed=True):
+        obj = super().from_repository(client, uri, include_server_managed)
 
         types = obj.rdf_type.values
         if pcdmuse.PreservationMasterFile in types:

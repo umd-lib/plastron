@@ -15,10 +15,10 @@ from bs4 import BeautifulSoup
 from rdflib import Graph, Literal, URIRef
 
 from plastron import rdf
+from plastron.client import Client
 from plastron.commands import BaseCommand
 from plastron.exceptions import ConfigError, FailureException, RESTAPIException
 from plastron.files import HTTPFileSource, LocalFileSource, RemoteFileSource, ZipFileSource
-from plastron.http import Transaction
 from plastron.jobs import ImportJob, ImportedItemStatus, JobError, ModelClassNotFoundError, build_lookup_index
 from plastron.namespaces import get_manager, prov, sc
 from plastron.oa import Annotation, TextualBody
@@ -505,11 +505,11 @@ class Command(BaseCommand):
         """
         return ImportJob(job_id, jobs_dir=jobs_dir)
 
-    def execute(self, repo, args):
+    def execute(self, client: Client, args):
         """
         Performs the import
 
-        :param repo: the repository configuration
+        :param client: the repository configuration
         :param args: the command-line arguments
         """
         start_time = datetime.now().timestamp()
@@ -544,7 +544,7 @@ class Command(BaseCommand):
                 'member_of': args.member_of,
                 # Use "repo.relpath" as default for "container",
                 # but allow it to be overridden by args
-                'container': args.container or repo.relpath,
+                'container': args.container or client.repo.relpath,
                 'binaries_location': args.binaries_location
             })
 
@@ -586,7 +586,7 @@ class Command(BaseCommand):
         created_uris = []
         import_run = job.new_run().start()
         for row in metadata:
-            repo_changeset = create_repo_changeset(repo, metadata, row)
+            repo_changeset = create_repo_changeset(client, metadata, row)
             item = repo_changeset.item
 
             # count the number of files referenced in this row
@@ -632,7 +632,7 @@ class Command(BaseCommand):
                 continue
 
             try:
-                self.update_repo(args, job, repo, metadata, row, repo_changeset,
+                self.update_repo(args, job, client, metadata, row, repo_changeset,
                                  created_uris, updated_uris)
             except FailureException as e:
                 metadata.errors += 1
@@ -682,13 +682,13 @@ class Command(BaseCommand):
             'count': metadata.stats()
         }
 
-    def update_repo(self, args, job, repo, metadata, row, repo_changeset, created_uris, updated_uris):
+    def update_repo(self, args, job, client: Client, metadata, row, repo_changeset, created_uris, updated_uris):
         """
         Updates the repository with the given RepoChangeSet
 
         :param args: the arguments from the command-line
         :param job: The ImportJob
-        :param repo: the repository configuration
+        :param client: the repository configuration
         :param metadata: A plastron.jobs.MetadataRows object representing the
                           CSV file being imported
         :param row: A single plastron.jobs.Row object representing the row
@@ -740,10 +740,10 @@ class Command(BaseCommand):
             logger.debug(f"Creating resources in container: {job.container}")
 
             try:
-                with Transaction(repo) as txn:
-                    item.create(repo, container_path=job.container)
-                    item.update(repo)
-                    txn.commit()
+                with client.transaction() as txn_client:
+                    item.create(txn_client, container_path=job.container)
+                    item.update(txn_client)
+                    txn_client.commit()
             except Exception as e:
                 raise FailureException(f'Creating item failed: {e}') from e
 
@@ -755,10 +755,10 @@ class Command(BaseCommand):
             # construct the SPARQL Update query if there are any deletions or insertions
             # then do a PATCH update of an existing item
             logger.info(f'Sending update for {item}')
-            sparql_update = repo_changeset.build_sparql_update(repo)
+            sparql_update = repo_changeset.build_sparql_update(client)
             logger.debug(sparql_update)
             try:
-                item.patch(repo, sparql_update)
+                item.patch(client, sparql_update)
             except RESTAPIException as e:
                 raise FailureException(f'Updating item failed: {e}') from e
 

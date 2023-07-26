@@ -3,10 +3,11 @@ import logging
 import sys
 
 from argparse import FileType, Namespace
+
+from plastron.client import Client, TransactionClient
 from plastron.commands import BaseCommand
 from plastron.exceptions import FailureException, RESTAPIException
 from plastron.files import BinarySource, HTTPFileSource, LocalFileSource
-from plastron.http import Repository, Transaction
 from plastron.models import Item
 from plastron.pcdm import File
 from plastron.util import uri_or_curie
@@ -119,7 +120,7 @@ def write_csv_header(csv_file: csv.DictReader, args: Namespace, csv_writer: csv.
 
 
 class Command(BaseCommand):
-    def __call__(self, repo: Repository, args: Namespace) -> None:
+    def __call__(self, client: Client, args: Namespace) -> None:
         csv_file = csv.DictReader(args.source_file)
         if csv_file.fieldnames is None:
             logger.error(f'No fields found in {csv_file}. Exiting.')
@@ -151,24 +152,24 @@ class Command(BaseCommand):
                 item.rdf_type.append(args.access)
                 file.rdf_type.append(args.access)
             try:
-                with Transaction(repo) as txn:
+                with client.transaction() as txn_client:  # type: TransactionClient
                     try:
-                        item.create(repo, container_path=args.container_path)
-                        item.update(repo)
+                        item.create(txn_client, container_path=args.container_path)
+                        item.update(txn_client)
                         # update the CSV with the new URI
                         row[args.binary_column] = file.uri
                         csv_writer.writerow(row)
-                        txn.commit()
+                        txn_client.commit()
                     except (RESTAPIException, FileNotFoundError) as e:
                         # if anything fails during item creation or committing the transaction
-                        # attempt to rollback the current transaction
+                        # attempt to roll back the current transaction
                         # failures here will be caught by the main loop's exception handler
                         # and should trigger a system exit
                         logger.error(f'{item.identifier} not created: {e}')
-                        txn.rollback()
+                        txn_client.rollback()
                     except KeyboardInterrupt:
                         logger.warning("Load interrupted")
-                        txn.rollback()
+                        txn_client.rollback()
                         raise
 
             except RESTAPIException as e:

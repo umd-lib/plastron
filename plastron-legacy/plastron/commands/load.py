@@ -7,9 +7,9 @@ from datetime import datetime
 from importlib import import_module
 from time import sleep
 
+from plastron.client import Client, TransactionClient
 from plastron.commands import BaseCommand
 from plastron.exceptions import ConfigError, DataReadException, RESTAPIException, FailureException
-from plastron.http import Transaction
 from plastron.util import ItemLog
 
 logger = logging.getLogger(__name__)
@@ -82,7 +82,7 @@ def configure_cli(subparsers):
 
 class Command(BaseCommand):
 
-    def __call__(self, fcrepo, args):
+    def __call__(self, client: Client, args):
         # Load batch configuration
         try:
             batch_config = BatchConfig(args.batch)
@@ -96,7 +96,7 @@ class Command(BaseCommand):
         if not os.path.isdir(batch_config.log_dir):
             os.makedirs(batch_config.log_dir)
 
-        fcrepo.load_binaries = args.load_binaries
+        client.load_binaries = args.load_binaries
 
         # Define the data_handler function for the data being loaded
         logger.info("Initializing data handler")
@@ -110,14 +110,14 @@ class Command(BaseCommand):
             args.create_annotations = False
 
         try:
-            batch = handler.Batch(fcrepo, batch_config)
+            batch = handler.Batch(client, batch_config)
         except (ConfigError, DataReadException) as e:
             logger.error(e.message)
             logger.error('Failed to initialize batch')
             raise FailureException(e.message)
 
         if not args.dry_run:
-            fcrepo.test_connection()
+            client.test_connection()
 
             # read the log of completed items
             fieldnames = ['number', 'timestamp', 'title', 'path', 'uri']
@@ -168,7 +168,7 @@ class Command(BaseCommand):
                 try:
                     logger.info(f"Loading item {n + 1}")
                     is_loaded = load_item(
-                        fcrepo, item, args, extra=batch_config.extra
+                        client, item, args, extra=batch_config.extra
                     )
                 except RESTAPIException:
                     logger.error(
@@ -218,9 +218,9 @@ def percentage(n):
     return p
 
 
-def load_item_internal(fcrepo, item, args, extra=None):
+def load_item_internal(client: Client, item, args, extra=None):
     logger.info('Creating item')
-    item.create(fcrepo)
+    item.create(client)
 
     if extra:
         logger.info('Adding additional triples')
@@ -233,37 +233,37 @@ def load_item_internal(fcrepo, item, args, extra=None):
         item.add_extra_properties(extra, rdf_format)
 
     logger.info('Updating item and components')
-    item.update(fcrepo)
+    item.update(client)
     if args.create_annotations:
         logger.info('Updating annotations')
-        item.update_annotations(fcrepo)
+        item.update_annotations(client)
 
 
-def load_item(fcrepo, batch_item, args, extra=None):
+def load_item(client: Client, batch_item, args, extra=None):
     # read data for item
     logger.info('Reading item data')
     item = batch_item.read_data()
 
     if args.use_transactions:
         # open transaction
-        with Transaction(fcrepo, keep_alive=90) as txn:
+        with client.transaction(keep_alive=90) as txn_client:  # type: TransactionClient
             # create item and its components
             try:
-                load_item_internal(fcrepo, item, args, extra)
+                load_item_internal(txn_client, item, args, extra)
 
                 # commit transaction
-                txn.commit()
+                txn_client.commit()
                 logger.info('Performing post-creation actions')
                 item.post_creation_hook()
                 return True
 
             except (RESTAPIException, FileNotFoundError) as e:
                 # if anything fails during item creation or committing the transaction
-                # attempt to rollback the current transaction
+                # attempt to roll back the current transaction
                 # failures here will be caught by the main loop's exception handler
                 # and should trigger a system exit
                 logger.error("Item creation failed: {0}".format(e))
-                txn.rollback()
+                txn_client.rollback()
                 logger.warning('Transaction rolled back. Continuing load.')
 
             except KeyboardInterrupt as e:
@@ -271,7 +271,7 @@ def load_item(fcrepo, batch_item, args, extra=None):
                 raise e
     else:
         try:
-            load_item_internal(fcrepo, item, args, extra)
+            load_item_internal(client, item, args, extra)
             return True
         except (RESTAPIException, FileNotFoundError) as e:
             logger.error("Item creation failed: {0}".format(e))

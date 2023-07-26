@@ -1,13 +1,12 @@
-import logging
 from datetime import datetime
-from os.path import dirname
-
-from plastron import rdf
-from plastron.exceptions import RESTAPIException
-from plastron.http import Repository, ResourceURI
-from rdflib import Graph, URIRef
 from uuid import uuid4
-from urllib.parse import urlsplit
+
+from rdflib import Graph, URIRef
+
+import logging
+from plastron import rdf
+from plastron.client import ResourceURI, Client
+from plastron.exceptions import RESTAPIException
 
 
 class Resource(rdf.Resource):
@@ -17,17 +16,17 @@ class Resource(rdf.Resource):
     Resources."""
 
     @classmethod
-    def from_repository(cls, repo: Repository, uri, include_server_managed=True):
-        graph = repo.get_graph(uri, include_server_managed=include_server_managed)
+    def from_repository(cls, client: Client, uri, include_server_managed=True):
+        graph = client.get_graph(uri, include_server_managed=include_server_managed)
         obj = cls.from_graph(graph, subject=uri)
         obj.uri = uri
-        obj.path = obj.uri[len(repo.endpoint):]
+        obj.path = obj.uri[len(client.repo.endpoint):]
 
         # get the description URI
-        obj.resource = ResourceURI(uri, repo.get_description_uri(uri))
+        obj.resource = ResourceURI(uri, client.get_description_uri(uri))
 
         # mark as created and updated so that the create_object and update_object
-        # methods doesn't try try to modify it
+        # methods doesn't try to modify it
         obj.created = True
         obj.updated = True
 
@@ -54,11 +53,11 @@ class Resource(rdf.Resource):
         else:
             return repr(self)
 
-    def load(self, repository: Repository):
+    def load(self, repository: Client):
         return self.read(repository.get_graph(self.uri))
 
-    def create(self, repository: Repository, container_path=None, slug=None, headers=None, recursive=True, **kwargs):
-        if not self.created and not self.exists_in_repo(repository):
+    def create(self, client: Client, container_path=None, slug=None, headers=None, recursive=True, **kwargs):
+        if not self.created and not self.exists_in_repo(client.repo):
 
             self.logger.info(f"Creating {self}...")
             if headers is None:
@@ -66,22 +65,22 @@ class Resource(rdf.Resource):
             if slug is not None:
                 headers['Slug'] = slug
             try:
-                self.resource = repository.create(container_path=container_path, headers=headers, **kwargs)
+                self.resource = client.create(container_path=container_path, headers=headers, **kwargs)
                 self.uri = URIRef(self.resource.uri)
 
-                if (repository.is_forwarded()):
-                    # Reverse forwarded URL back to fcrepo URL
-                    parsed_resource_uri = urlsplit(self.resource.uri)
-                    parsed_path = parsed_resource_uri.path
-                    self.path = parsed_path[len(repository.endpoint_base_path):]
-                else:
-                    self.path = self.resource.uri[len(repository.endpoint):]
+                # if client.is_forwarded():
+                #     # Reverse forwarded URL back to fcrepo URL
+                #     parsed_resource_uri = urlsplit(self.resource.uri)
+                #     parsed_path = parsed_resource_uri.path
+                #     self.path = parsed_path[len(client.endpoint_base_path):]
+                # else:
+                self.path = self.resource.uri[len(client.repo.endpoint):]
 
                 self.created = True
                 # TODO: get this from the response headers
                 self.creation_timestamp = datetime.now()
                 # TODO: get the fedora:parent
-                self.container_path = container_path or repository.relpath
+                self.container_path = container_path or client.repo.relpath
                 self.logger.info(f"Created {self}")
                 self.uuid = str(self.uri).rsplit('/', 1)[-1]
                 self.logger.info(f'URI: {self.uri}')
@@ -94,7 +93,7 @@ class Resource(rdf.Resource):
             self.logger.debug(f'Object "{self}" exists. Skipping.')
 
         if recursive:
-            repository.create_annotations(self)
+            client.create_annotations(self)
 
     def create_fragments(self):
         for obj in self.embedded_objects():
@@ -102,10 +101,10 @@ class Resource(rdf.Resource):
             obj.uri = URIRef('{0}#{1}'.format(self.uri, obj.uuid))
             obj.created = True
 
-    def patch(self, repository, sparql_update):
+    def patch(self, client, sparql_update):
         headers = {'Content-Type': 'application/sparql-update'}
         self.logger.info(f"Updating {self}")
-        response = repository.patch(self.resource.description_uri, data=sparql_update, headers=headers)
+        response = client.patch(self.resource.description_uri, data=sparql_update, headers=headers)
         if response.status_code == 204:
             self.logger.info(f"Updated {self}")
             self.updated = True
@@ -117,25 +116,25 @@ class Resource(rdf.Resource):
             raise RESTAPIException(response)
 
     # update existing repo object with SPARQL update
-    def update(self, repository, recursive=True):
+    def update(self, client, recursive=True):
         if not self.updated:
             # Ensure item being updated has a ResourceURI
             if self.resource is None:
-                self.resource = ResourceURI(self.uri, repository.get_description_uri(self.uri))
+                self.resource = ResourceURI(self.uri, client.get_description_uri(self.uri))
 
-            self.patch(repository, repository.build_sparql_update(insert_graph=self.graph()))
+            self.patch(client, client.build_sparql_update(insert_graph=self.graph()))
             if recursive:
                 # recursively update an object and all its components and files
                 for obj in self.linked_objects():
-                    obj.update(repository)
+                    obj.update(client)
                 # update any annotations
                 for annotation in self.annotations:
-                    annotation.update(repository)
+                    annotation.update(client)
 
     # check for the existence of a local object in the repository
-    def exists_in_repo(self, repository):
-        if str(self.uri).startswith(repository.endpoint):
-            return repository.exists(str(self.uri))
+    def exists_in_repo(self, client: Client):
+        if str(self.uri).startswith(client.repo.endpoint):
+            return client.exists(str(self.uri))
         else:
             return False
 
@@ -153,9 +152,9 @@ class Resource(rdf.Resource):
     def post_creation_hook(self):
         pass
 
-    def update_annotations(self, repository):
+    def update_annotations(self, client: Client):
         for annotation in self.annotations:
-            annotation.update(repository)
+            annotation.update(client)
 
 
 class RdfSource(Resource):

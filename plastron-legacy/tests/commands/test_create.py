@@ -6,8 +6,8 @@ import pytest
 from flask import url_for
 from http_server_mock import HttpServerMock
 
+from plastron.client import Repository, Client, get_authenticator
 from plastron.commands import create
-from plastron.http import Repository
 
 
 @pytest.fixture
@@ -44,29 +44,18 @@ def repo_app():
     return app
 
 
-@pytest.fixture
-def repo_base_config():
-    """Required parameters for Repository configuration"""
-    return {
-        'REST_ENDPOINT': 'http://localhost:9999',
-        'RELPATH': '/pcdm',
-        'LOG_DIR': '/logs',
-        'AUTH_TOKEN': 'foobar'
-    }
-
-
-def test_create_at_path(repo_base_config, repo_app):
+def test_create_at_path(client: Client, repo_app):
     cmd = create.Command()
-    cmd.repo = Repository(repo_base_config)
+    cmd.repo = client
     with repo_app.run('localhost', 9999):
         assert not cmd.repo.path_exists('/foo')
         cmd.create_at_path(Path('/foo'))
         assert cmd.repo.path_exists('/foo')
 
 
-def test_create_at_path_nested(repo_base_config, repo_app):
+def test_create_at_path_nested(client: Client, repo_app):
     cmd = create.Command()
-    cmd.repo = Repository(repo_base_config)
+    cmd.repo = client
     with repo_app.run('localhost', 9999):
         assert not cmd.repo.path_exists('/foo')
         assert not cmd.repo.path_exists('/foo/bar')
@@ -77,9 +66,9 @@ def test_create_at_path_nested(repo_base_config, repo_app):
         assert cmd.repo.path_exists('/foo/bar/baz')
 
 
-def test_create_in_container(repo_base_config, repo_app):
+def test_create_in_container(client: Client, repo_app):
     cmd = create.Command()
-    cmd.repo = Repository(repo_base_config)
+    cmd.repo = client
     with repo_app.run('localhost', 9999):
         cmd.create_at_path(Path('/foo'))
         assert cmd.repo.path_exists('/foo')

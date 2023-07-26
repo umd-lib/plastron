@@ -57,7 +57,7 @@ class Command(BaseCommand):
             logger.info('Dry run enabled, no actual deletions will take place')
 
         self.resources = ResourceList(
-            repository=self.repository,
+            client=self.repository,
             uri_list=args.uris,
             file=args.file,
             completed_file=args.completed

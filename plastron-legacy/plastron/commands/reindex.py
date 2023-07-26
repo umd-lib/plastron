@@ -35,7 +35,7 @@ class Command(BaseCommand):
         self.reindexing_queue = self.broker.destination('reindexing'),
         self.username = args.delegated_user or 'plastron'
         resources = ResourceList(
-            repository=self.repo,
+            client=self.repo,
             uri_list=args.uris
         )
 

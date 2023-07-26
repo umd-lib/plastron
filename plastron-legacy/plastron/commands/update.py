@@ -8,6 +8,7 @@ from email.utils import parsedate_to_datetime
 
 from pyparsing import ParseException
 
+from plastron.client import Client
 from plastron.commands import BaseCommand
 from plastron.exceptions import FailureException
 from plastron.util import ResourceList, get_title_string, parse_predicate_list, strtobool
@@ -76,7 +77,7 @@ class Command(BaseCommand):
     def __init__(self, config=None):
         super().__init__(config=config)
         self.result = None
-        self.repository = None
+        self.client = None
         self.dry_run = False
         self.sparql_update = None
         self.resources = None
@@ -92,9 +93,9 @@ class Command(BaseCommand):
     def __call__(self, fcrepo, args):
         self.execute(fcrepo, args)
 
-    def execute(self, fcrepo, args):
-        self.repository = fcrepo
-        self.repository.test_connection()
+    def execute(self, client: Client, args):
+        self.client = client
+        self.client.test_connection()
         self.dry_run = args.dry_run
         self.validate = args.validate
         self.model = args.model
@@ -128,7 +129,7 @@ class Command(BaseCommand):
             logger.info('Dry run enabled, no actual updates will take place')
 
         self.resources = ResourceList(
-            repository=self.repository,
+            client=self.client,
             uri_list=args.uris,
             file=args.file,
             completed_file=args.completed
@@ -178,7 +179,7 @@ class Command(BaseCommand):
             logger.info(f'Would update resource {resource} {title}')
             return
 
-        response = self.repository.patch(resource.description_uri, data=self.sparql_update, headers=headers)
+        response = self.client.patch(resource.description_uri, data=self.sparql_update, headers=headers)
         if response.status_code == 204:
             logger.info(f'Updated resource {resource} {title}')
             timestamp = parsedate_to_datetime(response.headers['date']).isoformat('T')

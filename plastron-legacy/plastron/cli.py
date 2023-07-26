@@ -14,9 +14,11 @@ from argparse import ArgumentParser, FileType
 from datetime import datetime
 from importlib import import_module
 from pkgutil import iter_modules
+
+from plastron import commands
+from plastron.client import Repository, Client, get_authenticator
 from plastron.exceptions import FailureException, ConfigError
 from plastron.logging import DEFAULT_LOGGING_OPTIONS
-from plastron.http import Repository
 from plastron.stomp import Broker
 from plastron.util import envsubst
 
@@ -129,7 +131,8 @@ def main():
             default_path=repo_config.get('RELPATH', '/'),
             external_url=repo_config.get('REPO_EXTERNAL_URL'),
         )
-        fcrepo = Client(
+        # TODO: respect the batch mode flag when getting the authenticator
+        client = Client(
             repo=repo,
             auth=get_authenticator(repo_config),
             ua_string=f'plastron/{version}',
@@ -176,7 +179,7 @@ def main():
             raise FailureException(f'Unable to execute command {args.cmd_name}')
 
         command = command_module.Command(config=command_config.get(args.cmd_name.upper()))
-        command.repo = fcrepo
+        command.repo = client
         command.broker = broker
 
         # The SOLR configuration would only be necessary for the verify command, so it can be optional
@@ -192,7 +195,7 @@ def main():
         logger.info(f'Loaded repo configuration from {args.repo or args.config_file.name}')
         if args.delegated_user is not None:
             logger.info(f'Running repository operations on behalf of {args.delegated_user}')
-        command(fcrepo, args)
+        command(client, args)
         print_footer(args)
     except FailureException as e:
         # something failed, exit with non-zero status

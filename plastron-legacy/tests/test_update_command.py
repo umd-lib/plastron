@@ -3,9 +3,9 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from plastron.client import Client
 from plastron.commands.update import Command
 from plastron.exceptions import FailureException
-from plastron.http import Repository
 from plastron.models import Letter, Item
 from plastron.stomp.messages import PlastronCommandMessage
 from pytest import raises
@@ -60,7 +60,7 @@ def test_parse_message(message_body):
     assert (namespace.use_transactions is False)  # Opposite of value in header
 
 
-def test_parse_message_model(message_body):
+def test_parse_message_model(message_body, repo):
     headers = {
         'PlastronJobId': 'test',
         'PlastronCommand': 'update',
@@ -71,13 +71,13 @@ def test_parse_message_model(message_body):
 
     assert namespace.model == 'Letter'
 
-    mock_repo = MagicMock(spec=Repository)
+    mock_client = MagicMock(spec=Client, repo=repo)
     cmd = Command()
-    cmd.execute(mock_repo, namespace)
+    cmd.execute(mock_client, namespace)
     assert cmd.model_class is Letter
 
 
-def test_model_class_loaded_on_each_execution(message_body):
+def test_model_class_loaded_on_each_execution(message_body, repo):
     """
     Testing the case where we have a single command instance, but execute() is
     run multiple times with different content models. The expected behavior is
@@ -86,7 +86,7 @@ def test_model_class_loaded_on_each_execution(message_body):
     See https://umd-dit.atlassian.net/browse/LIBFCREPO-1121
     """
     cmd = Command()
-    mock_repo = MagicMock(spec=Repository)
+    mock_client = MagicMock(spec=Client, repo=repo)
 
     headers = {
         'PlastronJobId': 'test',
@@ -97,7 +97,7 @@ def test_model_class_loaded_on_each_execution(message_body):
     namespace = Command.parse_message(message)
     assert namespace.model == 'Letter'
 
-    cmd.execute(mock_repo, namespace)
+    cmd.execute(mock_client, namespace)
     assert cmd.model_class is Letter
 
     headers = {
@@ -109,7 +109,7 @@ def test_model_class_loaded_on_each_execution(message_body):
     namespace = Command.parse_message(message)
     assert namespace.model == 'Item'
 
-    cmd.execute(mock_repo, namespace)
+    cmd.execute(mock_client, namespace)
     assert cmd.model_class is Item
 
 
@@ -121,7 +121,7 @@ def test_validate_requires_model():
         validate=True,
         model=''
     )
-    mock_repo = MagicMock(spec=Repository)
+    mock_repo = MagicMock(spec=Client)
     with raises(FailureException) as exc_info:
         cmd.execute(mock_repo, args)
     assert exc_info.value.args[0] == "Model must be provided when performing validation"

@@ -5,9 +5,9 @@ from concurrent.futures import ThreadPoolExecutor
 
 from stomp.listener import ConnectionListener
 
+from plastron.client import Repository, Client, get_authenticator
 from plastron.commands import get_command_class
 from plastron.exceptions import FailureException
-from plastron.http import Repository
 from plastron.stomp import Destination
 from plastron.stomp.handlers import AsynchronousResponseHandler, SynchronousResponseHandler
 from plastron.stomp.inbox_watcher import InboxWatcher
@@ -139,18 +139,25 @@ class MessageProcessor:
 
         args = command.parse_message(message)
 
-        cmd_repo_config = command.repo_config(self.repo_config, args)
+        repo_config = command.repo_config(self.repo_config, args)
 
         repo = Repository(
-            config=cmd_repo_config,
+            endpoint=repo_config['REST_ENDPOINT'],
+            default_path=repo_config.get('RELPATH', '/'),
+            external_url=repo_config.get('REPO_EXTERNAL_URL'),
+        )
+        # TODO: respect the batch mode flag when getting the authenticator
+        client = Client(
+            repo=repo,
+            auth=get_authenticator(repo_config),
             ua_string=f'plastron/{version}',
-            on_behalf_of=message.args.get('on-behalf-of')
+            on_behalf_of=message.args.get('on-behalf-of'),
         )
 
-        if repo.delegated_user is not None:
-            logger.info(f'Running repository operations on behalf of {repo.delegated_user}')
+        if client.delegated_user is not None:
+            logger.info(f'Running repository operations on behalf of {client.delegated_user}')
 
-        for status in (command.execute(repo, args) or []):
+        for status in (command.execute(client, args) or []):
             progress_topic.send(PlastronMessage(job_id=message.job_id, body=status))
 
         logger.info(f'Job {message.job_id} complete')

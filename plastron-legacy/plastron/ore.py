@@ -1,5 +1,5 @@
 from plastron import ldp, rdf
-from plastron.http import Repository
+from plastron.client import Client
 from plastron.namespaces import dcterms, iana, ore
 
 # alias the rdflib Namespace
@@ -48,12 +48,12 @@ class Aggregation(ldp.Resource):
             proxy_in=self
         ))
 
-    def load_proxies(self, repository: Repository):
+    def load_proxies(self, client: Client):
         """
         Returns an AggregationIterator over the resources in this aggregation,
         fully filled in with data from the given repository.
         """
-        return AggregationIterator(self, repository)
+        return AggregationIterator(self, client)
 
     def __iter__(self):
         """
@@ -65,9 +65,9 @@ class Aggregation(ldp.Resource):
     def proxies(self):
         return [proxy for proxy in self]
 
-    def create(self, repository: Repository, container_path=None, slug=None, headers=None, recursive=True, **kwargs):
+    def create(self, client: Client, container_path=None, slug=None, headers=None, recursive=True, **kwargs):
         super().create(
-            repository=repository,
+            client=client,
             container_path=container_path,
             slug=slug,
             headers=headers,
@@ -75,7 +75,7 @@ class Aggregation(ldp.Resource):
             **kwargs
         )
         if recursive:
-            repository.create_proxies(self)
+            client.create_proxies(self)
 
 
 class AggregationIterator:
@@ -84,9 +84,9 @@ class AggregationIterator:
     specified, then before each resource is returned, its metadata is
     retrieved from that repository.
     """
-    def __init__(self, aggregation: Aggregation, repository: Repository = None):
+    def __init__(self, aggregation: Aggregation, client: Client = None):
         self.aggregation = aggregation
-        self.repository = repository
+        self.repository = client
         if len(self.aggregation.first) == 0:
             # no members of the aggregation
             self.next_proxy = None

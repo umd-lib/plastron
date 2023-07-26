@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+import importlib.metadata
 
 import logging
 import logging.config
@@ -13,7 +14,6 @@ from argparse import ArgumentParser, FileType
 from datetime import datetime
 from importlib import import_module
 from pkgutil import iter_modules
-from plastron import commands, version
 from plastron.exceptions import FailureException, ConfigError
 from plastron.logging import DEFAULT_LOGGING_OPTIONS
 from plastron.http import Repository
@@ -22,6 +22,7 @@ from plastron.util import envsubst
 
 logger = logging.getLogger(__name__)
 now = datetime.utcnow().strftime('%Y%m%d%H%M%S')
+version = importlib.metadata.version('plastron')
 
 
 def load_commands(subparsers):
@@ -123,8 +124,16 @@ def main():
         command_config = {}
 
     try:
-        fcrepo = Repository(
-            repo_config, ua_string=f'plastron/{version}', on_behalf_of=args.delegated_user, batch_mode=args.batch_mode
+        repo = Repository(
+            endpoint=repo_config['REST_ENDPOINT'],
+            default_path=repo_config.get('RELPATH', '/'),
+            external_url=repo_config.get('REPO_EXTERNAL_URL'),
+        )
+        fcrepo = Client(
+            repo=repo,
+            auth=get_authenticator(repo_config),
+            ua_string=f'plastron/{version}',
+            on_behalf_of=args.delegated_user,
         )
     except ConfigError as e:
         logger.error(str(e))

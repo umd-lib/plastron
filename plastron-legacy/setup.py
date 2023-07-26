@@ -15,7 +15,7 @@ here = path.abspath(path.dirname(__file__))
 
 setup(
     name='plastron',
-    version=plastron.version,
+    version='4.0.0-dev',
     description='Utility for batch operations on a Fedora 4 repository.',
     long_description='Utility for batch operations on a Fedora 4 repository.',
     url='https://github.com/umd-lib/plastron',

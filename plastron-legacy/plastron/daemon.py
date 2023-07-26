@@ -1,3 +1,5 @@
+import importlib.metadata
+
 import logging
 import logging.config
 import sys
@@ -10,7 +12,6 @@ from typing import Any, Mapping, Tuple, Type
 import waitress
 import yaml
 
-from plastron import version
 from plastron.logging import DEFAULT_LOGGING_OPTIONS
 from plastron.stomp import Broker
 from plastron.stomp.listeners import CommandListener
@@ -18,6 +19,7 @@ from plastron.util import envsubst
 from plastron.web import create_app
 
 logger = logging.getLogger(__name__)
+version = importlib.metadata.version('plastron')
 
 
 class STOMPDaemon(Thread):

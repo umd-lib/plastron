@@ -1,13 +1,14 @@
+import importlib.metadata
 import logging
 import os
 
 from stomp import Connection11
 from stomp.exception import StompException
 
-from plastron import version
 from plastron.stomp.messages import Message
 
 logger = logging.getLogger(__name__)
+version = importlib.metadata.version('plastron')
 
 
 class Broker:

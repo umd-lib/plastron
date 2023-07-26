@@ -1,10 +1,10 @@
+import importlib.metadata
 import logging
 import os
 from concurrent.futures import ThreadPoolExecutor
 
 from stomp.listener import ConnectionListener
 
-from plastron import version
 from plastron.commands import get_command_class
 from plastron.exceptions import FailureException
 from plastron.http import Repository
@@ -14,6 +14,7 @@ from plastron.stomp.inbox_watcher import InboxWatcher
 from plastron.stomp.messages import MessageBox, PlastronCommandMessage, PlastronMessage
 
 logger = logging.getLogger(__name__)
+version = importlib.metadata.version('plastron')
 
 
 class CommandListener(ConnectionListener):

@@ -6,11 +6,11 @@ from plastron.web import create_app
 
 
 @pytest.fixture
-def client(request):
+def app_client(request, datadir):
     tmpdir = None
     marker = request.node.get_closest_marker('jobs_dir')
     if marker is not None:
-        test_jobs_dir = marker.args[0]
+        test_jobs_dir = datadir / marker.args[0]
     else:
         # create a new temporary directory that we know will be empty
         tmpdir = TemporaryDirectory()
@@ -24,50 +24,51 @@ def client(request):
         tmpdir.cleanup()
 
 
-def test_no_jobs(client):
-    response = client.get('/jobs')
+@pytest.mark.jobs_dir('jobsempty')
+def test_no_jobs(app_client):
+    response = app_client.get('/jobs')
     assert response.status_code == 200
     data = response.get_json()
     assert 'jobs' in data
     assert len(data['jobs']) == 0
 
 
-@pytest.mark.jobs_dir('tests/resources/jobs')
-def test_jobs_found(client):
-    response = client.get('/jobs')
+@pytest.mark.jobs_dir('jobs')
+def test_jobs_found(app_client):
+    response = app_client.get('/jobs')
     assert response.status_code == 200
     data = response.get_json()
     assert 'jobs' in data
     assert len(data['jobs']) == 5
 
 
-@pytest.mark.jobs_dir('tests/resources/jobs')
-def test_job_not_found(client):
-    response = client.get('/jobs/FOOBAR')
+@pytest.mark.jobs_dir('jobs')
+def test_job_not_found(app_client):
+    response = app_client.get('/jobs/FOOBAR')
     assert response.status_code == 404
 
 
-@pytest.mark.jobs_dir('tests/resources/jobs')
-def test_empty_job_dir(client):
-    response = client.get('/jobs/noconfigfile')
+@pytest.mark.jobs_dir('jobs')
+def test_empty_job_dir(app_client):
+    response = app_client.get('/jobs/noconfigfile')
     assert response.status_code == 404
 
 
-@pytest.mark.jobs_dir('tests/resources/jobs')
-def test_empty_config_file(client):
-    response = client.get('/jobs/emptyconfigfile')
+@pytest.mark.jobs_dir('jobs')
+def test_empty_config_file(app_client):
+    response = app_client.get('/jobs/emptyconfigfile')
     assert response.status_code == 404
 
 
-@pytest.mark.jobs_dir('tests/resources/jobs')
-def test_valid_config_file_no_metadata(client):
-    response = client.get('/jobs/nometadata')
+@pytest.mark.jobs_dir('jobs')
+def test_valid_config_file_no_metadata(app_client):
+    response = app_client.get('/jobs/nometadata')
     assert response.status_code == 404
 
 
-@pytest.mark.jobs_dir('tests/resources/jobs')
-def test_valid_job(client):
-    response = client.get('/jobs/validjob')
+@pytest.mark.jobs_dir('jobs')
+def test_valid_job(app_client):
+    response = app_client.get('/jobs/validjob')
     assert response.status_code == 200
     data = response.get_json()
     assert '@id' in data
@@ -87,9 +88,9 @@ def test_valid_job(client):
     assert data['total'] == 9
 
 
-@pytest.mark.jobs_dir('tests/resources/jobs')
-def test_valid_completed_job(client):
-    response = client.get('/jobs/validcompletedjob')
+@pytest.mark.jobs_dir('jobs')
+def test_valid_completed_job(app_client):
+    response = app_client.get('/jobs/validcompletedjob')
     assert response.status_code == 200
     data = response.get_json()
     assert '@id' in data

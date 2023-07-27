@@ -1,3 +1,4 @@
+from pathlib import Path
 from unittest.mock import MagicMock
 from tempfile import TemporaryFile
 from uuid import uuid4
@@ -59,17 +60,17 @@ def test_nonexistent_http_file_source():
     assert f.exists() is False
 
 
-def test_zip_file_source_exists():
-    zip_file_source = ZipFileSource('tests/resources/sample.zip', 'sample_image.jpg')
+def test_zip_file_source_exists(datadir):
+    zip_file_source = ZipFileSource(datadir / 'sample.zip', 'sample_image.jpg')
     assert zip_file_source.exists()
 
 
-def setup_remote_file_source_mock(remote_file_source):
-    # Wrap the given remote_file_sourcee in a mock, so that the methods that
+def setup_remote_file_source_mock(remote_file_source, local_file: Path):
+    # Wrap the given remote_file_source in a mock, so that the methods that
     # are accessed can be queried
     mock = MagicMock(wraps=remote_file_source)
     # Return a "real" Zip, so we don't have to mock zipfile.ZipFile
-    mock.open.return_value = open('tests/resources/sample.zip', 'rb')
+    mock.open.return_value = local_file.open('rb')
     # Need to mock __exit__ (following code in BinarySource.__exit__) because
     # "wraps" doesn't handle magic methods
     mock.__exit__.side_effect = (lambda _arg1, _arg2, _arg3: mock.close())
@@ -77,11 +78,11 @@ def setup_remote_file_source_mock(remote_file_source):
     return mock
 
 
-def test_zip_file_source_exists_closes_remote_file_source():
+def test_zip_file_source_exists_closes_remote_file_source(datadir):
     zip_file_source = ZipFileSource('sftp://user@example.com/sample.zip', 'sample_image.jpg')
     remote_file_source = zip_file_source.source
 
-    remote_file_source_mock = setup_remote_file_source_mock(remote_file_source)
+    remote_file_source_mock = setup_remote_file_source_mock(remote_file_source, datadir / 'sample.zip')
     zip_file_source.source = remote_file_source_mock
 
     assert zip_file_source.exists()
@@ -89,11 +90,11 @@ def test_zip_file_source_exists_closes_remote_file_source():
     remote_file_source_mock.close.assert_called()
 
 
-def test_zip_file_source_exists_closes_remote_file_source_when_file_does_not_exist():
+def test_zip_file_source_exists_closes_remote_file_source_when_file_does_not_exist(datadir):
     zip_file_source = ZipFileSource('sftp://user@example.com/sample.zip', 'does_not_exist.jpg')
     remote_file_source = zip_file_source.source
 
-    remote_file_source_mock = setup_remote_file_source_mock(remote_file_source)
+    remote_file_source_mock = setup_remote_file_source_mock(remote_file_source, datadir / 'sample.zip')
     zip_file_source.source = remote_file_source_mock
 
     assert not zip_file_source.exists()

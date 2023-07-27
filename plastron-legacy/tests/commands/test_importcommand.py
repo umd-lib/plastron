@@ -98,13 +98,13 @@ def test_model_is_required_unless_resuming():
     assert "A model is required unless resuming an existing job" in str(excinfo.value)
 
 
-def test_import_file_is_required_unless_resuming():
+def test_import_file_is_required_unless_resuming(datadir):
     # Verifies that the import command throws FailureException if an import_file
     # is not provided when not resuming
     job_id = 'test_id'
     args = create_args(job_id)
     args.import_file = None
-    config = {}
+    config = {'JOBS_DIR': datadir}
 
     command = Command(config)
     repo = None
@@ -232,7 +232,8 @@ def create_mock_job():
     """
 
     job_id = 'test_id'
-    mock_job = Command.create_import_job(job_id, 'test_jobs_dir')
+    test_jobs_dir = tempfile.NamedTemporaryFile()
+    mock_job = Command.create_import_job(job_id, test_jobs_dir.name)
     mock_job.save_config = MagicMock()
     mock_job.store_metadata_file = MagicMock()
     mock_metadata = MagicMock()

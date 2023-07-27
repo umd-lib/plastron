@@ -10,8 +10,8 @@ from plastron.models import Item
 
 
 @pytest.fixture
-def csv_data():
-    csv_file = open('tests/resources/embedded_objects.csv')
+def csv_data(datadir):
+    csv_file = (datadir / 'embedded_objects.csv').open()
     yield csv.DictReader(csv_file)
     csv_file.close()
 

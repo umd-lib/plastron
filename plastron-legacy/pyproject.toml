@@ -1,0 +1,59 @@
+[project]
+name = 'plastron-legacy'
+version = '4.0.0-dev'
+description = 'Utility for batch operations on a Fedora 4 repository.'
+authors = [
+    { name='University of Maryland Libraries', email='lib-ssdr@umd.edu' },
+]
+classifiers = [
+    'Development Status :: 5 - Production/Stable',
+    'Environment :: Console',
+    'Intended Audience :: Information Technology',
+    'Topic :: Utilities',
+    'License :: OSI Approved :: Apache Software License',
+    'Programming Language :: Python :: 3 :: Only',
+]
+keywords = ['fcrepo', 'repository', 'batch', 'utility']
+dependencies = [
+    'bagit',
+    'BeautifulSoup4',
+    'edtf-validate',
+    'Flask',
+    'iso639',
+    'jwcrypto',
+    'lxml>3.6.0',
+    'numpy',
+    'paramiko',
+    'Pillow>=6.2.2',
+    'pyparsing',
+    'PyYAML>3.12',
+    'rdflib<6.0.0',
+    'rdflib-jsonld==0.5.0',
+    'requests',
+    'setuptools<58.0.0',
+    'stomp.py',
+    'waitress',
+    'watchdog==0.10.3',
+    'pysolr',
+]
+requires-python = '>=3.8'
+
+[project.optional-dependencies]
+dev = ['pycodestyle']
+test = [
+    'CoilMQ',
+    'freezegun',
+    'httpretty',
+    'http-server-mock',
+    'pytest',
+    'pytest-datadir',
+]
+
+[project.scripts]
+plastron = 'plastron.cli:main'
+plastrond = 'plastron.daemon:main'
+
+[project.urls]
+Homepage = 'https://github.com/umd-lib/plastron'
+'Bug Reports' = 'https://github.com/umd-lib/plastron/issues'
+Source = 'https://github.com/umd-lib/plastron'

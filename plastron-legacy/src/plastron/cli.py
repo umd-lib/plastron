@@ -24,7 +24,7 @@ from plastron.util import envsubst
 
 logger = logging.getLogger(__name__)
 now = datetime.utcnow().strftime('%Y%m%d%H%M%S')
-version = importlib.metadata.version('plastron')
+version = importlib.metadata.version('plastron-legacy')
 
 
 def load_commands(subparsers):

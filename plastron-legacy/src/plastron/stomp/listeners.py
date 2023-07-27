@@ -14,7 +14,7 @@ from plastron.stomp.inbox_watcher import InboxWatcher
 from plastron.stomp.messages import MessageBox, PlastronCommandMessage, PlastronMessage
 
 logger = logging.getLogger(__name__)
-version = importlib.metadata.version('plastron')
+version = importlib.metadata.version('plastron-legacy')
 
 
 class CommandListener(ConnectionListener):

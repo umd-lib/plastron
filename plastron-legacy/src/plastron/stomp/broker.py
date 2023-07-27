@@ -8,7 +8,7 @@ from stomp.exception import StompException
 from plastron.stomp.messages import Message
 
 logger = logging.getLogger(__name__)
-version = importlib.metadata.version('plastron')
+version = importlib.metadata.version('plastron-legacy')
 
 
 class Broker:

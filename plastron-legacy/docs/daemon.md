@@ -1,8 +1,8 @@
 # Plastron Server
 
 The Plastron server (a.k.a., "plastrond") is implemented by the
-[plastron.daemon](../plastron/daemon.py) module, and there is a *plastrond*
-entry point provided by [setup.py](../setup.py).
+[plastron.daemon](../src/plastron/daemon.py) module, and there is a 
+*plastrond* entry point provided by [pyproject.toml](../pyproject.toml).
 
 ## Running with Python
 
@@ -72,9 +72,9 @@ Additional arguments for a command are sent in headers with the form `PlastronAr
 Many of these are specific to the command, but there is one with standard behavior across
 all commands:
 
-| Header                   | Description |
-|--------------------------|-------------|
-|`PlastronArg-on-behalf-of`|Username to delegate repository operations to|
+| Header                     | Description                                   |
+|----------------------------|-----------------------------------------------|
+| `PlastronArg-on-behalf-of` | Username to delegate repository operations to |
 
 See the [messages documentation](messages.md) for details on the headers and bodies
 of the messages the Plastron Daemon emits.

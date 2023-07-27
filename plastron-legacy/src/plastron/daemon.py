@@ -19,7 +19,7 @@ from plastron.util import envsubst
 from plastron.web import create_app
 
 logger = logging.getLogger(__name__)
-version = importlib.metadata.version('plastron')
+version = importlib.metadata.version('plastron-legacy')
 
 
 class STOMPDaemon(Thread):

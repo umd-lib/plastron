@@ -1,12 +1,13 @@
 import logging
+from io import BytesIO
 
 from bs4 import BeautifulSoup
-from io import BytesIO
-from plastron import rdf
+
 from plastron.commands import BaseCommand
 from plastron.namespaces import prov, sc
-from plastron.oa import Annotation, SpecificResource, TextualBody
-from plastron.pcdm import File, Object
+from plastron.rdf import rdf
+from plastron.rdf.oa import Annotation, SpecificResource, TextualBody
+from plastron.rdf.pcdm import File, Object
 
 
 logger = logging.getLogger(__name__)

@@ -1,6 +1,6 @@
-from plastron import ldp, rdf
 import plastron.validation.rules
 from plastron.namespaces import edm, geo, rdfs, owl
+from plastron.rdf import ldp, rdf
 
 
 def create_authority(graph, subject):

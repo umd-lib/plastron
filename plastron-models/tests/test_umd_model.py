@@ -1,7 +1,7 @@
-from plastron.models.umd import Item, umdform
 from rdflib import Graph, Literal, Namespace, URIRef
 
-from plastron.pcdm import Page
+from plastron.models.umd import Item, umdform
+from plastron.rdf.pcdm import Page
 
 rdf = (
     '@prefix dcterms: <http://purl.org/dc/terms/> .'

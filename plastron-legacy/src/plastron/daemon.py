@@ -12,10 +12,9 @@ from typing import Any, Mapping, Tuple, Type
 import waitress
 import yaml
 
-from plastron.logging import DEFAULT_LOGGING_OPTIONS
 from plastron.stomp import Broker
 from plastron.stomp.listeners import CommandListener
-from plastron.util import envsubst
+from plastron.util import envsubst, DEFAULT_LOGGING_OPTIONS
 from plastron.web import create_app
 
 logger = logging.getLogger(__name__)

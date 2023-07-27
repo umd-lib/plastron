@@ -1,12 +1,12 @@
+import logging
 from datetime import datetime
 from uuid import uuid4
 
 from rdflib import Graph, URIRef
 
-import logging
-from plastron import rdf
 from plastron.client import ResourceURI, Client
 from plastron.exceptions import RESTAPIException
+from plastron.rdf import rdf
 
 
 class Resource(rdf.Resource):
@@ -57,7 +57,7 @@ class Resource(rdf.Resource):
         return self.read(repository.get_graph(self.uri))
 
     def create(self, client: Client, container_path=None, slug=None, headers=None, recursive=True, **kwargs):
-        if not self.created and not self.exists_in_repo(client.repo):
+        if not self.created and not self.exists_in_repo(client):
 
             self.logger.info(f"Creating {self}...")
             if headers is None:

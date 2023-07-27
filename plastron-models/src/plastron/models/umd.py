@@ -1,9 +1,10 @@
-from plastron import pcdm, rdf
-from plastron.authority import LabeledThing
-from plastron.namespaces import dc, dcterms, edm
-from plastron.pcdm import Page
-from plastron.validation import is_edtf_formatted, is_valid_iso639_code, is_handle
 from rdflib import Namespace
+
+from plastron.rdf import pcdm, rdf
+from plastron.rdf.authority import LabeledThing
+from plastron.rdf.pcdm import Page
+from plastron.validation import is_edtf_formatted, is_valid_iso639_code, is_handle
+from plastron.namespaces import dc, dcterms, edm
 
 
 umdtype = Namespace('http://vocab.lib.umd.edu/datatype#')

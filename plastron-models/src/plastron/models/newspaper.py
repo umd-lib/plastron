@@ -1,10 +1,10 @@
 from lxml.etree import parse, XMLSyntaxError
 from rdflib import URIRef, Namespace
-from plastron import pcdm, ocr, oa, rdf
-from plastron.exceptions import DataReadException
-from plastron.namespaces import bibo, carriers, dc, dcterms, ebucore, fabio, ndnp, pcdmuse, prov, sc
-from plastron.validation import is_handle
 
+from plastron.exceptions import DataReadException
+from plastron.validation import is_handle
+from plastron.namespaces import bibo, carriers, dc, dcterms, fabio, ndnp, pcdmuse, prov, sc
+from plastron.rdf import pcdm, ocr, oa, rdf
 
 umdtype = Namespace('http://vocab.lib.umd.edu/datatype#')
 
@@ -174,7 +174,7 @@ class File(pcdm.File):
         types = obj.rdf_type.values
         if pcdmuse.PreservationMasterFile in types:
             obj.use = 'master'
-            # TODO: how to not hardocde this?
+            # TODO: how to not hardcode this?
             obj.resolution = (400, 400)
         elif pcdmuse.IntermediateFile in types:
             obj.use = 'service'

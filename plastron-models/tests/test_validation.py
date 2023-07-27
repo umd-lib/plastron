@@ -6,7 +6,7 @@ import pytest
 from httpretty import GET
 from rdflib import URIRef
 
-from plastron.rdf import RDFObjectProperty
+from plastron.rdf.rdf import RDFObjectProperty
 from plastron.validation import ValidationError, is_edtf_formatted, is_handle
 from plastron.validation.rules import from_vocabulary, required
 from plastron.validation.vocabularies import get_vocabulary

@@ -1,14 +1,16 @@
 import hashlib
 import io
 import zipfile
-import requests
 from mimetypes import guess_type
 from os.path import basename, isfile
+from urllib.parse import urlsplit
+
+import requests
 from paramiko import SFTPClient
+from rdflib import URIRef
+
 from plastron.exceptions import BinarySourceError, BinarySourceNotFoundError, RESTAPIException
 from plastron.util import get_ssh_client
-from rdflib import URIRef
-from urllib.parse import urlsplit
 
 
 class BinarySource:

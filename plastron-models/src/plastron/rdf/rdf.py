@@ -1,8 +1,10 @@
-import plastron.validation.rules
 import sys
-from plastron.namespaces import rdf
-from plastron.validation import ResourceValidationResult, ValidationError
+
 from rdflib import Graph, URIRef, Literal
+
+import plastron.validation.rules
+from plastron.validation import ResourceValidationResult, ValidationError
+from plastron.namespaces import rdf
 
 # alias the rdflib Namespace
 ns = rdf

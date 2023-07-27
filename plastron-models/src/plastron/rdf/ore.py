@@ -1,6 +1,6 @@
-from plastron import ldp, rdf
 from plastron.client import Client
 from plastron.namespaces import dcterms, iana, ore
+from plastron.rdf import ldp, rdf
 
 # alias the rdflib Namespace
 ns = ore

@@ -1,10 +1,11 @@
 import pytest
+
 from plastron.commands import importcommand
 from plastron.files import LocalFileSource, RemoteFileSource, ZipFileSource
 from plastron.jobs import build_fields
 from plastron.models import Item, umdtype
-from plastron.pcdm import Object
-from plastron.rdf import RDFDataProperty
+from plastron.rdf.pcdm import Object
+from plastron.rdf.rdf import RDFDataProperty
 from plastron.stomp.messages import PlastronCommandMessage
 
 cmd = importcommand.Command()

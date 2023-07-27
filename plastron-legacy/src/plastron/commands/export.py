@@ -18,7 +18,7 @@ from plastron.commands import BaseCommand
 from plastron.exceptions import DataReadException, FailureException, RESTAPIException
 from plastron.models import Item
 from plastron.namespaces import get_manager
-from plastron.serializers import EmptyItemListError, SERIALIZER_CLASSES, detect_resource_class
+from plastron.serializers.__init__ import EmptyItemListError, SERIALIZER_CLASSES, detect_resource_class
 from plastron.util import get_ssh_client, strtobool
 
 logger = logging.getLogger(__name__)

@@ -3,13 +3,14 @@ import logging
 import os
 from collections import defaultdict
 from contextlib import contextmanager
+from urllib.parse import urlparse
+
+from rdflib import Literal, Graph, URIRef
+
 from plastron.exceptions import DataReadException
 from plastron.models import Issue, Letter, Poster
 from plastron.namespaces import get_manager, bibo, rdf, fedora
-from plastron.rdf import RDFObjectProperty, RDFDataProperty, Resource
-from rdflib import Literal, Graph, URIRef
-from urllib.parse import urlparse
-
+from plastron.rdf.rdf import RDFObjectProperty, RDFDataProperty, Resource
 
 logger = logging.getLogger(__name__)
 nsm = get_manager()
@@ -92,7 +93,7 @@ def write_csv_file(row_info, file):
         if not has_column_values:
             row_info['headers'].remove(header)
 
-    # write the CSV file
+    # write the CSV file;
     # file must be opened in text mode, otherwise csv complains
     # about wanting str and not bytes
     with ensure_text_mode(file) as csv_file:
@@ -197,7 +198,7 @@ class CSVSerializer:
                         columns[datatype_header].append(serialization)
                         row_info['extra_headers'][header].add(datatype_header)
 
-                    # get the other values; literals without language or datatype, or URIRefs that snuck in
+                    # get the other values; literals without language or datatype, or URIRefs that have snuck in
                     values = [v for v in prop.values
                               if not isinstance(v, Literal) or (not v.language and not v.datatype)]
                     if len(values) > 0:

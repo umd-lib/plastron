@@ -4,7 +4,6 @@ import io
 import logging
 import os
 import re
-
 from argparse import FileType, Namespace, ArgumentTypeError
 from collections import OrderedDict, defaultdict
 from datetime import datetime
@@ -14,16 +13,16 @@ from uuid import uuid4
 from bs4 import BeautifulSoup
 from rdflib import Graph, Literal, URIRef
 
-from plastron import rdf
 from plastron.client import Client
 from plastron.commands import BaseCommand
 from plastron.exceptions import ConfigError, FailureException, RESTAPIException
 from plastron.files import HTTPFileSource, LocalFileSource, RemoteFileSource, ZipFileSource
 from plastron.jobs import ImportJob, ImportedItemStatus, JobError, ModelClassNotFoundError, build_lookup_index
 from plastron.namespaces import get_manager, prov, sc
-from plastron.oa import Annotation, TextualBody
-from plastron.pcdm import File, PreservationMasterFile
-from plastron.rdf import RDFDataProperty
+from plastron.rdf import rdf
+from plastron.rdf.oa import Annotation, TextualBody
+from plastron.rdf.pcdm import File, PreservationMasterFile
+from plastron.rdf.rdf import RDFDataProperty
 from plastron.util import datetimestamp, strtobool, uri_or_curie
 from plastron.validation import ValidationError, validate
 

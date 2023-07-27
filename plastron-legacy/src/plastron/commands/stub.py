@@ -1,18 +1,18 @@
 import csv
 import logging
 import sys
-
 from argparse import FileType, Namespace
+from typing import Optional
+
+from rdflib import URIRef
 
 from plastron.client import Client, TransactionClient
 from plastron.commands import BaseCommand
 from plastron.exceptions import FailureException, RESTAPIException
 from plastron.files import BinarySource, HTTPFileSource, LocalFileSource
 from plastron.models import Item
-from plastron.pcdm import File
+from plastron.rdf.pcdm import File
 from plastron.util import uri_or_curie
-from rdflib import URIRef
-from typing import Optional
 
 logger = logging.getLogger(__name__)
 

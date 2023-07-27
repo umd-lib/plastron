@@ -1,7 +1,7 @@
 import pytest
 
 from plastron.commands import BaseCommand, get_command_class
-from plastron.exceptions import FailureException
+from plastron.core.exceptions import FailureException
 
 
 def test_get_command_class():

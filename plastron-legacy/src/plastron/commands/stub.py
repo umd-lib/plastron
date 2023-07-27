@@ -8,11 +8,11 @@ from rdflib import URIRef
 
 from plastron.client import Client, TransactionClient
 from plastron.commands import BaseCommand
-from plastron.exceptions import FailureException, RESTAPIException
+from plastron.core.exceptions import FailureException, RESTAPIException
 from plastron.files import BinarySource, HTTPFileSource, LocalFileSource
 from plastron.models import Item
 from plastron.rdf.pcdm import File
-from plastron.util import uri_or_curie
+from plastron.rdf import uri_or_curie
 
 logger = logging.getLogger(__name__)
 

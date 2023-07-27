@@ -424,12 +424,13 @@ For a simple example, see the ping command, as implemented in
 [`plastron/commands/ping.py`](../plastron/commands/ping.py):
 
 ```python
-from plastron.exceptions import FailureException
+from plastron.core.exceptions import FailureException
+
 
 class Command:
     def __init__(self, subparsers):
         parser_ping = subparsers.add_parser('ping',
-                description='Check connection to the repository')
+                                            description='Check connection to the repository')
         parser_ping.set_defaults(cmd_name='ping')
 
     def __call__(self, fcrepo, args):

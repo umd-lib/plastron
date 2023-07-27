@@ -6,7 +6,7 @@ from collections import OrderedDict
 
 import plastron
 from plastron.commands.importcommand import Command, RepoChangeset
-from plastron.exceptions import FailureException
+from plastron.core.exceptions import FailureException
 from plastron.jobs import ConfigMissingError, Row
 from plastron.models.umd import Item
 from plastron.validation import ResourceValidationResult, ValidationError

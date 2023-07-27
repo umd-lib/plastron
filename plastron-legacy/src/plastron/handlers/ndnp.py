@@ -7,7 +7,7 @@ import lxml
 from lxml.etree import parse, XMLSyntaxError
 import os
 from plastron import pcdm
-from plastron.exceptions import DataReadException
+from plastron.core.exceptions import DataReadException
 from plastron.namespaces import dcmitype, ndnp
 from plastron.files.__init__ import LocalFileSource
 from plastron.models.newspaper import Article, Issue, IssueMetadata, MetadataFile, Page

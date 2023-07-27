@@ -14,11 +14,11 @@ from rdflib import URIRef
 from rdflib.util import from_n3
 
 import plastron.models
-from plastron.exceptions import DataReadException, FailureException
+from plastron.core.exceptions import DataReadException, FailureException
 from plastron.namespaces import get_manager
 from plastron.rdf.rdf import RDFDataProperty, Resource
-from plastron.serializers.__init__ import CSVSerializer
-from plastron.util import ItemLog, datetimestamp
+from plastron.serializers import CSVSerializer
+from plastron.core.util import ItemLog, datetimestamp
 
 
 nsm = get_manager()

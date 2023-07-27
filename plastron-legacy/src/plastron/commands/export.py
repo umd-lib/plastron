@@ -15,11 +15,12 @@ from paramiko import SFTPClient, SSHException
 from requests import ConnectionError
 
 from plastron.commands import BaseCommand
-from plastron.exceptions import DataReadException, FailureException, RESTAPIException
+from plastron.core.exceptions import DataReadException, FailureException, RESTAPIException
 from plastron.models import Item
 from plastron.namespaces import get_manager
 from plastron.serializers.__init__ import EmptyItemListError, SERIALIZER_CLASSES, detect_resource_class
-from plastron.util import get_ssh_client, strtobool
+from plastron.core.util import strtobool
+from plastron.files import get_ssh_client
 
 logger = logging.getLogger(__name__)
 nsm = get_manager()

@@ -3,7 +3,7 @@ import pytest
 from argparse import ArgumentParser, ArgumentTypeError
 
 from plastron.namespaces import dcterms, rdf, pcdm
-from plastron.util import uri_or_curie, parse_data_property, parse_object_property
+from plastron.rdf import parse_data_property, parse_object_property, uri_or_curie
 from rdflib.term import URIRef, Literal
 
 INVALID_URI_OR_CURIE_ARGS = [

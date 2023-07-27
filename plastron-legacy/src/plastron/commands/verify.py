@@ -3,7 +3,7 @@ import logging
 from argparse import Namespace
 
 from plastron.commands import BaseCommand
-from plastron.exceptions import FailureException
+from plastron.core.exceptions import FailureException
 
 
 def configure_cli(subparsers):

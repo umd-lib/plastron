@@ -6,7 +6,7 @@ import yaml
 from rdflib import Graph
 from plastron import pcdm, rdf
 from plastron.authority import create_authority
-from plastron.exceptions import ConfigError, DataReadException
+from plastron.core.exceptions import ConfigError, DataReadException
 from plastron.namespaces import dcterms
 from plastron.pcdm import Page, get_file_object
 

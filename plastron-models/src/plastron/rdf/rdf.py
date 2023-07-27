@@ -189,7 +189,7 @@ class Resource(metaclass=Meta):
             if (p, datatype) in self.uri_to_prop:
                 prop_type = self.uri_to_prop[p, datatype]
             elif (p, None) in self.uri_to_prop:
-                # fall back to a untyped property
+                # fall back to an untyped property
                 prop_type = self.uri_to_prop[p, None]
             else:
                 prop_type = None

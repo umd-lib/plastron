@@ -15,15 +15,15 @@ from rdflib import Graph, Literal, URIRef
 
 from plastron.client import Client
 from plastron.commands import BaseCommand
-from plastron.exceptions import ConfigError, FailureException, RESTAPIException
+from plastron.core.exceptions import ConfigError, FailureException, RESTAPIException
 from plastron.files import HTTPFileSource, LocalFileSource, RemoteFileSource, ZipFileSource
 from plastron.jobs import ImportJob, ImportedItemStatus, JobError, ModelClassNotFoundError, build_lookup_index
 from plastron.namespaces import get_manager, prov, sc
-from plastron.rdf import rdf
+from plastron.rdf import rdf, uri_or_curie
 from plastron.rdf.oa import Annotation, TextualBody
 from plastron.rdf.pcdm import File, PreservationMasterFile
 from plastron.rdf.rdf import RDFDataProperty
-from plastron.util import datetimestamp, strtobool, uri_or_curie
+from plastron.core.util import datetimestamp, strtobool
 from plastron.validation import ValidationError, validate
 
 nsm = get_manager()

@@ -10,8 +10,9 @@ from pyparsing import ParseException
 
 from plastron.client import Client
 from plastron.commands import BaseCommand
-from plastron.exceptions import FailureException
-from plastron.util import ResourceList, get_title_string, parse_predicate_list, strtobool
+from plastron.core.exceptions import FailureException
+from plastron.core.util import strtobool, ResourceList
+from plastron.rdf import parse_predicate_list, get_title_string
 from plastron.validation import validate
 
 logger = logging.getLogger(__name__)

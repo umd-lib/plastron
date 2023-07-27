@@ -7,7 +7,6 @@ from urllib.parse import urlparse
 
 from rdflib import Literal, Graph, URIRef
 
-from plastron.exceptions import DataReadException
 from plastron.models import Issue, Letter, Poster
 from plastron.namespaces import get_manager, bibo, rdf, fedora
 from plastron.rdf.rdf import RDFObjectProperty, RDFDataProperty, Resource
@@ -32,7 +31,7 @@ def detect_resource_class(graph, subject, fallback=None):
         if fallback is not None:
             return fallback
         else:
-            raise DataReadException(f'Unable to detect resource type for {subject}')
+            raise RuntimeError(f'Unable to detect resource type for {subject}')
 
 
 @contextmanager

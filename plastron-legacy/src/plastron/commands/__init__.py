@@ -1,6 +1,6 @@
 from importlib import import_module
 
-from plastron.exceptions import FailureException
+from plastron.core.exceptions import FailureException
 
 
 class BaseCommand:

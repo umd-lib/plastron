@@ -25,8 +25,8 @@ class ALTOResource(object):
         for node in self.xmldoc.xpath("//alto:TextBlock", namespaces=ns):
             yield TextBlock(node)
 
-    def textblock(self, id):
-        return TextBlock(self.xmldoc.xpath("//alto:TextBlock[@ID=$id]", id=id, namespaces=ns)[0])
+    def textblock(self, identifier):
+        return TextBlock(self.xmldoc.xpath("//alto:TextBlock[@ID=$id]", id=identifier, namespaces=ns)[0])
 
 
 class Region(object):
@@ -91,7 +91,8 @@ class Space(object):
         self.element = element
         super(Space, self).__init__()
 
-    def text(self, scale=None):
+    @staticmethod
+    def text(_scale=None):
         return ' '
 
 
@@ -100,5 +101,6 @@ class Hyphen(object):
         self.element = element
         super(Hyphen, self).__init__()
 
-    def text(self, scale=None):
+    @staticmethod
+    def text(_scale=None):
         return '\N{SOFT HYPHEN}'

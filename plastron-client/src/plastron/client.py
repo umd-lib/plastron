@@ -15,8 +15,6 @@ from requests.exceptions import ConnectionError
 from requests_jwtauth import HTTPBearerAuth, JWTSecretAuth
 from urlobject import URLObject
 
-# from plastron.exceptions import RuntimeError, FailureException, RESTAPIException
-
 logger = logging.getLogger(__name__)
 
 OMIT_SERVER_MANAGED_TRIPLES = 'return=representation; omit="http://fedora.info/definitions/v4/repository#ServerManaged"'

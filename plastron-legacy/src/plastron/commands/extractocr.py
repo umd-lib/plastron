@@ -1,10 +1,10 @@
 import logging
 import sys
 from datetime import datetime
-from plastron import util
+from plastron.core import util
 from plastron.client import Client, TransactionClient
 from plastron.commands import BaseCommand
-from plastron.exceptions import RESTAPIException, DataReadException, FailureException
+from plastron.core.exceptions import RESTAPIException, DataReadException, FailureException
 from plastron.models.newspaper import Page
 
 logger = logging.getLogger(__name__)

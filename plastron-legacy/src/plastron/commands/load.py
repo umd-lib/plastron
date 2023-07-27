@@ -9,8 +9,8 @@ from time import sleep
 
 from plastron.client import Client, TransactionClient
 from plastron.commands import BaseCommand
-from plastron.exceptions import ConfigError, DataReadException, RESTAPIException, FailureException
-from plastron.util import ItemLog
+from plastron.core.exceptions import ConfigError, DataReadException, RESTAPIException, FailureException
+from plastron.core.util import ItemLog
 
 logger = logging.getLogger(__name__)
 now = datetime.utcnow().strftime('%Y%m%d%H%M%S')

@@ -1,16 +1,43 @@
 import hashlib
 import io
+import urllib
 import zipfile
 from mimetypes import guess_type
 from os.path import basename, isfile
 from urllib.parse import urlsplit
 
 import requests
-from paramiko import SFTPClient
+from paramiko import SFTPClient, SSHClient, AutoAddPolicy, SSHException
+from paramiko.config import SSH_PORT
 from rdflib import URIRef
 
-from plastron.exceptions import BinarySourceError, BinarySourceNotFoundError, RESTAPIException
-from plastron.util import get_ssh_client
+
+def get_ssh_client(sftp_uri, **kwargs):
+    if isinstance(sftp_uri, str):
+        sftp_uri = urlsplit(sftp_uri)
+    if not isinstance(sftp_uri, urllib.parse.SplitResult):
+        raise TypeError('Expects a str or a urllib.parse.SplitResult')
+    ssh_client = SSHClient()
+    ssh_client.load_system_host_keys()
+    ssh_client.set_missing_host_key_policy(AutoAddPolicy)
+    try:
+        ssh_client.connect(
+            hostname=sftp_uri.hostname,
+            username=sftp_uri.username,
+            port=sftp_uri.port or SSH_PORT,
+            **kwargs
+        )
+        return ssh_client
+    except SSHException as e:
+        raise RuntimeError(str(e)) from e
+
+
+class BinarySourceError(Exception):
+    pass
+
+
+class BinarySourceNotFoundError(BinarySourceError):
+    pass
 
 
 class BinarySource:
@@ -166,7 +193,7 @@ class RepositoryFileSource(BinarySource):
         if response.status_code == 404:
             raise BinarySourceNotFoundError(f'{response.status_code} {response.reason}: {file_uri}')
         if response.status_code != 200:
-            raise RESTAPIException(response)
+            raise RuntimeError(f'{file_uri} not found')
 
         self._mimetype = response.headers['Content-Type']
 

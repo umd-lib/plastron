@@ -1,6 +1,6 @@
 from PIL import Image
 
-from plastron.files.__init__ import LocalFileSource, RepositoryFileSource
+from plastron.files import LocalFileSource, RepositoryFileSource
 from plastron.rdf import ldp, ore, rdf
 from plastron.namespaces import dcterms, ebucore, fabio, pcdm, pcdmuse, premis
 

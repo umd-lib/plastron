@@ -4,8 +4,7 @@ from uuid import uuid4
 
 from rdflib import Graph, URIRef
 
-from plastron.client import ResourceURI, Client
-from plastron.exceptions import RESTAPIException
+from plastron.client import ResourceURI, Client, RESTAPIException
 from plastron.rdf import rdf
 
 

@@ -5,7 +5,7 @@ import pytest
 
 from plastron.client import Client
 from plastron.commands.update import Command
-from plastron.exceptions import FailureException
+from plastron.core.exceptions import FailureException
 from plastron.models import Letter, Item
 from plastron.stomp.messages import PlastronCommandMessage
 from pytest import raises

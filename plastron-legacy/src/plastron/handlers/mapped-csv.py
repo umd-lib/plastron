@@ -6,7 +6,7 @@ from rdflib import Literal, URIRef
 from rdflib.util import from_n3
 from plastron import pcdm, namespaces, rdf
 from plastron.files.__init__ import LocalFileSource, RemoteFileSource
-from plastron.exceptions import ConfigError
+from plastron.core.exceptions import ConfigError
 from collections import OrderedDict
 
 nsm = namespaces.get_manager()

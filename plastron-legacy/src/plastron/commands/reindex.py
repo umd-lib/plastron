@@ -1,7 +1,8 @@
 import logging
 from plastron.commands import BaseCommand
 from plastron.namespaces import rdf
-from plastron.util import ResourceList, parse_predicate_list
+from plastron.rdf import parse_predicate_list
+from plastron.core.util import ResourceList
 from rdflib import URIRef
 
 logger = logging.getLogger(__name__)

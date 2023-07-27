@@ -8,7 +8,7 @@ from rdflib import Graph, Literal, URIRef
 from plastron.client import Client
 from plastron.commands import BaseCommand
 from plastron.namespaces import dcterms, get_manager, pcdm, rdf
-from plastron.util import uri_or_curie, parse_data_property, parse_object_property
+from plastron.rdf import parse_data_property, parse_object_property, uri_or_curie
 
 logger = logging.getLogger(__name__)
 

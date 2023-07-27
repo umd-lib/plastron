@@ -17,9 +17,9 @@ from pkgutil import iter_modules
 
 from plastron import commands
 from plastron.client import Repository, Client, get_authenticator
-from plastron.exceptions import FailureException, ConfigError
+from plastron.core.exceptions import FailureException, ConfigError
 from plastron.stomp import Broker
-from plastron.util import envsubst, DEFAULT_LOGGING_OPTIONS
+from plastron.core.util import envsubst, DEFAULT_LOGGING_OPTIONS
 
 logger = logging.getLogger(__name__)
 now = datetime.utcnow().strftime('%Y%m%d%H%M%S')

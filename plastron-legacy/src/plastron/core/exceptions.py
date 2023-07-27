@@ -24,11 +24,3 @@ class RESTAPIException(Exception):
 
 class FailureException(Exception):
     pass
-
-
-class BinarySourceError(Exception):
-    pass
-
-
-class BinarySourceNotFoundError(BinarySourceError):
-    pass

@@ -1,7 +1,7 @@
 from lxml.etree import parse, XMLSyntaxError
 from rdflib import URIRef, Namespace
 
-from plastron.exceptions import DataReadException
+from plastron.core.exceptions import DataReadException
 from plastron.validation import is_handle
 from plastron.namespaces import bibo, carriers, dc, dcterms, fabio, ndnp, pcdmuse, prov, sc
 from plastron.rdf import pcdm, ocr, oa, rdf

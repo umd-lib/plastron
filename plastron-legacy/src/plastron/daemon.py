@@ -14,7 +14,7 @@ import yaml
 
 from plastron.stomp import Broker
 from plastron.stomp.listeners import CommandListener
-from plastron.util import envsubst, DEFAULT_LOGGING_OPTIONS
+from plastron.core.util import envsubst, DEFAULT_LOGGING_OPTIONS
 from plastron.web import create_app
 
 logger = logging.getLogger(__name__)

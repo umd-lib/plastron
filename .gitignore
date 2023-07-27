@@ -1,7 +1,9 @@
 *.egg-info
 .pytest_cache
 .venv
+build
 config
+dist
 logs
 
 .coverage

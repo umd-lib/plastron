@@ -1,7 +1,8 @@
 import logging
 
 from plastron.commands import BaseCommand
-from plastron.util import get_title_string, ResourceList, parse_predicate_list
+from plastron.rdf import parse_predicate_list, get_title_string
+from plastron.core.util import ResourceList
 
 logger = logging.getLogger(__name__)
 

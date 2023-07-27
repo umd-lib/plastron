@@ -7,7 +7,7 @@ from stomp.listener import ConnectionListener
 
 from plastron.client import Repository, Client, get_authenticator
 from plastron.commands import get_command_class
-from plastron.exceptions import FailureException
+from plastron.core.exceptions import FailureException
 from plastron.stomp import Destination
 from plastron.stomp.handlers import AsynchronousResponseHandler, SynchronousResponseHandler
 from plastron.stomp.inbox_watcher import InboxWatcher

@@ -5,8 +5,13 @@ import pytest
 from plastron.web import create_app
 
 
+def create_app_client(jobs_dir):
+    app = create_app({'JOBS_DIR': jobs_dir})
+    return app.test_client()
+
+
 @pytest.fixture
-def app_client(request, datadir):
+def app_client(request, datadir, monkeypatch):
     tmpdir = None
     marker = request.node.get_closest_marker('jobs_dir')
     if marker is not None:
@@ -15,7 +20,8 @@ def app_client(request, datadir):
         # create a new temporary directory that we know will be empty
         tmpdir = TemporaryDirectory()
         test_jobs_dir = tmpdir.name
-    app = create_app({'JOBS_DIR': test_jobs_dir})
+    monkeypatch.setenv('JOBS_DIR', str(test_jobs_dir))
+    app = create_app()
 
     with app.test_client() as client:
         yield client

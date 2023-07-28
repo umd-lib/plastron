@@ -6,7 +6,7 @@ import pytest
 from flask import url_for
 from http_server_mock import HttpServerMock
 
-from plastron.client import Repository, Client, get_authenticator
+from plastron.client import Client
 from plastron.commands import create
 
 

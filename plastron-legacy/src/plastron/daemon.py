@@ -1,5 +1,4 @@
 import importlib.metadata
-
 import logging
 import logging.config
 import sys
@@ -9,13 +8,11 @@ from pathlib import Path
 from threading import Event, Thread
 from typing import Any, Mapping, Tuple, Type
 
-import waitress
 import yaml
 
+from plastron.core.util import envsubst, DEFAULT_LOGGING_OPTIONS
 from plastron.stomp import Broker
 from plastron.stomp.listeners import CommandListener
-from plastron.core.util import envsubst, DEFAULT_LOGGING_OPTIONS
-from plastron.web import create_app
 
 logger = logging.getLogger(__name__)
 version = importlib.metadata.version('plastron-legacy')
@@ -48,23 +45,8 @@ class STOMPDaemon(Thread):
             logger.error('Unable to connect to STOMP broker')
 
 
-class HTTPDaemon(Thread):
-    def __init__(self, config=None, **kwargs):
-        super().__init__(daemon=True, **kwargs)
-        self.jobs_dir = config.get('COMMANDS', {}).get('IMPORT', {}).get('JOBS_DIR', 'jobs')
-        server_config = config.get('HTTP_SERVER', {})
-        self.host = server_config.get('HOST', '0.0.0.0')
-        self.port = int(server_config.get('PORT', 5000))
-
-    def run(self):
-        app = create_app({'JOBS_DIR': Path(self.jobs_dir)})
-        logger.info(f'HTTP server listening on {self.host}:{self.port}')
-        waitress.serve(app, host=self.host, port=self.port)
-
-
 INTERFACES = {
     'stomp': STOMPDaemon,
-    'http': HTTPDaemon
 }
 
 

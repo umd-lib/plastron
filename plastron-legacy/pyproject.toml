@@ -17,22 +17,14 @@ keywords = ['fcrepo', 'repository', 'batch', 'utility']
 dependencies = [
     'bagit',
     'BeautifulSoup4',
-    'edtf-validate',
-    'Flask',
-    'iso639',
-    'jwcrypto',
     'lxml>3.6.0',
-    'numpy',
     'paramiko',
     'Pillow>=6.2.2',
     'pyparsing',
     'PyYAML>3.12',
-    'rdflib<6.0.0',
-    'rdflib-jsonld==0.5.0',
+    'rdflib',
     'requests',
-    'setuptools<58.0.0',
     'stomp.py',
-    'waitress',
     'watchdog==0.10.3',
     'pysolr',
 ]
@@ -42,6 +34,7 @@ requires-python = '>=3.8'
 dev = ['pycodestyle']
 test = [
     'CoilMQ',
+    'flask',
     'freezegun',
     'httpretty',
     'http-server-mock',

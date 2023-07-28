@@ -1,4 +1,5 @@
 import logging
+import os
 import urllib.parse
 from pathlib import Path
 
@@ -33,10 +34,9 @@ def latest_dropped_items(job: ImportJob):
     }
 
 
-def create_app(config):
+def create_app():
     app = Flask(__name__)
-    app.config.from_mapping(config)
-    jobs_dir = Path(app.config['JOBS_DIR'])
+    jobs_dir = Path(os.environ.get('JOBS_DIR', 'jobs'))
 
     def get_job(job_id: str):
         job = ImportJob(urllib.parse.unquote(job_id), str(jobs_dir))

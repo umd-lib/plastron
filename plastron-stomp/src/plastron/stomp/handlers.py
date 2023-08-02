@@ -1,6 +1,6 @@
 import logging
 
-from plastron.stomp import Destination
+from plastron.stomp.broker import Destination
 from plastron.stomp.messages import PlastronErrorMessage, PlastronMessage
 
 logger = logging.getLogger(__name__)

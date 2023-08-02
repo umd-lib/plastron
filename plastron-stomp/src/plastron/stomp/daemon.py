@@ -1,34 +1,51 @@
-import importlib.metadata
 import logging
 import logging.config
+import os
 import sys
-from argparse import ArgumentParser, FileType
 from datetime import datetime
 from pathlib import Path
 from threading import Event, Thread
-from typing import Any, Mapping, Tuple, Type
+from typing import TextIO, Dict, Any, Optional
 
+import click
 import yaml
 
 from plastron.core.util import envsubst, DEFAULT_LOGGING_OPTIONS
-from plastron.stomp import Broker
+from plastron.stomp import __version__
+from plastron.stomp.broker import ServerTuple, Broker
 from plastron.stomp.listeners import CommandListener
 
 logger = logging.getLogger(__name__)
-version = importlib.metadata.version('plastron-legacy')
 
 
 class STOMPDaemon(Thread):
-    def __init__(self, config=None, **kwargs):
+    def __init__(
+            self,
+            broker: Broker,
+            repo_config: Dict[str, Any],
+            command_config: Optional[Dict[str, Any]] = None,
+            **kwargs,
+    ):
         super().__init__(**kwargs)
-        if config is None:
-            config = {}
-        self.config = config
         self.started = Event()
         self.stopped = Event()
-        # configure STOMP message broker
-        self.broker = Broker(self.config['MESSAGE_BROKER'])
-        self.command_listener = CommandListener(self)
+        self.broker = broker
+
+        def started():
+            self.stopped.clear()
+            self.started.set()
+
+        def stopped():
+            self.started.clear()
+            self.stopped.set()
+
+        self.command_listener = CommandListener(
+            broker=self.broker,
+            repo_config=repo_config,
+            command_config=command_config,
+            after_connected=started,
+            after_disconnected=stopped,
+        )
 
     def run(self):
         # setup listeners
@@ -43,11 +60,6 @@ class STOMPDaemon(Thread):
                 self.command_listener.inbox_watcher.stop()
         else:
             logger.error('Unable to connect to STOMP broker')
-
-
-INTERFACES = {
-    'stomp': STOMPDaemon,
-}
 
 
 def configure_logging(log_filename_base: str, log_dir: str = 'logs', verbose: bool = False) -> None:
@@ -69,51 +81,39 @@ def configure_logging(log_filename_base: str, log_dir: str = 'logs', verbose: bo
     logging.config.dictConfig(logging_options)
 
 
-def get_daemon_config() -> Tuple[Type[Any], Mapping[str, Any]]:
-    parser = ArgumentParser(
-        prog='plastrond',
-        description='Batch operations daemon for Fedora 4.'
-    )
-    parser.add_argument(
-        '-c', '--config',
-        dest='config_file',
-        help='path to configuration file',
-        type=FileType(),
-        action='store',
-        required=True
-    )
-    parser.add_argument(
-        '-v', '--verbose',
-        help='increase the verbosity of the status output',
-        action='store_true'
-    )
-    parser.add_argument(
-        'interface',
-        help='interface to run',
-        choices=INTERFACES.keys()
-    )
-
-    # parse command line args
-    args = parser.parse_args()
-
-    config = envsubst(yaml.safe_load(args.config_file))
-
+@click.command
+@click.option(
+    '-c', '--config-file',
+    type=click.File(),
+    help='Configuration file',
+    required=True,
+)
+@click.option(
+    '-v', '--verbose',
+    is_flag=True,
+    help='increase the verbosity of the status output',
+)
+def main(config_file: TextIO, verbose: bool):
+    config = envsubst(yaml.safe_load(config_file))
+    repo_config = config.get('REPOSITORY', {})
+    command_config = config.get('COMMANDS', {})
+    broker_config = config['MESSAGE_BROKER']
     configure_logging(
         log_filename_base='plastron.daemon',
-        log_dir=config.get('REPOSITORY', {}).get('LOG_DIR', 'logs'),
-        verbose=args.verbose
+        log_dir=repo_config.get('LOG_DIR', 'logs'),
+        verbose=verbose,
     )
-
-    return INTERFACES[args.interface], config
-
-
-def main():
-    daemon_class, config = get_daemon_config()
-    daemon_description = f'plastrond/{version} ({daemon_class.__name__})'
+    daemon_description = f'plastrond-stomp/{__version__}'
 
     logger.info(f'Starting {daemon_description}')
+    broker = Broker(
+        server=ServerTuple.from_string(broker_config['SERVER']),
+        message_store_dir=broker_config['MESSAGE_STORE_DIR'],
+        destinations=broker_config.get('DESTINATIONS'),
+        public_uri_template=broker_config.get('PUBLIC_URI_TEMPLATE', os.environ.get('PUBLIC_URI_TEMPLATE', None))
+    )
 
-    thread = daemon_class(config=config)
+    thread = STOMPDaemon(broker=broker, repo_config=repo_config, command_config=command_config)
 
     try:
         thread.start()

@@ -52,7 +52,7 @@ class Command(BaseCommand):
     def reindex_item(self, resource, graph):
         logger.info(f'Reindexing {resource.uri}')
         types = ','.join(graph.objects(subject=URIRef(resource.uri), predicate=rdf.type))
-        self.broker.send_message(
+        self.broker.send(
             destination=self.reindexing_queue,
             headers={
                 'CamelFcrepoUri': resource.uri,

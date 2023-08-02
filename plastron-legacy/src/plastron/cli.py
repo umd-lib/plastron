@@ -18,7 +18,7 @@ from plastron.client import Endpoint, Client
 from plastron.client.auth import get_authenticator
 from plastron.core.exceptions import FailureException, ConfigError
 from plastron.core.util import envsubst, DEFAULT_LOGGING_OPTIONS
-from plastron.stomp import Broker
+from plastron.stomp.broker import Broker
 
 logger = logging.getLogger(__name__)
 now = datetime.utcnow().strftime('%Y%m%d%H%M%S')

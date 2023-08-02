@@ -2,14 +2,15 @@ import importlib.metadata
 import logging
 import os
 from concurrent.futures import ThreadPoolExecutor
+from typing import Dict, Any, Callable
 
 from stomp.listener import ConnectionListener
 
 from plastron.client import Endpoint, Client
 from plastron.client.auth import get_authenticator
-from plastron.commands import get_command_class
-from plastron.core.exceptions import FailureException
-from plastron.stomp import Destination
+from plastron.repo import Repository
+from plastron.stomp.broker import Broker, Destination
+from plastron.stomp.commands import get_command_class
 from plastron.stomp.handlers import AsynchronousResponseHandler, SynchronousResponseHandler
 from plastron.stomp.inbox_watcher import InboxWatcher
 from plastron.stomp.messages import MessageBox, PlastronCommandMessage, PlastronMessage
@@ -19,21 +20,25 @@ version = importlib.metadata.version('plastron-legacy')
 
 
 class CommandListener(ConnectionListener):
-    def __init__(self, thread: 'STOMPDaemon'):
-        self.thread = thread
-        self.broker = thread.broker
-        self.repo_config = thread.config['REPOSITORY']
-        self.queue = self.broker.destinations['JOBS']
-        self.status_queue = Destination(self.broker, self.broker.destinations['JOB_STATUS'])
-        self.progress_topic = Destination(self.broker, self.broker.destinations['JOB_PROGRESS'])
-        self.synchronous_queue = self.broker.destinations['SYNCHRONOUS_JOBS']
+    def __init__(
+            self,
+            broker: Broker,
+            repo_config: Dict[str, Any],
+            command_config: Dict[str, Any] = None,
+            after_connected: Callable = None,
+            after_disconnected: Callable = None,
+    ):
+        self.broker = broker
+        self.repo_config = repo_config
         self.inbox = MessageBox(os.path.join(self.broker.message_store_dir, 'inbox'), PlastronCommandMessage)
         self.outbox = MessageBox(os.path.join(self.broker.message_store_dir, 'outbox'), PlastronMessage)
         self.executor = ThreadPoolExecutor(thread_name_prefix=__name__)
         self.public_uri_template = self.broker.public_uri_template
         self.inbox_watcher = None
-        self.command_config = thread.config['COMMANDS']
+        self.command_config = command_config or {}
         self.processor = MessageProcessor(self.command_config, self.repo_config)
+        self.after_connected = after_connected
+        self.after_disconnected = after_disconnected
 
     def on_connecting(self, host_and_port):
         logger.info(f'Connecting to STOMP message broker {self.broker}')
@@ -45,7 +50,7 @@ class CommandListener(ConnectionListener):
         for message in self.outbox:
             logger.info(f"Found response message for job {message.job_id} in outbox")
             # send the job completed message
-            self.status_queue.send(message)
+            self.broker['JOB_STATUS'].send(message)
             logger.info(f'Sent response message for job {message.job_id}')
             # remove the message from the outbox now that sending has completed
             self.outbox.remove(message.job_id)
@@ -54,40 +59,27 @@ class CommandListener(ConnectionListener):
         for message in self.inbox:
             self.process_message(message, AsynchronousResponseHandler(self, message))
 
-        # then subscribe to the queue to receive incoming messages
-        self.broker.subscribe(
-            destination=self.queue,
-            id='plastron',
-            ack='client-individual'
-        )
-        logger.info(f"Subscribed to {self.queue}")
-
-        # Subscribe for synchronous jobs
-        self.broker.subscribe(
-            destination=self.synchronous_queue,
-            id='plastron-synchronous',
-            ack='client-individual'
-        )
-        logger.info(f"Subscribed to {self.synchronous_queue} for synchronous jobs")
+        # subscribe to receive asynchronous jobs
+        self.broker['JOBS'].subscribe(id='plastron', ack='client-individual')
+        # subscribe to receive synchronous jobs
+        self.broker['SYNCHRONOUS_JOBS'].subscribe(id='plastron-synchronous', ack='client-individual')
 
         self.inbox_watcher = InboxWatcher(self, self.inbox)
         self.inbox_watcher.start()
 
-        self.thread.stopped.clear()
-        self.thread.started.set()
+        if self.after_connected:
+            self.after_connected()
 
     def on_message(self, frame):
         headers = frame.headers
         body = frame.body
-        if headers['destination'] == self.synchronous_queue:
-            logger.debug(f'Received synchronous job message on {self.synchronous_queue} with headers: {headers}')
+        logger.debug(f'Received message on {headers["destination"]} with headers: {headers}')
+        if headers['destination'] == self.broker['SYNCHRONOUS_JOBS'].name:
             message = PlastronCommandMessage(headers=headers, body=body)
             self.process_message(message, SynchronousResponseHandler(self, message))
             self.broker.ack(message.id, 'plastron-synchronous')
 
-        elif headers['destination'] == self.queue:
-            logger.debug(f'Received message on {self.queue} with headers: {headers}')
-
+        elif headers['destination'] == self.broker['JOBS'].name:
             # save the message in the inbox until we can process it
             # Note: Processing will occur via the InboxWatcher, which will
             # respond to the inbox placing a file in the inbox message directory
@@ -98,14 +90,14 @@ class CommandListener(ConnectionListener):
 
     def process_message(self, message, response_handler):
         # send to a message processor thread
-        self.executor.submit(self.processor, message, self.progress_topic).add_done_callback(response_handler)
+        self.executor.submit(self.processor, message, self.broker['JOB_PROGRESS']).add_done_callback(response_handler)
 
     def on_disconnected(self):
         logger.warning('Disconnected from the STOMP message broker')
         if self.inbox_watcher:
             self.inbox_watcher.stop()
-        self.thread.started.clear()
-        self.thread.stopped.set()
+        if self.after_disconnected:
+            self.after_disconnected()
 
 
 class MessageProcessor:
@@ -119,11 +111,7 @@ class MessageProcessor:
         if command_name not in self.commands:
             # get the configuration options for this command
             config = self.command_config.get(command_name.upper(), {})
-
             command_class = get_command_class(command_name)
-            if getattr(command_class, 'parse_message') is None:
-                raise FailureException(f'Command class {command_class} does not support message processing')
-
             # cache an instance of this command
             self.commands[command_name] = command_class(config)
 
@@ -134,23 +122,22 @@ class MessageProcessor:
         command = self.get_command(message.command)
 
         if message.job_id is None:
-            raise FailureException('Expecting a PlastronJobId header')
+            raise RuntimeError('Expecting a PlastronJobId header')
 
         logger.info(f'Received message to initiate job {message.job_id}')
+        repo = Repository.from_config(self.repo_config)
+        repo.ua_string = f'plastron/{version}',
+        repo.delegated_user = message.args.get('on-behalf-of'),
 
-        args = command.parse_message(message)
-
-        repo_config = command.repo_config(self.repo_config, args)
-
-        repo = Endpoint(
-            url=repo_config['REST_ENDPOINT'],
-            default_path=repo_config.get('RELPATH', '/'),
-            external_url=repo_config.get('REPO_EXTERNAL_URL'),
+        endpoint = Endpoint(
+            url=self.repo_config['REST_ENDPOINT'],
+            default_path=self.repo_config.get('RELPATH', '/'),
+            external_url=self.repo_config.get('REPO_EXTERNAL_URL'),
         )
         # TODO: respect the batch mode flag when getting the authenticator
         client = Client(
-            endpoint=repo,
-            auth=get_authenticator(repo_config),
+            endpoint=endpoint,
+            auth=get_authenticator(self.repo_config),
             ua_string=f'plastron/{version}',
             on_behalf_of=message.args.get('on-behalf-of'),
         )
@@ -158,7 +145,7 @@ class MessageProcessor:
         if client.delegated_user is not None:
             logger.info(f'Running repository operations on behalf of {client.delegated_user}')
 
-        for status in (command.execute(client, args) or []):
+        for status in command(repo.client, message):
             progress_topic.send(PlastronMessage(job_id=message.job_id, body=status))
 
         logger.info(f'Job {message.job_id} complete')

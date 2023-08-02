@@ -7,7 +7,7 @@ from coilmq.server.socket_server import StompServer
 from coilmq.store.memory import MemoryQueue
 from coilmq.topic import TopicManager
 
-from plastron.daemon import STOMPDaemon
+from plastron.stomp.daemon import STOMPDaemon
 
 
 @pytest.fixture()

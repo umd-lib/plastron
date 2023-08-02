@@ -24,8 +24,6 @@ dependencies = [
     'PyYAML>3.12',
     'rdflib',
     'requests',
-    'stomp.py',
-    'watchdog==0.10.3',
     'pysolr',
 ]
 requires-python = '>=3.8'
@@ -33,7 +31,6 @@ requires-python = '>=3.8'
 [project.optional-dependencies]
 dev = ['pycodestyle']
 test = [
-    'CoilMQ',
     'flask',
     'freezegun',
     'httpretty',

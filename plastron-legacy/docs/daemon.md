@@ -1,7 +1,7 @@
 # Plastron Server
 
 The Plastron server (a.k.a., "plastrond") is implemented by the
-[plastron.daemon](../src/plastron/daemon.py) module, and there is a 
+[plastron.daemon](../../plastron-stomp/src/plastron/stomp/daemon.py) module, and there is a 
 *plastrond* entry point provided by [pyproject.toml](../pyproject.toml).
 
 ## Running with Python

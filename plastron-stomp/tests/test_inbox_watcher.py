@@ -1,12 +1,11 @@
+import os
+import tempfile
+import time
+from contextlib import contextmanager
+from unittest.mock import patch
+
 from plastron.stomp.inbox_watcher import InboxWatcher
 from plastron.stomp.messages import MessageBox, PlastronMessage
-
-from unittest.mock import patch
-import tempfile
-import os
-import time
-
-from contextlib import contextmanager
 
 
 def test_new_file_in_inbox():

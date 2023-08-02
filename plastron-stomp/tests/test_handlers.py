@@ -1,9 +1,9 @@
+from concurrent.futures import Future
 from typing import cast, Dict, Type
 from unittest import TestCase
 from unittest.mock import Mock
-from concurrent.futures import Future
 
-from plastron.stomp import Destination
+from plastron.stomp.broker import Destination
 from plastron.stomp.handlers import AsynchronousResponseHandler
 from plastron.stomp.listeners import CommandListener
 from plastron.stomp.messages import MessageBox, PlastronCommandMessage, PlastronErrorMessage, PlastronMessage

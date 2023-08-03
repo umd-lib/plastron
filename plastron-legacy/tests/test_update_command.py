@@ -60,7 +60,7 @@ def test_parse_message(message_body):
     assert (namespace.use_transactions is False)  # Opposite of value in header
 
 
-def test_parse_message_model(message_body, repo):
+def test_parse_message_model(message_body, endpoint):
     headers = {
         'PlastronJobId': 'test',
         'PlastronCommand': 'update',
@@ -71,13 +71,13 @@ def test_parse_message_model(message_body, repo):
 
     assert namespace.model == 'Letter'
 
-    mock_client = MagicMock(spec=Client, repo=repo)
+    mock_client = MagicMock(spec=Client, endpoint=endpoint)
     cmd = Command()
     cmd.execute(mock_client, namespace)
     assert cmd.model_class is Letter
 
 
-def test_model_class_loaded_on_each_execution(message_body, repo):
+def test_model_class_loaded_on_each_execution(message_body, endpoint):
     """
     Testing the case where we have a single command instance, but execute() is
     run multiple times with different content models. The expected behavior is
@@ -86,7 +86,7 @@ def test_model_class_loaded_on_each_execution(message_body, repo):
     See https://umd-dit.atlassian.net/browse/LIBFCREPO-1121
     """
     cmd = Command()
-    mock_client = MagicMock(spec=Client, repo=repo)
+    mock_client = MagicMock(spec=Client, endpoint=endpoint)
 
     headers = {
         'PlastronJobId': 'test',

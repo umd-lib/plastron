@@ -2,13 +2,15 @@
 
 import logging
 import os
+
 import yaml
 from rdflib import Graph
-from plastron import pcdm, rdf
-from plastron.authority import create_authority
+
 from plastron.core.exceptions import ConfigError, DataReadException
 from plastron.namespaces import dcterms
-from plastron.pcdm import Page, get_file_object
+from plastron.rdf import pcdm, rdf
+from plastron.rdf.authority import create_authority
+from plastron.rdf.pcdm import get_file_object, Page
 
 
 # ============================================================================
@@ -36,7 +38,7 @@ class Batch:
         if os.path.isfile(file_index):
             self.logger.info('Found file index in {0}'.format(file_index))
             with open(file_index, 'r') as index:
-                self.all_files = yaml.load(index)
+                self.all_files = yaml.safe_load(index)
         else:
             # Generate index of all files in the data path
             # maps the basename to a full path

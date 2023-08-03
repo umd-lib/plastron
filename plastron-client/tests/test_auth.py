@@ -5,7 +5,7 @@ from requests import Session, Request
 from requests.auth import HTTPBasicAuth
 from requests_jwtauth import HTTPBearerAuth, JWTSecretAuth
 
-from plastron.client import ClientCertAuth, get_authenticator
+from plastron.client.auth import ClientCertAuth, get_authenticator
 
 
 @pytest.fixture

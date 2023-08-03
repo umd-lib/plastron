@@ -1,25 +1,24 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 import importlib.metadata
-
 import logging
 import logging.config
 import os
 import sys
-import yaml
-import pysolr
-
-
 from argparse import ArgumentParser, FileType
 from datetime import datetime
 from importlib import import_module
 from pkgutil import iter_modules
 
+import pysolr
+import yaml
+
 from plastron import commands
-from plastron.client import Repository, Client, get_authenticator
+from plastron.client import Endpoint, Client
+from plastron.client.auth import get_authenticator
 from plastron.core.exceptions import FailureException, ConfigError
-from plastron.stomp import Broker
 from plastron.core.util import envsubst, DEFAULT_LOGGING_OPTIONS
+from plastron.stomp import Broker
 
 logger = logging.getLogger(__name__)
 now = datetime.utcnow().strftime('%Y%m%d%H%M%S')
@@ -125,14 +124,14 @@ def main():
         command_config = {}
 
     try:
-        repo = Repository(
-            endpoint=repo_config['REST_ENDPOINT'],
+        repo = Endpoint(
+            url=repo_config['REST_ENDPOINT'],
             default_path=repo_config.get('RELPATH', '/'),
             external_url=repo_config.get('REPO_EXTERNAL_URL'),
         )
         # TODO: respect the batch mode flag when getting the authenticator
         client = Client(
-            repo=repo,
+            endpoint=repo,
             auth=get_authenticator(repo_config),
             ua_string=f'plastron/{version}',
             on_behalf_of=args.delegated_user,
@@ -178,7 +177,7 @@ def main():
             raise FailureException(f'Unable to execute command {args.cmd_name}')
 
         command = command_module.Command(config=command_config.get(args.cmd_name.upper()))
-        command.repo = client
+        command.endpoint = client
         command.broker = broker
 
         # The SOLR configuration would only be necessary for the verify command, so it can be optional

@@ -5,18 +5,19 @@ import requests
 from requests import Session, Request
 from requests_jwtauth import HTTPBearerAuth
 
-from plastron.client import Repository, Client, random_slug, ResourceURI, ClientCertAuth, RepositoryStructure, \
-    FlatCreator, HierarchicalCreator, RESTAPIException
+from plastron.client import Endpoint, Client, random_slug, ResourceURI, RepositoryStructure, \
+    FlatCreator, HierarchicalCreator, ClientError
+from plastron.client.auth import ClientCertAuth
 
 
 @pytest.fixture()
-def repo():
-    return Repository(endpoint='http://example.com/repo')
+def endpoint():
+    return Endpoint(url='http://example.com/repo')
 
 
 @pytest.fixture()
-def client(repo):
-    return Client(repo=repo)
+def client(endpoint):
+    return Client(endpoint=endpoint)
 
 
 @pytest.fixture()
@@ -64,7 +65,7 @@ class MockDescribedbyHeaderResponse(MockOKResponse):
 
 def test_get_description_uri_failed_response(monkeypatch, client):
     monkeypatch.setattr(requests.Session, 'request', mock_request(MockNotFoundResponse()))
-    with pytest.raises(RESTAPIException):
+    with pytest.raises(ClientError):
         client.get_description_uri('http://example.com/repo/foo')
 
 
@@ -223,36 +224,36 @@ def test_undo_forward_when_forwarding(repo_forwarded_config):
 """
 
 
-def test_repository_auth(repo):
-    client = Client(repo=repo, auth=HTTPBearerAuth('abcd-1234'))
+def test_repository_auth(endpoint):
+    client = Client(endpoint=endpoint, auth=HTTPBearerAuth('abcd-1234'))
 
     assert isinstance(client.session.auth, HTTPBearerAuth)
     assert client.session.auth.token == 'abcd-1234'
 
 
 def test_repository_contains_uri():
-    repo = Repository(endpoint='http://localhost:8080/repo', external_url='http://example.com/repo')
+    repo = Endpoint(url='http://localhost:8080/repo', external_url='http://example.com/repo')
 
     assert repo.contains('') is False
     assert repo.contains('/not_in_repo') is False
-    assert repo.contains(repo.endpoint) is True
-    assert repo.contains(repo.endpoint + '/foo/bar') is True
+    assert repo.contains(repo.url) is True
+    assert repo.contains(repo.url + '/foo/bar') is True
     assert repo.contains(repo.external_url) is True
     assert repo.contains(repo.external_url + '/foo/bar') is True
 
 
 def test_repository_contains_uri_without_repo_external_url():
-    repo = Repository(endpoint='http://localhost:8080/repo')
+    repo = Endpoint(url='http://localhost:8080/repo')
 
     assert repo.contains('') is False
     assert repo.contains('/not_in_repo') is False
-    assert repo.contains(repo.endpoint) is True
-    assert repo.contains(repo.endpoint + '/foo/bar') is True
+    assert repo.contains(repo.url) is True
+    assert repo.contains(repo.url + '/foo/bar') is True
 
 
 def test_repository_repo_path():
     # Without REPO_EXTERNAL_URL
-    repo = Repository(endpoint='http://localhost:8080/repo')
+    repo = Endpoint(url='http://localhost:8080/repo')
 
     assert repo.repo_path(None) is None
     assert '' == repo.repo_path('')
@@ -261,7 +262,7 @@ def test_repository_repo_path():
     assert 'http://example.com/foo/bar' == repo.repo_path('http://example.com/foo/bar')
 
     # URLs starting with REST endpoint should have endpoint prefix removed
-    resource_uri = repo.endpoint + '/foo/bar'
+    resource_uri = repo.url + '/foo/bar'
     assert '/foo/bar' == repo.repo_path(resource_uri)
 
     # With REPO_EXTERNAL_URL
@@ -299,19 +300,19 @@ def test_client_cert_auth():
     assert r.cert == ('client-cert', 'abcd-1234')
 
 
-def test_client_ua_string(repo):
-    client = Client(repo=repo, ua_string='test/1.2.3')
+def test_client_ua_string(endpoint):
+    client = Client(endpoint=endpoint, ua_string='test/1.2.3')
     assert client.session.headers['User-Agent'] == 'test/1.2.3'
 
 
-def test_client_delegated_user(repo):
-    client = Client(repo=repo, on_behalf_of='josef_k')
+def test_client_delegated_user(endpoint):
+    client = Client(endpoint=endpoint, on_behalf_of='josef_k')
     assert client.session.headers['On-Behalf-Of'] == 'josef_k'
 
 
 def test_repo_external_url():
-    repo = Repository(endpoint='http://localhost:8080/repo', external_url='https://example.com/repo')
-    client = Client(repo=repo)
+    repo = Endpoint(url='http://localhost:8080/repo', external_url='https://example.com/repo')
+    client = Client(endpoint=repo)
     assert client.session.headers['X-Forwarded-Host'] == 'example.com'
     assert client.session.headers['X-Forwarded-Proto'] == 'https'
 
@@ -323,18 +324,18 @@ def test_repo_external_url():
         (RepositoryStructure.HIERARCHICAL, HierarchicalCreator),
     ]
 )
-def test_creator_structure(repo, config_value, creator_type):
-    client = Client(repo=repo, structure=config_value)
+def test_creator_structure(endpoint, config_value, creator_type):
+    client = Client(endpoint=endpoint, structure=config_value)
     assert isinstance(client.creator, creator_type)
 
 
-def test_creator_structure_invalid(repo):
+def test_creator_structure_invalid(endpoint):
     with pytest.raises(RuntimeError):
         # noinspection PyTypeChecker
-        Client(repo=repo, structure='foo')
+        Client(endpoint=endpoint, structure='foo')
 
 
 def test_get_graph_not_found(monkeypatch, client):
     monkeypatch.setattr(requests.Session, 'request', mock_request(MockNotFoundResponse()))
-    with pytest.raises(RESTAPIException):
+    with pytest.raises(ClientError):
         client.get_graph('http://localhost:9999/fcrepo/rest/123')

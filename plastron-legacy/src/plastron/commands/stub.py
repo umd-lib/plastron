@@ -6,9 +6,9 @@ from typing import Optional
 
 from rdflib import URIRef
 
-from plastron.client import Client, TransactionClient
+from plastron.client import Client, TransactionClient, ClientError
 from plastron.commands import BaseCommand
-from plastron.core.exceptions import FailureException, RESTAPIException
+from plastron.core.exceptions import FailureException
 from plastron.files import BinarySource, HTTPFileSource, LocalFileSource
 from plastron.models import Item
 from plastron.rdf.pcdm import File
@@ -160,7 +160,7 @@ class Command(BaseCommand):
                         row[args.binary_column] = file.uri
                         csv_writer.writerow(row)
                         txn_client.commit()
-                    except (RESTAPIException, FileNotFoundError) as e:
+                    except (ClientError, FileNotFoundError) as e:
                         # if anything fails during item creation or committing the transaction
                         # attempt to roll back the current transaction
                         # failures here will be caught by the main loop's exception handler
@@ -172,7 +172,7 @@ class Command(BaseCommand):
                         txn_client.rollback()
                         raise
 
-            except RESTAPIException as e:
+            except ClientError as e:
                 raise FailureException(f'Transaction rollback failed: {e}') from e
 
         if output_file is not sys.stdout:

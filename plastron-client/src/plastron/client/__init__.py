@@ -5,14 +5,15 @@ from base64 import urlsafe_b64encode
 from collections import namedtuple
 from contextlib import contextmanager
 from enum import Enum
-from typing import Mapping, Any, Optional, List, Callable, Tuple
+from http import HTTPStatus
+from pathlib import Path
+from typing import Any, Optional, List, Callable, Tuple
 
 import requests
 from rdflib import Graph, URIRef
-from requests import PreparedRequest, Response
-from requests.auth import AuthBase, HTTPBasicAuth
+from requests import Response
+from requests.auth import AuthBase
 from requests.exceptions import ConnectionError
-from requests_jwtauth import HTTPBearerAuth, JWTSecretAuth
 from urlobject import URLObject
 
 logger = logging.getLogger(__name__)
@@ -24,6 +25,25 @@ def random_slug(length=6):
     return urlsafe_b64encode(os.urandom(length)).decode()
 
 
+def paths_to_create(client: 'Client', path: Path) -> List[Path]:
+    if client.path_exists(str(path)):
+        return []
+    to_create = [path]
+    for ancestor in path.parents:
+        if not client.path_exists(str(ancestor)):
+            to_create.insert(0, ancestor)
+    return to_create
+
+
+def serialize(graph: Graph, **kwargs):
+    logger.info('Including properties:')
+    for _, p, o in graph:
+        pred = p.n3(namespace_manager=graph.namespace_manager)
+        obj = o.n3(namespace_manager=graph.namespace_manager)
+        logger.info(f'  {pred} {obj}')
+    return graph.serialize(**kwargs)
+
+
 # lightweight representation of a resource URI and URI of its description
 # for RDFSources, in general the uri and description_uri will be the same
 class ResourceURI(namedtuple('Resource', ['uri', 'description_uri'])):
@@ -33,12 +53,15 @@ class ResourceURI(namedtuple('Resource', ['uri', 'description_uri'])):
         return self.uri
 
 
-class RESTAPIException(Exception):
-    def __init__(self, response):
+class ClientError(Exception):
+    def __init__(self, response: Response, *args):
+        super().__init__(*args)
         self.response = response
+        self.status_code = self.response.status_code
+        self.reason = self.response.reason or HTTPStatus(self.status_code).phrase
 
     def __str__(self):
-        return f'{self.response.status_code} {self.response.reason}'
+        return f'{self.status_code} {self.reason}'
 
 
 class FlatCreator:
@@ -104,45 +127,9 @@ class HierarchicalCreator:
         self.client.create_all(item.path + '/a', item.annotations, name_function=random_slug)
 
 
-class ClientCertAuth(AuthBase):
-    def __init__(self, cert: str, key: str):
-        self.cert = cert
-        self.key = key
-
-    def __call__(self, request: PreparedRequest) -> PreparedRequest:
-        request.cert = (self.cert, self.key)
-        return request
-
-
-def get_authenticator(config: Mapping[str, Any]) -> Optional[AuthBase]:
-    if 'AUTH_TOKEN' in config:
-        return HTTPBearerAuth(token=config['AUTH_TOKEN'])
-    elif 'JWT_SECRET' in config:
-        return JWTSecretAuth(
-            secret=config['JWT_SECRET'],
-            claims={
-                'sub': 'plastron',
-                'iss': 'plastron',
-                'role': 'fedoraAdmin'
-            }
-        )
-    elif 'CLIENT_CERT' in config and 'CLIENT_KEY' in config:
-        return ClientCertAuth(
-            cert=config['CLIENT_CERT'],
-            key=config['CLIENT_KEY'],
-        )
-    elif 'FEDORA_USER' in config and 'FEDORA_PASSWORD' in config:
-        return HTTPBasicAuth(
-            username=config['FEDORA_USER'],
-            password=config['FEDORA_PASSWORD'],
-        )
-    else:
-        return None
-
-
-class Repository:
-    def __init__(self, endpoint: str, default_path: str = '/', external_url: str = None):
-        self.endpoint = URLObject(endpoint)
+class Endpoint:
+    def __init__(self, url: str, default_path: str = '/', external_url: str = None):
+        self.url = URLObject(url)
 
         # default container path
         self.relpath = default_path
@@ -154,12 +141,15 @@ class Repository:
         else:
             self.external_url: Optional[URLObject] = None
 
+    def __contains__(self, item):
+        return self.contains(item)
+
     def contains(self, uri: str) -> bool:
         """
         Returns True if the given URI string is contained within this
         repository, False otherwise
         """
-        return uri.startswith(self.endpoint) or (self.external_url is not None and uri.startswith(self.external_url))
+        return uri.startswith(self.url) or (self.external_url is not None and uri.startswith(self.external_url))
 
     def repo_path(self, resource_uri: Optional[str]) -> Optional[str]:
         """
@@ -172,14 +162,11 @@ class Repository:
         elif self.external_url:
             return resource_uri.replace(self.external_url, '')
         else:
-            return resource_uri.replace(self.endpoint, '')
+            return resource_uri.replace(self.url, '')
 
     @property
     def transaction_endpoint(self):
-        return os.path.join(self.endpoint, 'fcr:tx')
-
-    def uri(self):
-        return '/'.join([p.strip('/') for p in (self.endpoint, self.relpath)])
+        return os.path.join(self.url, 'fcr:tx')
 
 
 class RepositoryStructure(Enum):
@@ -187,10 +174,36 @@ class RepositoryStructure(Enum):
     HIERARCHICAL = 1
 
 
+class SessionHeaderAttribute:
+    def __init__(self, header_name: str):
+        self.header_name = header_name
+
+    def __set_name__(self, owner, name):
+        self.name = name
+
+    def __get__(self, instance, owner):
+        if instance is None:
+            return self
+        return instance.session.headers.get(self.header_name, None)
+
+    def __set__(self, instance, value):
+        if value is not None:
+            instance.session.headers.update({self.header_name: value})
+
+    def __delete__(self, instance):
+        try:
+            del instance.session.headers[self.header_name]
+        except KeyError:
+            pass
+
+
 class Client:
+    ua_string = SessionHeaderAttribute('User-Agent')
+    delegated_user = SessionHeaderAttribute('On-Behalf-Of')
+
     def __init__(
             self,
-            repo: Repository,
+            endpoint: Endpoint,
             structure: RepositoryStructure = RepositoryStructure.FLAT,
             auth: AuthBase = None,
             server_cert: str = None,
@@ -198,10 +211,8 @@ class Client:
             on_behalf_of: str = None,
             load_binaries: bool = True,
     ):
-        self.repo = repo
+        self.endpoint = endpoint
         self.structure = structure
-        self.ua_string = ua_string
-        self.delegated_user = on_behalf_of
         self.load_binaries = load_binaries
 
         self.session = requests.Session()
@@ -210,14 +221,12 @@ class Client:
             self.session.verify = server_cert
 
         # set session-wide headers
-        if self.ua_string is not None:
-            self.session.headers.update({'User-Agent': self.ua_string})
-        if self.delegated_user is not None:
-            self.session.headers.update({'On-Behalf-Of': self.delegated_user})
-        if self.repo.external_url is not None:
+        self.ua_string = ua_string
+        self.delegated_user = on_behalf_of
+        if self.endpoint.external_url is not None:
             self.session.headers.update({
-                'X-Forwarded-Host': self.repo.external_url.hostname,
-                'X-Forwarded-Proto': self.repo.external_url.scheme,
+                'X-Forwarded-Host': self.endpoint.external_url.hostname,
+                'X-Forwarded-Proto': self.endpoint.external_url.scheme,
             })
 
         # set creator strategy for the repository
@@ -267,7 +276,7 @@ class Client:
         response = self.get(description_uri, headers=headers, stream=True)
         if not response.ok:
             logger.error(f"Unable to get {headers['Accept']} representation of {uri}")
-            raise RESTAPIException(response)
+            raise ClientError(response)
         resource = ResourceURI(uri=uri, description_uri=description_uri)
         text = response.text
         return resource, text
@@ -288,9 +297,9 @@ class Client:
                         yield resource, graph
 
     def get_description_uri(self, uri: str, response: Response = None) -> str:
-        if response:
+        if response is not None:
             if not response.ok:
-                raise RESTAPIException(response)
+                raise ClientError(response)
             try:
                 return response.links['describedby']['url']
             except KeyError:
@@ -301,7 +310,7 @@ class Client:
 
     def is_reachable(self):
         try:
-            response = self.head(self.repo.endpoint)
+            response = self.head(self.endpoint.url)
             return response.status_code == 200
         except requests.exceptions.ConnectionError as e:
             logger.error(str(e))
@@ -309,20 +318,20 @@ class Client:
 
     def test_connection(self):
         # test connection to fcrepo
-        logger.debug(f"Endpoint = {self.repo.endpoint}")
-        logger.debug(f"Default container path = {self.repo.relpath}")
-        logger.info(f"Testing connection to {self.repo.endpoint}")
+        logger.debug(f"Endpoint = {self.endpoint.url}")
+        logger.debug(f"Default container path = {self.endpoint.relpath}")
+        logger.info(f"Testing connection to {self.endpoint.url}")
         if self.is_reachable():
             logger.info("Connection successful.")
         else:
-            raise ConnectionError(f'Unable to connect to {self.repo.endpoint}')
+            raise ConnectionError(f'Unable to connect to {self.endpoint.url}')
 
     def exists(self, uri: str, **kwargs) -> bool:
         response = self.head(uri, **kwargs)
-        return response.status_code == 200
+        return response.status_code == HTTPStatus.OK
 
     def path_exists(self, path: str, **kwargs) -> bool:
-        return self.exists(self.repo.endpoint + path, **kwargs)
+        return self.exists(self.endpoint.url + path, **kwargs)
 
     def get_location(self, response: Response) -> Optional[str]:
         try:
@@ -335,18 +344,61 @@ class Client:
         if url is not None:
             response = self.put(url, **kwargs)
         elif path is not None:
-            response = self.put(self.repo.endpoint + path, **kwargs)
+            response = self.put(self.endpoint.url + path, **kwargs)
         else:
-            container_uri = self.repo.endpoint + (container_path or self.repo.relpath)
+            container_uri = self.endpoint.url + (container_path or self.endpoint.relpath)
             response = self.post(container_uri, **kwargs)
 
-        if response.status_code == 201:
+        if response.status_code == HTTPStatus.CREATED:
             created_uri = self.get_location(response) or url
             description_uri = self.get_description_uri(created_uri, response)
 
             return ResourceURI(created_uri, description_uri)
         else:
-            raise RESTAPIException(response)
+            raise ClientError(response)
+
+    def create_at_path(self, target_path: Path, graph: Graph = None):
+        all_paths = paths_to_create(self, target_path)
+
+        if len(all_paths) == 0:
+            logger.info(f'{target_path} already exists')
+            return
+
+        resource = None
+        for path in all_paths:
+            logger.info(f'Creating {path}')
+            if path == target_path and graph:
+                resource = self.create(
+                    path=str(path),
+                    headers={
+                        'Content-Type': 'text/turtle'
+                    },
+                    data=serialize(graph, format='turtle')
+                )
+            else:
+                resource = self.create(path=str(path))
+
+            logger.info(f'Created {resource}')
+
+        return resource
+
+    def create_in_container(self, container_path: Path, graph: Graph = None):
+        if not self.path_exists(str(container_path)):
+            logger.error(f'Container path "{container_path}" not found')
+            return
+        if graph:
+            resource = self.create(
+                container_path=str(container_path),
+                headers={
+                    'Content-Type': 'text/turtle'
+                },
+                data=serialize(graph, format='turtle')
+            )
+        else:
+            resource = self.create(container_path=str(container_path))
+
+        logger.info(f'Created {resource}')
+        return resource
 
     def create_all(self, container_path: str, resources: List[Any], name_function: Callable = None):
         # ensure the container exists
@@ -401,16 +453,16 @@ class Client:
     def transaction(self, keep_alive: int = 90):
         logger.info('Creating transaction')
         try:
-            response = self.post(self.repo.transaction_endpoint)
+            response = self.post(self.endpoint.transaction_endpoint)
         except ConnectionError as e:
             raise TransactionError(f'Failed to create transaction: {e}') from e
-        if response.status_code == 201:
+        if response.status_code == HTTPStatus.CREATED:
             txn_client = TransactionClient.from_client(self)
             txn_client.begin(uri=response.headers['Location'], keep_alive=keep_alive)
             logger.info(f'Created transaction at {txn_client.transaction}')
             try:
                 yield txn_client
-            except RESTAPIException:
+            except ClientError:
                 txn_client.rollback()
             else:
                 txn_client.commit()
@@ -458,7 +510,7 @@ class TransactionClient(Client):
     @classmethod
     def from_client(cls, client: Client):
         return cls(
-            repo=client.repo,
+            endpoint=client.endpoint,
             structure=client.structure,
             auth=client.session.auth,
             server_cert=client.session.verify,
@@ -467,8 +519,8 @@ class TransactionClient(Client):
             load_binaries=client.load_binaries,
         )
 
-    def __init__(self, repo: Repository, **kwargs):
-        super().__init__(repo, **kwargs)
+    def __init__(self, endpoint: Endpoint, **kwargs):
+        super().__init__(endpoint, **kwargs)
         self.transaction = None
 
     def request(self, method, url, **kwargs):
@@ -498,12 +550,12 @@ class TransactionClient(Client):
     def insert_transaction_uri(self, uri: str) -> str:
         if uri.startswith(self.transaction.uri):
             return uri
-        return self.transaction.uri + self.repo.repo_path(uri)
+        return self.transaction.uri + self.endpoint.repo_path(uri)
 
     def remove_transaction_uri(self, uri: str) -> str:
         if uri.startswith(self.transaction.uri):
             repo_path = uri[len(self.transaction.uri):]
-            return self.repo.endpoint + repo_path
+            return self.endpoint.url + repo_path
         else:
             return uri
 
@@ -532,7 +584,7 @@ class TransactionClient(Client):
             response = self.post(self.transaction.maintenance_uri)
         except ConnectionError as e:
             raise TransactionError(f'Failed to maintain transaction {self.transaction}: {e}') from e
-        if response.status_code == 204:
+        if response.status_code == HTTPStatus.NO_CONTENT:
             logger.info(f'Transaction {self} is active until {response.headers["Expires"]}')
         else:
             raise TransactionError(
@@ -549,7 +601,7 @@ class TransactionClient(Client):
             response = self.post(self.transaction.commit_uri)
         except ConnectionError as e:
             raise TransactionError(f'Failed to commit transaction {self.transaction}: {e}') from e
-        if response.status_code == 204:
+        if response.status_code == HTTPStatus.NO_CONTENT:
             logger.info(f'Committed transaction {self.transaction}')
             return response
         else:
@@ -567,7 +619,7 @@ class TransactionClient(Client):
             response = self.post(self.transaction.rollback_uri)
         except ConnectionError as e:
             raise TransactionError(f'Failed to roll back transaction {self}: {e}') from e
-        if response.status_code == 204:
+        if response.status_code == HTTPStatus.NO_CONTENT:
             logger.info(f'Rolled back transaction {self.transaction}')
             return response
         else:

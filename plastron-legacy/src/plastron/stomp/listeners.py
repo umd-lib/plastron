@@ -5,7 +5,8 @@ from concurrent.futures import ThreadPoolExecutor
 
 from stomp.listener import ConnectionListener
 
-from plastron.client import Repository, Client, get_authenticator
+from plastron.client import Endpoint, Client
+from plastron.client.auth import get_authenticator
 from plastron.commands import get_command_class
 from plastron.core.exceptions import FailureException
 from plastron.stomp import Destination
@@ -141,14 +142,14 @@ class MessageProcessor:
 
         repo_config = command.repo_config(self.repo_config, args)
 
-        repo = Repository(
-            endpoint=repo_config['REST_ENDPOINT'],
+        repo = Endpoint(
+            url=repo_config['REST_ENDPOINT'],
             default_path=repo_config.get('RELPATH', '/'),
             external_url=repo_config.get('REPO_EXTERNAL_URL'),
         )
         # TODO: respect the batch mode flag when getting the authenticator
         client = Client(
-            repo=repo,
+            endpoint=repo,
             auth=get_authenticator(repo_config),
             ua_string=f'plastron/{version}',
             on_behalf_of=message.args.get('on-behalf-of'),

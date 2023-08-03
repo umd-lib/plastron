@@ -3,8 +3,9 @@
 import csv
 import logging
 import os
-from plastron import pcdm
+
 from plastron.models.newspaper import Reel, Page
+from plastron.rdf import pcdm
 
 
 class Batch:
@@ -47,6 +48,6 @@ class BatchItem:
         with open(self.path, 'r') as f:
             reader = csv.DictReader(f)
             for row in reader:
-                reel.add_member(Page.from_repository(self.batch.repo, row['uri']))
+                reel.add_member(Page.from_repository(self.batch.endpoint, row['uri']))
 
         return reel

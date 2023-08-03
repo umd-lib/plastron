@@ -14,8 +14,9 @@ from bagit import make_bag
 from paramiko import SFTPClient, SSHException
 from requests import ConnectionError
 
+from plastron.client import ClientError
 from plastron.commands import BaseCommand
-from plastron.core.exceptions import DataReadException, FailureException, RESTAPIException
+from plastron.core.exceptions import DataReadException, FailureException
 from plastron.models import Item
 from plastron.namespaces import get_manager
 from plastron.serializers.__init__ import EmptyItemListError, SERIALIZER_CLASSES, detect_resource_class
@@ -196,7 +197,7 @@ class Command(BaseCommand):
                 # log the failure, but continue to attempt to export the rest of the URIs
                 logger.error(f'Export of {uri} failed: {e}')
                 errors += 1
-            except (RESTAPIException, ConnectionError) as e:
+            except (ClientError, ConnectionError) as e:
                 # log the failure, but continue to attempt to export the rest of the URIs
                 logger.error(f'Unable to retrieve {uri}: {e}')
                 errors += 1

@@ -4,7 +4,7 @@ from uuid import uuid4
 
 from rdflib import Graph, URIRef
 
-from plastron.client import ResourceURI, Client, RESTAPIException
+from plastron.client import ResourceURI, Client, ClientError
 from plastron.rdf import rdf
 
 
@@ -19,7 +19,7 @@ class Resource(rdf.Resource):
         graph = client.get_graph(uri, include_server_managed=include_server_managed)
         obj = cls.from_graph(graph, subject=uri)
         obj.uri = uri
-        obj.path = obj.uri[len(client.repo.endpoint):]
+        obj.path = obj.uri[len(client.endpoint.url):]
 
         # get the description URI
         obj.resource = ResourceURI(uri, client.get_description_uri(uri))
@@ -73,18 +73,18 @@ class Resource(rdf.Resource):
                 #     parsed_path = parsed_resource_uri.path
                 #     self.path = parsed_path[len(client.endpoint_base_path):]
                 # else:
-                self.path = self.resource.uri[len(client.repo.endpoint):]
+                self.path = self.resource.uri[len(client.endpoint.url):]
 
                 self.created = True
                 # TODO: get this from the response headers
                 self.creation_timestamp = datetime.now()
                 # TODO: get the fedora:parent
-                self.container_path = container_path or client.repo.relpath
+                self.container_path = container_path or client.endpoint.relpath
                 self.logger.info(f"Created {self}")
                 self.uuid = str(self.uri).rsplit('/', 1)[-1]
                 self.logger.info(f'URI: {self.uri}')
                 self.create_fragments()
-            except RESTAPIException as e:
+            except ClientError as e:
                 self.logger.error(f"Failed to create {self}: {e}")
                 raise
         else:
@@ -112,7 +112,7 @@ class Resource(rdf.Resource):
             self.logger.error(f"Failed to update {self}")
             self.logger.error(sparql_update)
             self.logger.error(response.text)
-            raise RESTAPIException(response)
+            raise ClientError(response)
 
     # update existing repo object with SPARQL update
     def update(self, client, recursive=True):
@@ -132,7 +132,7 @@ class Resource(rdf.Resource):
 
     # check for the existence of a local object in the repository
     def exists_in_repo(self, client: Client):
-        if str(self.uri).startswith(client.repo.endpoint):
+        if str(self.uri).startswith(client.endpoint.url):
             return client.exists(str(self.uri))
         else:
             return False

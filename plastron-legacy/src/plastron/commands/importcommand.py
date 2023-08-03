@@ -13,9 +13,9 @@ from uuid import uuid4
 from bs4 import BeautifulSoup
 from rdflib import Graph, Literal, URIRef
 
-from plastron.client import Client
+from plastron.client import Client, ClientError
 from plastron.commands import BaseCommand
-from plastron.core.exceptions import ConfigError, FailureException, RESTAPIException
+from plastron.core.exceptions import ConfigError, FailureException
 from plastron.files import HTTPFileSource, LocalFileSource, RemoteFileSource, ZipFileSource
 from plastron.jobs import ImportJob, ImportedItemStatus, JobError, ModelClassNotFoundError, build_lookup_index
 from plastron.namespaces import get_manager, prov, sc
@@ -543,7 +543,7 @@ class Command(BaseCommand):
                 'member_of': args.member_of,
                 # Use "repo.relpath" as default for "container",
                 # but allow it to be overridden by args
-                'container': args.container or client.repo.relpath,
+                'container': args.container or client.endpoint.relpath,
                 'binaries_location': args.binaries_location
             })
 
@@ -758,7 +758,7 @@ class Command(BaseCommand):
             logger.debug(sparql_update)
             try:
                 item.patch(client, sparql_update)
-            except RESTAPIException as e:
+            except ClientError as e:
                 raise FailureException(f'Updating item failed: {e}') from e
 
             job.complete(item, row.line_reference, ImportedItemStatus.MODIFIED)

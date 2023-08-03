@@ -3,14 +3,16 @@
 
 import csv
 import logging
+import os
+
 import lxml
 from lxml.etree import parse, XMLSyntaxError
-import os
-from plastron import pcdm
+
 from plastron.core.exceptions import DataReadException
-from plastron.namespaces import dcmitype, ndnp
-from plastron.files.__init__ import LocalFileSource
+from plastron.files import LocalFileSource
 from plastron.models.newspaper import Article, Issue, IssueMetadata, MetadataFile, Page
+from plastron.namespaces import dcmitype, ndnp
+from plastron.rdf import pcdm
 
 # alias the rdflib Namespace
 ns = ndnp

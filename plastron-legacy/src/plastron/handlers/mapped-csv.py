@@ -1,13 +1,15 @@
 import csv
 import logging
 import os
+from collections import OrderedDict
+
 import yaml
 from rdflib import Literal, URIRef
 from rdflib.util import from_n3
-from plastron import pcdm, namespaces, rdf
-from plastron.files.__init__ import LocalFileSource, RemoteFileSource
+
 from plastron.core.exceptions import ConfigError
-from collections import OrderedDict
+from plastron.files import LocalFileSource, RemoteFileSource
+from plastron.rdf import pcdm, namespaces, rdf
 
 nsm = namespaces.get_manager()
 

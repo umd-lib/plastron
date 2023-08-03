@@ -6,8 +6,12 @@ import pytest
 from flask import url_for
 from http_server_mock import HttpServerMock
 
-from plastron.client import Client
-from plastron.commands import create
+from plastron.client import Client, Endpoint
+
+
+@pytest.fixture
+def client():
+    return Client(endpoint=Endpoint(url='http://localhost:9999'))
 
 
 @pytest.fixture
@@ -45,33 +49,27 @@ def repo_app():
 
 
 def test_create_at_path(client: Client, repo_app):
-    cmd = create.Command()
-    cmd.repo = client
     with repo_app.run('localhost', 9999):
-        assert not cmd.repo.path_exists('/foo')
-        cmd.create_at_path(Path('/foo'))
-        assert cmd.repo.path_exists('/foo')
+        assert not client.path_exists('/foo')
+        client.create_at_path(Path('/foo'))
+        assert client.path_exists('/foo')
 
 
 def test_create_at_path_nested(client: Client, repo_app):
-    cmd = create.Command()
-    cmd.repo = client
     with repo_app.run('localhost', 9999):
-        assert not cmd.repo.path_exists('/foo')
-        assert not cmd.repo.path_exists('/foo/bar')
-        assert not cmd.repo.path_exists('/foo/bar/baz')
-        cmd.create_at_path(Path('/foo/bar/baz'))
-        assert cmd.repo.path_exists('/foo')
-        assert cmd.repo.path_exists('/foo/bar')
-        assert cmd.repo.path_exists('/foo/bar/baz')
+        assert not client.path_exists('/foo')
+        assert not client.path_exists('/foo/bar')
+        assert not client.path_exists('/foo/bar/baz')
+        client.create_at_path(Path('/foo/bar/baz'))
+        assert client.path_exists('/foo')
+        assert client.path_exists('/foo/bar')
+        assert client.path_exists('/foo/bar/baz')
 
 
 def test_create_in_container(client: Client, repo_app):
-    cmd = create.Command()
-    cmd.repo = client
     with repo_app.run('localhost', 9999):
-        cmd.create_at_path(Path('/foo'))
-        assert cmd.repo.path_exists('/foo')
-        resource = cmd.create_in_container(Path('/foo'))
+        client.create_at_path(Path('/foo'))
+        assert client.path_exists('/foo')
+        resource = client.create_in_container(Path('/foo'))
         assert resource.uri
         assert re.match('http://localhost:9999/foo/.+', str(resource.uri))

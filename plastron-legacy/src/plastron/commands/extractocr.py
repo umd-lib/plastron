@@ -1,10 +1,11 @@
 import logging
 import sys
 from datetime import datetime
-from plastron.core import util
-from plastron.client import Client, TransactionClient
+
+from plastron.client import Client, TransactionClient, ClientError
 from plastron.commands import BaseCommand
-from plastron.core.exceptions import RESTAPIException, DataReadException, FailureException
+from plastron.core import util
+from plastron.core.exceptions import DataReadException, FailureException
 from plastron.models.newspaper import Page
 
 logger = logging.getLogger(__name__)
@@ -59,7 +60,7 @@ class Command(BaseCommand):
 
             try:
                 is_extracted = extract(client, uri)
-            except RESTAPIException:
+            except ClientError:
                 logger.error(
                     "Unable to commit or rollback transaction, aborting"
                 )
@@ -89,7 +90,7 @@ def extract(client: Client, uri):
             txn_client.commit()
             return True
 
-        except (RESTAPIException, DataReadException) as e:
+        except (ClientError, DataReadException) as e:
             # if anything fails during item creation or committing the transaction
             # attempt to roll back the current transaction
             # failures here will be caught by the main loop's exception handler

@@ -7,9 +7,9 @@ from datetime import datetime
 from importlib import import_module
 from time import sleep
 
-from plastron.client import Client, TransactionClient
+from plastron.client import Client, TransactionClient, ClientError
 from plastron.commands import BaseCommand
-from plastron.core.exceptions import ConfigError, DataReadException, RESTAPIException, FailureException
+from plastron.core.exceptions import ConfigError, DataReadException, FailureException
 from plastron.core.util import ItemLog
 
 logger = logging.getLogger(__name__)
@@ -170,7 +170,7 @@ class Command(BaseCommand):
                     is_loaded = load_item(
                         client, item, args, extra=batch_config.extra
                     )
-                except RESTAPIException:
+                except ClientError:
                     logger.error(
                         "Unable to commit or rollback transaction, aborting"
                     )
@@ -257,7 +257,7 @@ def load_item(client: Client, batch_item, args, extra=None):
                 item.post_creation_hook()
                 return True
 
-            except (RESTAPIException, FileNotFoundError) as e:
+            except (ClientError, FileNotFoundError) as e:
                 # if anything fails during item creation or committing the transaction
                 # attempt to roll back the current transaction
                 # failures here will be caught by the main loop's exception handler
@@ -273,7 +273,7 @@ def load_item(client: Client, batch_item, args, extra=None):
         try:
             load_item_internal(client, item, args, extra)
             return True
-        except (RESTAPIException, FileNotFoundError) as e:
+        except (ClientError, FileNotFoundError) as e:
             logger.error("Item creation failed: {0}".format(e))
             logger.warning('Continuing load.')
         except KeyboardInterrupt as e:

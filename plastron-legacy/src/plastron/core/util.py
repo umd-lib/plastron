@@ -8,7 +8,7 @@ from datetime import datetime
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 
-from plastron.client import Client, TransactionClient, RESTAPIException
+from plastron.client import Client, TransactionClient, ClientError
 
 DEFAULT_LOGGING_OPTIONS = {
     'version': 1,
@@ -229,10 +229,10 @@ class ResourceList:
                 yield uri
 
     def get_resources(self, client: Client, traverse=None):
-        repo = client.repo
+        repo = client.endpoint
         for uri in self.get_uris():
             if not repo.contains(uri):
-                logger.warning(f'Resource {uri} is not contained within the repository {repo.endpoint}')
+                logger.warning(f'Resource {uri} is not contained within the repository {repo.url}')
                 continue
             for resource, graph in client.recursive_get(uri, traverse=traverse):
                 yield resource, graph
@@ -255,7 +255,7 @@ class ResourceList:
                 for resource, graph in self.get_resources(client=txn_client, traverse=traverse):
                     try:
                         method(resource, graph)
-                    except RESTAPIException as e:
+                    except ClientError as e:
                         logger.error(f'{method.__name__} failed for {resource}: {e}: {e.response.text}')
                         # if anything fails while processing of the list of uris, attempt to
                         # roll back the transaction. Failures here will be caught by the main
@@ -264,7 +264,7 @@ class ResourceList:
                             txn_client.rollback()
                             logger.warning('Transaction rolled back.')
                             return False
-                        except RESTAPIException:
+                        except ClientError:
                             logger.error('Unable to roll back transaction, aborting')
                             raise
                 txn_client.commit()
@@ -275,7 +275,7 @@ class ResourceList:
             for resource, graph in self.get_resources(client=self.client, traverse=traverse):
                 try:
                     method(resource, graph)
-                except RESTAPIException as e:
+                except ClientError as e:
                     logger.error(f'{method.__name__} failed for {resource}: {e}: {e.response.text}')
                     logger.warning(f'Continuing {method.__name__} with next item')
             return True

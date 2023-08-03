@@ -1,8 +1,8 @@
 import logging
 from email.utils import parsedate_to_datetime
 
+from plastron.client import ClientError
 from plastron.commands import BaseCommand
-from plastron.core.exceptions import RESTAPIException
 from plastron.rdf import parse_predicate_list, get_title_string
 from plastron.core.util import ResourceList
 
@@ -83,4 +83,4 @@ class Command(BaseCommand):
                 timestamp = parsedate_to_datetime(response.headers['date']).isoformat('T')
                 self.resources.log_completed(resource.uri, title, timestamp)
             else:
-                raise RESTAPIException(response)
+                raise ClientError(response)

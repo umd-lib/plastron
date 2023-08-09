@@ -33,7 +33,7 @@ class Object(ore.Aggregation):
             page = Object.from_repository(repository, proxy.proxy_for[0])
             for file_uri in page.files:
                 file = File.from_repository(repository, file_uri)
-                graph = repository.get_graph(file_uri)
+                _, graph = repository.get_graph(file_uri)
                 file.read(graph)
                 yield file
 

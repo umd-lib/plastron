@@ -16,7 +16,7 @@ class Resource(rdf.Resource):
 
     @classmethod
     def from_repository(cls, client: Client, uri, include_server_managed=True):
-        graph = client.get_graph(uri, include_server_managed=include_server_managed)
+        _, graph = client.get_graph(uri, include_server_managed=include_server_managed)
         obj = cls.from_graph(graph, subject=uri)
         obj.uri = uri
         obj.path = obj.uri[len(client.endpoint.url):]
@@ -53,7 +53,7 @@ class Resource(rdf.Resource):
             return repr(self)
 
     def load(self, repository: Client):
-        return self.read(repository.get_graph(self.uri))
+        return self.read(repository.get_graph(self.uri)[1])
 
     def create(self, client: Client, container_path=None, slug=None, headers=None, recursive=True, **kwargs):
         if not self.created and not self.exists_in_repo(client):

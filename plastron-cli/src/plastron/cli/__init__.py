@@ -13,7 +13,7 @@ from pkgutil import iter_modules
 import pysolr
 import yaml
 
-from plastron import commands
+from plastron.cli import commands
 from plastron.client import Endpoint, Client
 from plastron.client.auth import get_authenticator
 from plastron.core.exceptions import FailureException, ConfigError

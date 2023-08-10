@@ -1,4 +1,4 @@
-from plastron.commands import BaseCommand
+from plastron.cli.commands import BaseCommand
 from plastron.core.exceptions import FailureException
 
 

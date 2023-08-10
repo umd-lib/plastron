@@ -1,4 +1,4 @@
-from plastron.commands import BaseCommand
+from plastron.cli.commands import BaseCommand
 
 
 def test_repo_config():

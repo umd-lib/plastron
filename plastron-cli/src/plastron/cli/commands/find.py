@@ -3,7 +3,7 @@ from typing import List, Tuple, Union
 from rdflib import URIRef, Literal
 
 import logging
-from plastron.commands import BaseCommand
+from plastron.cli.commands import BaseCommand
 from plastron.namespaces import get_manager, rdf
 from plastron.rdf import parse_predicate_list, parse_data_property, parse_object_property, uri_or_curie
 from plastron.repo import ResourceList

@@ -3,7 +3,7 @@ from unittest.mock import Mock
 
 import pytest
 
-from plastron.commands.importcommand import create_repo_changeset
+from plastron.cli.commands.importcommand import create_repo_changeset
 from plastron.jobs import Row, build_fields
 from plastron.models import Item
 

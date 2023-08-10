@@ -8,7 +8,7 @@ from importlib import import_module
 from time import sleep
 
 from plastron.client import Client, TransactionClient, ClientError
-from plastron.commands import BaseCommand
+from plastron.cli.commands import BaseCommand
 from plastron.core.exceptions import ConfigError, DataReadException, FailureException
 from plastron.core.util import ItemLog
 
@@ -101,7 +101,7 @@ class Command(BaseCommand):
         # Define the data_handler function for the data being loaded
         logger.info("Initializing data handler")
         module_name = batch_config.handler
-        handler = import_module('plastron.handlers.' + module_name)
+        handler = import_module('plastron.cli.handlers.' + module_name)
         logger.info('Loaded "{0}" handler'.format(module_name))
 
         # "--no-binaries" implies "--no-annotations"

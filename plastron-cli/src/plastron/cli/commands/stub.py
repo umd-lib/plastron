@@ -7,7 +7,7 @@ from typing import Optional
 from rdflib import URIRef
 
 from plastron.client import Client, TransactionClient, ClientError
-from plastron.commands import BaseCommand
+from plastron.cli.commands import BaseCommand
 from plastron.core.exceptions import FailureException
 from plastron.files import BinarySource, HTTPFileSource, LocalFileSource
 from plastron.models import Item

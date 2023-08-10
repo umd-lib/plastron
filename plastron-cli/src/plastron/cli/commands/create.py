@@ -6,7 +6,7 @@ from typing import List, Tuple, Union
 from rdflib import Graph, Literal, URIRef
 
 from plastron.client import Client
-from plastron.commands import BaseCommand
+from plastron.cli.commands import BaseCommand
 from plastron.namespaces import dcterms, get_manager, pcdm, rdf
 from plastron.rdf import parse_data_property, parse_object_property, uri_or_curie
 

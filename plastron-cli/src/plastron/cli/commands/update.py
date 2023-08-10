@@ -9,7 +9,7 @@ from email.utils import parsedate_to_datetime
 from pyparsing import ParseException
 
 from plastron.client import Client
-from plastron.commands import BaseCommand
+from plastron.cli.commands import BaseCommand
 from plastron.core.exceptions import FailureException
 from plastron.core.util import strtobool
 from plastron.repo import ResourceList

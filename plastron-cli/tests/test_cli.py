@@ -1,6 +1,6 @@
 from argparse import ArgumentParser
 from plastron.cli import load_commands
-from plastron.commands import importcommand
+from plastron.cli.commands import importcommand
 
 
 def test_find_commands_correctly_handles_import_command():

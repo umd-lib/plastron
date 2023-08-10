@@ -2,7 +2,7 @@ import logging
 import time
 from argparse import Namespace
 
-from plastron.commands import BaseCommand
+from plastron.cli.commands import BaseCommand
 from plastron.namespaces import get_manager
 
 

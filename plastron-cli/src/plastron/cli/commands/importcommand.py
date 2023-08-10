@@ -14,7 +14,7 @@ from bs4 import BeautifulSoup
 from rdflib import Graph, Literal, URIRef
 
 from plastron.client import Client, ClientError
-from plastron.commands import BaseCommand
+from plastron.cli.commands import BaseCommand
 from plastron.core.exceptions import ConfigError, FailureException
 from plastron.files import HTTPFileSource, LocalFileSource, RemoteFileSource, ZipFileSource
 from plastron.jobs import ImportJob, ImportedItemStatus, JobError, ModelClassNotFoundError, build_lookup_index

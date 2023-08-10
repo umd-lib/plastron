@@ -1,6 +1,6 @@
 import logging
 
-from plastron.commands import BaseCommand
+from plastron.cli.commands import BaseCommand
 from plastron.jobs import ExportJob
 from plastron.serializers import SERIALIZER_CLASSES
 

@@ -1,6 +1,6 @@
 from PIL import Image
 
-from plastron.commands import BaseCommand
+from plastron.cli.commands import BaseCommand
 from plastron.files import RepositoryFileSource
 import logging
 

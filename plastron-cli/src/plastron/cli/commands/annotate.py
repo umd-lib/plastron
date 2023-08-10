@@ -3,7 +3,7 @@ from io import BytesIO
 
 from bs4 import BeautifulSoup
 
-from plastron.commands import BaseCommand
+from plastron.cli.commands import BaseCommand
 from plastron.namespaces import prov, sc
 from plastron.rdf import rdf
 from plastron.rdf.oa import Annotation, SpecificResource, TextualBody

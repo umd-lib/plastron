@@ -4,7 +4,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from plastron.client import Client
-from plastron.commands.update import Command
+from plastron.cli.commands.update import Command
 from plastron.core.exceptions import FailureException
 from plastron.models import Letter, Item
 from plastron.stomp.messages import PlastronCommandMessage

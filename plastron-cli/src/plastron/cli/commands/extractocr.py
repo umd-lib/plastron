@@ -3,7 +3,7 @@ import sys
 from datetime import datetime
 
 from plastron.client import Client, TransactionClient, ClientError
-from plastron.commands import BaseCommand
+from plastron.cli.commands import BaseCommand
 from plastron.core import util
 from plastron.core.exceptions import DataReadException, FailureException
 from plastron.models.newspaper import Page

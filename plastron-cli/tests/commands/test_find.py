@@ -2,7 +2,7 @@ import pytest
 from rdflib import Graph, Literal
 
 from plastron.client import ResourceURI
-from plastron.commands.find import Command
+from plastron.cli.commands.find import Command
 from plastron.namespaces import rdf, pcdm, dcterms
 
 

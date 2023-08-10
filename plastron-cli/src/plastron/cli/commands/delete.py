@@ -2,7 +2,7 @@ import logging
 from email.utils import parsedate_to_datetime
 
 from plastron.client import ClientError
-from plastron.commands import BaseCommand
+from plastron.cli.commands import BaseCommand
 from plastron.rdf import parse_predicate_list, get_title_string
 from plastron.repo import ResourceList
 

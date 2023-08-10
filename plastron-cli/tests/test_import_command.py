@@ -1,6 +1,6 @@
 import pytest
 
-from plastron.commands import importcommand
+from plastron.cli.commands import importcommand
 from plastron.files import LocalFileSource, RemoteFileSource, ZipFileSource
 from plastron.jobs import build_fields
 from plastron.models import Item, umdtype

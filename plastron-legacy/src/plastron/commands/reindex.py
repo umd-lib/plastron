@@ -2,8 +2,8 @@ import logging
 
 from rdflib import URIRef
 
-from plastron.commands import BaseCommand
-from plastron.core.util import ResourceList
+from plastron.cli.commands import BaseCommand
+from plastron.repo import ResourceList
 from plastron.namespaces import rdf
 from plastron.rdf import parse_predicate_list
 

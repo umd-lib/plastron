@@ -11,7 +11,8 @@ from pyparsing import ParseException
 from plastron.client import Client
 from plastron.commands import BaseCommand
 from plastron.core.exceptions import FailureException
-from plastron.core.util import strtobool, ResourceList
+from plastron.core.util import strtobool
+from plastron.repo import ResourceList
 from plastron.rdf import parse_predicate_list, get_title_string
 from plastron.validation import validate
 

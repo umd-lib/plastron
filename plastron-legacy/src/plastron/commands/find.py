@@ -6,7 +6,7 @@ import logging
 from plastron.commands import BaseCommand
 from plastron.namespaces import get_manager, rdf
 from plastron.rdf import parse_predicate_list, parse_data_property, parse_object_property, uri_or_curie
-from plastron.core.util import ResourceList
+from plastron.repo import ResourceList
 
 logger = logging.getLogger(__name__)
 manager = get_manager()

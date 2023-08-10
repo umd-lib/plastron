@@ -6,8 +6,7 @@ from typing import Dict, Any, Callable
 
 from stomp.listener import ConnectionListener
 
-from plastron.client import Endpoint, Client
-from plastron.client.auth import get_authenticator
+from plastron.client import RepositoryStructure
 from plastron.repo import Repository
 from plastron.stomp.broker import Broker, Destination
 from plastron.stomp.commands import get_command_class
@@ -117,35 +116,29 @@ class MessageProcessor:
 
         return self.commands[command_name]
 
-    def __call__(self, message: PlastronCommandMessage, progress_topic: Destination):
-        # determine which command to load to process the message
-        command = self.get_command(message.command)
+    def configure_repo(self, message: PlastronCommandMessage) -> Repository:
+        repo = Repository.from_config(self.repo_config)
+        repo.ua_string = f'plastron/{version}',
+        repo.delegated_user = message.args.get('on-behalf-of'),
+        if 'structure' in message.args:
+            repo.client.structure = RepositoryStructure[message.args['structure'].upper()]
+        if 'relpath' in message.args:
+            repo.endpoint.relpath = message.args['relpath']
+        if repo.client.delegated_user is not None:
+            logger.info(f'Running repository operations on behalf of {repo.client.delegated_user}')
+        return repo
 
+    def __call__(self, message: PlastronCommandMessage, progress_topic: Destination):
         if message.job_id is None:
             raise RuntimeError('Expecting a PlastronJobId header')
 
         logger.info(f'Received message to initiate job {message.job_id}')
-        repo = Repository.from_config(self.repo_config)
-        repo.ua_string = f'plastron/{version}',
-        repo.delegated_user = message.args.get('on-behalf-of'),
+        repo = self.configure_repo(message)
 
-        endpoint = Endpoint(
-            url=self.repo_config['REST_ENDPOINT'],
-            default_path=self.repo_config.get('RELPATH', '/'),
-            external_url=self.repo_config.get('REPO_EXTERNAL_URL'),
-        )
-        # TODO: respect the batch mode flag when getting the authenticator
-        client = Client(
-            endpoint=endpoint,
-            auth=get_authenticator(self.repo_config),
-            ua_string=f'plastron/{version}',
-            on_behalf_of=message.args.get('on-behalf-of'),
-        )
+        # determine which command to load to process the message
+        command = self.get_command(message.command)
 
-        if client.delegated_user is not None:
-            logger.info(f'Running repository operations on behalf of {client.delegated_user}')
-
-        for status in command(repo.client, message):
+        for status in command(repo, message):
             progress_topic.send(PlastronMessage(job_id=message.job_id, body=status))
 
         logger.info(f'Job {message.job_id} complete')

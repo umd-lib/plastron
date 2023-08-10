@@ -1,12 +1,12 @@
 import pytest
 
+import plastron.jobs.utils
 from plastron.cli.commands import importcommand
 from plastron.files import LocalFileSource, RemoteFileSource, ZipFileSource
 from plastron.jobs import build_fields
 from plastron.models import Item, umdtype
 from plastron.rdf.pcdm import Object
 from plastron.rdf.rdf import RDFDataProperty
-from plastron.stomp.messages import PlastronCommandMessage
 
 cmd = importcommand.Command()
 
@@ -20,7 +20,7 @@ cmd = importcommand.Command()
     ]
 )
 def test_build_file_groups(value, expected_count):
-    assert len(importcommand.build_file_groups(value)) == expected_count
+    assert len(plastron.jobs.utils.build_file_groups(value)) == expected_count
 
 
 def test_build_fields_with_default_datatype():
@@ -51,19 +51,19 @@ def test_parse_value_string():
     prop_type = type('test', (RDFDataProperty,), {'datatype': None})
 
     # the empty string should parse to the empty list
-    assert len(list(importcommand.parse_value_string('', column, prop_type))) == 0
+    assert len(list(plastron.jobs.utils.parse_value_string('', column, prop_type))) == 0
     # single value
-    assert len(list(importcommand.parse_value_string('foo', column, prop_type))) == 1
+    assert len(list(plastron.jobs.utils.parse_value_string('foo', column, prop_type))) == 1
     # single value, followed by an empty string
-    assert len(list(importcommand.parse_value_string('foo|', column, prop_type))) == 1
+    assert len(list(plastron.jobs.utils.parse_value_string('foo|', column, prop_type))) == 1
     # two values
-    assert len(list(importcommand.parse_value_string('foo|bar', column, prop_type))) == 2
+    assert len(list(plastron.jobs.utils.parse_value_string('foo|bar', column, prop_type))) == 2
     # two values, with an empty string between
-    assert len(list(importcommand.parse_value_string('foo||bar', column, prop_type))) == 2
+    assert len(list(plastron.jobs.utils.parse_value_string('foo||bar', column, prop_type))) == 2
 
 
 # sample file group to use in add_files_* tests
-ADD_FILES_GROUPS = importcommand.build_file_groups('foo.jpg;foo.tiff;bar.jpg;baz.pdf')
+ADD_FILES_GROUPS = plastron.jobs.utils.build_file_groups('foo.jpg;foo.tiff;bar.jpg;baz.pdf')
 
 
 def test_add_files_paged():
@@ -96,114 +96,3 @@ def test_add_files_unpaged():
     assert len(item.proxies()) == 0
     # all 4 files should be attached directly to the item
     assert len(item.files) == 4
-
-
-# "Flat" layout config
-flat_repo_config = {
-    'REST_ENDPOINT': 'http://example.com/rest',
-    'RELPATH': '/pcdm',
-    'LOG_DIR': 'logs',
-    'STRUCTURE': 'flat'
-}
-
-# "Hierarchical" layout config
-hierarchical_repo_config = {
-    'REST_ENDPOINT': 'http://example.com/rest',
-    'RELPATH': '/dc/2021/2',
-    'LOG_DIR': 'logs',
-    'STRUCTURE': 'hierarchical'
-}
-
-# Import message does not specify structure
-no_structure_message = PlastronCommandMessage(
-    message_id='TEST-no-structure',
-    job_id='1',
-    command='import'
-)
-
-# Import message specifies "flat" structure
-flat_structure_message = PlastronCommandMessage(
-    message_id='TEST-flat-structure',
-    job_id='1',
-    command='import',
-    args={'structure': 'flat'}
-)
-
-# Import message specified "hierarchical" structure
-hierarchical_structure_message = PlastronCommandMessage(
-    message_id='TEST-hierarchical-structure',
-    job_id='1',
-    command='import',
-    args={'structure': 'hierarchical'}
-)
-
-
-def test_repo_config_uses_structure_from_repo_config_if_no_structure_specified():
-    # Flat structure in repo_config
-    args = cmd.parse_message(no_structure_message)
-
-    new_repo_config = cmd.repo_config(flat_repo_config, args)
-    assert new_repo_config['STRUCTURE'] == 'flat'
-
-    # Hierarchical structure in repo_config
-    args = cmd.parse_message(no_structure_message)
-
-    new_repo_config = cmd.repo_config(hierarchical_repo_config, args)
-    assert new_repo_config['STRUCTURE'] == 'hierarchical'
-
-
-def test_repo_config_uses_structure_from_message():
-    # Hierarchical structure specified in message
-    args = cmd.parse_message(hierarchical_structure_message)
-
-    new_repo_config = cmd.repo_config(flat_repo_config, args)
-    assert new_repo_config['STRUCTURE'] == 'hierarchical'
-
-    # Flat structure specified in message
-    args = cmd.parse_message(flat_structure_message)
-
-    new_repo_config = cmd.repo_config(hierarchical_repo_config, args)
-    assert new_repo_config['STRUCTURE'] == 'flat'
-
-
-# "relpath" layout config
-relpath_repo_config = {
-    'REST_ENDPOINT': 'http://example.com/rest',
-    'RELPATH': '/pcdm',
-    'LOG_DIR': 'logs',
-    'STRUCTURE': 'flat'
-}
-
-# Import message without relpath
-no_relpath_message = PlastronCommandMessage(
-    message_id='TEST-without-relpath',
-    job_id='1',
-    command='import',
-    args={'structure': 'flat'},
-)
-
-relpath_message = PlastronCommandMessage(
-    message_id='TEST-with-relpath',
-    job_id='1',
-    command='import',
-    args={
-        'structure': 'flat',
-        'relpath': '/test-relpath'
-    },
-)
-
-
-def test_repo_config_uses_relpath_from_repo_config_if_no_relpath_specified():
-    # Flat structure in repo_config
-    args = cmd.parse_message(no_relpath_message)
-
-    new_repo_config = cmd.repo_config(relpath_repo_config, args)
-    assert new_repo_config['RELPATH'] == '/pcdm'
-
-
-def test_repo_config_uses_relpath_from_message():
-    # Hierarchical structure specified in message
-    args = cmd.parse_message(relpath_message)
-
-    new_repo_config = cmd.repo_config(flat_repo_config, args)
-    assert new_repo_config['RELPATH'] == '/test-relpath'

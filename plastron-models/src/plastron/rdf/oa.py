@@ -1,6 +1,6 @@
 from rdflib import RDF
 
-from plastron.namespaces import dcterms, oa
+from plastron.namespaces import dcterms, oa, prov
 from plastron.rdf import ldp, rdf
 
 # alias the rdflib Namespace
@@ -59,3 +59,8 @@ class FragmentSelector(ldp.Resource):
 class XPathSelector(ldp.Resource):
     def __str__(self):
         return str(self.value)
+
+
+@rdf.object_property('derived_from', prov.wasDerivedFrom)
+class FullTextAnnotation(Annotation):
+    pass

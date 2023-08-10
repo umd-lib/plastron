@@ -1,6 +1,6 @@
 import pytest
 
-from plastron.cli.commands.importcommand import split_escaped
+from plastron.jobs.utils import split_escaped
 
 
 @pytest.mark.parametrize(

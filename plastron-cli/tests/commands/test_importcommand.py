@@ -5,7 +5,9 @@ import tempfile
 from collections import OrderedDict
 
 import plastron
-from plastron.cli.commands.importcommand import Command, RepoChangeset
+import plastron.jobs.utils
+from plastron.cli.commands.importcommand import Command
+from plastron.jobs.utils import RepoChangeset
 from plastron.core.exceptions import FailureException
 from plastron.jobs import ConfigMissingError, Row
 from plastron.models.umd import Item
@@ -131,7 +133,7 @@ def test_exception_when_no_validation_ruleset():
     item.validate = MagicMock(side_effect=ValidationError("test"))
     repo_changeset = RepoChangeset(item, None, None)
 
-    plastron.cli.commands.importcommand.create_repo_changeset = MagicMock(return_value=repo_changeset)
+    plastron.jobs.utils.create_repo_changeset = MagicMock(return_value=repo_changeset)
 
     with pytest.raises(FailureException) as excinfo:
         for _ in command.execute(repo, args):
@@ -158,13 +160,13 @@ def test_invalid_item_added_to_drop_invalid_log():
 
     repo_changeset = RepoChangeset(invalid_item, None, None)
 
-    plastron.cli.commands.importcommand.create_repo_changeset = MagicMock(return_value=repo_changeset)
+    plastron.jobs.utils.create_repo_changeset = MagicMock(return_value=repo_changeset)
     command.update_repo = MagicMock()
 
     for _ in command.execute(repo, args):
         pass
 
-    plastron.cli.commands.importcommand.create_repo_changeset.assert_called_once()
+    plastron.jobs.utils.create_repo_changeset.assert_called_once()
     command.update_repo.assert_not_called()
     mock_run.drop_invalid.assert_called_once()
 
@@ -186,7 +188,7 @@ def test_failed_item_added_to_drop_failed_log():
 
     repo_changeset = RepoChangeset(failed_item, Graph(), Graph())
 
-    plastron.cli.commands.importcommand.create_repo_changeset = MagicMock(return_value=repo_changeset)
+    plastron.jobs.utils.create_repo_changeset = MagicMock(return_value=repo_changeset)
     command.get_source = MagicMock()
     command.get_source.exists = MagicMock(return_value=True)
     command.update_repo = MagicMock(side_effect=FailureException)
@@ -194,7 +196,7 @@ def test_failed_item_added_to_drop_failed_log():
     for _ in command.execute(repo, args):
         pass
 
-    plastron.cli.commands.importcommand.create_repo_changeset.assert_called_once()
+    plastron.jobs.utils.create_repo_changeset.assert_called_once()
     command.update_repo.assert_called_once()
     mock_run.drop_failed.assert_called_once()
 

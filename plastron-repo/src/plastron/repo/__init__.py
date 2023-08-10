@@ -10,7 +10,7 @@ from rdflib import URIRef, Graph
 from requests.auth import AuthBase
 from urlobject import URLObject
 
-from plastron.client import Client, Endpoint, ClientError, TransactionClient
+from plastron.client import Client, Endpoint, ClientError, TransactionClient, RepositoryStructure
 from plastron.client.auth import get_authenticator
 from plastron.core.util import ItemLog
 from plastron.rdfmapping.resources import RDFResource, RDFResourceBase
@@ -22,6 +22,12 @@ def mint_fragment_identifier() -> str:
     return str(uuid4())
 
 
+def get_structure(structure_name: Optional[str]) -> RepositoryStructure:
+    if structure_name is None:
+        return RepositoryStructure.FLAT
+    return RepositoryStructure[structure_name.upper()]
+
+
 class Repository:
     @classmethod
     def from_config_file(cls, filename: str) -> 'Repository':
@@ -30,7 +36,18 @@ class Repository:
 
     @classmethod
     def from_config(cls, config: Dict[str, str]) -> 'Repository':
-        return cls.from_url(url=config['REST_ENDPOINT'], auth=get_authenticator(config))
+        endpoint = Endpoint(
+            url=config['REST_ENDPOINT'],
+            default_path=config.get('RELPATH', '/'),
+            external_url=config.get('REPO_EXTERNAL_URL', None)
+        )
+        client = Client(
+            endpoint=endpoint,
+            auth=get_authenticator(config),
+            structure=get_structure(config.get('STRUCTURE', None)),
+            server_cert=config.get('SERVER_CERT', None),
+        )
+        return cls(client=client)
 
     @classmethod
     def from_url(cls, url: str, auth: Optional[AuthBase] = None) -> 'Repository':

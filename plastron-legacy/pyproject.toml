@@ -14,18 +14,7 @@ classifiers = [
     'Programming Language :: Python :: 3 :: Only',
 ]
 keywords = ['fcrepo', 'repository', 'batch', 'utility']
-dependencies = [
-    'bagit',
-    'BeautifulSoup4',
-    'lxml>3.6.0',
-    'paramiko',
-    'Pillow>=6.2.2',
-    'pyparsing',
-    'PyYAML>3.12',
-    'rdflib',
-    'requests',
-    'pysolr',
-]
+dependencies = []
 requires-python = '>=3.8'
 
 [project.optional-dependencies]
@@ -40,8 +29,6 @@ test = [
 ]
 
 [project.scripts]
-plastron = 'plastron.cli:main'
-plastrond = 'plastron.daemon:main'
 
 [project.urls]
 Homepage = 'https://github.com/umd-lib/plastron'

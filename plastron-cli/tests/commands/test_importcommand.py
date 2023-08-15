@@ -1,19 +1,26 @@
 import argparse
 import os
-import pytest
 import tempfile
 from collections import OrderedDict
+from io import StringIO
+from unittest.mock import MagicMock
+
+import pytest
+from rdflib.graph import Graph
 
 import plastron
 import plastron.jobs.utils
 from plastron.cli.commands.importcommand import Command
+from plastron.client import Client, Endpoint
+from plastron.jobs import ConfigMissingError, Row, ImportOperation, ImportRun
 from plastron.jobs.utils import RepoChangeset
-from plastron.core.exceptions import FailureException
-from plastron.jobs import ConfigMissingError, Row
 from plastron.models.umd import Item
 from plastron.validation import ResourceValidationResult, ValidationError
-from rdflib.graph import Graph
-from unittest.mock import MagicMock
+
+
+@pytest.fixture
+def client():
+    return Client(endpoint=Endpoint(url='http://localhost:8080/fcrepo/rest'))
 
 
 def test_create_import_job():
@@ -28,38 +35,36 @@ def test_create_import_job():
     assert str(import_job.dir) == os.path.join(jobs_dir, job_id)
 
 
-def test_cannot_resume_without_job_id():
-    # Verifies that the import command throws FailureException when resuming a
+def test_cannot_resume_without_job_id(client):
+    # Verifies that the import command throws RuntimeError when resuming a
     # job and the job id is not provided
     command = Command()
     args = argparse.Namespace(resume=True, job_id=None)
-    repo = None
 
-    with pytest.raises(FailureException) as excinfo:
-        for _ in command.execute(repo, args):
+    with pytest.raises(RuntimeError) as excinfo:
+        for _ in command.execute(client, args):
             pass
 
     assert "Resuming a job requires a job id" in str(excinfo.value)
 
 
-def test_cannot_resume_without_job_directory():
-    # Verifies that the import command throws FailureException when resuming a
+def test_cannot_resume_without_job_directory(client):
+    # Verifies that the import command throws RuntimeError when resuming a
     # job and the directory associated with job id is not found
     jobs_dir = '/nonexistent_directory'
     config = {'JOBS_DIR': jobs_dir}
     command = Command(config)
     args = create_args('test_job_id')
     args.resume = True
-    repo = None
 
-    with pytest.raises(FailureException) as excinfo:
-        for _ in command.execute(repo, args):
+    with pytest.raises(RuntimeError) as excinfo:
+        for _ in command.execute(client, args):
             pass
 
-    assert "no such job directory found" in str(excinfo.value)
+    assert "no such job directory" in str(excinfo.value)
 
 
-def test_cannot_resume_without_config_file():
+def test_cannot_resume_without_config_file(client):
     # Verifies that the import command throws ConfigMissingError when resuming a
     # job and a config file is not found
     job_id = 'test_id'
@@ -74,17 +79,16 @@ def test_cannot_resume_without_config_file():
         os.mkdir(job_dir)
 
         command = Command(config)
-        repo = None
 
         with pytest.raises(ConfigMissingError) as excinfo:
-            for _ in command.execute(repo, args):
+            for _ in command.execute(client, args):
                 pass
 
         assert "config.yml is missing" in str(excinfo.value)
 
 
-def test_model_is_required_unless_resuming():
-    # Verifies that the import command throws FailureException if model
+def test_model_is_required_unless_resuming(client):
+    # Verifies that the import command throws RuntimeError if model
     # is not provided when not resuming
     job_id = 'test_id'
     args = create_args(job_id)
@@ -92,16 +96,15 @@ def test_model_is_required_unless_resuming():
     config = {}
 
     command = Command(config)
-    repo = None
-    with pytest.raises(FailureException) as excinfo:
-        for _ in command.execute(repo, args):
+    with pytest.raises(RuntimeError) as excinfo:
+        for _ in command.execute(client, args):
             pass
 
     assert "A model is required unless resuming an existing job" in str(excinfo.value)
 
 
-def test_import_file_is_required_unless_resuming(datadir):
-    # Verifies that the import command throws FailureException if an import_file
+def test_import_file_is_required_unless_resuming(datadir, client):
+    # Verifies that the import command throws RuntimeError if an import_file
     # is not provided when not resuming
     job_id = 'test_id'
     args = create_args(job_id)
@@ -109,16 +112,15 @@ def test_import_file_is_required_unless_resuming(datadir):
     config = {'JOBS_DIR': datadir}
 
     command = Command(config)
-    repo = None
-    with pytest.raises(FailureException) as excinfo:
-        for _ in command.execute(repo, args):
+    with pytest.raises(RuntimeError) as excinfo:
+        for _ in command.execute(client, args):
             pass
 
     assert "An import file is required unless resuming an existing job" in str(excinfo.value)
 
 
-def test_exception_when_no_validation_ruleset():
-    # Verifies that the import command throws FailureException if item
+def test_exception_when_no_validation_ruleset(client, monkeypatch):
+    # Verifies that the import command throws RuntimeError if item
     # validation throws a NoValidationRulesetException
     mock_job = create_mock_job()
     args = create_args(mock_job.id)
@@ -127,26 +129,26 @@ def test_exception_when_no_validation_ruleset():
     Command.create_import_job = MagicMock(return_value=mock_job)
 
     command = Command(config)
-    repo = None
 
     item = MagicMock(Item)
-    item.validate = MagicMock(side_effect=ValidationError("test"))
+    monkeypatch.setattr(Item, 'validate', MagicMock(side_effect=ValidationError("test")))
     repo_changeset = RepoChangeset(item, None, None)
 
     plastron.jobs.utils.create_repo_changeset = MagicMock(return_value=repo_changeset)
 
-    with pytest.raises(FailureException) as excinfo:
-        for _ in command.execute(repo, args):
+    with pytest.raises(RuntimeError) as excinfo:
+        for _ in command.execute(client, args):
             pass
 
     assert "Unable to run validation" in str(excinfo.value)
 
 
-def test_invalid_item_added_to_drop_invalid_log():
+def test_invalid_item_added_to_drop_invalid_log(client, monkeypatch):
     # Verifies that the import command adds an invalid item to the
     # drop-invalid log
     mock_job = create_mock_job()
     mock_run = create_mock_run(mock_job)
+    monkeypatch.setattr(ImportRun, 'drop_invalid', MagicMock())
     mock_job.new_run = MagicMock(return_value=mock_run)
     args = create_args(mock_job.id)
 
@@ -156,26 +158,31 @@ def test_invalid_item_added_to_drop_invalid_log():
     config = {}
 
     command = Command(config)
-    repo = None
 
     repo_changeset = RepoChangeset(invalid_item, None, None)
 
-    plastron.jobs.utils.create_repo_changeset = MagicMock(return_value=repo_changeset)
-    command.update_repo = MagicMock()
+    monkeypatch.setattr(plastron.jobs, 'create_repo_changeset', MagicMock(return_value=repo_changeset))
+    monkeypatch.setattr(ImportOperation, 'get_source', MagicMock())
+    ImportOperation.get_source.exists = MagicMock(return_value=True)
+    monkeypatch.setattr(ImportOperation, 'update_repo', MagicMock(side_effect=RuntimeError))
 
-    for _ in command.execute(repo, args):
+    plastron.jobs.utils.create_repo_changeset = MagicMock(return_value=repo_changeset)
+
+    for _ in command.execute(client, args):
         pass
 
-    plastron.jobs.utils.create_repo_changeset.assert_called_once()
-    command.update_repo.assert_not_called()
-    mock_run.drop_invalid.assert_called_once()
+    plastron.jobs.create_repo_changeset.assert_called_once()
+    ImportOperation.update_repo.assert_not_called()
+    ImportRun.drop_invalid.assert_called_once()
 
 
-def test_failed_item_added_to_drop_failed_log():
+def test_failed_item_added_to_drop_failed_log(client, monkeypatch):
     # Verifies that the import command adds a failed item to the
     # drop-failed log
     mock_job = create_mock_job()
     mock_run = create_mock_run(mock_job)
+    monkeypatch.setattr(ImportRun, 'drop_failed', MagicMock())
+    monkeypatch.setattr(ImportRun, 'drop_invalid', MagicMock())
     mock_job.new_run = MagicMock(return_value=mock_run)
     args = create_args(mock_job.id)
     failed_item = create_mock_item(is_valid=True)
@@ -184,21 +191,20 @@ def test_failed_item_added_to_drop_failed_log():
     config = {}
 
     command = Command(config)
-    repo = None
 
     repo_changeset = RepoChangeset(failed_item, Graph(), Graph())
 
-    plastron.jobs.utils.create_repo_changeset = MagicMock(return_value=repo_changeset)
-    command.get_source = MagicMock()
-    command.get_source.exists = MagicMock(return_value=True)
-    command.update_repo = MagicMock(side_effect=FailureException)
+    monkeypatch.setattr(plastron.jobs, 'create_repo_changeset', MagicMock(return_value=repo_changeset))
+    monkeypatch.setattr(ImportOperation, 'get_source', MagicMock())
+    ImportOperation.get_source.exists = MagicMock(return_value=True)
+    monkeypatch.setattr(ImportOperation, 'update_repo', MagicMock(side_effect=RuntimeError))
 
-    for _ in command.execute(repo, args):
+    for _ in command.execute(client, args):
         pass
 
-    plastron.jobs.utils.create_repo_changeset.assert_called_once()
-    command.update_repo.assert_called_once()
-    mock_run.drop_failed.assert_called_once()
+    plastron.jobs.create_repo_changeset.assert_called_once()
+    ImportOperation.update_repo.assert_called_once()
+    ImportRun.drop_failed.assert_called_once()
 
 
 def create_args(job_id):
@@ -219,7 +225,7 @@ def create_args(job_id):
         container="test_container",
         binaries_location="test_binaries_location",
         template_file=None,
-        import_file='test_import_file',
+        import_file=StringIO('Title,Identifier\nfoobar,123'),
         percentage=None,
         validate_only=False,
         limit=None,
@@ -250,11 +256,9 @@ def create_mock_job():
 
 
 def create_mock_run(job):
-    mock_run = MagicMock()
+    mock_run = MagicMock(spec=ImportRun)
     mock_run.job = job
     mock_run.start = MagicMock(return_value=mock_run)
-    mock_run.drop_failed = MagicMock()
-    mock_run.drop_invalid = MagicMock()
 
     return mock_run
 
@@ -272,4 +276,5 @@ def create_mock_item(is_valid=True):
     mock_validation_result.__bool__ = MagicMock(return_value=is_valid)
     mock_validation_result.is_valid = MagicMock(return_value=is_valid)
     mock_item.validate = MagicMock(return_value=mock_validation_result)
+    mock_item.created = False
     return mock_item

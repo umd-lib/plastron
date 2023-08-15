@@ -7,31 +7,28 @@ from coilmq.server.socket_server import StompServer
 from coilmq.store.memory import MemoryQueue
 from coilmq.topic import TopicManager
 
+from plastron.stomp.broker import ServerTuple, Broker
 from plastron.stomp.daemon import STOMPDaemon
 
 
 @pytest.fixture()
-def server_address():
-    return 'localhost', 61613
+def server_address() -> ServerTuple:
+    return ServerTuple('localhost', 61613)
 
 
 @pytest.fixture()
-def config(shared_datadir, server_address):
-    return {
-        'REPOSITORY': {},
-        'MESSAGE_BROKER': {
-            'SERVER': ':'.join(str(v) for v in server_address),
-            'MESSAGE_STORE_DIR': str(shared_datadir / 'msg'),
-            'DESTINATIONS': {
-                'JOBS': '/queue/plastron.jobs',
-                'JOB_PROGRESS': '/topic/plastron.jobs.progress',
-                'JOB_STATUS': '/queue/plastron.jobs.status',
-                'SYNCHRONOUS_JOBS': '/queue/plastron.jobs.synchronous',
-                'REINDEXING': '/queue/reindex',
-            }
-        },
-        'COMMANDS': {},
-    }
+def broker(server_address, shared_datadir) -> Broker:
+    return Broker(
+        server=server_address,
+        message_store_dir=(shared_datadir / 'msg'),
+        destinations={
+            'JOBS': '/queue/plastron.jobs',
+            'JOB_PROGRESS': '/topic/plastron.jobs.progress',
+            'JOB_STATUS': '/queue/plastron.jobs.status',
+            'SYNCHRONOUS_JOBS': '/queue/plastron.jobs.synchronous',
+            'REINDEXING': '/queue/reindex',
+        }
+    )
 
 
 @pytest.fixture()
@@ -49,8 +46,8 @@ def stomp_server(server_address):
 
 
 @pytest.fixture()
-def plastrond_stomp(config):
-    plastrond = STOMPDaemon(config=config)
+def plastrond_stomp(broker):
+    plastrond = STOMPDaemon(broker=broker, repo_config={})
 
     yield plastrond
 

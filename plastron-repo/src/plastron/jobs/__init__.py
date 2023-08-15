@@ -220,7 +220,7 @@ class ImportRun:
             raise FailureException('Run completed, cannot start again')
         self.timestamp = datetimestamp()
         self.dir = self.job.dir / self.timestamp
-        os.makedirs(self.dir)
+        self.dir.mkdir(parents=True, exist_ok=True)
         return self
 
     def drop_failed(self, item, line_reference, reason=''):
@@ -471,6 +471,7 @@ class ImportOperation:
             member_of: URIRef = None,
             container: str = None,
             binaries_location: str = None,
+            extract_text_types: str = None,
             **kwargs,
     ):
         self.job.save_config({
@@ -478,7 +479,8 @@ class ImportOperation:
             'access': access,
             'member_of': member_of,
             'container': container,
-            'binaries_location': binaries_location
+            'binaries_location': binaries_location,
+            'extract_text_types': extract_text_types,
         })
 
         return (yield from self.import_items(**kwargs))
@@ -635,8 +637,8 @@ class ImportOperation:
                     create_pages=False
                 )
 
-            if args.extract_text_types is not None:
-                annotate_from_files(item, args.extract_text_types.split(','))
+            if self.job.extract_text_types is not None:
+                annotate_from_files(item, self.job.extract_text_types.split(','))
 
             logger.debug(f"Creating resources in container: {self.job.container}")
 

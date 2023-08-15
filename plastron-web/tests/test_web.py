@@ -5,11 +5,6 @@ import pytest
 from plastron.web import create_app
 
 
-def create_app_client(jobs_dir):
-    app = create_app({'JOBS_DIR': jobs_dir})
-    return app.test_client()
-
-
 @pytest.fixture
 def app_client(request, datadir, monkeypatch):
     tmpdir = None

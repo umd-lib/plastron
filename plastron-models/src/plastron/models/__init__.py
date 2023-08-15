@@ -1,3 +1,4 @@
+import sys
 from typing import Type
 
 from plastron.models.letter import Letter
@@ -15,6 +16,6 @@ class ModelClassNotFoundError(Exception):
 
 def get_model_class(model_name: str) -> Type[Resource]:
     try:
-        return getattr(__package__, model_name)
+        return getattr(sys.modules[__package__], model_name)
     except AttributeError as e:
         raise ModelClassNotFoundError(model_name) from e

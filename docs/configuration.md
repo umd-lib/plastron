@@ -83,7 +83,6 @@ Options for the export command:
 |-----------------|-----------|
 |`SSH_PRIVATE_KEY`|Filename of private key to use when making SSH/SFTP connections|
 
-
 ### `IMPORT` sub-section
 
 Options for the [import command](import.md):
@@ -93,3 +92,11 @@ Options for the [import command](import.md):
 |`SSH_PRIVATE_KEY`|Filename of private key to use when making SSH/SFTP connections|
 
 [STOMP]: https://stomp.github.io/
+
+## `SOLR` section
+
+This section configures the connection to SOLR.
+
+| Option          |Description|
+|-----------------|-----------|
+|`URL`|Address to connect to SOLR in the form `http://localhost:{port}/solr/fedora4`|

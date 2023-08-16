@@ -1,8 +1,12 @@
 from lxml.etree import parse, XMLSyntaxError
-from rdflib import URIRef
+from rdflib import URIRef, Namespace
 from plastron import pcdm, ocr, oa, rdf
 from plastron.exceptions import DataReadException
 from plastron.namespaces import bibo, carriers, dc, dcterms, ebucore, fabio, ndnp, pcdmuse, prov, sc
+from plastron.validation import is_handle
+
+
+umdtype = Namespace('http://vocab.lib.umd.edu/datatype#')
 
 
 @rdf.data_property('title', dcterms.title)
@@ -10,6 +14,7 @@ from plastron.namespaces import bibo, carriers, dc, dcterms, ebucore, fabio, ndn
 @rdf.data_property('volume', bibo.volume)
 @rdf.data_property('issue', bibo.issue)
 @rdf.data_property('edition', bibo.edition)
+@rdf.data_property('handle', dcterms.identifier, datatype=umdtype.handle)
 @rdf.rdf_class(bibo.Issue)
 class Issue(pcdm.Object):
     """Newspaper issue"""
@@ -18,7 +23,8 @@ class Issue(pcdm.Object):
         'date': 'Date',
         'volume': 'Volume',
         'issue': 'Issue',
-        'edition': 'Edition'
+        'edition': 'Edition',
+        'handle': 'Handle'
     }
     VALIDATION_RULESET = {
         'title': {
@@ -41,7 +47,12 @@ class Issue(pcdm.Object):
         'edition': {
             'required': True,
             'exactly': 1
-        }
+        },
+        'handle': {
+            'required': False,
+            # 'exactly': 1,
+            'function': is_handle
+        },
     }
 
 

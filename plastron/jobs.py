@@ -188,6 +188,10 @@ class ImportJob:
                 config = yaml.safe_load(config_file)
             if config is None:
                 raise ConfigMissingError(self, f'Config file {self.config_filename} is empty')
+            for key, value in config.items():
+                # catch any improperly serialized "None" values, and convert to None
+                if value == 'None':
+                    config[key] = None
             self.config = config
             return self.config
         except FileNotFoundError as e:
@@ -202,7 +206,7 @@ class ImportJob:
         with open(self.config_filename, mode='w') as config_file:
             yaml.dump(
                 stream=config_file,
-                data={'job_id': self.id, **{k: str(v) for k, v in self.config.items()}}
+                data={'job_id': self.id, **{k: str(v) if v is not None else v for k, v in self.config.items()}}
             )
 
     def store_metadata_file(self, input_file):
@@ -531,6 +535,10 @@ class Row:
     @property
     def has_files(self):
         return 'FILES' in self.data and self.data['FILES'].strip() != ''
+
+    @property
+    def has_item_files(self):
+        return 'ITEM_FILES' in self.data and self.data['ITEM_FILES'].strip() != ''
 
     @property
     def filenames(self):

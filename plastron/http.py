@@ -91,7 +91,7 @@ class HierarchicalCreator:
 
 
 class Repository:
-    def __init__(self, config, ua_string=None, on_behalf_of=None):
+    def __init__(self, config, ua_string=None, on_behalf_of=None, batch_mode=False):
         # repo root
         self.endpoint = config['REST_ENDPOINT'].rstrip('/')
 
@@ -110,6 +110,7 @@ class Repository:
             [p.strip('/') for p in (self.endpoint, self.relpath)]
         )
         self.session = requests.Session()
+        self.session.batch_mode = batch_mode
         self.jwt_secret = None
         self.transaction = None
         self.load_binaries = True

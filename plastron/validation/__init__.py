@@ -1,4 +1,5 @@
 import logging
+import re
 
 from edtf_validate.valid_edtf import is_valid as is_valid_edtf
 from iso639 import is_valid639_1, is_valid639_2
@@ -32,6 +33,10 @@ def is_edtf_formatted(value):
 
 def is_valid_iso639_code(value):
     return is_valid639_1(value) or is_valid639_2(value)
+
+
+def is_handle(value: str) -> bool:
+    return bool(re.match('hdl:[^/]+/.*', value))
 
 
 class ResourceValidationResult:

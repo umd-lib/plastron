@@ -2,7 +2,7 @@ from plastron import pcdm, rdf
 from plastron.authority import LabeledThing
 from plastron.namespaces import dc, dcterms, edm
 from plastron.pcdm import Page
-from plastron.validation import is_edtf_formatted, is_valid_iso639_code
+from plastron.validation import is_edtf_formatted, is_valid_iso639_code, is_handle
 from rdflib import Namespace
 
 
@@ -29,6 +29,7 @@ umdform = Namespace('http://vocab.lib.umd.edu/form#')
 @rdf.object_property('rights_holder', dcterms.rightsHolder, embed=True, obj_class=LabeledThing)
 @rdf.data_property('bibliographic_citation', dcterms.bibliographicCitation)
 @rdf.data_property('accession_number', dcterms.identifier, datatype=umdtype.accessionNumber)
+@rdf.data_property('handle', dcterms.identifier, datatype=umdtype.handle)
 class Item(pcdm.Object):
     HEADER_MAP = {
         'object_type': 'Object Type',
@@ -52,7 +53,8 @@ class Item(pcdm.Object):
         'language': 'Language',
         'rights_holder.label': 'Rights Holder',
         'bibliographic_citation': 'Collection Information',
-        'accession_number': 'Accession Number'
+        'accession_number': 'Accession Number',
+        'handle': 'Handle'
     }
     VALIDATION_RULESET = {
         'object_type': {
@@ -102,7 +104,12 @@ class Item(pcdm.Object):
         },
         'accession_number': {
             'max_values': 1
-        }
+        },
+        'handle': {
+            'required': False,
+            # 'exactly': 1,
+            'function': is_handle
+        },
     }
 
     def get_new_member(self, rootname, number):

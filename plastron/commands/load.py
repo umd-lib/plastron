@@ -183,8 +183,8 @@ class Command(BaseCommand):
                        'timestamp': getattr(
                            item, 'creation_timestamp', str(datetime.utcnow())
                        ),
-                       'title': getattr(item, 'title', 'N/A'),
-                       'uri': getattr(item, 'uri', 'N/A')
+                       'title': getattr(item.issue, 'title', 'N/A'),
+                       'uri': getattr(item.issue, 'uri', 'N/A')
                        }
 
                 # write item details to relevant summary CSV

@@ -6,12 +6,15 @@ import logging.config
 import os
 import sys
 import yaml
+import pysolr
+
+
 from argparse import ArgumentParser, FileType
 from datetime import datetime
 from importlib import import_module
 from pkgutil import iter_modules
 from plastron import commands, version
-from plastron.exceptions import FailureException
+from plastron.exceptions import FailureException, ConfigError
 from plastron.logging import DEFAULT_LOGGING_OPTIONS
 from plastron.http import Repository
 from plastron.stomp import Broker
@@ -86,6 +89,14 @@ def main():
         action='store'
     )
 
+    parser.add_argument(
+        '--batch-mode', '-b',
+        help='specifies the use of batch user for interaction with fcrepo',
+        dest='batch_mode',
+        action='store',
+        default=False
+    )
+
     subparsers = parser.add_subparsers(title='commands')
 
     command_modules = load_commands(subparsers)
@@ -111,9 +122,13 @@ def main():
         broker_config = None
         command_config = {}
 
-    fcrepo = Repository(
-        repo_config, ua_string=f'plastron/{version}', on_behalf_of=args.delegated_user
-    )
+    try:
+        fcrepo = Repository(
+            repo_config, ua_string=f'plastron/{version}', on_behalf_of=args.delegated_user, batch_mode=args.batch_mode
+        )
+    except ConfigError as e:
+        logger.error(str(e))
+        sys.exit(1)
 
     if broker_config is not None:
         broker = Broker(broker_config)
@@ -148,12 +163,21 @@ def main():
     command_module = command_modules[args.cmd_name]
 
     try:
-        if hasattr(command_module, 'Command'):
-            command = command_module.Command(config=command_config.get(args.cmd_name.upper()))
-            command.repo = fcrepo
-            command.broker = broker
-        else:
+        if not hasattr(command_module, 'Command'):
             raise FailureException(f'Unable to execute command {args.cmd_name}')
+
+        command = command_module.Command(config=command_config.get(args.cmd_name.upper()))
+        command.repo = fcrepo
+        command.broker = broker
+
+        # The SOLR configuration would only be necessary for the verify command, so it can be optional
+        # Verify will check if solr got initialized and fail if it wasn't.
+        if 'SOLR' in config and 'URL' in config['SOLR']:
+            address = config['SOLR']['URL']
+            command.solr = pysolr.Solr(address, always_commit=True, timeout=10)
+        else:
+            command.solr = None
+
         # dispatch to the selected subcommand
         print_header(args)
         logger.info(f'Loaded repo configuration from {args.repo or args.config_file.name}')

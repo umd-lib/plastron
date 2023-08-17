@@ -13,7 +13,7 @@ from plastron.client import Client, ClientError
 from plastron.core.exceptions import ConfigError
 from plastron.core.util import datetimestamp, strtobool
 from plastron.files import HTTPFileSource, LocalFileSource, RemoteFileSource, ZipFileSource
-from plastron.jobs import ImportJob, ImportedItemStatus, ModelClassNotFoundError, ImportOperation
+from plastron.jobs import ImportJob, ImportedItemStatus, ModelClassNotFoundError
 from plastron.jobs.utils import build_file_groups, annotate_from_files
 from plastron.models import get_model_class
 from plastron.namespaces import get_manager
@@ -179,111 +179,6 @@ class Command(BaseCommand):
 
         return result_config
 
-    def get_source(self, base_location, path):
-        """
-        Get an appropriate BinarySource based on the type of ``base_location``.
-        The following forms of ``base_location`` are recognized:
-
-        * ``zip:<path to zipfile>``
-        * ``sftp:<user>@<host>/<path to dir>``
-        * ``http://<host>/<path to dir>``
-        * ``zip+sftp:<user>@<host>/<path to zipfile>``
-        * ``<local dir path>``
-
-        :param base_location:
-        :param path:
-        :return:
-        """
-        if base_location.startswith('zip:'):
-            return ZipFileSource(base_location[4:], path)
-        elif base_location.startswith('sftp:'):
-            return RemoteFileSource(
-                location=os.path.join(base_location, path),
-                ssh_options={'key_filename': self.ssh_private_key}
-            )
-        elif base_location.startswith('http:') or base_location.startswith('https:'):
-            base_uri = base_location if base_location.endswith('/') else base_location + '/'
-            return HTTPFileSource(base_uri + path)
-        elif base_location.startswith('zip+sftp:'):
-            return ZipFileSource(
-                zip_file=base_location[4:],
-                path=path,
-                ssh_options={'key_filename': self.ssh_private_key}
-            )
-        else:
-            # with no URI prefix, assume a local file path
-            return LocalFileSource(localpath=os.path.join(base_location, path))
-
-    def get_file(self, base_location, filename):
-        """
-        Get a file object for the given base_location and filename.
-
-        Currently, if the file has an "image/tiff" MIME type, this method returns
-        a :py:class:`plastron.pcdm.PreservationMasterFile`; otherwise it returns
-        a basic :py:class:`plastron.pcdm.File`.
-
-        :param base_location:
-        :param filename:
-        :return:
-        """
-        source = self.get_source(base_location, filename)
-
-        # XXX: hardcoded image/tiff as the preservation master format
-        # TODO: make preservation master format configurable per collection or job
-        if source.mimetype() == 'image/tiff':
-            file_class = PreservationMasterFile
-        else:
-            file_class = File
-
-        return file_class.from_source(title=basename(filename), source=source)
-
-    def add_files(self, item, file_groups, base_location, access=None, create_pages=True):
-        """
-        Add pages and files to the given item. A page is added for each key (basename) in the file_groups
-        parameter, and a file is added for each element in the value list for that key.
-
-        :param item: PCDM Object to add the pages to.
-        :param file_groups: Dictionary of basename to filename list mappings.
-        :param base_location: Location of the files.
-        :param access: Optional RDF class representing the access level for this item.
-        :param create_pages: Whether to create an intermediate page object for each file group. Defaults to True.
-        :return: The number of files added.
-        """
-        if base_location is None:
-            raise ConfigError('Must specify a binaries-location')
-
-        if create_pages:
-            logger.debug(f'Creating {len(file_groups.keys())} page(s)')
-
-        count = 0
-
-        for n, (rootname, filenames) in enumerate(file_groups.items(), 1):
-            if create_pages:
-                # create a member object for each rootname
-                # delegate to the item model how to build the member object
-                member = item.get_new_member(rootname, n)
-                # add to the item
-                item.add_member(member)
-                proxy = item.append_proxy(member, title=member.title)
-                # add the access class to the member resources
-                if access is not None:
-                    member.rdf_type.append(access)
-                    proxy.rdf_type.append(access)
-                file_parent = member
-            else:
-                # files will be added directly to the item
-                file_parent = item
-
-            # add the files to their parent object (either the item or a member)
-            for filename in filenames:
-                file = self.get_file(base_location, filename)
-                count += 1
-                file_parent.add_file(file)
-                if access is not None:
-                    file.rdf_type.append(access)
-
-        return count
-
     @staticmethod
     def create_import_job(job_id, jobs_dir):
         """
@@ -321,17 +216,19 @@ class Command(BaseCommand):
             args.job_id = f"import-{datetimestamp()}"
 
         repo = Repository(client=client)
-        operation = ImportOperation(args.job_id, self.jobs_dir, repo=repo)
+        job = ImportJob(args.job_id, self.jobs_dir, repo=repo)
         if args.resume:
-            metadata = yield from operation.resume()
+            metadata = yield from job.resume()
         else:
-            metadata = yield from operation.start(
+            metadata = yield from job.start(
                 import_file=args.import_file,
                 model=args.model,
                 access=args.access,
                 member_of=args.member_of,
                 container=args.container,
                 binaries_location=args.binaries_location,
+                limit=args.limit,
+                percentage=args.percentage,
             )
 
         """ TODO: statistics object to return
@@ -357,7 +254,7 @@ class Command(BaseCommand):
                 result_type = 'validate_failed'
         else:
             # import phase
-            if len(operation.job.completed_log) == metadata.total:
+            if len(job.completed_log) == metadata.total:
                 result_type = 'import_complete'
             else:
                 result_type = 'import_incomplete'
@@ -367,93 +264,3 @@ class Command(BaseCommand):
             'validation': metadata.validation_reports,
             'count': metadata.stats()
         }
-
-    def update_repo(self, args, job, client: Client, metadata, row, repo_changeset, created_uris, updated_uris):
-        """
-        Updates the repository with the given RepoChangeSet
-
-        :param args: the arguments from the command-line
-        :param job: The ImportJob
-        :param client: the repository configuration
-        :param metadata: A plastron.jobs.MetadataRows object representing the
-                          CSV file being imported
-        :param row: A single plastron.jobs.Row object representing the row
-                     being imported
-        :param repo_changeset: The RepoChangeSet object describing the changes
-                                 to make to the repository.
-        :param created_uris: Accumulator storing a list of created URIS. This
-                              variable is MODIFIED by this method.
-        :param updated_uris: Accumulator storing a list of updated URIS. This
-                              variable is MODIFIED by this method.
-        """
-        item = repo_changeset.item
-
-        if not item.created:
-            # if an item is new, don't construct a SPARQL Update query
-            # instead, just create and update normally
-            # create new item in the repo
-            logger.debug('Creating a new item')
-            # add the access class
-            if job.access is not None:
-                item.rdf_type.append(URIRef(job.access))
-            # add the collection membership
-            if job.member_of is not None:
-                item.member_of = URIRef(job.member_of)
-
-            if row.has_files:
-                create_pages = bool(strtobool(row.get('CREATE_PAGES', 'True')))
-                logger.debug('Adding pages and files to new item')
-                self.add_files(
-                    item,
-                    build_file_groups(row['FILES']),
-                    base_location=job.binaries_location,
-                    access=job.access,
-                    create_pages=create_pages
-                )
-
-            if row.has_item_files:
-                self.add_files(
-                    item,
-                    build_file_groups(row['ITEM_FILES']),
-                    base_location=job.binaries_location,
-                    access=job.access,
-                    create_pages=False
-                )
-
-            if args.extract_text_types is not None:
-                annotate_from_files(item, args.extract_text_types.split(','))
-
-            logger.debug(f"Creating resources in container: {job.container}")
-
-            try:
-                with client.transaction() as txn_client:
-                    item.create(txn_client, container_path=job.container)
-                    item.update(txn_client)
-                    txn_client.commit()
-            except Exception as e:
-                raise RuntimeError(f'Creating item failed: {e}') from e
-
-            job.complete(item, row.line_reference, ImportedItemStatus.CREATED)
-            metadata.created += 1
-            created_uris.append(item.uri)
-
-        elif repo_changeset:
-            # construct the SPARQL Update query if there are any deletions or insertions
-            # then do a PATCH update of an existing item
-            logger.info(f'Sending update for {item}')
-            sparql_update = repo_changeset.build_sparql_update(client)
-            logger.debug(sparql_update)
-            try:
-                item.patch(client, sparql_update)
-            except ClientError as e:
-                raise RuntimeError(f'Updating item failed: {e}') from e
-
-            job.complete(item, row.line_reference, ImportedItemStatus.MODIFIED)
-            metadata.updated += 1
-            updated_uris.append(item.uri)
-
-        else:
-            job.complete(item, row.line_reference, ImportedItemStatus.UNCHANGED)
-            metadata.unchanged += 1
-            logger.info(f'No changes found for "{item}" ({row.uri}); skipping')
-            metadata.skipped += 1

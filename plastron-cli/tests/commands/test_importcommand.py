@@ -12,7 +12,7 @@ import plastron
 import plastron.jobs.utils
 from plastron.cli.commands.importcommand import Command
 from plastron.client import Client, Endpoint
-from plastron.jobs import ConfigMissingError, Row, ImportOperation, ImportRun
+from plastron.jobs import JobConfigError, Row, ImportOperation, ImportRun
 from plastron.jobs.utils import RepoChangeset
 from plastron.models.umd import Item
 from plastron.validation import ResourceValidationResult, ValidationError
@@ -80,7 +80,7 @@ def test_cannot_resume_without_config_file(client):
 
         command = Command(config)
 
-        with pytest.raises(ConfigMissingError) as excinfo:
+        with pytest.raises(JobConfigError) as excinfo:
             for _ in command.execute(client, args):
                 pass
 

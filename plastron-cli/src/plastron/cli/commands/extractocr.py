@@ -5,7 +5,7 @@ from datetime import datetime
 from plastron.client import Client, TransactionClient, ClientError
 from plastron.cli.commands import BaseCommand
 from plastron.core import util
-from plastron.core.exceptions import DataReadException, FailureException
+from plastron.core.exceptions import DataReadException
 from plastron.models.newspaper import Page
 
 logger = logging.getLogger(__name__)
@@ -34,7 +34,7 @@ class Command(BaseCommand):
             completed = util.ItemLog('logs/annotated.csv', fieldnames, 'uri')
         except Exception as e:
             logger.error('Non-standard map file specified: {0}'.format(e))
-            raise FailureException()
+            raise RuntimeError()
 
         logger.info('Found {0} completed items'.format(len(completed)))
 
@@ -43,7 +43,7 @@ class Command(BaseCommand):
                 ignored = util.ItemLog(args.ignore, fieldnames, 'uri')
             except Exception as e:
                 logger.error('Non-standard ignore file specified: {0}'.format(e))
-                raise FailureException()
+                raise RuntimeError()
         else:
             ignored = []
 
@@ -64,7 +64,7 @@ class Command(BaseCommand):
                 logger.error(
                     "Unable to commit or rollback transaction, aborting"
                 )
-                raise FailureException()
+                raise RuntimeError()
 
             row = {
                 'uri': uri,

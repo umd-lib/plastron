@@ -1,7 +1,6 @@
 import pytest
 
 from plastron.cli.commands import BaseCommand, get_command_class
-from plastron.core.exceptions import FailureException
 
 
 def test_get_command_class():
@@ -17,5 +16,5 @@ def test_get_import_command_class():
 
 
 def test_non_existent_command_class():
-    with pytest.raises(FailureException):
+    with pytest.raises(RuntimeError):
         _cls = get_command_class('foo')

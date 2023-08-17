@@ -1,7 +1,5 @@
 from importlib import import_module
 
-from plastron.core.exceptions import FailureException
-
 
 class BaseCommand:
     def __init__(self, config=None):
@@ -29,9 +27,9 @@ def get_command_class(command_name: str):
     try:
         command_module = import_module('.'.join([__package__, module_name]))
     except ModuleNotFoundError as e:
-        raise FailureException(f'Unable to load a command with the name {command_name}') from e
+        raise RuntimeError(f'Unable to load a command with the name {command_name}') from e
     command_class = getattr(command_module, 'Command')
     if command_class is None:
-        raise FailureException(f'Command class not found in module {command_module}')
+        raise RuntimeError(f'Command class not found in module {command_module}')
 
     return command_class

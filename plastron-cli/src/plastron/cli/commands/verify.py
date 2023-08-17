@@ -3,7 +3,6 @@ import logging
 from argparse import Namespace
 
 from plastron.cli.commands import BaseCommand
-from plastron.core.exceptions import FailureException
 
 
 def configure_cli(subparsers):
@@ -24,7 +23,7 @@ def configure_cli(subparsers):
 class Command(BaseCommand):
     def __call__(self, fcrepo, args: Namespace):
         if not self.solr:
-            raise FailureException('A URL for the Solr connection was not provided in the configuration file')
+            raise RuntimeError('A URL for the Solr connection was not provided in the configuration file')
 
         invalid_items = []
         try:
@@ -37,7 +36,7 @@ class Command(BaseCommand):
                     if len(query) == 0:
                         invalid_items.append(item["uri"])
         except OSError as e:
-            raise FailureException(f'Unable to read {args.log}: {e}')
+            raise RuntimeError(f'Unable to read {args.log}: {e}')
 
         if len(invalid_items) > 0:
             logging.info(f"There are {len(invalid_items)} items in the mapfile whose URIs aren't indexed:")

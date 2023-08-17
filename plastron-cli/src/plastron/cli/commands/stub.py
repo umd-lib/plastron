@@ -8,7 +8,6 @@ from rdflib import URIRef
 
 from plastron.client import Client, TransactionClient, ClientError
 from plastron.cli.commands import BaseCommand
-from plastron.core.exceptions import FailureException
 from plastron.files import BinarySource, HTTPFileSource, LocalFileSource
 from plastron.models import Item
 from plastron.rdf.pcdm import File
@@ -173,7 +172,7 @@ class Command(BaseCommand):
                         raise
 
             except ClientError as e:
-                raise FailureException(f'Transaction rollback failed: {e}') from e
+                raise RuntimeError(f'Transaction rollback failed: {e}') from e
 
         if output_file is not sys.stdout:
             output_file.close()

@@ -23,7 +23,7 @@ from rdflib import URIRef
 from requests import ConnectionError
 
 from plastron.client import Client, ClientError
-from plastron.core.exceptions import DataReadException, FailureException
+from plastron.core.exceptions import DataReadException
 from plastron.core.util import ItemLog, datetimestamp, strtobool
 from plastron.files import get_ssh_client, ZipFileSource, RemoteFileSource, HTTPFileSource, LocalFileSource
 from plastron.jobs.utils import create_repo_changeset, build_file_groups, annotate_from_files, build_fields
@@ -189,7 +189,7 @@ class ImportRun:
         self.timestamp = timestamp
         self.dir = self.job.dir / self.timestamp
         if not self.dir.is_dir():
-            raise FailureException(f'Import run {self.timestamp} not found')
+            raise RuntimeError(f'Import run {self.timestamp} not found')
         return self
 
     @property
@@ -217,7 +217,7 @@ class ImportRun:
         :return:
         """
         if self.dir is not None:
-            raise FailureException('Run completed, cannot start again')
+            raise RuntimeError('Run completed, cannot start again')
         self.timestamp = datetimestamp()
         self.dir = self.job.dir / self.timestamp
         self.dir.mkdir(parents=True, exist_ok=True)
@@ -295,7 +295,7 @@ class MetadataRows:
         try:
             self.fields = build_fields(self.fieldnames, self.model_class)
         except DataReadException as e:
-            raise FailureException(str(e)) from e
+            raise RuntimeError(str(e)) from e
 
         self.validation_reports: List[Mapping] = []
         self.skipped = 0
@@ -321,7 +321,7 @@ class MetadataRows:
 
         if percentage is not None:
             if not self.metadata_file.seekable():
-                raise FailureException('Cannot execute a percentage load using a non-seekable file')
+                raise RuntimeError('Cannot execute a percentage load using a non-seekable file')
             identifier_column = self.model_class.HEADER_MAP['identifier']
             identifiers = [
                 row[identifier_column] for row in self.csv_file if row[identifier_column] not in job.completed_log
@@ -513,9 +513,9 @@ class ImportOperation:
         try:
             metadata = self.job.metadata(limit=limit, percentage=percentage)
         except ModelClassNotFoundError as e:
-            raise FailureException(f'Model class {e.model_name} not found') from e
+            raise RuntimeError(f'Model class {e.model_name} not found') from e
         except JobError as e:
-            raise FailureException(str(e)) from e
+            raise RuntimeError(str(e)) from e
 
         if metadata.has_binaries and self.job.binaries_location is None:
             raise RuntimeError('Must specify --binaries-location if the metadata has a FILES column')

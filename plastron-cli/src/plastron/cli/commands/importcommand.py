@@ -10,7 +10,7 @@ from rdflib import URIRef
 
 from plastron.cli.commands import BaseCommand
 from plastron.client import Client, ClientError
-from plastron.core.exceptions import ConfigError, FailureException
+from plastron.core.exceptions import ConfigError
 from plastron.core.util import datetimestamp, strtobool
 from plastron.files import HTTPFileSource, LocalFileSource, RemoteFileSource, ZipFileSource
 from plastron.jobs import ImportJob, ImportedItemStatus, ModelClassNotFoundError, ImportOperation
@@ -431,7 +431,7 @@ class Command(BaseCommand):
                     item.update(txn_client)
                     txn_client.commit()
             except Exception as e:
-                raise FailureException(f'Creating item failed: {e}') from e
+                raise RuntimeError(f'Creating item failed: {e}') from e
 
             job.complete(item, row.line_reference, ImportedItemStatus.CREATED)
             metadata.created += 1
@@ -446,7 +446,7 @@ class Command(BaseCommand):
             try:
                 item.patch(client, sparql_update)
             except ClientError as e:
-                raise FailureException(f'Updating item failed: {e}') from e
+                raise RuntimeError(f'Updating item failed: {e}') from e
 
             job.complete(item, row.line_reference, ImportedItemStatus.MODIFIED)
             metadata.updated += 1

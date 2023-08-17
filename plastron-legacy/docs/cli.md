@@ -424,9 +424,6 @@ For a simple example, see the ping command, as implemented in
 [`plastron/commands/ping.py`](../plastron/commands/ping.py):
 
 ```python
-from plastron.core.exceptions import FailureException
-
-
 class Command:
     def __init__(self, subparsers):
         parser_ping = subparsers.add_parser('ping',
@@ -437,7 +434,7 @@ class Command:
         try:
             fcrepo.test_connection()
         except:
-            raise FailureException()
+            raise RuntimeError()
 ```
 
 The `FailureException` is caught by the `plastron` script and causes it to exit with

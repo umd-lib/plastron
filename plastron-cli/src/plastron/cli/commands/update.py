@@ -10,7 +10,6 @@ from pyparsing import ParseException
 
 from plastron.client import Client
 from plastron.cli.commands import BaseCommand
-from plastron.core.exceptions import FailureException
 from plastron.core.util import strtobool
 from plastron.repo import ResourceList
 from plastron.rdf import parse_predicate_list, get_title_string
@@ -108,7 +107,7 @@ class Command(BaseCommand):
         }
 
         if self.validate and not self.model:
-            raise FailureException("Model must be provided when performing validation")
+            raise RuntimeError("Model must be provided when performing validation")
 
         if self.model:
             # Retrieve the model to use for validation
@@ -116,7 +115,7 @@ class Command(BaseCommand):
             try:
                 self.model_class = getattr(importlib.import_module("plastron.models"), self.model)
             except AttributeError as e:
-                raise FailureException(f'Unable to load model "{self.model}"') from e
+                raise RuntimeError(f'Unable to load model "{self.model}"') from e
 
         self.sparql_update = args.update_file.read().encode('utf-8')
 

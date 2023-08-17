@@ -16,7 +16,7 @@ import yaml
 from plastron.cli import commands
 from plastron.client import Endpoint, Client
 from plastron.client.auth import get_authenticator
-from plastron.core.exceptions import FailureException, ConfigError
+from plastron.core.exceptions import ConfigError
 from plastron.core.util import envsubst, DEFAULT_LOGGING_OPTIONS
 from plastron.stomp.broker import Broker
 
@@ -174,7 +174,7 @@ def main():
 
     try:
         if not hasattr(command_module, 'Command'):
-            raise FailureException(f'Unable to execute command {args.cmd_name}')
+            raise RuntimeError(f'Unable to execute command {args.cmd_name}')
 
         command = command_module.Command(config=command_config.get(args.cmd_name.upper()))
         command.endpoint = client
@@ -195,7 +195,7 @@ def main():
             logger.info(f'Running repository operations on behalf of {args.delegated_user}')
         command(client, args)
         print_footer(args)
-    except FailureException as e:
+    except RuntimeError as e:
         # something failed, exit with non-zero status
         logger.error(str(e))
         sys.exit(1)

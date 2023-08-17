@@ -9,7 +9,7 @@ from time import sleep
 
 from plastron.client import Client, TransactionClient, ClientError
 from plastron.cli.commands import BaseCommand
-from plastron.core.exceptions import ConfigError, DataReadException, FailureException
+from plastron.core.exceptions import ConfigError, DataReadException
 from plastron.core.util import ItemLog
 
 logger = logging.getLogger(__name__)
@@ -89,7 +89,7 @@ class Command(BaseCommand):
         except ConfigError as e:
             logger.error(e.message)
             logger.error(f'Failed to load batch configuration from {args.batch}')
-            raise FailureException(e.message)
+            raise RuntimeError(e.message)
 
         logger.info(f'Loaded batch configuration from {args.batch}')
 
@@ -114,7 +114,7 @@ class Command(BaseCommand):
         except (ConfigError, DataReadException) as e:
             logger.error(e.message)
             logger.error('Failed to initialize batch')
-            raise FailureException(e.message)
+            raise RuntimeError(e.message)
 
         if not args.dry_run:
             client.test_connection()
@@ -125,7 +125,7 @@ class Command(BaseCommand):
                 completed = ItemLog(batch_config.mapfile, fieldnames, 'path')
             except Exception as e:
                 logger.error(f"Non-standard map file specified: {e}")
-                raise FailureException()
+                raise RuntimeError()
 
             logger.info(f"Found {len(completed)} completed items")
 
@@ -134,7 +134,7 @@ class Command(BaseCommand):
                     ignored = ItemLog(args.ignore, fieldnames, 'path')
                 except Exception as e:
                     logger.error(f"Non-standard ignore file specified: {e}")
-                    raise FailureException()
+                    raise RuntimeError()
             else:
                 ignored = []
 
@@ -174,7 +174,7 @@ class Command(BaseCommand):
                     logger.error(
                         "Unable to commit or rollback transaction, aborting"
                     )
-                    raise FailureException()
+                    raise RuntimeError()
                 except DataReadException as e:
                     logger.error(f"Skipping item {n + 1}: {e.message}")
 

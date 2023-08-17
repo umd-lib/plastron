@@ -5,7 +5,6 @@ import pytest
 
 from plastron.client import Client
 from plastron.cli.commands.update import Command
-from plastron.core.exceptions import FailureException
 from plastron.models import Letter, Item
 from plastron.stomp.messages import PlastronCommandMessage
 from pytest import raises
@@ -122,6 +121,6 @@ def test_validate_requires_model():
         model=''
     )
     mock_repo = MagicMock(spec=Client)
-    with raises(FailureException) as exc_info:
+    with raises(RuntimeError) as exc_info:
         cmd.execute(mock_repo, args)
     assert exc_info.value.args[0] == "Model must be provided when performing validation"

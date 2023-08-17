@@ -1,5 +1,4 @@
 from plastron.cli.commands import BaseCommand
-from plastron.core.exceptions import FailureException
 
 
 def configure_cli(subparsers):
@@ -15,4 +14,4 @@ class Command(BaseCommand):
         try:
             fcrepo.test_connection()
         except ConnectionError as e:
-            raise FailureException(str(e)) from e
+            raise RuntimeError(str(e)) from e

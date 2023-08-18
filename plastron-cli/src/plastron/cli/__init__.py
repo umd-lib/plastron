@@ -14,7 +14,7 @@ import pysolr
 import yaml
 
 from plastron.cli import commands
-from plastron.client import Endpoint, Client
+from plastron.client import Endpoint, Client, RepositoryStructure
 from plastron.client.auth import get_authenticator
 from plastron.core.exceptions import ConfigError
 from plastron.core.util import envsubst, DEFAULT_LOGGING_OPTIONS
@@ -135,6 +135,7 @@ def main():
             auth=get_authenticator(repo_config),
             ua_string=f'plastron/{version}',
             on_behalf_of=args.delegated_user,
+            structure=RepositoryStructure[repo_config.get('STRUCTURE', 'flat').upper()]
         )
     except ConfigError as e:
         logger.error(str(e))

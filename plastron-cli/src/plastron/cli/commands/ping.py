@@ -1,3 +1,5 @@
+from requests.exceptions import ConnectionError
+
 from plastron.cli.commands import BaseCommand
 
 

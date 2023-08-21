@@ -1,12 +1,13 @@
 from collections import defaultdict
 from copy import deepcopy, copy
-from typing import List, Optional, Union, Any
+from typing import List, Optional, Union, Any, Type, Dict
+from uuid import uuid4
 
 from rdflib import Graph, URIRef
 from rdflib.term import BNode
 
 from plastron.rdfmapping.descriptors import ObjectProperty, Property, DataProperty
-from plastron.rdfmapping.properties import RDFProperty
+from plastron.rdfmapping.properties import RDFProperty, ValidationResult
 
 
 def is_iterable(value: Any) -> bool:
@@ -44,13 +45,34 @@ class RDFResourceBase:
             self._uri = URIRef(uri)
         else:
             self._uri = BNode()
-        self.base_graph = graph or Graph()
+        self.base_graph = graph if graph is not None else Graph()
 
         self.inserts = set()
         self.deletes = set()
         if not graph:
             self.set_properties(**self.default_values)
         self.set_properties(**kwargs)
+
+    def get_fragment_resource(
+            self,
+            object_class: Type['RDFResourceBase'],
+            fragment_id: Optional[str] = None,
+    ) -> 'RDFResourceBase':
+        """
+        Embedded (i.e., "fragment") resources share a graph with their parent resource. They
+        are essentially a different "filter" through which to view the same graph.
+
+        :param fragment_id: fragment identifier to append to the parent resource's URI. Defaults to a new UUIDv4 string.
+        :param object_class:
+        :return:
+        """
+        if fragment_id is None:
+            fragment_id = str(uuid4())
+        uri = URIRef(self.uri + '#' + fragment_id)
+        fragment = object_class(uri=uri, graph=self.base_graph)
+        fragment.inserts = self.inserts
+        fragment.deletes = self.deletes
+        return fragment
 
     def set_properties(self, **kwargs):
         for name, value in kwargs.items():
@@ -106,6 +128,12 @@ class RDFResourceBase:
         if not all(test(self) for test in self.validators):
             return False
         return True
+
+    def validate(self) -> Dict[str, ValidationResult]:
+        results = {name: getattr(self, name).is_valid for name in self.rdf_property_names}
+        for test in self.validators:
+            results['_' + test.__name__] = test(self)
+        return results
 
 
 class RDFResource(RDFResourceBase):

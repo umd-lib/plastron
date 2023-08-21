@@ -1,7 +1,29 @@
-from typing import Set, Tuple, Callable, Any, Iterable
+from typing import Set, Tuple, Callable, Any, Iterable, Optional
 
 from rdflib import Literal, URIRef
-from rdflib.term import Identifier
+from rdflib.term import Identifier, BNode
+
+
+class ValidationResult:
+    def __init__(self, prop: 'RDFProperty', message: Optional[str] = ''):
+        self.prop = prop
+        self.message = message
+
+    def __str__(self):
+        return self.message
+
+    def __bool__(self):
+        raise NotImplementedError
+
+
+class ValidationFailure(ValidationResult):
+    def __bool__(self):
+        return False
+
+
+class ValidationSuccess(ValidationResult):
+    def __bool__(self):
+        return True
 
 
 class RDFProperty:
@@ -64,14 +86,17 @@ class RDFProperty:
             self.add(value)
 
     @property
-    def is_valid(self) -> bool:
+    def is_valid(self) -> ValidationResult:
         if self.required and len(self) == 0:
-            return False
+            return ValidationFailure(self, 'is required')
         if not self.repeatable and len(self) > 1:
-            return False
+            return ValidationFailure(self, 'is not repeatable')
         if self._validate is not None:
-            return all(self._validate(v) for v in self.values)
-        return True
+            if all(self._validate(v) for v in self.values):
+                return ValidationSuccess(self)
+            else:
+                return ValidationFailure(self, f'is not {self._validate.__doc__}')
+        return ValidationSuccess(self)
 
 
 class RDFDataProperty(RDFProperty):
@@ -96,19 +121,20 @@ class RDFDataProperty(RDFProperty):
         return iter(v.language for v in self.values)
 
     @property
-    def is_valid(self) -> bool:
-        if not super().is_valid:
+    def is_valid(self) -> ValidationResult:
+        is_valid_result = super().is_valid
+        if not is_valid_result:
             # exception to the superclass rule: if repeatable is False but the only difference
             # in the values is their language, it should be valid
             if not self.repeatable and len(self) > 1:
                 if len(set(self.languages)) != len(self):
-                    return False
+                    return ValidationFailure(self, 'is not repeatable')
             else:
-                return False
+                return is_valid_result
         # all values must be literals
         if not all(isinstance(v, Literal) for v in self.values):
-            return False
-        return True
+            return ValidationFailure(self, 'all values must be Literals')
+        return ValidationSuccess(self)
 
 
 class RDFObjectProperty(RDFProperty):
@@ -134,7 +160,7 @@ class RDFObjectProperty(RDFProperty):
         for value in self.values:
             if isinstance(value, Identifier):
                 if value not in self._object_map:
-                    self._object_map[value] = self.object_class(value)
+                    self._object_map[value] = self.object_class(uri=value, graph=self.resource.base_graph)
                 yield self._object_map[value]
             else:
                 yield value
@@ -157,13 +183,14 @@ class RDFObjectProperty(RDFProperty):
         super().remove(obj)
 
     @property
-    def is_valid(self) -> bool:
-        if not super().is_valid:
-            return False
+    def is_valid(self) -> ValidationResult:
+        is_valid_result = super().is_valid
+        if not is_valid_result:
+            return is_valid_result
         # all values must be URIRefs
-        if not all(isinstance(v, URIRef) for v in self.values):
-            return False
-        return True
+        if not all(isinstance(v, URIRef) or isinstance(v, BNode) for v in self.values):
+            return ValidationFailure(self, 'all values must be URIs or BNodes')
+        return ValidationSuccess(self)
 
 
 class RDFPropertyError(Exception):

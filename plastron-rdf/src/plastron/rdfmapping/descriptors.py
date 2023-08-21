@@ -73,10 +73,10 @@ class ObjectProperty(Property):
 
     def __set__(self, instance, value):
         # coerce non-URIRef values (e.g., strings) into URIRefs
-        if not isinstance(value, URIRef):
-            v = URIRef(str(value))
-        else:
+        if isinstance(value, URIRef) or hasattr(value, 'uri'):
             v = value
+        else:
+            v = URIRef(str(value))
         super().__set__(instance, v)
 
 

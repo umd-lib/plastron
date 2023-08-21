@@ -13,14 +13,14 @@ from pathlib import Path
 from shutil import copyfileobj
 from tempfile import TemporaryDirectory
 from time import mktime
-from typing import List, Mapping, Optional, Type, Union, Any, IO
+from typing import List, Mapping, Optional, Type, Union, Any, IO, NamedTuple
 from urllib.parse import urlsplit
 from zipfile import ZipFile
 
 import yaml
 from bagit import make_bag
 from paramiko import SFTPClient, SSHException
-from rdflib import URIRef
+from rdflib import URIRef, Literal
 from requests import ConnectionError
 
 from plastron.client import Client, ClientError
@@ -29,16 +29,25 @@ from plastron.core.util import ItemLog, datetimestamp, strtobool
 from plastron.files import get_ssh_client, ZipFileSource, RemoteFileSource, HTTPFileSource, LocalFileSource, \
     BinarySource
 from plastron.jobs.utils import create_repo_changeset, build_file_groups, annotate_from_files, build_fields, \
-    RepoChangeset
+    RepoChangeset, ColumnSpec, parse_value_string
 from plastron.models import get_model_class, Item, ModelClassNotFoundError
 from plastron.rdf.pcdm import File, PreservationMasterFile, Object
 from plastron.rdf.rdf import Resource
+from plastron.rdfmapping.properties import ValidationFailure
 from plastron.repo import Repository
 from plastron.serializers import SERIALIZER_CLASSES, detect_resource_class, EmptyItemListError
-from plastron.validation import validate, ValidationError
+from plastron.validation import ValidationError
 
 logger = logging.getLogger(__name__)
 UUID_REGEX = re.compile(r'([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})', re.IGNORECASE)
+
+
+class LineReference(NamedTuple):
+    filename: str
+    line_number: int
+
+    def __str__(self):
+        return f'{self.filename}:{self.line_number}'
 
 
 def is_run_dir(path: Path) -> bool:
@@ -149,10 +158,10 @@ class ImportJob:
             self._model_class = get_model_class(self.config.model)
         return self._model_class
 
-    def complete(self, item: Resource, line_reference: str, status: ImportedItemStatus):
+    def complete(self, item: Resource, line_reference: LineReference, status: ImportedItemStatus):
         # write to the completed item log
         self.completed_log.append({
-            'id': getattr(item, 'identifier', line_reference),
+            'id': getattr(item, 'identifier', str(line_reference)),
             'timestamp': datetimestamp(digits_only=False),
             'title': getattr(item, 'title', ''),
             'uri': getattr(item, 'uri', ''),
@@ -250,15 +259,16 @@ class ImportJob:
             metadata.files += len(row.filenames)
 
             try:
-                report = validate(item)
+                results = item.validate()
             except ValidationError as e:
                 raise RuntimeError(f'Unable to run validation: {e}') from e
 
+            is_valid = all(bool(result) for result in results.values())
             metadata.validation_reports.append({
                 'line': row.line_reference,
-                'is_valid': report.is_valid(),
-                'passed': [outcome for outcome in report.passed()],
-                'failed': [outcome for outcome in report.failed()]
+                'is_valid': is_valid,
+                # 'passed': [outcome for outcome in report.passed()],
+                # 'failed': [outcome for outcome in report.failed()]
             })
 
             missing_files = [
@@ -267,14 +277,19 @@ class ImportJob:
             if len(missing_files) > 0:
                 logger.warning(f'{len(missing_files)} file(s) for "{item}" not found')
 
-            if report.is_valid() and len(missing_files) == 0:
+            if is_valid and len(missing_files) == 0:
                 metadata.valid += 1
                 logger.info(f'"{item}" is valid')
             else:
+                failures = {
+                    getattr(item.__class__, name).label: result
+                    for name, result in results.items()
+                    if isinstance(result, ValidationFailure)
+                }
                 # drop invalid items
                 metadata.invalid += 1
                 logger.warning(f'"{item}" is invalid, skipping')
-                reasons = [' '.join(str(f) for f in outcome) for outcome in report.failed()]
+                reasons = [f'{name} {result}' for name, result in failures.items()]
                 if len(missing_files) > 0:
                     reasons.extend(f'Missing file: {f}' for f in missing_files)
                 import_run.drop_invalid(
@@ -344,7 +359,7 @@ class ImportJob:
         updated_uris = []
         item = repo_changeset.item
 
-        if not item.created:
+        if item.uri == URIRef(''):
             # if an item is new, don't construct a SPARQL Update query
             # instead, just create and update normally
             # create new item in the repo
@@ -748,7 +763,7 @@ class MetadataRows:
             if self.subset_to_load is not None and line[self.identifier_column] not in self.subset_to_load:
                 continue
 
-            line_reference = f"{self.job.metadata_filename}:{row_number + 1}"
+            line_reference = LineReference(filename=str(self.job.metadata_filename), line_number=row_number + 1)
             logger.debug(f'Processing {line_reference}')
             self.rows += 1
 
@@ -780,7 +795,7 @@ class MetadataRows:
 
 
 class Row:
-    def __init__(self, line_reference: str, row_number: int, data: Mapping, identifier_column: str):
+    def __init__(self, line_reference: LineReference, row_number: int, data: Mapping, identifier_column: str):
         self.line_reference = line_reference
         self.number = row_number
         self.data = data
@@ -791,6 +806,9 @@ class Row:
 
     def get(self, key, default=None):
         return self.data.get(key, default)
+
+    def parse_value(self, column: ColumnSpec) -> List[Union[Literal, URIRef]]:
+        return parse_value_string(self[column.header], column)
 
     @property
     def identifier(self):

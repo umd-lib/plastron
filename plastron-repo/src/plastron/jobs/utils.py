@@ -1,10 +1,15 @@
 import logging
 import re
 from collections import OrderedDict, defaultdict
+from dataclasses import dataclass
 from os.path import splitext, basename
+from typing import Optional, Dict, List, Union
 from uuid import uuid4
 
 from bs4 import BeautifulSoup
+from plastron.rdfmapping.properties import RDFObjectProperty
+
+from plastron.rdfmapping.descriptors import DataProperty, Property
 from rdflib import Literal, URIRef, Graph
 from rdflib.util import from_n3
 
@@ -57,11 +62,24 @@ def build_lookup_index(item: Resource, index_string: str):
     return index
 
 
-def build_fields(fieldnames, model_class):
+@dataclass
+class ColumnSpec:
+    attrs: str
+    header: str
+    prop: Property
+    lang_code: Optional[str] = None
+    datatype: Optional[URIRef] = None
+
+
+def build_fields(fieldnames, model_class) -> Dict[str, List[ColumnSpec]]:
     property_attrs = {header: attrs for attrs, header in model_class.HEADER_MAP.items()}
     fields = defaultdict(list)
     # group typed and language-tagged columns by their property attribute
     for header in fieldnames:
+        # make sure we skip the system columns
+        if header in CSVSerializer.SYSTEM_HEADERS:
+            continue
+
         if '[' in header:
             # this field has a language tag
             # header format is "Header Label [Language Label]"
@@ -73,11 +91,13 @@ def build_fields(fieldnames, model_class):
             # if the language label isn't a name in the LANGUAGE_CODES table,
             # assume that it is itself a language code
             lang_code = CSVSerializer.LANGUAGE_CODES.get(language_label, language_label)
-            fields[attrs].append({
-                'header': header,
-                'lang_code': lang_code,
-                'datatype': None
-            })
+            fields[attrs].append(ColumnSpec(
+                attrs=attrs,
+                header=header,
+                prop=get_final_prop(model_class, attrs),
+                lang_code=lang_code,
+                datatype=None,
+            ))
         elif '{' in header:
             # this field has a datatype
             # header format is "Header Label {Datatype Label}
@@ -95,30 +115,40 @@ def build_fields(fieldnames, model_class):
             except KeyError as e:
                 raise DataReadException(f'Unknown datatype "{datatype_label}" in "{header}" in import file.') from e
 
-            fields[attrs].append({
-                'header': header,
-                'lang_code': None,
-                'datatype': datatype_uri
-            })
+            fields[attrs].append(ColumnSpec(
+                attrs=attrs,
+                header=header,
+                prop=get_final_prop(model_class, attrs),
+                lang_code=None,
+                datatype=datatype_uri,
+            ))
         else:
             # no language tag or datatype
-            # make sure we skip the system columns
-            if header not in CSVSerializer.SYSTEM_HEADERS:
-                if header not in property_attrs:
-                    raise DataReadException(f'Unrecognized header "{header}" in import file.')
-                # check for a default datatype defined in the model
-                attrs = property_attrs[header]
-                prop = model_class.name_to_prop.get(attrs)
-                if prop is not None and issubclass(prop, RDFDataProperty):
-                    datatype_uri = prop.datatype
-                else:
-                    datatype_uri = None
-                fields[attrs].append({
-                    'header': header,
-                    'lang_code': None,
-                    'datatype': datatype_uri
-                })
+            if header not in property_attrs:
+                raise DataReadException(f'Unrecognized header "{header}" in import file.')
+            # check for a default datatype defined in the model
+            attrs = property_attrs[header]
+            prop = get_final_prop(model_class, attrs.split('.'))
+            if prop is not None and isinstance(prop, DataProperty):
+                datatype_uri = prop.datatype
+            else:
+                datatype_uri = None
+            fields[attrs].append(ColumnSpec(
+                attrs=attrs,
+                header=header,
+                prop=prop,
+                lang_code=None,
+                datatype=datatype_uri,
+            ))
     return fields
+
+
+def get_final_prop(model_class, attrs):
+    next_attr_name = attrs.pop(0)
+    next_attr = getattr(model_class, next_attr_name)
+    if not attrs:
+        return next_attr
+    return get_final_prop(next_attr.object_class, attrs)
 
 
 def build_file_groups(filenames_string):
@@ -147,15 +177,17 @@ def split_escaped(string: str, separator: str = '|'):
     return [re.sub(r'\\(.)', r'\1', v) for v in values]
 
 
-def parse_value_string(value_string, column, prop_type):
+def parse_value_string(value_string, column: ColumnSpec) -> List[Union[Literal, URIRef]]:
+    values = []
     # filter out empty strings, so we don't get spurious empty values in the properties
     for value in filter(not_empty, split_escaped(value_string, separator='|')):
-        if issubclass(prop_type, RDFDataProperty):
+        if isinstance(column.prop, DataProperty):
             # default to the property's defined datatype
             # if it was not specified in the column header
-            yield Literal(value, lang=column['lang_code'], datatype=column.get('datatype', prop_type.datatype))
+            values.append(Literal(value, lang=column.lang_code, datatype=(column.datatype or column.prop.datatype)))
         else:
-            yield URIRef(value)
+            values.append(URIRef(value))
+    return values
 
 
 def annotate_from_files(item, mime_types):
@@ -207,7 +239,7 @@ def create_repo_changeset(repo, metadata, row, validate_only=False):
             # no URI in the CSV means we will create a new object
             logger.info(f'No URI found for {row.line_reference}; will create new resource')
             # create a new object (will create in the repo later)
-            item = metadata.model_class()
+            item = metadata.model_class(uri=URIRef(''))
 
     # track new embedded objects that are added to the graph
     # so we can ensure that they have at least one statement
@@ -221,25 +253,21 @@ def create_repo_changeset(repo, metadata, row, validate_only=False):
     # to their correct positional locations
     row_index = build_lookup_index(item, row.index_string)
 
-    for attrs, columns in metadata.fields.items():
-        prop_type = get_property_type(item.__class__, attrs)
+    for attrs, columns in metadata.fields.items():  # type: str, List[ColumnSpec]
         if '.' not in attrs:
             # simple, non-embedded values
             # attrs is the entire property name
             new_values = []
-            for column in columns:
-                header = column['header']
-                new_values.extend(parse_value_string(row[header], column, prop_type))
+            # there may be 1 or more physical columns in the metadata spreadsheet
+            # that correspond to a single logical property of the item (e.g., multiple
+            # languages or datatypes)
+            for column in columns:  # type: ColumnSpec
+                new_values.extend(row.parse_value(column))
 
             # construct a SPARQL update by diffing for deletions and insertions
             # update the property and get the sets of values deleted and inserted
             prop = getattr(item, attrs)
-            deleted_values, inserted_values = prop.update(new_values)
-
-            for deleted_value in deleted_values:
-                delete_graph.add((item.uri, prop.uri, prop.get_term(deleted_value)))
-            for inserted_value in inserted_values:
-                insert_graph.add((item.uri, prop.uri, prop.get_term(inserted_value)))
+            prop.update(new_values)
 
         else:
             # complex, embedded values
@@ -248,49 +276,37 @@ def create_repo_changeset(repo, metadata, row, validate_only=False):
             # then this column has a different subject than the main uri
             # correlate positions and urirefs
             # XXX: for now, assuming only 2 levels of chaining
-            first_attr, next_attr = attrs.split('.', 2)
+            first_attr, next_attrs = attrs.split('.', 1)
             new_values = defaultdict(list)
-            for column in columns:
-                header = column['header']
-                for i, value_string in enumerate(row[header].split(';')):
-                    new_values[i].extend(parse_value_string(value_string, column, prop_type))
+            for column in columns:  # type: ColumnSpec
+                for i, value_string in enumerate(row[column.header].split(';')):
+                    new_values[i].extend(parse_value_string(value_string, column))
 
             if first_attr in row_index:
                 # existing embedded object
                 for i, values in new_values.items():
                     # get the embedded object
                     obj = row_index[first_attr][i]
-                    prop = getattr(obj, next_attr)
-                    deleted_values, inserted_values = prop.update(values)
-
-                    for deleted_value in deleted_values:
-                        delete_graph.add((item.uri, prop.uri, prop.get_term(deleted_value)))
-                    for inserted_value in inserted_values:
-                        insert_graph.add((item.uri, prop.uri, prop.get_term(inserted_value)))
+                    prop = getattr(obj, next_attrs)
+                    prop.update(values)
             else:
                 # create new embedded objects (a.k.a hash resources) that are not in the index
-                first_prop_type = item.name_to_prop[first_attr]
+                first_prop: RDFObjectProperty = getattr(item, first_attr)
                 for i, values in new_values.items():
                     # we can assume that for any properties with dotted notation,
                     # all attributes except for the last one are object properties
-                    if first_prop_type.obj_class is not None:
+                    if first_prop.object_class is not None:
                         # create a new object
-                        # TODO: remove hardcoded UUID fragment minting
-                        obj = first_prop_type.obj_class(uri=f'{item.uri}#{uuid4()}')
+                        obj = item.get_fragment_resource(first_prop.object_class)
                         # add the new object to the index
                         row_index[first_attr][i] = obj
-                        setattr(obj, next_attr, values)
-                        next_attr_prop = obj.name_to_prop[next_attr]
-                        for value in values:
-                            new_objects[(first_attr, obj)].add((obj.uri, next_attr_prop.uri, value))
+                        getattr(obj, next_attrs).extend(values)
+                        first_prop.add(obj)
 
-    # add new embedded objects to the insert graph
-    for (attr, obj), graph in new_objects.items():
-        # add that object to the main item
-        getattr(item, attr).append(obj)
-        # add to the insert graph
-        insert_graph.add((item.uri, item.name_to_prop[attr].uri, obj.uri))
-        insert_graph += graph
+    for triple in item.inserts:
+        insert_graph.add(triple)
+    for triple in item.deletes:
+        delete_graph.add(triple)
 
     # do a pass to remove statements that are both deleted and then re-inserted
     for statement in delete_graph:

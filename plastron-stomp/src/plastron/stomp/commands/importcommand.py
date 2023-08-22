@@ -2,8 +2,8 @@ import io
 import logging
 from argparse import Namespace, ArgumentTypeError
 
+from plastron.jobs import ImportJob
 from plastron.utils import datetimestamp
-from plastron.jobs import ImportJob, ImportOperation
 from plastron.namespaces import get_manager
 from plastron.rdf import uri_or_curie
 from plastron.repo import Repository
@@ -66,7 +66,12 @@ class Command:
             # TODO: generate a more unique id? add in user and hostname?
             args.job_id = f"import-{datetimestamp()}"
 
-        operation = ImportOperation(args.job_id, self.jobs_dir, repo=repo)
+        operation = ImportJob(
+            job_id=args.job_id,
+            jobs_dir=self.jobs_dir,
+            repo=repo,
+            ssh_private_key=self.ssh_private_key,
+        )
         if args.resume:
             metadata = yield from operation.resume()
         else:

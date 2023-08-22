@@ -208,11 +208,12 @@ class Command(BaseCommand):
             args.job_id = f"import-{datetimestamp()}"
 
         repo = Repository(client=client)
-        job = ImportJob(args.job_id, self.jobs_dir, repo=repo)
+        job = ImportJob(args.job_id, self.jobs_dir)
         if args.resume:
-            metadata = yield from job.resume()
+            metadata = yield from job.resume(repo=repo)
         else:
             metadata = yield from job.start(
+                repo=repo,
                 import_file=args.import_file,
                 model=args.model,
                 access=args.access,

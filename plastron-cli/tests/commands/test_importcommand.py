@@ -12,7 +12,7 @@ import plastron
 import plastron.jobs.utils
 from plastron.cli.commands.importcommand import Command
 from plastron.client import Client, Endpoint
-from plastron.jobs import JobConfigError, Row, ImportOperation, ImportRun
+from plastron.jobs import JobConfigError, Row, ImportRun, ImportJob
 from plastron.jobs.utils import RepoChangeset
 from plastron.models.umd import Item
 from plastron.validation import ResourceValidationResult, ValidationError
@@ -162,9 +162,9 @@ def test_invalid_item_added_to_drop_invalid_log(client, monkeypatch):
     repo_changeset = RepoChangeset(invalid_item, None, None)
 
     monkeypatch.setattr(plastron.jobs, 'create_repo_changeset', MagicMock(return_value=repo_changeset))
-    monkeypatch.setattr(ImportOperation, 'get_source', MagicMock())
-    ImportOperation.get_source.exists = MagicMock(return_value=True)
-    monkeypatch.setattr(ImportOperation, 'update_repo', MagicMock(side_effect=RuntimeError))
+    monkeypatch.setattr(ImportJob, 'get_source', MagicMock())
+    ImportJob.get_source.exists = MagicMock(return_value=True)
+    monkeypatch.setattr(ImportJob, 'update_repo', MagicMock(side_effect=RuntimeError))
 
     plastron.jobs.utils.create_repo_changeset = MagicMock(return_value=repo_changeset)
 
@@ -172,7 +172,7 @@ def test_invalid_item_added_to_drop_invalid_log(client, monkeypatch):
         pass
 
     plastron.jobs.create_repo_changeset.assert_called_once()
-    ImportOperation.update_repo.assert_not_called()
+    ImportJob.update_repo.assert_not_called()
     ImportRun.drop_invalid.assert_called_once()
 
 
@@ -195,15 +195,15 @@ def test_failed_item_added_to_drop_failed_log(client, monkeypatch):
     repo_changeset = RepoChangeset(failed_item, Graph(), Graph())
 
     monkeypatch.setattr(plastron.jobs, 'create_repo_changeset', MagicMock(return_value=repo_changeset))
-    monkeypatch.setattr(ImportOperation, 'get_source', MagicMock())
-    ImportOperation.get_source.exists = MagicMock(return_value=True)
-    monkeypatch.setattr(ImportOperation, 'update_repo', MagicMock(side_effect=RuntimeError))
+    monkeypatch.setattr(ImportJob, 'get_source', MagicMock())
+    ImportJob.get_source.exists = MagicMock(return_value=True)
+    monkeypatch.setattr(ImportJob, 'update_repo', MagicMock(side_effect=RuntimeError))
 
     for _ in command.execute(client, args):
         pass
 
     plastron.jobs.create_repo_changeset.assert_called_once()
-    ImportOperation.update_repo.assert_called_once()
+    ImportJob.update_repo.assert_called_once()
     ImportRun.drop_failed.assert_called_once()
 
 

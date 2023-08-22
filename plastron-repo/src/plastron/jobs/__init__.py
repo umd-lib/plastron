@@ -108,7 +108,7 @@ class ImportConfig:
 
 
 class ImportJob:
-    def __init__(self, job_id, jobs_dir, repo: Repository, ssh_private_key: str = None):
+    def __init__(self, job_id, jobs_dir, ssh_private_key: str = None):
         self.id = job_id
         # URL-escaped ID that can be used as a path segment on a filesystem or URL
         self.safe_id = urllib.parse.quote(job_id, safe='')
@@ -124,7 +124,6 @@ class ImportJob:
         completed_fieldnames = ['id', 'timestamp', 'title', 'uri', 'status']
         self.completed_log = ItemLog(self.dir / 'completed.log.csv', completed_fieldnames, 'id')
 
-        self.repo = repo
         self.ssh_private_key = ssh_private_key
 
     def __str__(self):
@@ -192,6 +191,7 @@ class ImportJob:
 
     def start(
             self,
+            repo: Repository,
             model: Type[Resource],
             access: URIRef = None,
             member_of: URIRef = None,
@@ -209,9 +209,9 @@ class ImportJob:
             'extract_text_types': extract_text_types,
         })
 
-        return (yield from self.import_items(**kwargs))
+        return (yield from self.import_items(repo=repo, **kwargs))
 
-    def resume(self, **kwargs):
+    def resume(self, repo: Repository, **kwargs):
         if not self.dir_exists:
             raise RuntimeError(f'Cannot resume job "{self.id}": no such job directory: "{self.dir}"')
 
@@ -222,9 +222,16 @@ class ImportJob:
         except FileNotFoundError:
             raise RuntimeError(f'Cannot resume job {self.id}: no config.yml found in {self.dir}')
 
-        return (yield from self.import_items(**kwargs))
+        return (yield from self.import_items(repo=repo, **kwargs))
 
-    def import_items(self, limit: int = None, percentage=None, validate_only: bool = False, import_file: IO = None):
+    def import_items(
+            self,
+            repo: Repository,
+            limit: int = None,
+            percentage=None,
+            validate_only: bool = False,
+            import_file: IO = None,
+    ):
         start_time = datetime.now().timestamp()
 
         if percentage:
@@ -251,7 +258,7 @@ class ImportJob:
 
         import_run = self.new_run().start()
         for row in metadata:
-            repo_changeset = create_repo_changeset(self.repo.client, metadata, row)
+            repo_changeset = create_repo_changeset(repo.client, metadata, row)
             item = repo_changeset.item
 
             # count the number of files referenced in this row
@@ -303,7 +310,7 @@ class ImportJob:
                 continue
 
             try:
-                self.update_repo(metadata, row, repo_changeset)
+                self.update_repo(repo, metadata, row, repo_changeset)
             except RuntimeError as e:
                 metadata.errors += 1
                 logger.error(f'{item} import failed: {e}')
@@ -343,10 +350,11 @@ class ImportJob:
         else:
             return []
 
-    def update_repo(self, metadata: 'MetadataRows', row: 'Row', repo_changeset: RepoChangeset):
+    def update_repo(self, repo: Repository, metadata: 'MetadataRows', row: 'Row', repo_changeset: RepoChangeset):
         """
         Updates the repository with the given RepoChangeSet
 
+        :param repo:
         :param metadata: A plastron.jobs.MetadataRows object representing the
                           CSV file being imported
         :param row: A single plastron.jobs.Row object representing the row
@@ -396,7 +404,7 @@ class ImportJob:
             logger.debug(f"Creating resources in container: {self.config.container}")
 
             try:
-                with self.repo.client.transaction() as txn_client:
+                with repo.client.transaction() as txn_client:
                     item.create(txn_client, container_path=self.config.container)
                     item.update(txn_client)
             except Exception as e:
@@ -410,10 +418,10 @@ class ImportJob:
             # construct the SPARQL Update query if there are any deletions or insertions
             # then do a PATCH update of an existing item
             logger.info(f'Sending update for {item}')
-            sparql_update = repo_changeset.build_sparql_update(self.repo.client)
+            sparql_update = repo_changeset.build_sparql_update(repo.client)
             logger.debug(sparql_update)
             try:
-                item.patch(self.repo.client, sparql_update)
+                item.patch(repo.client, sparql_update)
             except ClientError as e:
                 raise RuntimeError(f'Updating item failed: {e}') from e
 

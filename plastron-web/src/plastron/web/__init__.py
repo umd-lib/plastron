@@ -65,7 +65,7 @@ def create_app():
         try:
             return {
                 '@id': job_url(job_id),
-                **job.config,
+                **vars(job.config),
                 'runs': job.runs,
                 'completed': items(job.completed_log),
                 'dropped': latest_dropped_items(job),

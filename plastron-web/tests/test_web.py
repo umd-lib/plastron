@@ -1,75 +1,58 @@
-from tempfile import TemporaryDirectory
-
 import pytest
 
 from plastron.web import create_app
 
 
 @pytest.fixture
-def app_client(request, datadir, monkeypatch):
-    tmpdir = None
-    marker = request.node.get_closest_marker('jobs_dir')
-    if marker is not None:
-        test_jobs_dir = datadir / marker.args[0]
-    else:
-        # create a new temporary directory that we know will be empty
-        tmpdir = TemporaryDirectory()
-        test_jobs_dir = tmpdir.name
-    monkeypatch.setenv('JOBS_DIR', str(test_jobs_dir))
-    app = create_app()
+def app_client(datadir, monkeypatch):
+    def _create_app_client(jobs_dir):
+        test_jobs_dir = datadir / jobs_dir
+        monkeypatch.setenv('JOBS_DIR', str(test_jobs_dir))
+        app = create_app()
 
-    with app.test_client() as client:
-        yield client
+        return app.test_client()
 
-    if tmpdir is not None:
-        tmpdir.cleanup()
+    return _create_app_client
 
 
-@pytest.mark.jobs_dir('jobsempty')
 def test_no_jobs(app_client):
-    response = app_client.get('/jobs')
+    response = app_client('jobsempty').get('/jobs')
     assert response.status_code == 200
     data = response.get_json()
     assert 'jobs' in data
     assert len(data['jobs']) == 0
 
 
-@pytest.mark.jobs_dir('jobs')
 def test_jobs_found(app_client):
-    response = app_client.get('/jobs')
+    response = app_client('jobs').get('/jobs')
     assert response.status_code == 200
     data = response.get_json()
     assert 'jobs' in data
     assert len(data['jobs']) == 5
 
 
-@pytest.mark.jobs_dir('jobs')
 def test_job_not_found(app_client):
-    response = app_client.get('/jobs/FOOBAR')
+    response = app_client('jobs').get('/jobs/FOOBAR')
     assert response.status_code == 404
 
 
-@pytest.mark.jobs_dir('jobs')
 def test_empty_job_dir(app_client):
-    response = app_client.get('/jobs/noconfigfile')
+    response = app_client('jobs').get('/jobs/noconfigfile')
     assert response.status_code == 404
 
 
-@pytest.mark.jobs_dir('jobs')
 def test_empty_config_file(app_client):
-    response = app_client.get('/jobs/emptyconfigfile')
+    response = app_client('jobs').get('/jobs/emptyconfigfile')
     assert response.status_code == 404
 
 
-@pytest.mark.jobs_dir('jobs')
 def test_valid_config_file_no_metadata(app_client):
-    response = app_client.get('/jobs/nometadata')
+    response = app_client('jobs').get('/jobs/nometadata')
     assert response.status_code == 404
 
 
-@pytest.mark.jobs_dir('jobs')
 def test_valid_job(app_client):
-    response = app_client.get('/jobs/validjob')
+    response = app_client('jobs').get('/jobs/validjob')
     assert response.status_code == 200
     data = response.get_json()
     assert '@id' in data
@@ -89,9 +72,8 @@ def test_valid_job(app_client):
     assert data['total'] == 9
 
 
-@pytest.mark.jobs_dir('jobs')
 def test_valid_completed_job(app_client):
-    response = app_client.get('/jobs/validcompletedjob')
+    response = app_client('jobs').get('/jobs/validcompletedjob')
     assert response.status_code == 200
     data = response.get_json()
     assert '@id' in data

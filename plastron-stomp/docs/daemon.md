@@ -1,8 +1,8 @@
 # Plastron Server
 
 The Plastron server (a.k.a., "plastrond") is implemented by the
-[plastron.daemon](../../plastron-stomp/src/plastron/stomp/daemon.py) module, and there is a 
-*plastrond* entry point provided by [pyproject.toml](../pyproject.toml).
+[plastron.daemon](../src/plastron/stomp/daemon.py) module, and there is a 
+*plastrond* entry point provided by [pyproject.toml](../../plastron-utils/pyproject.toml).
 
 ## Running with Python
 
@@ -18,7 +18,7 @@ The Plastron Daemon itself can run in one of two modes:
 
 ## Running with Docker Swarm
 
-This repository contains a [docker-compose.yml](../docker-compose.yml) file 
+This repository contains a [docker-compose.yml](../../plastron-utils/docker-compose.yml) file 
 that defines a Docker stack that can be run alongside the [umd-fcrepo-docker]
 stack. This stack runs two containers, `plastrond-stomp` and `plastrond-http`,
 each running the Plastron Daemon in their respective mode.
@@ -55,9 +55,9 @@ docker service logs -f plastrond_plastrond-http
 
 ## Configuration
 
-See [Configuration](configuration.md).
+See [Configuration](../../docs/configuration.md).
 
-See [docker-plastron-template.yml](../docker-plastron-template.yml) for an 
+See [docker-plastron-template.yml](../../plastron-utils/docker-plastron-template.yml) for an 
 example of the config file.
 
 ## STOMP Message Headers

@@ -85,7 +85,7 @@ Options for the export command:
 
 ### `IMPORT` sub-section
 
-Options for the [import command](import.md):
+Options for the [import command](../plastron-cli/docs/import.md):
 
 | Option          |Description|
 |-----------------|-----------|

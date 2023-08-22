@@ -9,7 +9,7 @@ Plastron is composed of several distribution packages:
 * **[plastron-client](plastron-client)**: The Fedora repository API client
 * **[plastron-models](plastron-models)**: RDF-to-Python object modeling, CSV 
   serialization
-* **[plastron-legacy](plastron-legacy)**: Everything else (currently):
+* **[plastron-legacy](plastron-utils)**: Everything else (currently):
   * Runnable commands (e.g., batch loading, exporting)
   * Data handlers for batch ingest formats
   * Entrypoint interfaces (currently a command-line tool and a daemon)
@@ -40,9 +40,14 @@ cd plastron
 python -m venv .venv
 source .venv/bin/activate
 pip install -e \
+    plastron-utils[test] \
     plastron-client[test] \
+    plastron-rdf[test] \
     plastron-models[test] \
-    plastron-legacy[test]
+    plastron-repo[test] \
+    plastron-web[test] \
+    plastron-stomp[test] \
+    plastron-cli[test]
 ```
 
 This allows for in-place editing of Plastron's source code in the git
@@ -52,19 +57,18 @@ structure).
 ### Testing
 
 Plastron uses the [pytest] test framework for its tests.
-(plastron-legacy/tests).
 
 ```bash
 pytest
 ```
 
-See the [testing documentation](plastron-legacy/docs/testing.md) for more
+See the [testing documentation](docs/testing.md) for more
 information.
 
 ## Running
 
-* [Command-line client](plastron-legacy/docs/cli.md)
-* [Server](plastron-legacy/docs/daemon.md)
+* [Command-line client](plastron-cli/docs/cli.md)
+* [Server](plastron-stomp/docs/daemon.md)
 
 ## Name
 
@@ -75,7 +79,7 @@ Source: [Wikipedia](https://en.wikipedia.org/wiki/Turtle_shell#Plastron)
 
 ## License
 
-See the [LICENSE](plastron-legacy/LICENSE.md) file for license rights and
+See the [LICENSE](plastron-utils/LICENSE.md) file for license rights and
 limitations (Apache 2.0).
 
 [development mode]: https://packaging.python.org/tutorials/installing-packages/#installing-from-vcs

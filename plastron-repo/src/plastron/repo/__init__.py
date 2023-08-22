@@ -12,7 +12,7 @@ from urlobject import URLObject
 
 from plastron.client import Client, Endpoint, ClientError, TransactionClient, RepositoryStructure
 from plastron.client.auth import get_authenticator
-from plastron.core.util import ItemLog
+from plastron.utils import ItemLog
 from plastron.rdfmapping.resources import RDFResource, RDFResourceBase
 
 logger = logging.getLogger(__name__)
@@ -287,3 +287,11 @@ class ResourceList:
                 self.completed_buffer.writerow(row)
             else:
                 self.completed.writerow(row)
+
+
+class DataReadError(Exception):
+    def __init__(self, message):
+        self.message = message
+
+    def __str__(self):
+        return self.message

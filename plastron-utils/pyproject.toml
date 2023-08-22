@@ -1,5 +1,5 @@
 [project]
-name = 'plastron-legacy'
+name = 'plastron-utils'
 version = '4.0.0-dev'
 description = 'Utility for batch operations on a Fedora 4 repository.'
 authors = [

@@ -13,7 +13,7 @@ from plastron.rdfmapping.descriptors import DataProperty, Property
 from rdflib import Literal, URIRef, Graph
 from rdflib.util import from_n3
 
-from plastron.core.exceptions import DataReadException
+from plastron.repo import DataReadError
 from plastron.namespaces import sc, get_manager
 from plastron.rdf import rdf
 from plastron.rdf.oa import TextualBody, FullTextAnnotation
@@ -87,7 +87,7 @@ def build_fields(fieldnames, model_class) -> Dict[str, List[ColumnSpec]]:
             try:
                 attrs = property_attrs[header_label]
             except KeyError as e:
-                raise DataReadException(f'Unknown header "{header}" in import file.') from e
+                raise DataReadError(f'Unknown header "{header}" in import file.') from e
             # if the language label isn't a name in the LANGUAGE_CODES table,
             # assume that it is itself a language code
             lang_code = CSVSerializer.LANGUAGE_CODES.get(language_label, language_label)
@@ -105,15 +105,15 @@ def build_fields(fieldnames, model_class) -> Dict[str, List[ColumnSpec]]:
             try:
                 attrs = property_attrs[header_label]
             except KeyError as e:
-                raise DataReadException(f'Unknown header "{header}" in import file.') from e
+                raise DataReadError(f'Unknown header "{header}" in import file.') from e
             # the datatype label should either be a key in the lookup table,
             # or an n3-abbreviated URI of a datatype
             try:
                 datatype_uri = CSVSerializer.DATATYPE_URIS.get(datatype_label, from_n3(datatype_label, nsm=nsm))
                 if not isinstance(datatype_uri, URIRef):
-                    raise DataReadException(f'Unknown datatype "{datatype_label}" in "{header}" in import file.')
+                    raise DataReadError(f'Unknown datatype "{datatype_label}" in "{header}" in import file.')
             except KeyError as e:
-                raise DataReadException(f'Unknown datatype "{datatype_label}" in "{header}" in import file.') from e
+                raise DataReadError(f'Unknown datatype "{datatype_label}" in "{header}" in import file.') from e
 
             fields[attrs].append(ColumnSpec(
                 attrs=attrs,
@@ -125,7 +125,7 @@ def build_fields(fieldnames, model_class) -> Dict[str, List[ColumnSpec]]:
         else:
             # no language tag or datatype
             if header not in property_attrs:
-                raise DataReadException(f'Unrecognized header "{header}" in import file.')
+                raise DataReadError(f'Unrecognized header "{header}" in import file.')
             # check for a default datatype defined in the model
             attrs = property_attrs[header]
             prop = get_final_prop(model_class, attrs.split('.'))

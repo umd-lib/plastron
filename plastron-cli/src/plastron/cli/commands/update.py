@@ -10,7 +10,7 @@ from pyparsing import ParseException
 
 from plastron.client import Client
 from plastron.cli.commands import BaseCommand
-from plastron.core.util import strtobool
+from plastron.utils import strtobool
 from plastron.repo import ResourceList
 from plastron.rdf import parse_predicate_list, get_title_string
 from plastron.validation import validate

@@ -10,7 +10,7 @@ from typing import TextIO, Dict, Any, Optional
 import click
 import yaml
 
-from plastron.core.util import envsubst, DEFAULT_LOGGING_OPTIONS
+from plastron.utils import DEFAULT_LOGGING_OPTIONS, envsubst
 from plastron.stomp import __version__
 from plastron.stomp.broker import ServerTuple, Broker
 from plastron.stomp.listeners import CommandListener

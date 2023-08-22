@@ -6,11 +6,14 @@ import os
 import yaml
 from rdflib import Graph
 
-from plastron.core.exceptions import ConfigError, DataReadException
+from plastron.repo import DataReadError
+from plastron.cli import ConfigError
 from plastron.namespaces import dcterms
 from plastron.rdf import pcdm, rdf
 from plastron.rdf.authority import create_authority
 from plastron.rdf.pcdm import get_file_object, Page
+
+logger = logging.getLogger(__name__)
 
 
 # ============================================================================
@@ -133,9 +136,9 @@ class BatchItem:
             filename = str(o)
             # ensure exactly one path that is mapped from the basename
             if filename not in self.batch.all_files:
-                raise DataReadException('File {0} not found'.format(filename))
+                raise DataReadError('File {0} not found'.format(filename))
             elif len(self.batch.all_files[filename]) > 1:
-                raise DataReadException('Filename {0} is not unique'.format(filename))
+                raise DataReadError('Filename {0} is not unique'.format(filename))
 
             file_path = self.batch.all_files[filename][0]
 
@@ -154,7 +157,7 @@ class BatchItem:
                 else:
                     parts[page_no].append(file_path)
             else:
-                item.logger.warning(
+                logger.warning(
                     'Filename {0} does not match a known pattern'.format(filename))
 
         # remove the dcterms:hasPart triples

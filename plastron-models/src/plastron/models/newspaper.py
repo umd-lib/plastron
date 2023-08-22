@@ -1,7 +1,7 @@
 from lxml.etree import parse, XMLSyntaxError
 from rdflib import URIRef, Namespace
 
-from plastron.core.exceptions import DataReadException
+from plastron.repo import DataReadError
 from plastron.validation import is_handle
 from plastron.namespaces import bibo, carriers, dc, dcterms, fabio, ndnp, pcdmuse, prov, sc
 from plastron.rdf import pcdm, ocr, oa, rdf
@@ -142,9 +142,9 @@ class Page(pcdm.Object):
             with ocr_file.source as stream:
                 tree = parse(stream)
         except OSError:
-            raise DataReadException("Unable to read {0}".format(ocr_file.filename))
+            raise DataReadError("Unable to read {0}".format(ocr_file.filename))
         except XMLSyntaxError:
-            raise DataReadException("Unable to parse {0} as XML".format(ocr_file.filename))
+            raise DataReadError("Unable to parse {0} as XML".format(ocr_file.filename))
 
         # read in resolution from issue METS data
         master = next(self.files_for('master'))

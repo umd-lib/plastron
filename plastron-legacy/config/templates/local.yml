@@ -1,4 +1,0 @@
-REST_ENDPOINT: http://localhost:8080/rest/
-RELPATH: /pcdm
-FEDORA_USER: fedoraAdmin
-FEDORA_PASSWORD: secret3

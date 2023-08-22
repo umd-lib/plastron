@@ -1,6 +1,6 @@
 import logging
 
-from plastron.core.util import strtobool
+from plastron.utils import strtobool
 from plastron.jobs import ExportJob
 
 logger = logging.getLogger(__name__)

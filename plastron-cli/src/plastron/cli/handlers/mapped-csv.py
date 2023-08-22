@@ -7,7 +7,7 @@ import yaml
 from rdflib import Literal, URIRef
 from rdflib.util import from_n3
 
-from plastron.core.exceptions import ConfigError
+from plastron.cli import ConfigError
 from plastron.files import LocalFileSource, RemoteFileSource
 from plastron.rdf import pcdm, namespaces, rdf
 

@@ -24,8 +24,7 @@ from rdflib import URIRef, Literal
 from requests import ConnectionError
 
 from plastron.client import Client, ClientError
-from plastron.core.exceptions import DataReadException
-from plastron.core.util import ItemLog, datetimestamp, strtobool
+from plastron.utils import datetimestamp, strtobool, ItemLog
 from plastron.files import get_ssh_client, ZipFileSource, RemoteFileSource, HTTPFileSource, LocalFileSource, \
     BinarySource
 from plastron.jobs.utils import create_repo_changeset, build_file_groups, annotate_from_files, build_fields, \
@@ -34,7 +33,7 @@ from plastron.models import get_model_class, Item, ModelClassNotFoundError
 from plastron.rdf.pcdm import File, PreservationMasterFile, Object
 from plastron.rdf.rdf import Resource
 from plastron.rdfmapping.properties import ValidationFailure
-from plastron.repo import Repository
+from plastron.repo import Repository, DataReadError
 from plastron.serializers import SERIALIZER_CLASSES, detect_resource_class, EmptyItemListError
 from plastron.validation import ValidationError
 
@@ -672,7 +671,7 @@ class MetadataRows:
 
         try:
             self.fields = build_fields(self.fieldnames, self.model_class)
-        except DataReadException as e:
+        except DataReadError as e:
             raise RuntimeError(str(e)) from e
 
         self.validation_reports: List[Mapping] = []
@@ -900,7 +899,7 @@ class ExportJob:
                 # TODO: expand to other types of unique ids?
                 match = UUID_REGEX.search(uri)
                 if match is None:
-                    raise DataReadException(f'No UUID found in {uri}')
+                    raise DataReadError(f'No UUID found in {uri}')
                 item_dir = match[0]
 
                 _, graph = self.client.get_graph(uri)
@@ -932,7 +931,7 @@ class ExportJob:
 
                 count += 1
 
-            except DataReadException as e:
+            except DataReadError as e:
                 # log the failure, but continue to attempt to export the rest of the URIs
                 logger.error(f'Export of {uri} failed: {e}')
                 errors += 1

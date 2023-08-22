@@ -48,7 +48,6 @@ DEFAULT_LOGGING_OPTIONS = {
         'level': 'DEBUG'
     }
 }
-
 logger = logging.getLogger(__name__)
 
 

@@ -4,9 +4,9 @@ from datetime import datetime
 
 from plastron.client import Client, TransactionClient, ClientError
 from plastron.cli.commands import BaseCommand
-from plastron.core import util
-from plastron.core.exceptions import DataReadException
+from plastron.repo import DataReadError
 from plastron.models.newspaper import Page
+from plastron.utils import ItemLog
 
 logger = logging.getLogger(__name__)
 now = datetime.utcnow().strftime('%Y%m%d%H%M%S')
@@ -31,7 +31,7 @@ class Command(BaseCommand):
 
         # read the log of completed items
         try:
-            completed = util.ItemLog('logs/annotated.csv', fieldnames, 'uri')
+            completed = ItemLog('logs/annotated.csv', fieldnames, 'uri')
         except Exception as e:
             logger.error('Non-standard map file specified: {0}'.format(e))
             raise RuntimeError()
@@ -40,7 +40,7 @@ class Command(BaseCommand):
 
         if args.ignore is not None:
             try:
-                ignored = util.ItemLog(args.ignore, fieldnames, 'uri')
+                ignored = ItemLog(args.ignore, fieldnames, 'uri')
             except Exception as e:
                 logger.error('Non-standard ignore file specified: {0}'.format(e))
                 raise RuntimeError()
@@ -48,7 +48,7 @@ class Command(BaseCommand):
             ignored = []
 
         skipfile = 'logs/skipped.extractocr.{0}.csv'.format(now)
-        skipped = util.ItemLog(skipfile, fieldnames, 'uri')
+        skipped = ItemLog(skipfile, fieldnames, 'uri')
 
         for line in sys.stdin:
             uri = line.rstrip('\n')
@@ -90,7 +90,7 @@ def extract(client: Client, uri):
             txn_client.commit()
             return True
 
-        except (ClientError, DataReadException) as e:
+        except (ClientError, DataReadError) as e:
             # if anything fails during item creation or committing the transaction
             # attempt to roll back the current transaction
             # failures here will be caught by the main loop's exception handler

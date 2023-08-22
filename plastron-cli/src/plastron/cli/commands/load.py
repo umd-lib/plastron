@@ -9,8 +9,9 @@ from time import sleep
 
 from plastron.client import Client, TransactionClient, ClientError
 from plastron.cli.commands import BaseCommand
-from plastron.core.exceptions import ConfigError, DataReadException
-from plastron.core.util import ItemLog
+from plastron.repo import DataReadError
+from plastron.cli import ConfigError
+from plastron.utils import ItemLog
 
 logger = logging.getLogger(__name__)
 now = datetime.utcnow().strftime('%Y%m%d%H%M%S')
@@ -111,7 +112,7 @@ class Command(BaseCommand):
 
         try:
             batch = handler.Batch(client, batch_config)
-        except (ConfigError, DataReadException) as e:
+        except (ConfigError, DataReadError) as e:
             logger.error(e.message)
             logger.error('Failed to initialize batch')
             raise RuntimeError(e.message)
@@ -175,7 +176,7 @@ class Command(BaseCommand):
                         "Unable to commit or rollback transaction, aborting"
                     )
                     raise RuntimeError()
-                except DataReadException as e:
+                except DataReadError as e:
                     logger.error(f"Skipping item {n + 1}: {e.message}")
 
                 row = {'number': n + 1,

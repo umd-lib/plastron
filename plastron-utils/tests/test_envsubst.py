@@ -1,4 +1,4 @@
-from plastron.core.util import envsubst
+from plastron.utils import envsubst
 
 
 def test_simple_strings():

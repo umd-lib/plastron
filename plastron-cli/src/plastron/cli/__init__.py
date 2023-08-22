@@ -16,13 +16,12 @@ import yaml
 from plastron.cli import commands
 from plastron.client import Endpoint, Client, RepositoryStructure
 from plastron.client.auth import get_authenticator
-from plastron.core.exceptions import ConfigError
-from plastron.core.util import envsubst, DEFAULT_LOGGING_OPTIONS
+from plastron.utils import DEFAULT_LOGGING_OPTIONS, envsubst
 from plastron.stomp.broker import Broker
 
 logger = logging.getLogger(__name__)
 now = datetime.utcnow().strftime('%Y%m%d%H%M%S')
-version = importlib.metadata.version('plastron-legacy')
+version = importlib.metadata.version('plastron-cli')
 
 
 def load_commands(subparsers):
@@ -222,3 +221,11 @@ def print_footer(args):
 
 if __name__ == "__main__":
     main()
+
+
+class ConfigError(Exception):
+    def __init__(self, message):
+        self.message = message
+
+    def __str__(self):
+        return self.message

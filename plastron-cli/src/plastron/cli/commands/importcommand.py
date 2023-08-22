@@ -1,24 +1,16 @@
 import copy
 import csv
 import logging
-import os
 from argparse import FileType, ArgumentTypeError
-from os.path import basename
 from typing import TextIO
 
-from rdflib import URIRef
-
 from plastron.cli.commands import BaseCommand
-from plastron.client import Client, ClientError
-from plastron.core.exceptions import ConfigError
-from plastron.core.util import datetimestamp, strtobool
-from plastron.files import HTTPFileSource, LocalFileSource, RemoteFileSource, ZipFileSource
-from plastron.jobs import ImportJob, ImportedItemStatus, ModelClassNotFoundError
-from plastron.jobs.utils import build_file_groups, annotate_from_files
+from plastron.client import Client
+from plastron.utils import datetimestamp
+from plastron.jobs import ImportJob, ModelClassNotFoundError
 from plastron.models import get_model_class
 from plastron.namespaces import get_manager
 from plastron.rdf import uri_or_curie
-from plastron.rdf.pcdm import File, PreservationMasterFile
 from plastron.repo import Repository
 
 nsm = get_manager()

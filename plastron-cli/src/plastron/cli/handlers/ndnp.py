@@ -8,7 +8,7 @@ import os
 import lxml
 from lxml.etree import parse, XMLSyntaxError
 
-from plastron.core.exceptions import DataReadException
+from plastron.repo import DataReadError
 from plastron.files import LocalFileSource
 from plastron.models.newspaper import Article, Issue, IssueMetadata, MetadataFile, Page
 from plastron.namespaces import dcmitype, ndnp
@@ -71,9 +71,9 @@ class Batch:
         try:
             tree = parse(config.batch_file)
         except OSError:
-            raise DataReadException(f'Unable to read {config.batch_file}')
+            raise DataReadError(f'Unable to read {config.batch_file}')
         except XMLSyntaxError:
-            raise DataReadException(f'Unable to parse {config.batch_file} as XML')
+            raise DataReadError(f'Unable to parse {config.batch_file} as XML')
 
         root = tree.getroot()
         m = XPATHMAP
@@ -159,9 +159,9 @@ class BatchItem:
         try:
             tree = parse(self.path)
         except OSError:
-            raise DataReadException("Unable to read {0}".format(self.path))
+            raise DataReadError("Unable to read {0}".format(self.path))
         except XMLSyntaxError:
-            raise DataReadException(
+            raise DataReadError(
                 "Unable to parse {0} as XML".format(self.path)
             )
 
@@ -177,7 +177,7 @@ class BatchItem:
             issue.date = root.find('.//MODS:dateIssued', xmlns).text
             issue.sequence_attr = ('Page', 'number')
         except AttributeError:
-            raise DataReadException("Missing metadata in {0}".format(self.path))
+            raise DataReadError("Missing metadata in {0}".format(self.path))
 
         # optional metadata elements
         if root.find(m['volume']) is not None:
@@ -213,11 +213,11 @@ class BatchItem:
         try:
             article_tree = parse(self.article_path)
         except OSError:
-            raise DataReadException(
+            raise DataReadError(
                 "Unable to read {0}".format(self.article_path)
             )
         except XMLSyntaxError:
-            raise DataReadException(
+            raise DataReadError(
                 "Unable to parse {0} as XML".format(self.article_path)
             )
 
@@ -258,7 +258,7 @@ class BatchItem:
             filexml = issue_mets.file(fileid)
 
             if 'ADMID' not in filexml.attrib:
-                raise DataReadException(f'No ADMID found for {fileid}, cannot lookup technical metadata')
+                raise DataReadError(f'No ADMID found for {fileid}, cannot lookup technical metadata')
 
             # get technical metadata by type
             techmd = {}
@@ -334,16 +334,16 @@ class METSResource(object):
         try:
             return self.xpath('METS:dmdSec[@ID=$id]', id=id)[0]
         except IndexError:
-            raise DataReadException(f'Cannot find METS:dmdSec element with ID "{id}"')
+            raise DataReadError(f'Cannot find METS:dmdSec element with ID "{id}"')
 
     def file(self, id):
         try:
             return self.xpath('METS:fileSec//METS:file[@ID=$id]', id=id)[0]
         except IndexError:
-            raise DataReadException(f'Cannot find METS:file element with ID "{id}"')
+            raise DataReadError(f'Cannot find METS:file element with ID "{id}"')
 
     def techmd(self, id):
         try:
             return self.xpath('METS:amdSec/METS:techMD[@ID=$id]', id=id)[0]
         except IndexError:
-            raise DataReadException(f'Cannot find METS:techMD element with ID "{id}"')
+            raise DataReadError(f'Cannot find METS:techMD element with ID "{id}"')

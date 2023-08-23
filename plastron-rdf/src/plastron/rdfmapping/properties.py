@@ -26,6 +26,14 @@ class ValidationSuccess(ValidationResult):
         return True
 
 
+class ValidationResultsDict(dict):
+    def failures(self):
+        return {k: v for k, v in self.items() if isinstance(v, ValidationFailure)}.items()
+
+    def successes(self):
+        return {k: v for k, v in self.items() if isinstance(v, ValidationSuccess)}.items()
+
+
 class RDFProperty:
     def __init__(
             self,

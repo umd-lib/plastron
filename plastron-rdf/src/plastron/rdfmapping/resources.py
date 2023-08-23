@@ -7,7 +7,7 @@ from rdflib import Graph, URIRef
 from rdflib.term import BNode
 
 from plastron.rdfmapping.descriptors import ObjectProperty, Property, DataProperty
-from plastron.rdfmapping.properties import RDFProperty, ValidationResult
+from plastron.rdfmapping.properties import RDFProperty, ValidationResult, ValidationResultsDict
 
 
 def is_iterable(value: Any) -> bool:
@@ -129,8 +129,8 @@ class RDFResourceBase:
             return False
         return True
 
-    def validate(self) -> Dict[str, ValidationResult]:
-        results = {name: getattr(self, name).is_valid for name in self.rdf_property_names}
+    def validate(self) -> ValidationResultsDict:
+        results = ValidationResultsDict({name: getattr(self, name).is_valid for name in self.rdf_property_names})
         for test in self.validators:
             results['_' + test.__name__] = test(self)
         return results

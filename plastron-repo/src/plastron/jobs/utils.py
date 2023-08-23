@@ -4,20 +4,19 @@ from collections import OrderedDict, defaultdict
 from dataclasses import dataclass
 from os.path import splitext, basename
 from typing import Optional, Dict, List, Union
-from uuid import uuid4
 
 from bs4 import BeautifulSoup
-from plastron.rdfmapping.properties import RDFObjectProperty
-
-from plastron.rdfmapping.descriptors import DataProperty, Property
 from rdflib import Literal, URIRef, Graph
 from rdflib.util import from_n3
 
-from plastron.repo import DataReadError
+from plastron.client import Client
 from plastron.namespaces import sc, get_manager
 from plastron.rdf import rdf
 from plastron.rdf.oa import TextualBody, FullTextAnnotation
-from plastron.rdf.rdf import RDFDataProperty, Resource
+from plastron.rdf.rdf import Resource
+from plastron.rdfmapping.descriptors import DataProperty, Property
+from plastron.rdfmapping.properties import RDFObjectProperty
+from plastron.repo import DataReadError
 from plastron.serializers import CSVSerializer
 
 logger = logging.getLogger(__name__)
@@ -246,9 +245,6 @@ def create_repo_changeset(repo, metadata, row, validate_only=False):
     # where they appear as the subject
     new_objects = defaultdict(Graph)
 
-    delete_graph = Graph()
-    insert_graph = Graph()
-
     # build the lookup index to map hash URI objects
     # to their correct positional locations
     row_index = build_lookup_index(item, row.index_string)
@@ -303,18 +299,7 @@ def create_repo_changeset(repo, metadata, row, validate_only=False):
                         getattr(obj, next_attrs).extend(values)
                         first_prop.add(obj)
 
-    for triple in item.inserts:
-        insert_graph.add(triple)
-    for triple in item.deletes:
-        delete_graph.add(triple)
-
-    # do a pass to remove statements that are both deleted and then re-inserted
-    for statement in delete_graph:
-        if statement in insert_graph:
-            delete_graph.remove(statement)
-            insert_graph.remove(statement)
-
-    return RepoChangeset(item, insert_graph, delete_graph)
+    return RepoChangeset(item)
 
 
 class RepoChangeset:
@@ -324,13 +309,15 @@ class RepoChangeset:
 
     :param item: a repository model object (i.e. from plastron.models) from
                  the repository (or an empty object if validation only)
-    :param insert_graph: an RDF Graph object to insert into the repository
-    :param delete_graph: an RDF Graph object to delete from the repository
     """
-    def __init__(self, item, insert_graph, delete_graph):
+    def __init__(self, item):
         self._item = item
-        self._insert_graph = insert_graph
-        self._delete_graph = delete_graph
+        self._insert_graph = Graph()
+        for triple in self._item.inserts:
+            self._insert_graph.add(triple)
+        self._delete_graph = Graph()
+        for triple in self._item.deletes:
+            self._delete_graph.add(triple)
 
     @property
     def item(self):
@@ -351,5 +338,5 @@ class RepoChangeset:
     def __bool__(self):
         return not self.is_empty
 
-    def build_sparql_update(self, repo):
-        return repo.build_sparql_update(self.delete_graph, self.insert_graph)
+    def build_sparql_update(self, client: Client):
+        return client.build_sparql_update(self.delete_graph, self.insert_graph)

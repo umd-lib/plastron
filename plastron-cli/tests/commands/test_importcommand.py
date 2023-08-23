@@ -132,7 +132,7 @@ def test_exception_when_no_validation_ruleset(client, monkeypatch):
 
     item = MagicMock(Item)
     monkeypatch.setattr(Item, 'validate', MagicMock(side_effect=ValidationError("test")))
-    repo_changeset = RepoChangeset(item, None, None)
+    repo_changeset = RepoChangeset(item)
 
     plastron.jobs.utils.create_repo_changeset = MagicMock(return_value=repo_changeset)
 
@@ -159,7 +159,7 @@ def test_invalid_item_added_to_drop_invalid_log(client, monkeypatch):
 
     command = Command(config)
 
-    repo_changeset = RepoChangeset(invalid_item, None, None)
+    repo_changeset = RepoChangeset(invalid_item)
 
     monkeypatch.setattr(plastron.jobs, 'create_repo_changeset', MagicMock(return_value=repo_changeset))
     monkeypatch.setattr(ImportJob, 'get_source', MagicMock())
@@ -192,7 +192,7 @@ def test_failed_item_added_to_drop_failed_log(client, monkeypatch):
 
     command = Command(config)
 
-    repo_changeset = RepoChangeset(failed_item, Graph(), Graph())
+    repo_changeset = RepoChangeset(failed_item)
 
     monkeypatch.setattr(plastron.jobs, 'create_repo_changeset', MagicMock(return_value=repo_changeset))
     monkeypatch.setattr(ImportJob, 'get_source', MagicMock())

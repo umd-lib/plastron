@@ -37,6 +37,7 @@ class Property:
     def _get_property_kwargs(self, instance) -> Dict[str, Any]:
         return {
             'resource': instance,
+            'attr_name': self.name,
             'predicate': self.predicate,
             'required': self.required,
             'repeatable': self.repeatable,

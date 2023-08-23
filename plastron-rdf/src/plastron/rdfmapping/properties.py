@@ -30,12 +30,14 @@ class RDFProperty:
     def __init__(
             self,
             resource,
+            attr_name: str,
             predicate: URIRef,
             required: bool = False,
             repeatable: bool = False,
             validate: Callable[[Any], bool] = None,
     ):
         self.resource = resource
+        self.attr_name = attr_name
         self.predicate = predicate
         self.required = required
         self.repeatable = repeatable
@@ -103,13 +105,14 @@ class RDFDataProperty(RDFProperty):
     def __init__(
             self,
             resource,
+            attr_name: str,
             predicate: URIRef,
             required: bool = False,
             repeatable: bool = False,
             validate: Callable[[Any], bool] = None,
             datatype: URIRef = None,
     ):
-        super().__init__(resource, predicate, required, repeatable, validate)
+        super().__init__(resource, attr_name, predicate, required, repeatable, validate)
         self.datatype = datatype
 
     @property
@@ -141,6 +144,7 @@ class RDFObjectProperty(RDFProperty):
     def __init__(
             self,
             resource,
+            attr_name: str,
             predicate: URIRef,
             required: bool = False,
             repeatable: bool = False,
@@ -148,7 +152,7 @@ class RDFObjectProperty(RDFProperty):
             object_class: type = None,
             embedded: bool = False,
     ):
-        super().__init__(resource, predicate, required, repeatable, validate)
+        super().__init__(resource, attr_name, predicate, required, repeatable, validate)
         self.object_class = object_class
         self.embedded = embedded
         self._object_map = {}

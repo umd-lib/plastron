@@ -210,9 +210,14 @@ class Command(BaseCommand):
         repo = Repository(client=client)
         job = ImportJob(args.job_id, self.jobs_dir)
         if args.resume:
-            metadata = yield from job.resume(repo=repo)
+            count = yield from job.resume(
+                repo=repo,
+                limit=args.limit,
+                percentage=args.percentage,
+                validate_only=args.validate_only,
+            )
         else:
-            metadata = yield from job.start(
+            count = yield from job.start(
                 repo=repo,
                 import_file=args.import_file,
                 model=args.model,
@@ -222,38 +227,27 @@ class Command(BaseCommand):
                 binaries_location=args.binaries_location,
                 limit=args.limit,
                 percentage=args.percentage,
+                validate_only=args.validate_only,
             )
 
-        """ TODO: statistics object to return
-        logger.info(f'Skipped {metadata.skipped} items')
-        logger.info(f'Completed {len(job.completed_log) - initial_completed_item_count} items')
-        logger.info(f'Dropped {len(import_run.invalid_items)} invalid items')
-        logger.info(f'Dropped {len(import_run.failed_items)} failed items')
-
-        logger.info(f"Found {metadata.valid} valid items")
-        logger.info(f"Found {metadata.invalid} invalid items")
-        logger.info(f"Found {metadata.errors} errors")
-        if not args.validate_only:
-            logger.info(f"{metadata.unchanged} of {metadata.total} items remained unchanged")
-            logger.info(f"Created {metadata.created} of {metadata.total} items")
-            logger.info(f"Updated {metadata.updated} of {metadata.total} items")
-        """
+        for key, value in count.items():
+            logger.info(f"{key.title().replace('_', ' ')}: {value}")
 
         if args.validate_only:
             # validate phase
-            if metadata.invalid == 0:
+            if count['invalid_items'] == 0:
                 result_type = 'validate_success'
             else:
                 result_type = 'validate_failed'
         else:
             # import phase
-            if len(job.completed_log) == metadata.total:
+            if len(job.completed_log) == count['total_items']:
                 result_type = 'import_complete'
             else:
                 result_type = 'import_incomplete'
 
         self.result = {
             'type': result_type,
-            'validation': metadata.validation_reports,
-            'count': metadata.stats()
+            'validation': job.validation_reports,
+            'count': count,
         }

@@ -253,8 +253,20 @@ class ImportJob:
         if metadata.has_binaries and self.config.binaries_location is None:
             raise RuntimeError('Must specify --binaries-location if the metadata has a FILES column')
 
-        initial_completed_item_count = len(self.completed_log)
-        logger.info(f'Found {initial_completed_item_count} completed items')
+        count = Counter(
+            total_items=metadata.total,
+            rows=0,
+            errors=0,
+            initially_completed_items=len(self.completed_log),
+            files=0,
+            valid_items=0,
+            invalid_items=0,
+            created_items=0,
+            updated_items=0,
+            unchanged_items=0,
+            skipped_items=0,
+        )
+        logger.info(f'Found {count["initially_completed_items"]} completed items')
 
         import_run = self.new_run().start()
         for row in metadata:
@@ -262,15 +274,15 @@ class ImportJob:
             item = repo_changeset.item
 
             # count the number of files referenced in this row
-            metadata.files += len(row.filenames)
+            count['files'] += len(row.filenames)
 
             try:
-                results = item.validate()
+                results: ValidationResultsDict = item.validate()
             except ValidationError as e:
                 raise RuntimeError(f'Unable to run validation: {e}') from e
 
             is_valid = all(bool(result) for result in results.values())
-            metadata.validation_reports.append({
+            self.validation_reports.append({
                 'line': row.line_reference,
                 'is_valid': is_valid,
                 # 'passed': [outcome for outcome in report.passed()],
@@ -284,18 +296,13 @@ class ImportJob:
                 logger.warning(f'{len(missing_files)} file(s) for "{item}" not found')
 
             if is_valid and len(missing_files) == 0:
-                metadata.valid += 1
+                count['valid_items'] += 1
                 logger.info(f'"{item}" is valid')
             else:
-                failures = {
-                    getattr(item.__class__, name).label: result
-                    for name, result in results.items()
-                    if isinstance(result, ValidationFailure)
-                }
                 # drop invalid items
-                metadata.invalid += 1
+                count['invalid_items'] += 1
                 logger.warning(f'"{item}" is invalid, skipping')
-                reasons = [f'{name} {result}' for name, result in failures.items()]
+                reasons = [f'{name} {result}' for name, result in results.failures()]
                 if len(missing_files) > 0:
                     reasons.extend(f'Missing file: {f}' for f in missing_files)
                 import_run.drop_invalid(
@@ -310,9 +317,15 @@ class ImportJob:
                 continue
 
             try:
-                self.update_repo(repo, metadata, row, repo_changeset)
+                created, updated, unchanged = self.update_repo(repo, row, repo_changeset)
+                count.update(
+                    created_items=len(created),
+                    updated_items=len(updated),
+                    unchanged_items=len(unchanged),
+                    skipped_items=len(unchanged),
+                )
             except RuntimeError as e:
-                metadata.errors += 1
+                count['items_with_errors'] += 1
                 logger.error(f'{item} import failed: {e}')
                 import_run.drop_failed(item, row.line_reference, reason=str(e))
 
@@ -324,10 +337,10 @@ class ImportJob:
                     'now': now,
                     'elapsed': now - start_time
                 },
-                'count': metadata.stats()
+                'count': count,
             }
 
-        return metadata
+        return count
 
     @property
     def access(self) -> Optional[URIRef]:

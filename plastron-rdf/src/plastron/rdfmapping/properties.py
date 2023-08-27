@@ -59,6 +59,13 @@ class RDFProperty:
     def values(self):
         return self.resource.graph.objects(self.resource.uri, self.predicate)
 
+    @property
+    def value(self):
+        try:
+            return next(iter(self.values))
+        except StopIteration:
+            return None
+
     def __iter__(self):
         return self.values
 
@@ -186,6 +193,13 @@ class RDFObjectProperty(RDFProperty):
                 yield self._object_map[value]
             else:
                 yield value
+
+    @property
+    def object(self):
+        try:
+            return next(iter(self.objects))
+        except StopIteration:
+            return None
 
     def add(self, value):
         if self.object_class is not None and hasattr(value, 'uri'):

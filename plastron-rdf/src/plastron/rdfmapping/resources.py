@@ -1,13 +1,35 @@
 from collections import defaultdict
 from copy import deepcopy, copy
-from typing import List, Optional, Union, Any, Type, Dict
+from typing import List, Optional, Union, Any, Type
 from uuid import uuid4
 
 from rdflib import Graph, URIRef
-from rdflib.term import BNode
+from rdflib.term import Node
 
 from plastron.rdfmapping.descriptors import ObjectProperty, Property, DataProperty
-from plastron.rdfmapping.properties import RDFProperty, ValidationResult, ValidationResultsDict
+from plastron.rdfmapping.properties import RDFProperty, ValidationResultsDict
+
+
+def update_node(node: Node, old_uri: URIRef, new_uri: URIRef) -> Optional[URIRef]:
+    if node == old_uri or str(node).startswith(old_uri + '#'):
+        return URIRef(str(node).replace(old_uri, new_uri))
+    else:
+        return None
+
+
+def update_uri(graph: Graph, old_uri: URIRef, new_uri: URIRef):
+    """Change occurrences of ``old_uri`` to ``new_uri`` in the ``graph``.
+    This includes URIRefs that contain a fragment identifier following
+    the ``old_uri``.
+
+    The ``graph`` object is updated in place."""
+    for s, p, o in graph:
+        new_s = update_node(s, old_uri, new_uri)
+        new_p = update_node(p, old_uri, new_uri)
+        new_o = update_node(o, old_uri, new_uri)
+        if new_s or new_p or new_o:
+            graph.remove((s, p, o))
+            graph.add((new_s or s, new_p or p, new_o or o))
 
 
 def is_iterable(value: Any) -> bool:
@@ -37,18 +59,19 @@ class RDFResourceBase:
         cls.rdf_property_names = copy(cls.__base__.rdf_property_names) + own_properties
         # default_values and validators are modified by decorators, which
         # run after the __init_subclass__ method
-        cls.default_values = copy(cls.__base__.default_values)
-        cls.validators = copy(cls.__base__.validators)
+        cls.default_values = deepcopy(cls.__base__.default_values)
+        cls.validators = deepcopy(cls.__base__.validators)
 
     def __init__(self, uri: Union[URIRef, str] = None, graph: Optional[Graph] = None, **kwargs):
         if uri is not None:
             self._uri = URIRef(uri)
         else:
-            self._uri = BNode()
+            # use a unique UUID URI for resources that do not (yet) have a URI subject
+            self._uri = URIRef(uuid4().urn)
         self.base_graph = graph if graph is not None else Graph()
 
-        self.inserts = set()
-        self.deletes = set()
+        self.inserts = Graph()
+        self.deletes = Graph()
         if not graph:
             self.set_properties(**self.default_values)
         self.set_properties(**kwargs)
@@ -92,7 +115,9 @@ class RDFResourceBase:
 
     @property
     def graph(self) -> Graph:
-        graph = deepcopy(self.base_graph)
+        graph = Graph()
+        for triple in self.base_graph.triples((self._uri, None, None)):
+            graph.add(triple)
         for triple in self.deletes:
             graph.remove(triple)
         for triple in self.inserts:
@@ -111,12 +136,22 @@ class RDFResourceBase:
         self.clear_changes()
 
     def clear_changes(self):
-        self.deletes.clear()
-        self.inserts.clear()
+        for triple in self.deletes:
+            self.deletes.remove(triple)
+        for triple in self.inserts:
+            self.inserts.remove(triple)
 
     @property
     def uri(self) -> URIRef:
+        """The primary subject for this RDF resource."""
         return self._uri
+
+    @uri.setter
+    def uri(self, new_uri: URIRef):
+        update_uri(self.base_graph, self._uri, new_uri)
+        update_uri(self.deletes, self._uri, new_uri)
+        update_uri(self.inserts, self._uri, new_uri)
+        self._uri = new_uri
 
     def rdf_properties(self) -> List[RDFProperty]:
         return [getattr(self, attr_name) for attr_name in self.rdf_property_names]

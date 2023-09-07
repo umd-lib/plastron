@@ -1,9 +1,9 @@
-import csv
 import dataclasses
 import logging
 import os
 import re
 import urllib.parse
+from collections import Counter
 from dataclasses import dataclass
 from datetime import datetime
 from email.utils import parsedate
@@ -13,61 +13,134 @@ from pathlib import Path
 from shutil import copyfileobj
 from tempfile import TemporaryDirectory
 from time import mktime
-from typing import List, Mapping, Optional, Type, Union, Any, IO, NamedTuple
+from typing import List, Mapping, Optional, Type, Union, Any, IO, Generator, Iterable
 from urllib.parse import urlsplit
 from zipfile import ZipFile
 
 import yaml
 from bagit import make_bag
 from paramiko import SFTPClient, SSHException
+from plastron.utils import datetimestamp, ItemLog
 from rdflib import URIRef, Literal
 from requests import ConnectionError
 
-from plastron.client import Client, ClientError
-from plastron.utils import datetimestamp, strtobool, ItemLog
+from plastron.client import Client, ClientError, random_slug
 from plastron.files import get_ssh_client, ZipFileSource, RemoteFileSource, HTTPFileSource, LocalFileSource, \
     BinarySource
 from plastron.jobs.utils import create_repo_changeset, build_file_groups, annotate_from_files, build_fields, \
-    RepoChangeset, ColumnSpec, parse_value_string
-from plastron.models import get_model_class, Item, ModelClassNotFoundError
+    RepoChangeset, ColumnSpec, parse_value_string, Row, MetadataRows, JobError, JobConfigError, LineReference
+from plastron.models import get_model_class, Item, ModelClassNotFoundError, umdform
+from plastron.models.umd import Page, Proxy, PCDMObject, PCDMFile
 from plastron.rdf.pcdm import File, PreservationMasterFile, Object
 from plastron.rdf.rdf import Resource
-from plastron.rdfmapping.properties import ValidationFailure
-from plastron.repo import Repository, DataReadError
+from plastron.rdfmapping.properties import ValidationFailure, ValidationResultsDict, ValidationResult, ValidationSuccess
+from plastron.repo import Repository, DataReadError, ContainerResource, BinaryResource, RDFResourceType
 from plastron.serializers import SERIALIZER_CLASSES, detect_resource_class, EmptyItemListError
 from plastron.validation import ValidationError
 
 logger = logging.getLogger(__name__)
 UUID_REGEX = re.compile(r'([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})', re.IGNORECASE)
 
-
-class LineReference(NamedTuple):
-    filename: str
-    line_number: int
-
-    def __str__(self):
-        return f'{self.filename}:{self.line_number}'
+DROPPED_INVALID_FIELDNAMES = ['id', 'timestamp', 'title', 'uri', 'reason']
+DROPPED_FAILED_FIELDNAMES = ['id', 'timestamp', 'title', 'uri', 'reason']
 
 
 def is_run_dir(path: Path) -> bool:
     return path.is_dir() and re.match(r'^\d{14}$', path.name)
 
 
-class JobError(Exception):
-    def __init__(self, job, *args):
-        super().__init__(*args)
-        self.job = job
+def format_size(size: int, decimal_places: Optional[int] = None):
+    for unit in ('B', 'KB', 'MB', 'GB', 'TB'):
+        if size < 1024:
+            break
+        size /= 1024
 
-    def __str__(self):
-        return f'Job {self.job} error: {super().__str__()}'
-
-
-class JobConfigError(JobError):
-    pass
+    if decimal_places is not None:
+        return round(size, decimal_places), unit
 
 
-class MetadataError(JobError):
-    pass
+def compress_bag(bag, dest, root_dirname=''):
+    with ZipFile(dest, mode='w') as zip_file:
+        for dirpath, dirnames, filenames in os.walk(bag.path):
+            for name in filenames:
+                src_filename = os.path.join(dirpath, name)
+                archived_name = normpath(os.path.join(root_dirname, relpath(dirpath, start=bag.path), name))
+                zip_file.write(filename=src_filename, arcname=archived_name)
+
+
+def get_new_member(item, rootname, number):
+    # TODO: this should probably be defined in a structural model, or profiles of a descriptive model
+    if isinstance(item, Item) and umdform.pool_reports in item.format:
+        if rootname.startswith('body-'):
+            title = Literal('Body')
+        else:
+            title = Literal(f'Attachment {number - 1}')
+    else:
+        title = Literal(f'Page {number}')
+
+    member = Page(title=title, number=Literal(number), member_of=item)
+
+    # add the member to the item
+    item.has_member.add(member)
+    return member
+
+
+def create_page(
+        container: ContainerResource,
+        parent: RDFResourceType,
+        number: int,
+        file_sources: Mapping[str, BinarySource] = None,
+) -> ContainerResource:
+    """Create a page with the given number, contained in container, as a pcdm:memberOf
+    the parent RDF resource."""
+    if file_sources is None:
+        file_sources = {}
+    logger.debug(f'Creating page {number} for {parent}')
+    page = container.create_child(
+        resource_class=ContainerResource,
+        slug=random_slug(),
+        description=Page(title=f'Page {number}', number=number, member_of=parent),
+    )
+    files_container = page.create_child(resource_class=ContainerResource, slug='f')
+    for filename, source in file_sources.items():
+        file = create_file(
+            container=files_container,
+            source=source,
+            parent=page.description,
+        )
+        page.description.has_file.add(URIRef(file.url))
+    page.save()
+    return page
+
+
+def create_file(
+        container: ContainerResource,
+        source: BinarySource,
+        parent: RDFResourceType,
+        slug: str = None,
+) -> BinaryResource:
+    """Create a single file"""
+    if slug is None:
+        slug = random_slug()
+    with source.open() as stream:
+        logger.debug(f'Creating file {source.filename} for {parent}')
+        file = container.create_child(
+            resource_class=BinaryResource,
+            slug=slug,
+            description=PCDMFile(
+                title=basename(source.filename),
+                file_of=parent,
+            ),
+            data=stream,
+            headers={
+                'Content-Type': source.mimetype(),
+                'Digest': source.digest(),
+                'Content-Disposition': f'attachment; filename="{source.filename}"',
+            },
+        )
+    file.save()
+    logger.debug(f'Created file: {file.url} {file.description.title.value}')
+    return file
 
 
 class ImportedItemStatus(Enum):
@@ -125,6 +198,7 @@ class ImportJob:
         self.completed_log = ItemLog(self.dir / 'completed.log.csv', completed_fieldnames, 'id')
 
         self.ssh_private_key = ssh_private_key
+        self.validation_reports = []
 
     def __str__(self):
         return self.id
@@ -199,7 +273,7 @@ class ImportJob:
             binaries_location: str = None,
             extract_text_types: str = None,
             **kwargs,
-    ):
+    ) -> Generator[Any, None, Counter]:
         self.save_config({
             'model': model,
             'access': access,
@@ -211,7 +285,7 @@ class ImportJob:
 
         return (yield from self.import_items(repo=repo, **kwargs))
 
-    def resume(self, repo: Repository, **kwargs):
+    def resume(self, repo: Repository, **kwargs) -> Generator[Any, None, Counter]:
         if not self.dir_exists:
             raise RuntimeError(f'Cannot resume job "{self.id}": no such job directory: "{self.dir}"')
 
@@ -231,7 +305,7 @@ class ImportJob:
             percentage=None,
             validate_only: bool = False,
             import_file: IO = None,
-    ):
+    ) -> Generator[Any, None, Counter]:
         start_time = datetime.now().timestamp()
 
         if percentage:
@@ -270,43 +344,24 @@ class ImportJob:
 
         import_run = self.new_run().start()
         for row in metadata:
-            repo_changeset = create_repo_changeset(repo.client, metadata, row)
-            item = repo_changeset.item
+            logger.debug(f'Row data: {row.data}')
+            import_row = ImportRow(self, repo, row)
 
             # count the number of files referenced in this row
             count['files'] += len(row.filenames)
 
-            try:
-                results: ValidationResultsDict = item.validate()
-            except ValidationError as e:
-                raise RuntimeError(f'Unable to run validation: {e}') from e
-
-            is_valid = all(bool(result) for result in results.values())
-            self.validation_reports.append({
-                'line': row.line_reference,
-                'is_valid': is_valid,
-                # 'passed': [outcome for outcome in report.passed()],
-                # 'failed': [outcome for outcome in report.failed()]
-            })
-
-            missing_files = [
-                name for name in row.filenames if not self.get_source(self.config.binaries_location, name).exists()
-            ]
-            if len(missing_files) > 0:
-                logger.warning(f'{len(missing_files)} file(s) for "{item}" not found')
-
-            if is_valid and len(missing_files) == 0:
+            # validate metadata and files
+            validation = import_row.validate_item()
+            if validation.ok:
                 count['valid_items'] += 1
-                logger.info(f'"{item}" is valid')
+                logger.info(f'"{import_row}" is valid')
             else:
                 # drop invalid items
                 count['invalid_items'] += 1
-                logger.warning(f'"{item}" is invalid, skipping')
-                reasons = [f'{name} {result}' for name, result in results.failures()]
-                if len(missing_files) > 0:
-                    reasons.extend(f'Missing file: {f}' for f in missing_files)
+                logger.warning(f'"{import_row}" is invalid, skipping')
+                reasons = [f'{name} {result}' for name, result in validation.failures()]
                 import_run.drop_invalid(
-                    item=item,
+                    item=import_row.item,
                     line_reference=row.line_reference,
                     reason=f'Validation failures: {"; ".join(reasons)}'
                 )
@@ -317,17 +372,21 @@ class ImportJob:
                 continue
 
             try:
-                created, updated, unchanged = self.update_repo(repo, row, repo_changeset)
-                count.update(
-                    created_items=len(created),
-                    updated_items=len(updated),
-                    unchanged_items=len(unchanged),
-                    skipped_items=len(unchanged),
-                )
+                status = import_row.update_repo()
+                self.complete(import_row.item, row.line_reference, status)
+                if status == ImportedItemStatus.CREATED:
+                    count['created_items'] += 1
+                elif status == ImportedItemStatus.MODIFIED:
+                    count['updated_items'] += 1
+                elif status == ImportedItemStatus.UNCHANGED:
+                    count['unchanged_items'] += 1
+                    count['skipped_items'] += 1
+                else:
+                    raise RuntimeError(f'Unknown status "{status}" returned when importing "{import_row.item}"')
             except RuntimeError as e:
                 count['items_with_errors'] += 1
-                logger.error(f'{item} import failed: {e}')
-                import_run.drop_failed(item, row.line_reference, reason=str(e))
+                logger.error(f'{import_row.item} import failed: {e}')
+                import_run.drop_failed(import_row.item, row.line_reference, reason=str(e))
 
             # update the status
             now = datetime.now().timestamp()
@@ -362,91 +421,6 @@ class ImportJob:
             return self.config.extract_text_types.split(',')
         else:
             return []
-
-    def update_repo(self, repo: Repository, metadata: 'MetadataRows', row: 'Row', repo_changeset: RepoChangeset):
-        """
-        Updates the repository with the given RepoChangeSet
-
-        :param repo:
-        :param metadata: A plastron.jobs.MetadataRows object representing the
-                          CSV file being imported
-        :param row: A single plastron.jobs.Row object representing the row
-                     being imported
-        :param repo_changeset: The RepoChangeSet object describing the changes
-                                 to make to the repository.
-        """
-        created_uris = []
-        updated_uris = []
-        item = repo_changeset.item
-
-        if item.uri == URIRef(''):
-            # if an item is new, don't construct a SPARQL Update query
-            # instead, just create and update normally
-            # create new item in the repo
-            logger.debug('Creating a new item')
-            # add the access class
-            if self.access is not None:
-                item.rdf_type.append(self.access)
-            # add the collection membership
-            if self.member_of is not None:
-                item.member_of = self.member_of
-
-            if row.has_files:
-                create_pages = bool(strtobool(row.get('CREATE_PAGES', 'True')))
-                logger.debug('Adding pages and files to new item')
-                self.add_files(
-                    item,
-                    build_file_groups(row['FILES']),
-                    base_location=self.config.binaries_location,
-                    access=self.access,
-                    create_pages=create_pages
-                )
-
-            if row.has_item_files:
-                self.add_files(
-                    item,
-                    build_file_groups(row['ITEM_FILES']),
-                    base_location=self.config.binaries_location,
-                    access=self.access,
-                    create_pages=False
-                )
-
-            if self.extract_text_types is not None:
-                annotate_from_files(item, self.extract_text_types)
-
-            logger.debug(f"Creating resources in container: {self.config.container}")
-
-            try:
-                with repo.client.transaction() as txn_client:
-                    item.create(txn_client, container_path=self.config.container)
-                    item.update(txn_client)
-            except Exception as e:
-                raise RuntimeError(f'Creating item failed: {e}') from e
-
-            self.complete(item, row.line_reference, ImportedItemStatus.CREATED)
-            metadata.created += 1
-            created_uris.append(item.uri)
-
-        elif repo_changeset:
-            # construct the SPARQL Update query if there are any deletions or insertions
-            # then do a PATCH update of an existing item
-            logger.info(f'Sending update for {item}')
-            sparql_update = repo_changeset.build_sparql_update(repo.client)
-            logger.debug(sparql_update)
-            try:
-                item.patch(repo.client, sparql_update)
-            except ClientError as e:
-                raise RuntimeError(f'Updating item failed: {e}') from e
-
-            self.complete(item, row.line_reference, ImportedItemStatus.MODIFIED)
-            metadata.updated += 1
-            updated_uris.append(item.uri)
-
-        else:
-            self.complete(item, row.line_reference, ImportedItemStatus.UNCHANGED)
-            metadata.unchanged += 1
-            logger.info(f'No changes found for "{item}" ({row.uri}); skipping')
-            metadata.skipped += 1
 
     def get_source(self, base_location: str, path: str) -> BinarySource:
         """
@@ -533,19 +507,24 @@ class ImportJob:
 
         count = 0
 
+        previous_proxy: Optional[Proxy] = None
         for n, (rootname, filenames) in enumerate(file_groups.items(), 1):
             if create_pages:
                 # create a member object for each rootname
                 # delegate to the item model how to build the member object
-                member = item.get_new_member(rootname, n)
-                # add to the item
-                item.add_member(member)
-                proxy = item.append_proxy(member, title=member.title)
+                member = get_new_member(item, rootname, n)
+                proxy = Proxy(proxy_for=member, proxy_in=item)
+                if previous_proxy is not None:
+                    previous_proxy.next = proxy
+                    proxy.prev = previous_proxy
+                else:
+                    item.first = proxy
                 # add the access class to the member resources
                 if access is not None:
-                    member.rdf_type.append(access)
-                    proxy.rdf_type.append(access)
+                    member.rdf_type.add(access)
+                    proxy.rdf_type.add(access)
                 file_parent = member
+                previous_proxy = proxy
             else:
                 # files will be added directly to the item
                 file_parent = item
@@ -554,15 +533,171 @@ class ImportJob:
             for filename in filenames:
                 file = self.get_file(base_location, filename)
                 count += 1
-                file_parent.add_file(file)
+                # file_parent.add_file(file)
                 if access is not None:
-                    file.rdf_type.append(access)
+                    file.rdf_type.add(access)
+
+        item.last = previous_proxy
 
         return count
 
 
-DROPPED_INVALID_FIELDNAMES = ['id', 'timestamp', 'title', 'uri', 'reason']
-DROPPED_FAILED_FIELDNAMES = ['id', 'timestamp', 'title', 'uri', 'reason']
+class ImportRow:
+    def __init__(self, job: ImportJob, repo: Repository, row: Row):
+        self.job = job
+        self.row = row
+        self.repo = repo
+        self.item = create_repo_changeset(repo, row)
+
+    def __str__(self):
+        return str(self.item)
+
+    def validate_item(self) -> ValidationResultsDict:
+        """Validate the item for this import row, and check that all files
+        listed are present.
+
+        :returns: ValidationResult
+        """
+        try:
+            results: ValidationResultsDict = self.item.validate()
+        except ValidationError as e:
+            raise RuntimeError(f'Unable to run validation: {e}') from e
+
+        results['FILES'] = self.validate_files(self.row.filenames)
+        results['ITEM_FILES'] = self.validate_files(self.row.item_filenames)
+
+        return results
+
+    def validate_files(self, filenames: Iterable[str]) -> ValidationResult:
+        """Check that a file exists in the job's binaries location for each
+        file name given.
+
+        :returns: ValidationResult
+        """
+        missing_files = [
+            name for name in filenames
+            if not self.job.get_source(self.job.config.binaries_location, name).exists()
+        ]
+        if len(missing_files) == 0:
+            return ValidationSuccess(
+                prop=None,
+                message='All files present',
+            )
+        else:
+            return ValidationFailure(
+                prop=None,
+                message=f'Missing {len(missing_files)} files: {";".join(missing_files)}',
+            )
+
+    def update_repo(self) -> ImportedItemStatus:
+        """
+        Either creates a new item, updates an existing item, or does nothing
+        to an existing item (if there are no changes).
+
+        :returns: ImportedItemStatus
+        """
+        if self.item.uri.startswith('urn:uuid:'):
+            # if an item is new, don't construct a SPARQL Update query
+            # instead, just create and update normally
+            # create new item in the repo
+            logger.debug('Creating a new item')
+            # add the access class
+            if self.job.access is not None:
+                self.item.rdf_type.append(self.job.access)
+            # add the collection membership
+            if self.job.member_of is not None:
+                self.item.member_of = self.job.member_of
+
+            if self.job.extract_text_types is not None:
+                annotate_from_files(self.item, self.job.extract_text_types)
+
+            container: ContainerResource = self.repo[self.job.config.container:ContainerResource]
+            logger.debug(f"Creating resources in container: {container.path}")
+
+            try:
+                self.item.apply_changes()
+                with self.repo.transaction():
+                    # create the main resource
+                    logger.debug(f'Creating main resource for "{self.item}"')
+                    resource = container.create_child(
+                        resource_class=ContainerResource,
+                        description=self.item,
+                    )
+                    # switch the resource model to PCDM Object, for adding members
+                    resource.model = PCDMObject
+                    # hierarchical object: members container under the main resource
+                    logger.debug(f'Creating members container for {resource.path}')
+                    members_container = resource.create_child(resource_class=ContainerResource, slug='m')
+                    proxies_container = resource.create_child(resource_class=ContainerResource, slug='x')
+                    # add pages and files to those pages
+                    if self.row.has_files:
+                        file_groups = build_file_groups(self.row['FILES'])
+                        previous_proxy = None
+                        for n, (rootname, filenames) in enumerate(file_groups.items(), 1):
+                            file_sources = {
+                                filename: self.job.get_source(self.job.config.binaries_location, filename)
+                                for filename in filenames
+                            }
+                            page = create_page(
+                                container=members_container,
+                                parent=resource.description,
+                                number=n,
+                                file_sources=file_sources,
+                            )
+                            proxy = proxies_container.create_child(
+                                resource_class=ContainerResource,
+                                description=Proxy(
+                                    proxy_for=page.description,
+                                    proxy_in=resource.description,
+                                    title=page.description.title.value,
+                                ),
+                                slug=random_slug(),
+                            )
+                            if previous_proxy is None:
+                                # first page in sequence
+                                resource.description.first = URIRef(proxy.url)
+                            else:
+                                previous_proxy.description.next = URIRef(proxy.url)
+                                proxy.description.prev = URIRef(previous_proxy.url)
+                                previous_proxy.save()
+                            proxy.save()
+                            previous_proxy = proxy
+                            resource.description.has_member.add(URIRef(page.url))
+                        resource.description.last = URIRef(previous_proxy.url)
+                    if self.row.has_item_files:
+                        item_files_container = resource.create_child(resource_class=ContainerResource, slug='f')
+                        for rootname, filenames in self.row.item_filenames:
+                            for filename in filenames:
+                                source = self.job.get_source(self.job.config.binaries_location, filename)
+                                file = create_file(
+                                    container=item_files_container,
+                                    source=source,
+                                    parent=resource.description,
+                                )
+                                resource.description.has_file.add(URIRef(file.url))
+                    resource.save()
+            except Exception as e:
+                raise RuntimeError(f'Creating item failed: {e}') from e
+
+            logger.info(f'Created {resource.url}')
+            return ImportedItemStatus.CREATED
+
+        elif self.item.has_changes:
+            # construct the SPARQL Update query if there are any deletions or insertions
+            # then do a PATCH update of an existing item
+            logger.info(f'Sending update for {self.item}')
+            sparql_update = self.repo.client.build_sparql_update(self.item.deletes, self.item.inserts)
+            logger.debug(sparql_update)
+            try:
+                self.item.patch(self.repo.client, sparql_update)
+            except ClientError as e:
+                raise RuntimeError(f'Updating item failed: {e}') from e
+
+            return ImportedItemStatus.MODIFIED
+
+        else:
+            logger.info(f'No changes found for "{self.item}" ({self.item.uri}); skipping')
+            return ImportedItemStatus.UNCHANGED
 
 
 class ImportRun:
@@ -671,192 +806,6 @@ class ImportRun:
         :return:
         """
         self.job.complete(item, line_reference, status)
-
-
-class MetadataRows:
-    """
-    Iterable sequence of rows from the metadata CSV file of an import job.
-    """
-
-    def __init__(self, job: ImportJob, limit: int = None, percentage: int = None):
-        self.job = job
-        self.limit = limit
-        self.metadata_file = None
-
-        try:
-            self.metadata_file = open(job.metadata_filename, 'r')
-        except FileNotFoundError as e:
-            raise MetadataError(job, f'Cannot read source file "{job.metadata_filename}: {e}') from e
-
-        self.csv_file = csv.DictReader(self.metadata_file)
-
-        try:
-            self.fields = build_fields(self.fieldnames, self.model_class)
-        except DataReadError as e:
-            raise RuntimeError(str(e)) from e
-
-        self.validation_reports: List[Mapping] = []
-        self.skipped = 0
-        self.subset_to_load = None
-
-        self.total = None
-        self.rows = 0
-        self.errors = 0
-        self.valid = 0
-        self.invalid = 0
-        self.created = 0
-        self.updated = 0
-        self.unchanged = 0
-        self.files = 0
-
-        if self.metadata_file.seekable():
-            # get the row count of the file, then rewind the CSV file
-            self.total = sum(1 for _ in self.csv_file)
-            self._rewind_csv_file()
-        else:
-            # file is not seekable, so we can't get a row count in advance
-            self.total = None
-
-        if percentage is not None:
-            if not self.metadata_file.seekable():
-                raise RuntimeError('Cannot execute a percentage load using a non-seekable file')
-            identifier_column = self.model_class.HEADER_MAP['identifier']
-            identifiers = [
-                row[identifier_column] for row in self.csv_file if row[identifier_column] not in job.completed_log
-            ]
-            self._rewind_csv_file()
-
-            if len(identifiers) == 0:
-                logger.info('No items remaining to load')
-                self.subset_to_load = []
-            else:
-                target_count = int(((percentage / 100) * self.total))
-                logger.info(f'Attempting to load {target_count} items ({percentage}% of {self.total})')
-                if len(identifiers) > target_count:
-                    # evenly space the items to load among the remaining items
-                    step_size = int((100 * (1 - (len(job.completed_log) / self.total))) / percentage)
-                else:
-                    # load all remaining items
-                    step_size = 1
-                self.subset_to_load = identifiers[::step_size]
-
-    def _rewind_csv_file(self):
-        # rewind the file and re-create the CSV reader
-        self.metadata_file.seek(0)
-        self.csv_file = csv.DictReader(self.metadata_file)
-
-    @property
-    def model_class(self):
-        return self.job.model_class
-
-    @property
-    def has_binaries(self) -> bool:
-        return 'FILES' in self.fieldnames
-
-    @property
-    def fieldnames(self):
-        return self.csv_file.fieldnames
-
-    @property
-    def identifier_column(self):
-        return self.model_class.HEADER_MAP['identifier']
-
-    def stats(self):
-        return {
-            'total': self.total,
-            'rows': self.rows,
-            'errors': self.errors,
-            'valid': self.valid,
-            'invalid': self.invalid,
-            'created': self.created,
-            'updated': self.updated,
-            'unchanged': self.unchanged,
-            'files': self.files
-        }
-
-    def __iter__(self):
-        for row_number, line in enumerate(self.csv_file, 1):
-            if self.limit is not None and row_number > self.limit:
-                logger.info(f'Stopping after {self.limit} rows')
-                break
-
-            if self.subset_to_load is not None and line[self.identifier_column] not in self.subset_to_load:
-                continue
-
-            line_reference = LineReference(filename=str(self.job.metadata_filename), line_number=row_number + 1)
-            logger.debug(f'Processing {line_reference}')
-            self.rows += 1
-
-            if any(v is None for v in line.values()):
-                self.errors += 1
-                self.validation_reports.append({
-                    'line': line_reference,
-                    'is_valid': False,
-                    'error': f'Line {line_reference} has the wrong number of columns'
-                })
-                # TODO: this should be part of ImportRun?
-                self.job.drop_invalid(item=None, line_reference=line_reference, reason='Wrong number of columns')
-                continue
-
-            row = Row(line_reference, row_number, line, self.identifier_column)
-
-            if row.identifier in self.job.completed_log:
-                logger.info(f'Already loaded "{row.identifier}" from {line_reference}, skipping')
-                self.skipped += 1
-                continue
-
-            yield row
-
-        if self.total is None:
-            # if we weren't able to get the total count before,
-            # use the final row count as the total count for the
-            # job completion message
-            self.total = self.rows
-
-
-class Row:
-    def __init__(self, line_reference: LineReference, row_number: int, data: Mapping, identifier_column: str):
-        self.line_reference = line_reference
-        self.number = row_number
-        self.data = data
-        self.identifier_column = identifier_column
-
-    def __getitem__(self, item):
-        return self.data[item]
-
-    def get(self, key, default=None):
-        return self.data.get(key, default)
-
-    def parse_value(self, column: ColumnSpec) -> List[Union[Literal, URIRef]]:
-        return parse_value_string(self[column.header], column)
-
-    @property
-    def identifier(self):
-        return self.data[self.identifier_column]
-
-    @property
-    def has_uri(self):
-        return 'URI' in self.data and self.data['URI'].strip() != ''
-
-    @property
-    def uri(self) -> URIRef:
-        return URIRef(self.data['URI']) if self.has_uri else None
-
-    @property
-    def has_files(self):
-        return 'FILES' in self.data and self.data['FILES'].strip() != ''
-
-    @property
-    def has_item_files(self):
-        return 'ITEM_FILES' in self.data and self.data['ITEM_FILES'].strip() != ''
-
-    @property
-    def filenames(self):
-        return self.data['FILES'].strip().split(';') if self.has_files else []
-
-    @property
-    def index_string(self):
-        return self.data.get('INDEX')
 
 
 @dataclass
@@ -1016,22 +965,3 @@ class ExportJob:
                 'errors': errors
             }
         }
-
-
-def format_size(size: int, decimal_places: Optional[int] = None):
-    for unit in ('B', 'KB', 'MB', 'GB', 'TB'):
-        if size < 1024:
-            break
-        size /= 1024
-
-    if decimal_places is not None:
-        return round(size, decimal_places), unit
-
-
-def compress_bag(bag, dest, root_dirname=''):
-    with ZipFile(dest, mode='w') as zip_file:
-        for dirpath, dirnames, filenames in os.walk(bag.path):
-            for name in filenames:
-                src_filename = os.path.join(dirpath, name)
-                archived_name = normpath(os.path.join(root_dirname, relpath(dirpath, start=bag.path), name))
-                zip_file.write(filename=src_filename, arcname=archived_name)

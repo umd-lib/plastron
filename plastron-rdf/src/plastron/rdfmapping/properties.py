@@ -1,11 +1,11 @@
-from typing import Set, Tuple, Callable, Any, Iterable, Optional
+from typing import Set, Tuple, Callable, Any, Iterable, Optional, ItemsView, TypeVar
 
 from rdflib import Literal, URIRef
 from rdflib.term import Identifier, BNode
 
 
 class ValidationResult:
-    def __init__(self, prop: 'RDFProperty', message: Optional[str] = ''):
+    def __init__(self, prop: Optional['RDFProperty'] = None, message: Optional[str] = ''):
         self.prop = prop
         self.message = message
 
@@ -27,10 +27,14 @@ class ValidationSuccess(ValidationResult):
 
 
 class ValidationResultsDict(dict):
-    def failures(self):
+    @property
+    def ok(self):
+        return len(self.failures()) == 0
+
+    def failures(self) -> ItemsView[str, ValidationFailure]:
         return {k: v for k, v in self.items() if isinstance(v, ValidationFailure)}.items()
 
-    def successes(self):
+    def successes(self) -> ItemsView[str, ValidationSuccess]:
         return {k: v for k, v in self.items() if isinstance(v, ValidationSuccess)}.items()
 
 
@@ -52,11 +56,13 @@ class RDFProperty:
         self._validate = validate
 
     @property
-    def uri(self):
+    def uri(self) -> URIRef:
+        """URI of the predicate"""
         return self.predicate
 
     @property
-    def values(self):
+    def values(self) -> Iterable:
+        """Values of this property"""
         return self.resource.graph.objects(self.resource.uri, self.predicate)
 
     @property
@@ -76,10 +82,12 @@ class RDFProperty:
         return len(list(self.values))
 
     def clear(self):
+        """Remove all values from this property."""
         for value in iter(self):
             self.remove(value)
 
     def add(self, value):
+        """Add a single value to this property."""
         try:
             self.resource.deletes.remove((self.resource.uri, self.predicate, value))
         except KeyError:
@@ -88,6 +96,7 @@ class RDFProperty:
         self.resource.inserts.add((self.resource.uri, self.predicate, value))
 
     def remove(self, value):
+        """Remove a single value from this property."""
         try:
             self.resource.inserts.remove((self.resource.uri, self.predicate, value))
         except KeyError:
@@ -95,8 +104,13 @@ class RDFProperty:
             pass
         self.resource.deletes.add((self.resource.uri, self.predicate, value))
 
-    def update(self, new_values) -> Tuple[Set, Set]:
-        # take the set differences to find deleted and inserted values
+    def update(self, new_values: Iterable) -> Tuple[Set, Set]:
+        """Update this property to have only the new values.
+
+        This method takes the set differences between the current values and the
+        new values to construct sets of deleted and inserted values, then removes
+        and adds those values, respectively.
+        """
         old_values_set = set(self.values)
         new_values_set = set(new_values)
         deleted_values = old_values_set - new_values_set
@@ -165,6 +179,9 @@ class RDFDataProperty(RDFProperty):
         return ValidationSuccess(self)
 
 
+T = TypeVar('T')
+
+
 class RDFObjectProperty(RDFProperty):
     def __init__(
             self,
@@ -174,7 +191,7 @@ class RDFObjectProperty(RDFProperty):
             required: bool = False,
             repeatable: bool = False,
             validate: Callable[[Any], bool] = None,
-            object_class: type = None,
+            object_class: T = None,
             embedded: bool = False,
     ):
         super().__init__(resource, attr_name, predicate, required, repeatable, validate)
@@ -183,7 +200,7 @@ class RDFObjectProperty(RDFProperty):
         self._object_map = {}
 
     @property
-    def objects(self):
+    def objects(self) -> Iterable[T]:
         if self.object_class is None:
             raise RDFPropertyError(f'No object class defined for the property with predicate {self.predicate}')
         for value in self.values:
@@ -195,22 +212,23 @@ class RDFObjectProperty(RDFProperty):
                 yield value
 
     @property
-    def object(self):
+    def object(self) -> T:
         try:
             return next(iter(self.objects))
         except StopIteration:
             return None
 
     def add(self, value):
-        if self.object_class is not None and hasattr(value, 'uri'):
-            obj = value.uri
-            self._object_map[obj] = value
+        if hasattr(value, 'uri'):
+            obj = URIRef(value.uri)
+            if self.object_class is not None:
+                self._object_map[obj] = value
         else:
             obj = value
         super().add(obj)
 
     def remove(self, value):
-        if self.object_class is not None and hasattr(value, 'uri'):
+        if hasattr(value, 'uri'):
             obj = URIRef(value.uri)
             if obj in self._object_map:
                 del self._object_map[obj]

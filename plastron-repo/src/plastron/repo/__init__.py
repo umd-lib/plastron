@@ -1,19 +1,22 @@
 import logging
 import shutil
 import sys
+from contextlib import contextmanager
 from tempfile import NamedTemporaryFile
-from typing import Optional, Type, Dict
+from typing import Optional, Type, Dict, Union, TypeVar, Set, Iterator
 from uuid import uuid4
 
 import yaml
-from rdflib import URIRef, Graph
+from plastron.utils import ItemLog
+from rdflib import URIRef
+from requests import Response
 from requests.auth import AuthBase
 from urlobject import URLObject
 
 from plastron.client import Client, Endpoint, ClientError, TransactionClient, RepositoryStructure
 from plastron.client.auth import get_authenticator
-from plastron.utils import ItemLog
-from plastron.rdfmapping.resources import RDFResource, RDFResourceBase
+from plastron.rdfmapping.graph import TrackChangesGraph
+from plastron.rdfmapping.resources import RDFResourceBase
 
 logger = logging.getLogger(__name__)
 
@@ -26,6 +29,10 @@ def get_structure(structure_name: Optional[str]) -> RepositoryStructure:
     if structure_name is None:
         return RepositoryStructure.FLAT
     return RepositoryStructure[structure_name.upper()]
+
+
+ResourceType = TypeVar('ResourceType', bound='RepositoryResource')
+RDFResourceType = TypeVar('RDFResourceType', bound=RDFResourceBase)
 
 
 class Repository:
@@ -56,70 +63,86 @@ class Repository:
         return cls(client=client)
 
     def __init__(self, client: Client):
-        self.client = client
+        self._client = client
         self.endpoint = client.endpoint
+        self._txn_client = None
 
-    def __getitem__(self, item: str):
-        if item.startswith(self.endpoint.url):
-            path = item[len(self.endpoint.url):]
+    @property
+    def client(self):
+        return self._txn_client or self._client
+
+    def get_resource(self, path: str, resource_class: Type[ResourceType] = None) -> ResourceType:
+        """Get an object representing a resource at a particular path with this repository.
+
+        By default, returns an object of type RepositoryResource, but you may pass a different
+        resource class in the resource_class parameter. That class must support a constructor
+        with keyword arguments "repo" and "path".
+
+        :returns: RepositoryResource instance, or an instance of the resource_class, if provided
+        :raises RepositoryError: if it cannot instantiate an instance of the resource class
+        """
+        if resource_class is None:
+            resource_class = RepositoryResource
+        if path.startswith(self.endpoint.url):
+            path = path[len(self.endpoint.url):]
         else:
+            path = path
+        try:
+            return resource_class(repo=self, path=path)
+        except TypeError as e:
+            raise RepositoryError(f'Cannot get "{path}" as type "{resource_class.__name__}": {e}"') from e
+
+    def __getitem__(self, item: Union[str, slice]) -> ResourceType:
+        """Syntactic sugar for the get_resource method. It accepts either a string or a slice.
+
+        If a string is used, it is used as the path, and the resource class defaults to
+        RepositoryResource.
+
+        If a slice is used, the "start" segment is used as the path and the "stop" segment
+        is used as the resource class. If it is None, defaults to RepositoryResource.
+
+        Examples::
+
+            # get resource at "/foo" as a RepositoryResource object
+            r = repo['/foo']
+            instanceof(r, RepositoryResource)  # True
+
+            # get resource at "/bar" as an OtherResource object
+            r = repo['/bar':OtherResource]
+            instanceof(r, OtherResource)  # True
+
+        :raises TypeError: if non-string, non-slice key is used"""
+        if isinstance(item, str):
             path = item
-        if '#' in path:
-            # fragment resource
-            parent_path, hash_id = path.split('#', 1)
-            return FragmentResource(parent=RepositoryResource(repo=self, path=parent_path), identifier=hash_id)
-        # regular resource
-        return RepositoryResource(repo=self, path=path)
+            resource_class = RepositoryResource
+        elif isinstance(item, slice):
+            path = item.start
+            resource_class = item.stop if item.stop is not None else RepositoryResource
+        else:
+            raise TypeError(f'Cannot use a key of type "{type(item).__name__}" here')
+        return self.get_resource(path, resource_class=resource_class)
+
+    @contextmanager
+    def transaction(self, keep_alive: int = 90):
+        with self.client.transaction(keep_alive) as txn_client:
+            self._txn_client = txn_client
+            yield self._txn_client
+            self._txn_client = None
+
+    def create(self, resource_class: Type[ResourceType] = None, **kwargs) -> ResourceType:
+        resource_uri = self.client.create(**kwargs)
+        return self.get_resource(resource_uri.uri, resource_class=resource_class)
 
 
-class DescribableResource:
-    def __init__(self):
-        self._graph: Optional[Graph] = None
-        self._description: Optional[RDFResourceBase] = None
-        self._model: Optional[Type[RDFResourceBase]] = None
+class RepositoryResource:
+    """A single HTTP/LDP resource within a repository."""
 
-    @property
-    def url(self):
-        raise NotImplementedError
-
-    def read(self):
-        """
-        Implementations of this method are responsible for populating
-        the :attr:`_graph` attribute.
-        """
-        raise NotImplementedError
-
-    @property
-    def graph(self) -> Graph:
-        if self._graph is None:
-            self.read()
-        return self._graph
-
-    @property
-    def description(self) -> RDFResourceBase:
-        return self._description
-
-    @property
-    def model(self) -> Type[RDFResourceBase]:
-        return self._model
-
-    @model.setter
-    def model(self, value: Type[RDFResourceBase]):
-        self._model = value
-        self._description = self.model(uri=URIRef(self.url), graph=self.graph)
-
-    def describe_as(self, model: Type[RDFResource]):
-        return model(uri=URIRef(self.url), graph=self.graph)
-
-
-class RepositoryResource(DescribableResource):
     def __init__(self, repo: Repository, path: str = None):
-        super().__init__()
         self.repo = repo
         self.path = path
-        self.client = repo.client
-        self._types = None
-        self._fragments = None
+        self._types: Optional[Set[URLObject]] = None
+        self._description_url: Optional[URLObject] = None
+        self._graph: TrackChangesGraph = TrackChangesGraph()
 
     @property
     def url(self) -> Optional[URLObject]:
@@ -128,66 +151,82 @@ class RepositoryResource(DescribableResource):
         else:
             return None
 
-    def exists(self) -> bool:
-        return self.url is not None and self.client.head(self.url).ok
-
-    def read(self, model: Optional[Type[RDFResourceBase]] = None):
-        if self.url is None:
-            raise RepositoryError('Resource has no URL')
-        response = self.client.head(self.url)
-        self._types = [link['url'] for link in response.links.values() if link['rel'] == 'type']
-        try:
-            # TODO: different handling for binaries?
-            _, self._graph = self.client.get_graph(self.url)
-        except ClientError as e:
-            raise RepositoryError(f'Unable to retrieve {self.url}: {e}') from e
-        self.model = model or RDFResourceBase
-        subjects = {URLObject(s) for s in set(self.graph.subjects())}
-        self._fragments = [
-            FragmentResource(identifier=url.fragment, parent=self)
-            for url in filter(lambda s: s.startswith(f'{self.url}#'), subjects)
-        ]
-
-    def save(self):
-        pass
+    @property
+    def description_url(self) -> Optional[URLObject]:
+        return self._description_url
 
     @property
-    def is_binary(self):
+    def client(self) -> Client:
+        return self.repo.client
+
+    @property
+    def graph(self) -> TrackChangesGraph:
+        return self._graph
+
+    @property
+    def exists(self) -> bool:
+        return self.url is not None and self._head().ok
+
+    @property
+    def is_binary(self) -> bool:
         if self._types is None:
             raise RepositoryError('Resource types unknown')
         return 'http://www.w3.org/ns/ldp#NonRDFSource' in self._types
 
-    def fragments(self):
-        subjects = {URLObject(s) for s in set(self.graph.subjects())}
-        for url in filter(lambda s: s.startswith(f'{self.url}#'), subjects):
-            yield FragmentResource(identifier=url.fragment, parent=self)
+    def _head(self) -> Response:
+        if self.url is None:
+            raise RepositoryError('Resource has no URL')
+        response = self.client.head(self.url)
+        self._types = {URLObject(link['url']) for link in response.links.values() if link['rel'] == 'type'}
+        if 'describedby' in response.links:
+            self._description_url = URLObject(response.links['describedby']['url'])
+        return response
+
+    @contextmanager
+    def describe(self, model: Type[RDFResourceBase]) -> Iterator[RDFResourceBase]:
+        yield model(uri=URIRef(self.url), graph=self._graph)
+
+    def attach_description(self, description: RDFResourceBase):
+        description.uri = URIRef(self.url)
+        self._graph = description.graph
+
+    def read(self):
+        self._head()
+        try:
+            # TODO: different handling for binaries?
+            (uri, description_uri), self._graph = self.client.get_graph(self.url)
+            self._description_url = URLObject(description_uri)
+        except ClientError as e:
+            raise RepositoryError(f'Unable to retrieve {self.url}: {e}') from e
+
+    def save(self):
+        self._graph.apply_changes()
+        try:
+            logger.debug(f'Putting graph to {self.description_url}')
+            response = self.client.put_graph(self.description_url, self._graph)
+            if not response.ok:
+                raise RepositoryError(f'Unable to save {self.url}: {response}')
+        except ClientError as e:
+            raise RepositoryError(f'Unable to save {self.url}: {e}') from e
 
 
-class FragmentResource(DescribableResource):
-    def __init__(self, parent: RepositoryResource = None, identifier: str = None):
-        super().__init__()
-        self.parent = parent
-        if identifier is not None:
-            self.identifier = identifier
-        else:
-            self.identifier = mint_fragment_identifier()
-        self._graph = None
+class ContainerResource(RepositoryResource):
+    """An LDP container resource."""
 
-    @property
-    def url(self) -> URLObject:
-        if self.parent:
-            return self.parent.url.with_fragment(self.identifier)
-        else:
-            return URLObject(f'#{self.identifier}')
+    def create_child(
+            self,
+            resource_class: Type[ResourceType] = RepositoryResource,
+            description: RDFResourceType = None,
+            **kwargs,
+    ) -> ResourceType:
+        resource = self.repo.create(resource_class=resource_class, container_path=self.path, **kwargs)
+        if description is not None:
+            resource.attach_description(description)
+        return resource
 
-    def exists(self) -> bool:
-        return self.parent.exists()
 
-    def read(self, model: Optional[Type[RDFResourceBase]] = None):
-        self._graph = Graph()
-        for triple in self.parent.graph.triples((URIRef(self.url), None, None)):
-            self._graph.add(triple)
-        self.model = model or RDFResourceBase
+class BinaryResource(RepositoryResource):
+    pass
 
 
 class RepositoryError(Exception):

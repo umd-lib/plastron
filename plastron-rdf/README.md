@@ -32,12 +32,12 @@ mapping. The optional arguments are:
 For DataProperty attributes, you can also specify:
 
 * `datatype`: URI of the data type of this field. This has two functions:
+
     1. Used in conjunction with the predicate URI to select the triples to 
        return the values of for this attribute. This allows you to reuse 
        the same predicate URI for different attributes. Note that a 
        DataProperty with `datatype=None` (the default) will only return 
        values *without* a datatype.
-       
        Note that because of the way RDF literals are defined, an attribute 
        cannot have a non-`None` datatype *and* a language code.
   
@@ -103,8 +103,9 @@ Using that object, you can manipulate and query its values:
 ```
 
 You can check the validity of the resource as a whole, or of each of its
-individual properties. Checking the resource as a whole returns a simple
-boolean, while checking each property returns a ValidationResult, either
+individual properties. Checking the resource as a whole returns a
+ValidationResultsDict object of attribute names mapped to ValidationResult 
+objects, while checking each property returns a ValidationResult, either
 ValidationSuccess (which evaluates to True in a boolean context) or
 ValidationFailure (which evaluates to False).
 
@@ -121,11 +122,9 @@ False
 'is required'
 ```
 
-The `validate()` method on the RDF resource returns a 
-ValidationResultsDict object of attribute names mapped to 
-ValidationResult objects. The ValidationResultsDict is a subclass of a 
-regular dictionary, with added methods to get the items that are 
-successes and the items that are failures.
+The ValidationResultsDict is a subclass of a regular dictionary, with 
+added methods to get the items that are successes and the items that are 
+failures.
 
 ```pycon
 >>> results = book.validate()

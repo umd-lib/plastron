@@ -340,12 +340,16 @@ class Client:
             logger.warning('No Location header in response')
             return None
 
-    def create(self, path: str = None, url: str = None, container_path: str = None, **kwargs) -> ResourceURI:
+    def create(self, path: str = None, url: str = None, container_path: str = None, slug: str = None, **kwargs) -> ResourceURI:
         if url is not None:
             response = self.put(url, **kwargs)
         elif path is not None:
             response = self.put(self.endpoint.url + path, **kwargs)
         else:
+            if 'headers' not in kwargs:
+                kwargs['headers'] = {}
+            if slug is not None:
+                kwargs['headers']['Slug'] = slug
             container_uri = self.endpoint.url + (container_path or self.endpoint.relpath)
             response = self.post(container_uri, **kwargs)
 
@@ -428,15 +432,23 @@ class Client:
     def create_annotations(self, item):
         self.creator.create_annotations(item)
 
+    def put_graph(self, url, graph: Graph) -> Response:
+        return self.put(
+            self.get_description_uri(url),
+            headers={
+                'Content-Type': 'application/n-triples',
+            },
+            data=graph.serialize(format='application/n-triples')
+        )
+
     def build_sparql_update(self, delete_graph: Graph = None, insert_graph: Graph = None) -> str:
-        # go through each graph and update subjects with transaction IDs
         if delete_graph is not None:
-            deletes = delete_graph.serialize(format='nt').decode('utf-8').strip()
+            deletes = delete_graph.serialize(format='nt').strip()
         else:
             deletes = None
 
         if insert_graph is not None:
-            inserts = insert_graph.serialize(format='nt').decode('utf-8').strip()
+            inserts = insert_graph.serialize(format='nt').strip()
         else:
             inserts = None
 
@@ -459,7 +471,7 @@ class Client:
         if response.status_code == HTTPStatus.CREATED:
             txn_client = TransactionClient.from_client(self)
             txn_client.begin(uri=response.headers['Location'], keep_alive=keep_alive)
-            logger.info(f'Created transaction at {txn_client.transaction}')
+            logger.info(f'Created transaction at {txn_client.tx}')
             try:
                 yield txn_client
             except ClientError:
@@ -469,7 +481,7 @@ class Client:
             finally:
                 # when we leave the transaction context, always
                 # set the stop flag on the keep-alive ping
-                txn_client.transaction.stop()
+                txn_client.tx.stop()
         else:
             raise TransactionError(f'Failed to create transaction: {response.status_code} {response.reason}')
 
@@ -521,12 +533,12 @@ class TransactionClient(Client):
 
     def __init__(self, endpoint: Endpoint, **kwargs):
         super().__init__(endpoint, **kwargs)
-        self.transaction = None
+        self.tx = None
 
     def request(self, method, url, **kwargs):
         # make sure the transaction keep-alive thread hasn't failed
-        if self.transaction.keep_alive.failed.is_set():
-            raise RuntimeError('Transaction keep-alive failed') from self.transaction.keep_alive.exception
+        if self.tx.keep_alive.failed.is_set():
+            raise RuntimeError('Transaction keep-alive failed') from self.tx.keep_alive.exception
 
         target_uri = self.insert_transaction_uri(url)
         return super().request(method, target_uri, **kwargs)
@@ -538,6 +550,12 @@ class TransactionClient(Client):
             logger.warning('No Location header in response')
             return None
 
+    def put_graph(self, url, graph: Graph) -> Response:
+        return super().put_graph(
+            url=url,
+            graph=self.insert_transaction_uri_for_graph(graph),
+        )
+
     def build_sparql_update(self, delete_graph: Graph = None, insert_graph: Graph = None) -> str:
         return super().build_sparql_update(
             delete_graph=self.insert_transaction_uri_for_graph(delete_graph),
@@ -548,13 +566,13 @@ class TransactionClient(Client):
         return self.remove_transaction_uri(super().get_description_uri(uri=uri, response=response))
 
     def insert_transaction_uri(self, uri: str) -> str:
-        if uri.startswith(self.transaction.uri):
+        if uri.startswith(self.tx.uri):
             return uri
-        return self.transaction.uri + self.endpoint.repo_path(uri)
+        return self.tx.uri + self.endpoint.repo_path(uri)
 
     def remove_transaction_uri(self, uri: str) -> str:
-        if uri.startswith(self.transaction.uri):
-            repo_path = uri[len(self.transaction.uri):]
+        if uri.startswith(self.tx.uri):
+            repo_path = uri[len(self.tx.uri):]
             return self.endpoint.url + repo_path
         else:
             return uri
@@ -568,63 +586,66 @@ class TransactionClient(Client):
             new_graph.add((s_txn, p, o))
         return new_graph
 
+    def transaction(self, keep_alive: int = 90):
+        raise TransactionError('Cannot nest transactions')
+
     @property
     def active(self):
-        return self.transaction and self.transaction.active
+        return self.tx and self.tx.active
 
     def begin(self, uri: str, keep_alive: int = 90):
-        self.transaction = Transaction(client=self, uri=uri, keep_alive=keep_alive)
+        self.tx = Transaction(client=self, uri=uri, keep_alive=keep_alive)
 
     def maintain(self):
         logger.info(f'Maintaining transaction {self}')
         if not self.active:
-            raise TransactionError(f'Cannot maintain inactive transaction: {self.transaction}')
+            raise TransactionError(f'Cannot maintain inactive transaction: {self.tx}')
 
         try:
-            response = self.post(self.transaction.maintenance_uri)
+            response = self.post(self.tx.maintenance_uri)
         except ConnectionError as e:
-            raise TransactionError(f'Failed to maintain transaction {self.transaction}: {e}') from e
+            raise TransactionError(f'Failed to maintain transaction {self.tx}: {e}') from e
         if response.status_code == HTTPStatus.NO_CONTENT:
             logger.info(f'Transaction {self} is active until {response.headers["Expires"]}')
         else:
             raise TransactionError(
-                f'Failed to maintain transaction {self.transaction}: {response.status_code} {response.reason}'
+                f'Failed to maintain transaction {self.tx}: {response.status_code} {response.reason}'
             )
 
     def commit(self):
-        logger.info(f'Committing transaction {self.transaction}')
+        logger.info(f'Committing transaction {self.tx}')
         if not self.active:
-            raise TransactionError(f'Cannot commit inactive transaction: {self.transaction}')
+            raise TransactionError(f'Cannot commit inactive transaction: {self.tx}')
 
-        self.transaction.stop()
+        self.tx.stop()
         try:
-            response = self.post(self.transaction.commit_uri)
+            response = self.post(self.tx.commit_uri)
         except ConnectionError as e:
-            raise TransactionError(f'Failed to commit transaction {self.transaction}: {e}') from e
+            raise TransactionError(f'Failed to commit transaction {self.tx}: {e}') from e
         if response.status_code == HTTPStatus.NO_CONTENT:
-            logger.info(f'Committed transaction {self.transaction}')
+            logger.info(f'Committed transaction {self.tx}')
             return response
         else:
             raise TransactionError(
-                f'Failed to commit transaction {self.transaction}: {response.status_code} {response.reason}'
+                f'Failed to commit transaction {self.tx}: {response.status_code} {response.reason}'
             )
 
     def rollback(self):
-        logger.info(f'Rolling back transaction {self.transaction}')
-        if not self.transaction.active:
-            raise TransactionError(f'Cannot roll back inactive transaction: {self.transaction}')
+        logger.info(f'Rolling back transaction {self.tx}')
+        if not self.tx.active:
+            raise TransactionError(f'Cannot roll back inactive transaction: {self.tx}')
 
-        self.transaction.stop()
+        self.tx.stop()
         try:
-            response = self.post(self.transaction.rollback_uri)
+            response = self.post(self.tx.rollback_uri)
         except ConnectionError as e:
             raise TransactionError(f'Failed to roll back transaction {self}: {e}') from e
         if response.status_code == HTTPStatus.NO_CONTENT:
-            logger.info(f'Rolled back transaction {self.transaction}')
+            logger.info(f'Rolled back transaction {self.tx}')
             return response
         else:
             raise TransactionError(
-                f'Failed to roll back transaction {self.transaction}: {response.status_code} {response.reason}'
+                f'Failed to roll back transaction {self.tx}: {response.status_code} {response.reason}'
             )
 
 

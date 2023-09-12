@@ -7,7 +7,8 @@ from rdflib import Graph, URIRef
 from rdflib.term import Node
 
 from plastron.rdfmapping.descriptors import ObjectProperty, Property, DataProperty
-from plastron.rdfmapping.properties import RDFProperty, ValidationResultsDict
+from plastron.rdfmapping.properties import RDFProperty
+from plastron.rdfmapping.validation import ValidationResultsDict
 
 
 def update_node(node: Node, old_uri: URIRef, new_uri: URIRef) -> Optional[URIRef]:

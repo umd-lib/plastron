@@ -33,8 +33,8 @@ from plastron.models import get_model_class, Item, ModelClassNotFoundError, umdf
 from plastron.models.umd import Page, Proxy, PCDMObject, PCDMFile
 from plastron.rdf.pcdm import File, PreservationMasterFile, Object
 from plastron.rdf.rdf import Resource
-from plastron.rdfmapping.properties import ValidationFailure, ValidationResultsDict, ValidationResult, ValidationSuccess
 from plastron.repo import Repository, DataReadError, ContainerResource, BinaryResource, RDFResourceType
+from plastron.rdfmapping.validation import ValidationResultsDict, ValidationResult, ValidationSuccess, ValidationFailure
 from plastron.serializers import SERIALIZER_CLASSES, detect_resource_class, EmptyItemListError
 from plastron.validation import ValidationError
 

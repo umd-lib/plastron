@@ -1,41 +1,11 @@
-from typing import Set, Tuple, Callable, Any, Iterable, Optional, ItemsView, TypeVar
+from typing import Set, Tuple, Callable, Any, Iterable, TypeVar
 
 from rdflib import Literal, URIRef
 from rdflib.term import Identifier, BNode
 
+from plastron.rdfmapping.validation import ValidationResult, ValidationFailure, ValidationSuccess
 
-class ValidationResult:
-    def __init__(self, prop: Optional['RDFProperty'] = None, message: Optional[str] = ''):
-        self.prop = prop
-        self.message = message
-
-    def __str__(self):
-        return self.message
-
-    def __bool__(self):
-        raise NotImplementedError
-
-
-class ValidationFailure(ValidationResult):
-    def __bool__(self):
-        return False
-
-
-class ValidationSuccess(ValidationResult):
-    def __bool__(self):
-        return True
-
-
-class ValidationResultsDict(dict):
-    @property
-    def ok(self):
-        return len(self.failures()) == 0
-
-    def failures(self) -> ItemsView[str, ValidationFailure]:
-        return {k: v for k, v in self.items() if isinstance(v, ValidationFailure)}.items()
-
-    def successes(self) -> ItemsView[str, ValidationSuccess]:
-        return {k: v for k, v in self.items() if isinstance(v, ValidationSuccess)}.items()
+ObjectType = TypeVar('ObjectType')
 
 
 class RDFProperty:
@@ -179,9 +149,6 @@ class RDFDataProperty(RDFProperty):
         return ValidationSuccess(self)
 
 
-T = TypeVar('T')
-
-
 class RDFObjectProperty(RDFProperty):
     def __init__(
             self,
@@ -191,7 +158,7 @@ class RDFObjectProperty(RDFProperty):
             required: bool = False,
             repeatable: bool = False,
             validate: Callable[[Any], bool] = None,
-            object_class: T = None,
+            object_class: ObjectType = None,
             embedded: bool = False,
     ):
         super().__init__(resource, attr_name, predicate, required, repeatable, validate)
@@ -200,7 +167,7 @@ class RDFObjectProperty(RDFProperty):
         self._object_map = {}
 
     @property
-    def objects(self) -> Iterable[T]:
+    def objects(self) -> Iterable[ObjectType]:
         if self.object_class is None:
             raise RDFPropertyError(f'No object class defined for the property with predicate {self.predicate}')
         for value in self.values:
@@ -212,7 +179,7 @@ class RDFObjectProperty(RDFProperty):
                 yield value
 
     @property
-    def object(self) -> T:
+    def object(self) -> ObjectType:
         try:
             return next(iter(self.objects))
         except StopIteration:

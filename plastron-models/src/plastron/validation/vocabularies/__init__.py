@@ -2,10 +2,11 @@ import logging
 from functools import lru_cache
 from os.path import abspath, dirname
 from pathlib import Path
-from typing import List
+from typing import List, Set
 
 import requests
-from rdflib import Graph
+from rdflib import Graph, URIRef
+from rdflib.term import Node
 
 from plastron.validation import ValidationError
 
@@ -45,5 +46,5 @@ def get_vocabulary(vocab_uri: str) -> Graph:
 
 
 @lru_cache()
-def get_subjects(vocab_uri: str) -> List[str]:
-    return [str(s) for s in set(get_vocabulary(vocab_uri).subjects())]
+def get_subjects(vocab_uri: str) -> Set[Node]:
+    return set(get_vocabulary(vocab_uri).subjects())

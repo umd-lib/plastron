@@ -1,40 +1,82 @@
 from rdflib import Namespace
 
+from plastron.rdfmapping.decorators import rdf_type
+from plastron.rdfmapping.descriptors import ObjectProperty, DataProperty
+from plastron.rdfmapping.resources import RDFResource
 from plastron.validation import is_edtf_formatted, is_handle
-from plastron.namespaces import bibo, dc, dcmitype, dcterms, edm, geo, rel, skos
-from plastron.rdf import pcdm, rdf
-from plastron.rdf.authority import LabeledThing
+from plastron.namespaces import bibo, dc, dcmitype, dcterms, edm, geo, rel, skos, owl
 
 umdtype = Namespace('http://vocab.lib.umd.edu/datatype#')
 
 
-@rdf.rdf_class(edm.Agent)
-class Author(LabeledThing):
+class AuthorityRecord(RDFResource):
+    same_as = ObjectProperty(owl.sameAs, repeatable=True)
+
+
+@rdf_type(edm.Agent)
+class Agent(AuthorityRecord):
     pass
 
 
-@rdf.rdf_class(edm.Agent)
-class Recipient(LabeledThing):
+@rdf_type(skos.Concept)
+class Concept(AuthorityRecord):
     pass
 
 
-@rdf.rdf_class(skos.Concept)
-class Subject(LabeledThing):
+@rdf_type(edm.Place)
+class Place(AuthorityRecord):
+    lat = DataProperty(geo.lat)
+    long = DataProperty(geo.long)
+
+
+@rdf_type(dcmitype.Collection)
+class Collection(AuthorityRecord):
     pass
 
 
-@rdf.rdf_class(edm.Place)
-@rdf.data_property('lat', geo.lat)
-@rdf.data_property('lon', geo.long)
-class Place(LabeledThing):
-    pass
+@rdf_type(bibo.Letter)
+class Letter(RDFResource):
+    title = DataProperty(dcterms.title, required=True)
+    author = ObjectProperty(rel.aut, repeatable=True, embed=True, cls=Agent)
+    recipient = ObjectProperty(bibo.recipient, repeatable=True, embed=True, cls=Agent)
+    part_of = ObjectProperty(dcterms.isPartOf, required=True, embed=True, cls=Collection)
+    place = ObjectProperty(dcterms.spatial, repeatable=True, embed=True, cls=Place)
+    subject = ObjectProperty(dcterms.subject, repeatable=True, embed=True, cls=Concept)
+    rights = ObjectProperty(dcterms.rights, required=True)
+    identifier = DataProperty(dcterms.identifier, required=True)
+    type = DataProperty(edm.hasType, required=True)
+    date = DataProperty(dc.date, validate=is_edtf_formatted)
+    language = DataProperty(dc.language, required=True)
+    description = DataProperty(dcterms.description, required=True)
+    bibliographic_citation = DataProperty(dcterms.bibliographicCitation, required=True)
+    extent = DataProperty(dcterms.extent, required=True)
+    rights_holder = DataProperty(dcterms.rightsHolder, required=True)
+    handle = DataProperty(dcterms.identifier, datatype=umdtype.handle, validate=is_handle)
+
+    HEADER_MAP = {
+        'title': 'Title',
+        'rights_holder': 'Rights Holder',
+        'extent': 'Extent',
+        'bibliographic_citation': 'Bibliographic Citation',
+        'description': 'Description',
+        'language': 'Language',
+        'date': 'Date',
+        'type': 'Resource Type',
+        'rights': 'Rights',
+        'subject.label': 'Subject',
+        'place.label': 'Location',
+        'place.lon': 'Longitude',
+        'place.lat': 'Latitude',
+        'part_of.label': 'Archival Collection',
+        'part_of.same_as': 'Handle/Link',
+        'identifier': 'Identifier',
+        'recipient.label': 'Recipient',
+        'author.label': 'Author',
+        'handle': 'Handle'
+    }
 
 
-@rdf.rdf_class(dcmitype.Collection)
-class Collection(LabeledThing):
-    pass
-
-
+"""
 @rdf.object_property('author', rel.aut, embed=True, obj_class=Author)
 @rdf.object_property('recipient', bibo.recipient, embed=True, obj_class=Recipient)
 @rdf.object_property('part_of', dcterms.isPartOf, embed=True, obj_class=Collection)
@@ -132,3 +174,4 @@ class Letter(pcdm.Object):
             'function': is_handle
         },
     }
+"""

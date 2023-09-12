@@ -25,6 +25,7 @@ def validate(item):
 
 
 def is_edtf_formatted(value):
+    """an EDTF-formatted date"""
     # Allow blank values
     if str(value).strip() == "":
         return True
@@ -32,10 +33,12 @@ def is_edtf_formatted(value):
 
 
 def is_valid_iso639_code(value):
+    """a valid ISO-639 language code"""
     return is_valid639_1(value) or is_valid639_2(value)
 
 
 def is_handle(value: str) -> bool:
+    """a handle URI"""
     return bool(re.match('hdl:[^/]+/.*', value))
 
 

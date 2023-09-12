@@ -1,37 +1,92 @@
 from rdflib import Namespace
 
-from plastron.rdf import pcdm, rdf
-from plastron.rdf.authority import LabeledThing
-from plastron.rdf.pcdm import Page
+from plastron.namespaces import dc, dcterms, edm, rdfs, owl, ldp, fabio, pcdm, iana, ore
+from plastron.rdfmapping.decorators import rdf_type
+from plastron.rdfmapping.descriptors import ObjectProperty, DataProperty
+from plastron.rdfmapping.resources import RDFResource, RDFResourceBase
+# from plastron.rdf import pcdm, rdf
+# from plastron.rdf.authority import LabeledThing
+# from plastron.rdf.pcdm import Page
 from plastron.validation import is_edtf_formatted, is_valid_iso639_code, is_handle
-from plastron.namespaces import dc, dcterms, edm
-
+from plastron.validation.vocabularies import get_subjects
 
 umdtype = Namespace('http://vocab.lib.umd.edu/datatype#')
 umdform = Namespace('http://vocab.lib.umd.edu/form#')
 
 
-@rdf.object_property('object_type', dcterms.type)
-@rdf.data_property('identifier', dcterms.identifier)
-@rdf.object_property('rights', dcterms.rights)
-@rdf.data_property('title', dcterms.title)
-@rdf.object_property('format', edm.hasType)
-@rdf.object_property('archival_collection', dcterms.isPartOf)
-@rdf.data_property('date', dc.date)
-@rdf.data_property('description', dcterms.description)
-@rdf.data_property('alternate_title', dcterms.alternative)
-@rdf.object_property('creator', dcterms.creator, embed=True, obj_class=LabeledThing)
-@rdf.object_property('contributor', dcterms.contributor, embed=True, obj_class=LabeledThing)
-@rdf.object_property('publisher', dcterms.publisher, embed=True, obj_class=LabeledThing)
-@rdf.object_property('location', dcterms.spatial, embed=True, obj_class=LabeledThing)
-@rdf.data_property('extent', dcterms.extent)
-@rdf.object_property('subject', dcterms.subject, embed=True, obj_class=LabeledThing)
-@rdf.data_property('language', dc.language)
-@rdf.object_property('rights_holder', dcterms.rightsHolder, embed=True, obj_class=LabeledThing)
-@rdf.data_property('bibliographic_citation', dcterms.bibliographicCitation)
-@rdf.data_property('accession_number', dcterms.identifier, datatype=umdtype.accessionNumber)
-@rdf.data_property('handle', dcterms.identifier, datatype=umdtype.handle)
-class Item(pcdm.Object):
+class LabeledThing(RDFResource):
+    label = DataProperty(rdfs.label, required=True)
+    same_as = ObjectProperty(owl.sameAs)
+
+
+def is_from_vocabulary(vocab_uri):
+    #subjects = get_subjects(vocab_uri)
+
+    def _value_from_vocab(value):
+        return True  # value in subjects
+
+    _value_from_vocab.__doc__ = f'from vocabulary {vocab_uri}'
+    return _value_from_vocab
+
+
+class LDPContainer(RDFResource):
+    contains = ObjectProperty(ldp.contains, repeatable=True)
+
+
+class AggregationMixin(RDFResourceBase):
+    first = ObjectProperty(iana.first, required=True, cls='Proxy')
+    last = ObjectProperty(iana.last, required=True, cls='Proxy')
+
+
+@rdf_type(pcdm.Object)
+class PCDMObject(RDFResource, AggregationMixin):
+    has_member = ObjectProperty(pcdm.hasMember, repeatable=True, cls='PCDMObject')
+    member_of = ObjectProperty(pcdm.memberOf, repeatable=True, cls='PCDMObject')
+    has_file = ObjectProperty(pcdm.hasFile, repeatable=True, cls='PCDMFile')
+
+
+@rdf_type(pcdm.File)
+class PCDMFile(RDFResource):
+    title = DataProperty(dcterms.title)
+    file_of = ObjectProperty(pcdm.fileOf, repeatable=True, cls=PCDMObject)
+
+    def __str__(self):
+        return str(self.title or self.uri)
+
+
+class Item(PCDMObject):
+    object_type = ObjectProperty(
+        dcterms.type,
+        required=True,
+        validate=is_from_vocabulary('http://purl.org/dc/dcmitype/'),
+    )
+    identifier = DataProperty(dcterms.identifier, required=True, repeatable=True)
+    rights = ObjectProperty(
+        dcterms.rights,
+        required=True,
+        validate=is_from_vocabulary('http://vocab.lib.umd.edu/rightsStatement#'),
+    )
+    title = DataProperty(dcterms.title, required=True)
+    format = ObjectProperty(edm.hasType, validate=is_from_vocabulary('http://vocab.lib.umd.edu/form#'))
+    archival_collection = ObjectProperty(
+        dcterms.isPartOf,
+        validate=is_from_vocabulary('http://vocab.lib.umd.edu/collection#'),
+    )
+    date = DataProperty(dc.date, validate=is_edtf_formatted)
+    description = DataProperty(dcterms.description)
+    alternate_title = DataProperty(dcterms.alternative, repeatable=True)
+    creator = ObjectProperty(dcterms.creator, repeatable=True, embed=True, cls=LabeledThing)
+    contributor = ObjectProperty(dcterms.contributor, repeatable=True, embed=True, cls=LabeledThing)
+    publisher = ObjectProperty(dcterms.publisher, repeatable=True, embed=True, cls=LabeledThing)
+    location = ObjectProperty(dcterms.spatial, repeatable=True, embed=True, cls=LabeledThing)
+    extent = DataProperty(dcterms.extent, repeatable=True)
+    subject = ObjectProperty(dcterms.subject, repeatable=True, embed=True, cls=LabeledThing)
+    language = DataProperty(dc.language, repeatable=True, validate=is_valid_iso639_code)
+    rights_holder = ObjectProperty(dcterms.rightsHolder, repeatable=True, embed=True, cls=LabeledThing)
+    bibliographic_citation = DataProperty(dcterms.bibliographicCitation)
+    accession_number = DataProperty(dcterms.identifier, datatype=umdtype.accessionNumber)
+    handle = DataProperty(dcterms.identifier, datatype=umdtype.handle, validate=is_handle)
+
     HEADER_MAP = {
         'object_type': 'Object Type',
         'identifier': 'Identifier',
@@ -55,69 +110,26 @@ class Item(pcdm.Object):
         'rights_holder.label': 'Rights Holder',
         'bibliographic_citation': 'Collection Information',
         'accession_number': 'Accession Number',
-        'handle': 'Handle'
-    }
-    VALIDATION_RULESET = {
-        'object_type': {
-            'required': True,
-            'exactly': 1,
-            'from_vocabulary': 'http://purl.org/dc/dcmitype/',
-        },
-        'identifier': {
-            'required': True
-        },
-        'rights': {
-            'required': True,
-            'exactly': 1,
-            'from_vocabulary': 'http://vocab.lib.umd.edu/rightsStatement#'
-        },
-        'title': {
-            'required': True,
-            'exactly': 1
-        },
-        'format': {
-            'from_vocabulary': 'http://vocab.lib.umd.edu/form#'
-        },
-        'archival_collection': {
-            'max_values': 1,
-            'from_vocabulary': 'http://vocab.lib.umd.edu/collection#'
-        },
-        'date': {
-            'max_values': 1,
-            'function': is_edtf_formatted
-        },
-        'description': {
-            'max_values': 1
-        },
-        'alternate_title': {},
-        'creator': {},
-        'contributor': {},
-        'publisher': {},
-        'location': {},
-        'extent': {},
-        'subject': {},
-        'language': {
-            'function': is_valid_iso639_code
-        },
-        'rights_holder': {},
-        'bibliographic_citation': {
-            'max_values': 1
-        },
-        'accession_number': {
-            'max_values': 1
-        },
-        'handle': {
-            'required': False,
-            # 'exactly': 1,
-            'function': is_handle
-        },
+        'handle': 'Handle',
     }
 
-    def get_new_member(self, rootname, number):
-        if str(self.format) == str(umdform.pool_reports):
-            if rootname.startswith('body-'):
-                return Page(title=f'Body', number=number)
-            else:
-                return Page(title=f'Attachment {number - 1}', number=number)
-        else:
-            return Page(title=f'Page {number}', number=number)
+    def __str__(self):
+        return str(self.title)
+
+
+@rdf_type(fabio.Page)
+class Page(PCDMObject):
+    title = DataProperty(dcterms.title)
+    number = DataProperty(fabio.hasSequenceIdentifier)
+
+    def __str__(self):
+        return str(self.title or self.uri)
+
+
+@rdf_type(ore.Proxy)
+class Proxy(RDFResource):
+    title = DataProperty(dcterms.title)
+    prev = ObjectProperty(iana.prev, cls='Proxy')
+    next = ObjectProperty(iana.next, cls='Proxy')
+    proxy_for = ObjectProperty(ore.proxyFor, cls=RDFResourceBase)
+    proxy_in = ObjectProperty(ore.proxyIn, cls=RDFResourceBase)

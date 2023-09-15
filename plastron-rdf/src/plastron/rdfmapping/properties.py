@@ -33,7 +33,7 @@ class RDFProperty:
     @property
     def values(self) -> Iterable:
         """Values of this property"""
-        return self.resource.graph.objects(self.resource.uri, self.predicate)
+        return self.resource.graph.with_changes().objects(self.resource.uri, self.predicate)
 
     @property
     def value(self):
@@ -58,21 +58,11 @@ class RDFProperty:
 
     def add(self, value):
         """Add a single value to this property."""
-        try:
-            self.resource.deletes.remove((self.resource.uri, self.predicate, value))
-        except KeyError:
-            # this is the case where this value has not been deleted
-            pass
-        self.resource.inserts.add((self.resource.uri, self.predicate, value))
+        self.resource.graph.add((self.resource.uri, self.predicate, value))
 
     def remove(self, value):
         """Remove a single value from this property."""
-        try:
-            self.resource.inserts.remove((self.resource.uri, self.predicate, value))
-        except KeyError:
-            # this is the case where this value has not been inserted
-            pass
-        self.resource.deletes.add((self.resource.uri, self.predicate, value))
+        self.resource.graph.remove((self.resource.uri, self.predicate, value))
 
     def update(self, new_values: Iterable) -> Tuple[Set, Set]:
         """Update this property to have only the new values.

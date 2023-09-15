@@ -182,9 +182,8 @@ class RepositoryResource:
             self._description_url = URLObject(response.links['describedby']['url'])
         return response
 
-    @contextmanager
-    def describe(self, model: Type[RDFResourceBase]) -> Iterator[RDFResourceBase]:
-        yield model(uri=URIRef(self.url), graph=self._graph)
+    def describe(self, model: Type[RDFResourceType]) -> Iterator[RDFResourceType]:
+        return model(uri=URIRef(self.url), graph=self._graph)
 
     def attach_description(self, description: RDFResourceBase):
         description.uri = URIRef(self.url)
@@ -202,8 +201,8 @@ class RepositoryResource:
     def save(self):
         self._graph.apply_changes()
         try:
-            logger.debug(f'Putting graph to {self.description_url}')
-            response = self.client.put_graph(self.description_url, self._graph)
+            logger.debug(f'Putting graph to {self.url}')
+            response = self.client.put_graph(self.url, self._graph)
             if not response.ok:
                 raise RepositoryError(f'Unable to save {self.url}: {response}')
         except ClientError as e:

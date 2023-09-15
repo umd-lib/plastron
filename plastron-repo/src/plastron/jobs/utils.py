@@ -277,7 +277,7 @@ class Row:
             # create a new object (will create in the repo later)
             resource = RepositoryResource(repo=repo)
 
-        return resource.describe(self.spreadsheet.model_class)
+        return self.spreadsheet.model_class(uri=self.uri, graph=resource.graph)
 
     @property
     def identifier(self):

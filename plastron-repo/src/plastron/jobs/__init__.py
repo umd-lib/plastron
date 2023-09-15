@@ -96,21 +96,18 @@ def create_page(
     if file_sources is None:
         file_sources = {}
     logger.debug(f'Creating page {number} for {parent}')
-    page = container.create_child(
+    page_resource = container.create_child(
         resource_class=ContainerResource,
         slug=random_slug(),
         description=Page(title=f'Page {number}', number=number, member_of=parent),
     )
-    files_container = page.create_child(resource_class=ContainerResource, slug='f')
-    for filename, source in file_sources.items():
-        file = create_file(
-            container=files_container,
-            source=source,
-            parent=page.description,
-        )
-        page.description.has_file.add(URIRef(file.url))
-    page.save()
-    return page
+    files_container = page_resource.create_child(resource_class=ContainerResource, slug='f')
+    with page_resource.describe(Page) as page:
+        for filename, source in file_sources.items():
+            file = create_file(container=files_container, source=source, parent=page)
+            page.has_file.add(URIRef(file.url))
+    page_resource.save()
+    return page_resource
 
 
 def create_file(
@@ -122,15 +119,13 @@ def create_file(
     """Create a single file"""
     if slug is None:
         slug = random_slug()
+    title = basename(source.filename)
     with source.open() as stream:
         logger.debug(f'Creating file {source.filename} for {parent}')
-        file = container.create_child(
+        file_resource = container.create_child(
             resource_class=BinaryResource,
             slug=slug,
-            description=PCDMFile(
-                title=basename(source.filename),
-                file_of=parent,
-            ),
+            description=PCDMFile(title=title, file_of=parent),
             data=stream,
             headers={
                 'Content-Type': source.mimetype(),
@@ -138,9 +133,9 @@ def create_file(
                 'Content-Disposition': f'attachment; filename="{source.filename}"',
             },
         )
-    file.save()
-    logger.debug(f'Created file: {file.url} {file.description.title.value}')
-    return file
+    file_resource.save()
+    logger.debug(f'Created file: {file_resource.url} {title}')
+    return file_resource
 
 
 class ImportedItemStatus(Enum):
@@ -623,8 +618,6 @@ class ImportRow:
                         resource_class=ContainerResource,
                         description=self.item,
                     )
-                    # switch the resource model to PCDM Object, for adding members
-                    resource.model = PCDMObject
                     # hierarchical object: members container under the main resource
                     logger.debug(f'Creating members container for {resource.path}')
                     members_container = resource.create_child(resource_class=ContainerResource, slug='m')
@@ -632,38 +625,44 @@ class ImportRow:
                     # add pages and files to those pages
                     if self.row.has_files:
                         file_groups = build_file_groups(self.row['FILES'])
-                        previous_proxy = None
-                        for n, (rootname, filenames) in enumerate(file_groups.items(), 1):
-                            file_sources = {
-                                filename: self.job.get_source(self.job.config.binaries_location, filename)
-                                for filename in filenames
-                            }
-                            page = create_page(
-                                container=members_container,
-                                parent=resource.description,
-                                number=n,
-                                file_sources=file_sources,
-                            )
-                            proxy = proxies_container.create_child(
-                                resource_class=ContainerResource,
-                                description=Proxy(
-                                    proxy_for=page.description,
-                                    proxy_in=resource.description,
-                                    title=page.description.title.value,
-                                ),
-                                slug=random_slug(),
-                            )
-                            if previous_proxy is None:
-                                # first page in sequence
-                                resource.description.first = URIRef(proxy.url)
-                            else:
-                                previous_proxy.description.next = URIRef(proxy.url)
-                                proxy.description.prev = URIRef(previous_proxy.url)
-                                previous_proxy.save()
-                            proxy.save()
-                            previous_proxy = proxy
-                            resource.description.has_member.add(URIRef(page.url))
-                        resource.description.last = URIRef(previous_proxy.url)
+                        with resource.describe(PCDMObject) as obj:
+                            previous_proxy_resource = None
+                            for n, (rootname, filenames) in enumerate(file_groups.items(), 1):
+                                file_sources = {
+                                    filename: self.job.get_source(self.job.config.binaries_location, filename)
+                                    for filename in filenames
+                                }
+                                page_resource = create_page(
+                                    container=members_container,
+                                    parent=obj,
+                                    number=n,
+                                    file_sources=file_sources,
+                                )
+                                with page_resource.describe(Page) as page:
+                                    proxy_resource = proxies_container.create_child(
+                                        resource_class=ContainerResource,
+                                        description=Proxy(
+                                            proxy_for=page,
+                                            proxy_in=obj,
+                                            title=page.title.value,
+                                        ),
+                                        slug=random_slug(),
+                                    )
+                                    with proxy_resource.describe(Proxy) as proxy:
+                                        if previous_proxy_resource is None:
+                                            # first page in sequence
+                                            obj.first = proxy
+                                            obj.last = proxy
+                                        else:
+                                            with previous_proxy_resource.describe(Proxy) as previous_proxy:
+                                                previous_proxy.next = proxy
+                                                proxy.prev = previous_proxy
+                                                previous_proxy.save()
+                                                obj.last = proxy
+                                    proxy_resource.save()
+                                    previous_proxy_resource = proxy_resource
+                                    obj.has_member.add(page)
+                    """
                     if self.row.has_item_files:
                         item_files_container = resource.create_child(resource_class=ContainerResource, slug='f')
                         for rootname, filenames in self.row.item_filenames:
@@ -675,6 +674,7 @@ class ImportRow:
                                     parent=resource.description,
                                 )
                                 resource.description.has_file.add(URIRef(file.url))
+                    """
                     resource.save()
             except Exception as e:
                 raise RuntimeError(f'Creating item failed: {e}') from e

@@ -4,33 +4,11 @@ from typing import List, Optional, Union, Any, Type
 from uuid import uuid4
 
 from rdflib import Graph, URIRef
-from rdflib.term import Node
 
 from plastron.rdfmapping.descriptors import ObjectProperty, Property, DataProperty
+from plastron.rdfmapping.graph import TrackChangesGraph
 from plastron.rdfmapping.properties import RDFProperty
 from plastron.rdfmapping.validation import ValidationResultsDict
-
-
-def update_node(node: Node, old_uri: URIRef, new_uri: URIRef) -> Optional[URIRef]:
-    if node == old_uri or str(node).startswith(old_uri + '#'):
-        return URIRef(str(node).replace(old_uri, new_uri))
-    else:
-        return None
-
-
-def update_uri(graph: Graph, old_uri: URIRef, new_uri: URIRef):
-    """Change occurrences of ``old_uri`` to ``new_uri`` in the ``graph``.
-    This includes URIRefs that contain a fragment identifier following
-    the ``old_uri``.
-
-    The ``graph`` object is updated in place."""
-    for s, p, o in graph:
-        new_s = update_node(s, old_uri, new_uri)
-        new_p = update_node(p, old_uri, new_uri)
-        new_o = update_node(o, old_uri, new_uri)
-        if new_s or new_p or new_o:
-            graph.remove((s, p, o))
-            graph.add((new_s or s, new_p or p, new_o or o))
 
 
 def is_iterable(value: Any) -> bool:
@@ -69,13 +47,26 @@ class RDFResourceBase:
         else:
             # use a unique UUID URI for resources that do not (yet) have a URI subject
             self._uri = URIRef(uuid4().urn)
-        self.base_graph = graph if graph is not None else Graph()
 
-        self.inserts = Graph()
-        self.deletes = Graph()
-        if not graph:
+        if graph:
+            if isinstance(graph, TrackChangesGraph):
+                self._graph = graph
+            else:
+                self._graph = TrackChangesGraph()
+                for triple in graph:
+                    self._graph.add(triple)
+                self._graph.apply_changes()
+        else:
+            self._graph = TrackChangesGraph()
             self.set_properties(**self.default_values)
         self.set_properties(**kwargs)
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        if exc_type is None:
+            self.apply_changes()
 
     def get_fragment_resource(
             self,
@@ -93,9 +84,7 @@ class RDFResourceBase:
         if fragment_id is None:
             fragment_id = str(uuid4())
         uri = URIRef(self.uri + '#' + fragment_id)
-        fragment = object_class(uri=uri, graph=self.base_graph)
-        fragment.inserts = self.inserts
-        fragment.deletes = self.deletes
+        fragment = object_class(uri=uri, graph=self._graph)
         return fragment
 
     def set_properties(self, **kwargs):
@@ -115,32 +104,15 @@ class RDFResourceBase:
         self.apply_changes()
 
     @property
-    def graph(self) -> Graph:
-        graph = Graph()
-        for triple in self.base_graph.triples((self._uri, None, None)):
-            graph.add(triple)
-        for triple in self.deletes:
-            graph.remove(triple)
-        for triple in self.inserts:
-            graph.add(triple)
-        return graph
+    def graph(self) -> TrackChangesGraph:
+        return self._graph
 
     @property
     def has_changes(self) -> bool:
-        return len(self.deletes) > 0 or len(self.inserts) > 0
+        return self._graph.has_changes
 
     def apply_changes(self):
-        for triple in self.deletes:
-            self.base_graph.remove(triple)
-        for triple in self.inserts:
-            self.base_graph.add(triple)
-        self.clear_changes()
-
-    def clear_changes(self):
-        for triple in self.deletes:
-            self.deletes.remove(triple)
-        for triple in self.inserts:
-            self.inserts.remove(triple)
+        self._graph.apply_changes()
 
     @property
     def uri(self) -> URIRef:
@@ -149,9 +121,7 @@ class RDFResourceBase:
 
     @uri.setter
     def uri(self, new_uri: URIRef):
-        update_uri(self.base_graph, self._uri, new_uri)
-        update_uri(self.deletes, self._uri, new_uri)
-        update_uri(self.inserts, self._uri, new_uri)
+        self._graph.change_uri(self._uri, new_uri)
         self._uri = new_uri
 
     def rdf_properties(self) -> List[RDFProperty]:

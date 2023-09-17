@@ -49,7 +49,7 @@ class Collection(LabeledThing):
 @rdf.data_property('bibliographic_citation', dcterms.bibliographicCitation)
 @rdf.data_property('extent', dcterms.extent)
 @rdf.data_property('rights_holder', dcterms.rightsHolder)
-@rdf.data_property('handle', dcterms.identifer, datatype=umdtype.handle)
+@rdf.data_property('handle', dcterms.identifier, datatype=umdtype.handle)
 @rdf.rdf_class(bibo.Letter)
 class Letter(pcdm.Object):
     HEADER_MAP = {
@@ -128,7 +128,7 @@ class Letter(pcdm.Object):
         },
         'handle': {
             'required': False,
-            'exactly': 1,
+            # 'exactly': 1,
             'function': is_handle
         },
     }

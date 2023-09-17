@@ -28,7 +28,7 @@ from plastron.client import Client, ClientError, random_slug
 from plastron.files import get_ssh_client, ZipFileSource, RemoteFileSource, HTTPFileSource, LocalFileSource, \
     BinarySource
 from plastron.jobs.utils import create_repo_changeset, build_file_groups, annotate_from_files, build_fields, \
-    RepoChangeset, ColumnSpec, parse_value_string, Row, MetadataRows, JobError, JobConfigError, LineReference
+    RepoChangeset, ColumnSpec, parse_value_string, Row, ImportSpreadsheet, JobError, JobConfigError, LineReference
 from plastron.models import get_model_class, Item, ModelClassNotFoundError, umdform
 from plastron.models.umd import Page, Proxy, PCDMObject, PCDMFile
 from plastron.rdf.pcdm import File, PreservationMasterFile, Object
@@ -235,8 +235,8 @@ class ImportJob:
             'status': status.value
         })
 
-    def metadata(self, **kwargs) -> 'MetadataRows':
-        return MetadataRows(self, **kwargs)
+    def metadata(self, **kwargs) -> 'ImportSpreadsheet':
+        return ImportSpreadsheet(self, **kwargs)
 
     def new_run(self) -> 'ImportRun':
         return ImportRun(self)

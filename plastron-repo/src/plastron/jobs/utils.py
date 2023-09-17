@@ -242,7 +242,7 @@ def annotate_from_files(item, mime_types):
 class Row:
     def __init__(
             self,
-            spreadsheet: 'MetadataRows',
+            spreadsheet: 'ImportSpreadsheet',
             line_reference: LineReference,
             row_number: int,
             data: Mapping,
@@ -312,7 +312,7 @@ class Row:
         return self.data.get('INDEX')
 
 
-class MetadataRows:
+class ImportSpreadsheet:
     """
     Iterable sequence of rows from the metadata CSV file of an import job.
     """
@@ -341,12 +341,6 @@ class MetadataRows:
         self.total = None
         self.rows = 0
         self.errors = 0
-        self.valid = 0
-        self.invalid = 0
-        self.created = 0
-        self.updated = 0
-        self.unchanged = 0
-        self.files = 0
 
         if self.metadata_file.seekable():
             # get the row count of the file, then rewind the CSV file
@@ -399,19 +393,6 @@ class MetadataRows:
     @property
     def identifier_column(self):
         return self.model_class.HEADER_MAP['identifier']
-
-    def stats(self):
-        return {
-            'total': self.total,
-            'rows': self.rows,
-            'errors': self.errors,
-            'valid': self.valid,
-            'invalid': self.invalid,
-            'created': self.created,
-            'updated': self.updated,
-            'unchanged': self.unchanged,
-            'files': self.files
-        }
 
     def __iter__(self):
         for row_number, line in enumerate(self.csv_file, 1):

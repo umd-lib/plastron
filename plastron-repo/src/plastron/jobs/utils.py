@@ -394,13 +394,16 @@ class ImportSpreadsheet:
     def identifier_column(self):
         return self.model_class.HEADER_MAP['identifier']
 
+    def should_load(self, line) -> bool:
+        return self.subset_to_load is None or line[self.identifier_column] in self.subset_to_load
+
     def __iter__(self):
         for row_number, line in enumerate(self.csv_file, 1):
             if self.limit is not None and row_number > self.limit:
                 logger.info(f'Stopping after {self.limit} rows')
                 break
 
-            if self.subset_to_load is not None and line[self.identifier_column] not in self.subset_to_load:
+            if not self.should_load(line):
                 continue
 
             line_reference = LineReference(filename=str(self.job.metadata_filename), line_number=row_number + 1)

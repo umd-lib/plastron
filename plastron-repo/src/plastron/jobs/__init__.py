@@ -27,7 +27,7 @@ from requests import ConnectionError
 from plastron.client import Client, ClientError, random_slug
 from plastron.files import get_ssh_client, ZipFileSource, RemoteFileSource, HTTPFileSource, LocalFileSource, \
     BinarySource
-from plastron.jobs.utils import create_repo_changeset, build_file_groups, annotate_from_files, build_fields, \
+from plastron.jobs.utils import get_item_to_import, build_file_groups, annotate_from_files, build_fields, \
     RepoChangeset, ColumnSpec, parse_value_string, Row, ImportSpreadsheet, JobError, JobConfigError, LineReference
 from plastron.models import get_model_class, Item, ModelClassNotFoundError, umdform
 from plastron.models.umd import Page, Proxy, PCDMObject, PCDMFile
@@ -235,9 +235,6 @@ class ImportJob:
             'status': status.value
         })
 
-    def metadata(self, **kwargs) -> 'ImportSpreadsheet':
-        return ImportSpreadsheet(self, **kwargs)
-
     def new_run(self) -> 'ImportRun':
         return ImportRun(self)
 
@@ -313,7 +310,7 @@ class ImportJob:
             self.store_metadata_file(import_file)
 
         try:
-            metadata = self.metadata(limit=limit, percentage=percentage)
+            metadata = ImportSpreadsheet(metadata_filename=self.metadata_filename, model_class=self.model_class)
         except ModelClassNotFoundError as e:
             raise RuntimeError(f'Model class {e.model_name} not found') from e
         except JobError as e:
@@ -338,7 +335,7 @@ class ImportJob:
         logger.info(f'Found {count["initially_completed_items"]} completed items')
 
         import_run = self.new_run().start()
-        for row in metadata:
+        for row in metadata.rows(limit=limit, percentage=percentage, completed=self.completed_log):
             logger.debug(f'Row data: {row.data}')
             import_row = ImportRow(self, repo, row)
 
@@ -542,7 +539,7 @@ class ImportRow:
         self.job = job
         self.row = row
         self.repo = repo
-        self.item = create_repo_changeset(repo, row)
+        self.item = get_item_to_import(repo, row)
 
     def __str__(self):
         return str(self.item)

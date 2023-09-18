@@ -4,7 +4,8 @@ import re
 from collections import OrderedDict, defaultdict
 from dataclasses import dataclass
 from os.path import splitext, basename
-from typing import Optional, Dict, List, Union, Mapping, NamedTuple, Type
+from pathlib import Path
+from typing import Optional, Dict, List, Union, Mapping, NamedTuple, Type, Iterator, Sequence
 
 from bs4 import BeautifulSoup
 from rdflib import Literal, URIRef, Graph
@@ -317,15 +318,15 @@ class ImportSpreadsheet:
     Iterable sequence of rows from the metadata CSV file of an import job.
     """
 
-    def __init__(self, job, limit: int = None, percentage: int = None):
-        self.job = job
-        self.limit = limit
+    def __init__(self, metadata_filename: Union[Path, str], model_class: Type[RDFResourceBase]):
+        self.metadata_filename = metadata_filename
         self.metadata_file = None
+        self.model_class = model_class
 
         try:
-            self.metadata_file = open(job.metadata_filename, 'r')
+            self.metadata_file = open(metadata_filename, 'r')
         except FileNotFoundError as e:
-            raise MetadataError(job, f'Cannot read source file "{job.metadata_filename}: {e}') from e
+            raise RuntimeError(f'Cannot read metadata file "{metadata_filename}": {e}') from e
 
         self.csv_file = csv.DictReader(self.metadata_file)
 
@@ -339,7 +340,7 @@ class ImportSpreadsheet:
         self.subset_to_load = None
 
         self.total = None
-        self.rows = 0
+        self.row_count = 0
         self.errors = 0
 
         if self.metadata_file.seekable():
@@ -350,37 +351,10 @@ class ImportSpreadsheet:
             # file is not seekable, so we can't get a row count in advance
             self.total = None
 
-        if percentage is not None:
-            if not self.metadata_file.seekable():
-                raise RuntimeError('Cannot execute a percentage load using a non-seekable file')
-            identifier_column = self.model_class.HEADER_MAP['identifier']
-            identifiers = [
-                row[identifier_column] for row in self.csv_file if row[identifier_column] not in job.completed_log
-            ]
-            self._rewind_csv_file()
-
-            if len(identifiers) == 0:
-                logger.info('No items remaining to load')
-                self.subset_to_load = []
-            else:
-                target_count = int(((percentage / 100) * self.total))
-                logger.info(f'Attempting to load {target_count} items ({percentage}% of {self.total})')
-                if len(identifiers) > target_count:
-                    # evenly space the items to load among the remaining items
-                    step_size = int((100 * (1 - (len(job.completed_log) / self.total))) / percentage)
-                else:
-                    # load all remaining items
-                    step_size = 1
-                self.subset_to_load = identifiers[::step_size]
-
     def _rewind_csv_file(self):
         # rewind the file and re-create the CSV reader
         self.metadata_file.seek(0)
         self.csv_file = csv.DictReader(self.metadata_file)
-
-    @property
-    def model_class(self) -> Type[RDFResourceBase]:
-        return self.job.model_class
 
     @property
     def has_binaries(self) -> bool:
@@ -395,20 +369,55 @@ class ImportSpreadsheet:
         return self.model_class.HEADER_MAP['identifier']
 
     def should_load(self, line) -> bool:
+        """Whether the given line is part of the subset of lines to load."""
         return self.subset_to_load is None or line[self.identifier_column] in self.subset_to_load
 
-    def __iter__(self):
+    def rows(self, limit: int = None, percentage: int = None, completed: Sequence = None) -> Iterator[Row]:
+        """Iterator over the rows in this spreadsheet.
+
+        :param limit: maximum row number to return
+        :param percentage: percentage of rows to load, as an integer 1-100
+        :param completed: record of already completed items; typically an ItemLog instance, but it
+          only has to support ``__len__()`` and "__contains__(identifier)"
+        """
+
+        if completed is None:
+            completed = []
+
+        if percentage is not None:
+            if not self.metadata_file.seekable():
+                raise RuntimeError('Cannot execute a percentage load using a non-seekable file')
+            identifier_column = self.model_class.HEADER_MAP['identifier']
+            identifiers = [
+                row[identifier_column] for row in self.csv_file if row[identifier_column] not in completed
+            ]
+            self._rewind_csv_file()
+
+            if len(identifiers) == 0:
+                logger.info('No items remaining to load')
+                self.subset_to_load = []
+            else:
+                target_count = int(((percentage / 100) * self.total))
+                logger.info(f'Attempting to load {target_count} items ({percentage}% of {self.total})')
+                if len(identifiers) > target_count:
+                    # evenly space the items to load among the remaining items
+                    step_size = int((100 * (1 - (len(completed) / self.total))) / percentage)
+                else:
+                    # load all remaining items
+                    step_size = 1
+                self.subset_to_load = identifiers[::step_size]
+
         for row_number, line in enumerate(self.csv_file, 1):
-            if self.limit is not None and row_number > self.limit:
-                logger.info(f'Stopping after {self.limit} rows')
+            if limit is not None and row_number > limit:
+                logger.info(f'Stopping after {limit} rows')
                 break
 
             if not self.should_load(line):
                 continue
 
-            line_reference = LineReference(filename=str(self.job.metadata_filename), line_number=row_number + 1)
+            line_reference = LineReference(filename=str(self.metadata_filename), line_number=row_number + 1)
             logger.debug(f'Processing {line_reference}')
-            self.rows += 1
+            self.row_count += 1
 
             if any(v is None for v in line.values()):
                 self.errors += 1
@@ -418,12 +427,12 @@ class ImportSpreadsheet:
                     'error': f'Line {line_reference} has the wrong number of columns'
                 })
                 # TODO: this should be part of ImportRun?
-                self.job.drop_invalid(item=None, line_reference=line_reference, reason='Wrong number of columns')
+                # self.job.drop_invalid(item=None, line_reference=line_reference, reason='Wrong number of columns')
                 continue
 
             row = Row(self, line_reference, row_number, line, self.identifier_column)
 
-            if row.identifier in self.job.completed_log:
+            if row.identifier in completed:
                 logger.info(f'Already loaded "{row.identifier}" from {line_reference}, skipping')
                 self.skipped += 1
                 continue
@@ -434,20 +443,18 @@ class ImportSpreadsheet:
             # if we weren't able to get the total count before,
             # use the final row count as the total count for the
             # job completion message
-            self.total = self.rows
+            self.total = self.row_count
 
 
-def create_repo_changeset(repo: Repository, row: Row, validate_only=False):
+def get_item_to_import(repo: Repository, row: Row, validate_only=False) -> RDFResourceBase:
     """
-    Returns a RepoChangeset of the changes to make to the repository
+    Gets an RDF resource to be imported
 
     :param repo: the repository configuration
     :param row: A single plastron.jobs.Row object representing the row
                  to import
     :param validate_only: If true, will not fetch existing object from the
                 repository.
-    :return: A RepoChangeSet encapsulating the changes to make to the
-            repository.
     """
     fields = row.spreadsheet.fields
     item = row.get_object(repo, read_from_repo=(not validate_only))

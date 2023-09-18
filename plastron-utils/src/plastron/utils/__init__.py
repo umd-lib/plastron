@@ -2,6 +2,7 @@ import csv
 import logging
 import os
 import re
+from collections.abc import Sequence
 from datetime import datetime
 from pathlib import Path
 
@@ -119,7 +120,7 @@ def strtobool(val):
         raise ValueError("invalid truth value %r" % (val,))
 
 
-class ItemLog:
+class ItemLog(Sequence):
     def __init__(self, filename, fieldnames, keyfield, header=True):
         self.filename = Path(filename)
         self.fieldnames = fieldnames
@@ -182,6 +183,12 @@ class ItemLog:
 
     def __len__(self):
         return len(self.item_keys)
+
+    def __getitem__(self, item):
+        for n, row in enumerate(self):
+            if n == item:
+                return row
+        raise IndexError(item)
 
 
 class ItemLogError(Exception):

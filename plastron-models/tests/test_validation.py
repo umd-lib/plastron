@@ -116,7 +116,8 @@ def test_remote_vocab_error(MockGraph):
     MockGraph.return_value = mock_graph
     # failure to retrieve the vocabulary over HTTP should
     # raise a ValidationError
-    pytest.raises(ValidationError, get_vocabulary, 'http://example.org/foo/')
+    with pytest.raises(ValidationError):
+        get_vocabulary('http://example.org/foo/')
 
 
 @httpretty.activate

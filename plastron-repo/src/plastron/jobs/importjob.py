@@ -157,6 +157,9 @@ class ImportJob:
         except IndexError:
             return None
 
+    def get_metadata(self) -> ImportSpreadsheet:
+        return ImportSpreadsheet(metadata_filename=self.metadata_filename, model_class=self.model_class)
+
     def start(
             self,
             repo: Repository,
@@ -212,7 +215,7 @@ class ImportJob:
             self.store_metadata_file(import_file)
 
         try:
-            metadata = ImportSpreadsheet(metadata_filename=self.metadata_filename, model_class=self.model_class)
+            metadata = self.get_metadata()
         except ModelClassNotFoundError as e:
             raise RuntimeError(f'Model class {e.model_name} not found') from e
         except JobError as e:
@@ -243,7 +246,7 @@ class ImportJob:
                 continue
 
             logger.debug(f'Row data: {row.data}')
-            import_row = ImportRow(self, repo, row)
+            import_row = self.get_import_row(repo, row)
 
             # count the number of files referenced in this row
             count['files'] += len(row.filenames)
@@ -281,7 +284,7 @@ class ImportJob:
                     count['skipped_items'] += 1
                 else:
                     raise RuntimeError(f'Unknown status "{status}" returned when importing "{import_row.item}"')
-            except RuntimeError as e:
+            except JobError as e:
                 count['items_with_errors'] += 1
                 logger.error(f'{import_row.item} import failed: {e}')
                 import_run.drop_failed(import_row.item, row.line_reference, reason=str(e))
@@ -319,6 +322,9 @@ class ImportJob:
             return self.config.extract_text_types.split(',')
         else:
             return []
+
+    def get_import_row(self, repo: Repository, row: Row):
+        return ImportRow(self, repo, row)
 
     def get_source(self, base_location: str, path: str) -> BinarySource:
         """
@@ -492,7 +498,7 @@ class ImportRow:
                                 resource.create_file(source=source)
                     resource.save()
             except RepositoryError as e:
-                raise RuntimeError(f'Creating item failed: {e}') from e
+                raise JobError(f'Creating item failed: {e}') from e
 
             logger.info(f'Created {resource.url}')
             return ImportedItemStatus.CREATED
@@ -505,7 +511,7 @@ class ImportRow:
                 resource.attach_description(self.item)
                 resource.update()
             except RepositoryError as e:
-                raise RuntimeError(f'Updating item failed: {e}') from e
+                raise JobError(f'Updating item failed: {e}') from e
 
             logger.info(f'Updated {resource.url}')
             return ImportedItemStatus.MODIFIED

@@ -1,7 +1,7 @@
 from rdflib import Graph, Literal, Namespace, URIRef
 
 from plastron.models.umd import Item, umdform
-from plastron.rdf.pcdm import Page
+from plastron.repo.pcdm import get_new_member_title
 
 rdf = (
     '@prefix dcterms: <http://purl.org/dc/terms/> .'
@@ -11,9 +11,9 @@ rdf = (
 )
 
 base_uri = 'http://example.com/xyz'
-item = Item.from_graph(
+item = Item(
     graph=Graph().parse(data=rdf, format='turtle', publicID=base_uri),
-    subject=base_uri
+    uri=base_uri
 )
 dcterms = Namespace('http://purl.org/dc/terms/')
 umdtype = Namespace('http://vocab.lib.umd.edu/datatype#')
@@ -21,33 +21,26 @@ umdtype = Namespace('http://vocab.lib.umd.edu/datatype#')
 
 def test_identifier_distinct_from_accession_number():
     assert len(item.identifier) == 1
-    assert item.identifier[0] == Literal('foo')
+    assert item.identifier.value == Literal('foo')
 
     assert len(item.accession_number) == 1
-    assert item.accession_number[0] == Literal('1212XN1', datatype=umdtype.accessionNumber)
+    assert item.accession_number.value == Literal('1212XN1', datatype=umdtype.accessionNumber)
 
-    graph = item.graph()
-    assert (URIRef(base_uri), dcterms.identifier, Literal('foo')) in graph
-    assert (URIRef(base_uri), dcterms.identifier, Literal('1212XN1', datatype=umdtype.accessionNumber)) in graph
+    assert (URIRef(base_uri), dcterms.identifier, Literal('foo')) in item.graph
+    assert (URIRef(base_uri), dcterms.identifier, Literal('1212XN1', datatype=umdtype.accessionNumber)) in item.graph
 
 
 def test_get_new_member():
     basic_item = Item()
-    page = basic_item.get_new_member('foo', 1)
-    assert isinstance(page, Page)
-    assert str(page.number) == '1'
-    assert str(page.title) == 'Page 1'
+    title = get_new_member_title(basic_item, 'foo', 1)
+    assert str(title) == 'Page 1'
 
 
 def test_get_new_member_pool_report():
     pool_report = Item(format=umdform.pool_reports)
 
-    body = pool_report.get_new_member('body-processed-redacted', 1)
-    assert isinstance(body, Page)
-    assert str(body.number) == '1'
-    assert str(body.title) == 'Body'
+    body_title = get_new_member_title(pool_report, 'body-processed-redacted', 1)
+    assert str(body_title) == 'Body'
 
-    attachment = pool_report.get_new_member('foo', 2)
-    assert isinstance(attachment, Page)
-    assert str(attachment.number) == '2'
-    assert str(attachment.title) == 'Attachment 1'
+    attachment_title = get_new_member_title(pool_report, 'foo', 2)
+    assert str(attachment_title) == 'Attachment 1'

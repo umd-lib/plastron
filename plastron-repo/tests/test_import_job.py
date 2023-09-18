@@ -1,4 +1,4 @@
-from plastron.jobs import ImportJob
+from plastron.jobs.importjob import ImportJob
 
 
 def test_safe_job_id():

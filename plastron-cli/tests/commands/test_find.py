@@ -9,8 +9,7 @@ from plastron.namespaces import rdf, pcdm, dcterms
 @pytest.fixture
 def resources(datadir):
     source_graph = Graph()
-    with open(datadir / 'graph.ttl', 'r') as fh:
-        source_graph.load(fh, format='turtle')
+    source_graph.parse(datadir / 'graph.ttl', format='turtle')
 
     resource_graphs = []
     for subject in set(source_graph.subjects()):

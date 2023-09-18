@@ -96,7 +96,7 @@ class StringSource(BinarySource):
 
     def open(self):
         if self.buffer is None or self.buffer.closed:
-            self.buffer = io.StringIO(self.content)
+            self.buffer = io.BytesIO(self.content.encode())
         return self.buffer
 
     def close(self):

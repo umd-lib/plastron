@@ -9,7 +9,8 @@ dependencies = [
     "requests",
     "paramiko",
     "pillow",
-    "rdflib",
+    # rdflib 6.0.0 fixed the 308 HTTP redirect bug
+    "rdflib >= 6.0.0",
 ]
 
 [project.optional-dependencies]

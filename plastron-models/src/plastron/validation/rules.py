@@ -25,7 +25,8 @@ def exactly(prop, length):
 
 
 def allowed_values(prop, values):
-    return not any(True for v in prop.values if str(v) not in values)
+    # is the set of property values a subset of the set of possible values?
+    return set(prop.values) <= set(values)
 
 
 def from_vocabulary(prop, vocab_uri):

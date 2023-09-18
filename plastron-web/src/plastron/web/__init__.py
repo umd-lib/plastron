@@ -6,7 +6,7 @@ from pathlib import Path
 from flask import Flask, url_for
 from werkzeug.exceptions import NotFound
 
-from plastron.jobs import JobConfigError, ImportJob, JobError
+from plastron.jobs.importjob import JobConfigError, ImportJob, JobError
 
 logger = logging.getLogger(__name__)
 
@@ -69,7 +69,7 @@ def create_app():
                 'runs': job.runs,
                 'completed': items(job.completed_log),
                 'dropped': latest_dropped_items(job),
-                'total': job.metadata().total
+                'total': job.get_metadata().total
             }
         except JobError as e:
             raise NotFound from e

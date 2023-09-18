@@ -118,13 +118,14 @@ class PCDMObjectResource(PCDMFileBearingResource):
                 for file_spec in file_group.files:
                     page_resource.create_file(source=file_spec.source)
         page_resource.save()
+        self.member_urls.add(page_resource.url)
         return page_resource
 
     def create_proxy(self, target: RDFResourceBase, title: str) -> ContainerResource:
         """Create a proxy resource for the given target."""
         if self.proxies_container is None:
             logger.debug(f'Creating proxies container for {self.path}')
-            self.proxies_container = self.create_child(resource_class=ContainerResource, slug='m')
+            self.proxies_container = self.create_child(resource_class=ContainerResource, slug='x')
 
         return self.proxies_container.create_child(
             resource_class=ContainerResource,

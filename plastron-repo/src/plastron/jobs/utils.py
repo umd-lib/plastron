@@ -420,7 +420,7 @@ class ImportSpreadsheet:
         try:
             self.metadata_file = open(metadata_filename, 'r')
         except FileNotFoundError as e:
-            raise RuntimeError(f'Cannot read metadata file "{metadata_filename}": {e}') from e
+            raise MetadataError(f'Cannot read metadata file "{metadata_filename}": {e}') from e
 
         self.csv_file = csv.DictReader(self.metadata_file)
 

@@ -1,49 +1,43 @@
-import csv
-from unittest.mock import Mock
-
 import pytest
 
-from plastron.jobs.utils import create_repo_changeset
-from plastron.jobs import Row, build_fields
+from plastron.jobs.utils import ImportSpreadsheet
 from plastron.models import Item
+from plastron.repo import Repository
 
 
 @pytest.fixture
-def csv_data(datadir):
-    csv_file = (datadir / 'embedded_objects.csv').open()
-    yield csv.DictReader(csv_file)
-    csv_file.close()
+def repo():
+    return Repository.from_url('http://localhost:8080/rest')
 
 
 @pytest.fixture
-def rows(csv_data):
-    return [
-        Row(line_reference=f'test:{n + 1}', row_number=n, data=row, identifier_column='Identifier')
-        for n, row in enumerate(csv_data, start=1)
-    ]
+def csv_filename(datadir):
+    return datadir / 'embedded_objects.csv'
 
 
 @pytest.fixture
-def metadata(csv_data):
-    metadata = Mock()
-    metadata.fields = build_fields(csv_data.fieldnames, Item)
-    metadata.model_class = Item
-    return metadata
+def spreadsheet(csv_filename):
+    return ImportSpreadsheet(metadata_filename=csv_filename, model_class=Item)
 
 
-def test_single_embed(metadata, rows):
-    changeset = create_repo_changeset(None, metadata, rows[1])
-
-    assert len(changeset.item.creator) == 1
-
-
-def test_multiple_embeds(metadata, rows):
-    changeset = create_repo_changeset(None, metadata, rows[0])
-
-    assert len(changeset.item.creator) == 11
+@pytest.fixture
+def rows(spreadsheet):
+    return list(spreadsheet.rows())
 
 
-def test_single_embedded_contributor(metadata, rows):
-    changeset = create_repo_changeset(None, metadata, rows[2])
+def test_single_embed(repo, rows):
+    item = rows[1].get_object(repo)
 
-    assert len(changeset.item.contributor) == 1
+    assert len(item.creator) == 1
+
+
+def test_multiple_embeds(repo, rows):
+    item = rows[0].get_object(repo)
+
+    assert len(item.creator) == 11
+
+
+def test_single_embedded_contributor(repo, rows):
+    item = rows[2].get_object(repo)
+
+    assert len(item.contributor) == 1

@@ -1,7 +1,7 @@
 import logging
 
 from plastron.cli.commands import BaseCommand
-from plastron.jobs import ExportJob
+from plastron.jobs.exportjob import ExportJob
 from plastron.serializers import SERIALIZER_CLASSES
 
 logger = logging.getLogger(__name__)

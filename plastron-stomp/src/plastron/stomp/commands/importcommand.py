@@ -2,7 +2,7 @@ import io
 import logging
 from argparse import Namespace, ArgumentTypeError
 
-from plastron.jobs import ImportJob
+from plastron.jobs.importjob import ImportJob
 from plastron.utils import datetimestamp
 from plastron.namespaces import get_manager
 from plastron.rdf import uri_or_curie

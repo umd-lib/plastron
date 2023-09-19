@@ -17,7 +17,7 @@ from plastron.rdf import rdf
 from plastron.rdf.oa import TextualBody, FullTextAnnotation
 from plastron.rdfmapping.descriptors import DataProperty, Property
 from plastron.rdfmapping.properties import RDFObjectProperty
-from plastron.rdfmapping.resources import RDFResourceBase
+from plastron.rdfmapping.resources import RDFResourceType
 from plastron.repo import DataReadError, Repository, RepositoryResource
 from plastron.serializers import CSVSerializer
 
@@ -33,7 +33,7 @@ def get_property_type(model_class: rdf.Resource, attrs):
         return model_class.name_to_prop[attrs]
 
 
-def build_lookup_index(item: RDFResourceBase, index_string: str):
+def build_lookup_index(item: RDFResourceType, index_string: str):
     """
     Build a lookup dictionary for embedded object properties of an item.
 
@@ -318,7 +318,7 @@ class ImportSpreadsheet:
     Iterable sequence of rows from the metadata CSV file of an import job.
     """
 
-    def __init__(self, metadata_filename: Union[Path, str], model_class: Type[RDFResourceBase]):
+    def __init__(self, metadata_filename: Union[Path, str], model_class: Type[RDFResourceType]):
         self.metadata_filename = metadata_filename
         self.metadata_file = None
         self.model_class = model_class

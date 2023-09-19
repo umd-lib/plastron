@@ -1,6 +1,6 @@
 from collections import defaultdict
 from copy import deepcopy, copy
-from typing import List, Optional, Union, Any, Type
+from typing import List, Optional, Union, Any, Type, TypeVar
 from uuid import uuid4
 
 from rdflib import Graph, URIRef
@@ -149,3 +149,6 @@ class RDFResource(RDFResourceBase):
 
 class ResourceError(Exception):
     pass
+
+
+RDFResourceType = TypeVar('RDFResourceType', bound=RDFResourceBase)

@@ -3,11 +3,10 @@ import shutil
 import sys
 from contextlib import contextmanager
 from tempfile import NamedTemporaryFile
-from typing import Optional, Type, Dict, Union, TypeVar, Set, Iterator
+from typing import Optional, Type, Dict, Union, TypeVar, Set
 from uuid import uuid4
 
 import yaml
-from plastron.utils import ItemLog
 from rdflib import URIRef
 from requests import Response
 from requests.auth import AuthBase
@@ -16,7 +15,8 @@ from urlobject import URLObject
 from plastron.client import Client, Endpoint, ClientError, TransactionClient, RepositoryStructure
 from plastron.client.auth import get_authenticator
 from plastron.rdfmapping.graph import TrackChangesGraph
-from plastron.rdfmapping.resources import RDFResourceBase
+from plastron.rdfmapping.resources import RDFResourceBase, RDFResourceType
+from plastron.utils import ItemLog
 
 logger = logging.getLogger(__name__)
 
@@ -32,7 +32,6 @@ def get_structure(structure_name: Optional[str]) -> RepositoryStructure:
 
 
 ResourceType = TypeVar('ResourceType', bound='RepositoryResource')
-RDFResourceType = TypeVar('RDFResourceType', bound=RDFResourceBase)
 
 
 class Repository:
@@ -144,6 +143,9 @@ class RepositoryResource:
         self._description_url: Optional[URLObject] = None
         self._graph: TrackChangesGraph = TrackChangesGraph()
 
+    def __str__(self):
+        return self.path if self.path is not None else '[NEW]'
+
     @property
     def url(self) -> Optional[URLObject]:
         if self.path is not None:
@@ -182,7 +184,7 @@ class RepositoryResource:
             self._description_url = URLObject(response.links['describedby']['url'])
         return response
 
-    def describe(self, model: Type[RDFResourceType]) -> Iterator[RDFResourceType]:
+    def describe(self, model: Type[RDFResourceType]) -> RDFResourceType:
         return model(uri=URIRef(self.url), graph=self._graph)
 
     def attach_description(self, description: RDFResourceBase):

@@ -7,15 +7,18 @@ Tools for working with a Fedora 4 repository.
 Plastron is composed of several distribution packages:
 
 * **[plastron-client](plastron-client)**: The Fedora repository API client
-* **[plastron-models](plastron-models)**: RDF-to-Python object modeling, CSV 
+* **[plastron-rdf](plastron-rdf)**: RDF-to-Python property mapping
+* **[plastron-models](plastron-models)**: Content models, CSV 
   serialization
-* **[plastron-legacy](plastron-utils)**: Everything else (currently):
-  * Runnable commands (e.g., batch loading, exporting)
-  * Data handlers for batch ingest formats
-  * Entrypoint interfaces (currently a command-line tool and a daemon)
-* **plastron-cli** (planned)
-* **plastron-stomp** (planned)
-* **plastron-web** (planned)
+* **[plastron-repo](plastron-repo)**: Repository operations and structural 
+  models (LDP, PCDM, Web Annotations, etc.)
+* **[plastron-cli](plastron-cli)**: Command-line tool. Also includes the 
+  handler classes for the `load` command
+* **[plastron-stomp](plastron-stomp)**: STOMP daemon for handling 
+  asynchronous operations
+* **[plastron-web](plastron-web)**: Web application for handling 
+  synchronous operations
+* **[plastron-utils](plastron-utils)**: Miscellaneous utilities
 
 The intent is that these distribution packages are independently useful, 
 either as tools that can be run or libraries to be included in other projects.
@@ -24,11 +27,9 @@ either as tools that can be run or libraries to be included in other projects.
 
 Requires Python 3.8+
 
-### Install from GitHub
-
-```bash
-pip install git+https://github.com/umd-lib/plastron
-```
+This repository includes a [.python-version](.python-version) file. If you are
+using a tool like [pyenv] to manage your Python versions, it will select 
+an installed Python 3.8 for you.
 
 ### Install for development
 
@@ -39,15 +40,15 @@ git clone git@github.com:umd-lib/plastron.git
 cd plastron
 python -m venv .venv
 source .venv/bin/activate
-pip install -e \
-    plastron-utils[test] \
-    plastron-client[test] \
-    plastron-rdf[test] \
-    plastron-models[test] \
-    plastron-repo[test] \
-    plastron-web[test] \
-    plastron-stomp[test] \
-    plastron-cli[test]
+pip install \
+    -e ./plastron-utils[test] \
+    -e ./plastron-client[test] \
+    -e ./plastron-rdf[test] \
+    -e ./plastron-models[test] \
+    -e ./plastron-repo[test] \
+    -e ./plastron-web[test] \
+    -e ./plastron-stomp[test] \
+    -e ./plastron-cli[test]
 ```
 
 This allows for in-place editing of Plastron's source code in the git
@@ -84,3 +85,4 @@ limitations (Apache 2.0).
 
 [development mode]: https://packaging.python.org/tutorials/installing-packages/#installing-from-vcs
 [pytest]: https://pypi.org/project/pytest/
+[pyenv]: https://github.com/pyenv/pyenv

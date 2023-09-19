@@ -27,11 +27,11 @@ from requests import ConnectionError
 from plastron.client import Client, ClientError, random_slug
 from plastron.files import get_ssh_client, ZipFileSource, RemoteFileSource, HTTPFileSource, LocalFileSource, \
     BinarySource
-from plastron.jobs.utils import get_item_to_import, build_file_groups, annotate_from_files, build_fields, \
-    RepoChangeset, ColumnSpec, parse_value_string, Row, ImportSpreadsheet, JobError, JobConfigError, LineReference
 from plastron.models import get_model_class, Item, ModelClassNotFoundError, umdform
 from plastron.models.umd import Page, Proxy, PCDMObject, PCDMFile
 from plastron.rdf.pcdm import File, PreservationMasterFile, Object
+from plastron.jobs.utils import build_file_groups, annotate_from_files, build_fields, ColumnSpec, parse_value_string, \
+    Row, ImportSpreadsheet, JobError, JobConfigError, LineReference, InvalidRow
 from plastron.rdf.rdf import Resource
 from plastron.repo import Repository, DataReadError, ContainerResource, BinaryResource, RDFResourceType
 from plastron.rdfmapping.validation import ValidationResultsDict, ValidationResult, ValidationSuccess, ValidationFailure
@@ -225,7 +225,7 @@ class ImportJob:
             self._model_class = get_model_class(self.config.model)
         return self._model_class
 
-    def complete(self, item: Resource, line_reference: LineReference, status: ImportedItemStatus):
+    def complete(self, item: RDFResourceBase, line_reference: LineReference, status: ImportedItemStatus):
         # write to the completed item log
         self.completed_log.append({
             'id': getattr(item, 'identifier', str(line_reference)),
@@ -336,6 +336,10 @@ class ImportJob:
 
         import_run = self.new_run().start()
         for row in metadata.rows(limit=limit, percentage=percentage, completed=self.completed_log):
+            if isinstance(row, InvalidRow):
+                import_run.drop_invalid(item=None, line_reference=row.line_reference, reason=row.reason)
+                continue
+
             logger.debug(f'Row data: {row.data}')
             import_row = ImportRow(self, repo, row)
 

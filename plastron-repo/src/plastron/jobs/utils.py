@@ -240,6 +240,12 @@ def annotate_from_files(item, mime_types):
             member.annotations.append(annotation)
 
 
+@dataclass
+class InvalidRow:
+    line_reference: LineReference
+    reason: str
+
+
 class Row:
     def __init__(
             self,
@@ -372,7 +378,12 @@ class ImportSpreadsheet:
         """Whether the given line is part of the subset of lines to load."""
         return self.subset_to_load is None or line[self.identifier_column] in self.subset_to_load
 
-    def rows(self, limit: int = None, percentage: int = None, completed: Sequence = None) -> Iterator[Row]:
+    def rows(
+            self,
+            limit: int = None,
+            percentage: int = None,
+            completed: Sequence = None,
+    ) -> Iterator[Union[Row, InvalidRow]]:
         """Iterator over the rows in this spreadsheet.
 
         :param limit: maximum row number to return
@@ -426,8 +437,7 @@ class ImportSpreadsheet:
                     'is_valid': False,
                     'error': f'Line {line_reference} has the wrong number of columns'
                 })
-                # TODO: this should be part of ImportRun?
-                # self.job.drop_invalid(item=None, line_reference=line_reference, reason='Wrong number of columns')
+                yield InvalidRow(line_reference=line_reference, reason='Wrong number of columns')
                 continue
 
             row = Row(self, line_reference, row_number, line, self.identifier_column)

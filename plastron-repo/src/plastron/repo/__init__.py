@@ -210,6 +210,26 @@ class RepositoryResource:
         except ClientError as e:
             raise RepositoryError(f'Unable to save {self.url}: {e}') from e
 
+    def update(self):
+        if not self._graph.has_changes:
+            logger.debug(f'No changes for {self.url}')
+            return
+        logger.info(f'Sending update for {self.url}')
+        sparql_update = self.repo.client.build_sparql_update(self._graph.deletes, self._graph.inserts)
+        logger.debug(sparql_update)
+        try:
+            response = self.client.patch(
+                self.url,
+                headers={
+                    'Content-Type': 'application/sparql-update'
+                },
+                data=sparql_update,
+            )
+            if not response.ok:
+                raise RepositoryError(f'Unable to update {self.url}: {response}')
+        except ClientError as e:
+            raise RepositoryError(f'Unable to update {self.url}: {e}') from e
+
 
 class ContainerResource(RepositoryResource):
     """An LDP container resource."""

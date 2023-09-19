@@ -2,16 +2,16 @@ import csv
 import logging
 import re
 from collections import OrderedDict, defaultdict
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from os.path import splitext, basename
 from pathlib import Path
-from typing import Optional, Dict, List, Union, Mapping, NamedTuple, Type, Iterator, Sequence
+from typing import Optional, Dict, List, Union, Mapping, NamedTuple, Iterator, Sequence, Type
 
 from bs4 import BeautifulSoup
-from rdflib import Literal, URIRef, Graph
+from rdflib import Literal, URIRef
 from rdflib.util import from_n3
 
-from plastron.client import Client
+from plastron.files import BinarySource
 from plastron.namespaces import sc, get_manager
 from plastron.rdf import rdf
 from plastron.rdf.oa import TextualBody, FullTextAnnotation
@@ -177,15 +177,34 @@ def get_final_prop(model_class, attrs):
     return get_final_prop(next_attr.object_class, attrs)
 
 
-def build_file_groups(filenames_string):
+@dataclass
+class FileSpec:
+    name: str
+    source: BinarySource = None
+
+    def __str__(self):
+        return self.name
+
+
+@dataclass
+class FileGroup:
+    rootname: str
+    files: List[FileSpec] = field(default_factory=list)
+
+    def __str__(self):
+        extensions = list(map(lambda f: str(f).replace(self.rootname, ''), self.files))
+        return f'{self.rootname}{{{",".join(extensions)}}}'
+
+
+def build_file_groups(filenames_string: str) -> Dict[str, FileGroup]:
     file_groups = OrderedDict()
     if filenames_string.strip() == '':
         return file_groups
     for filename in filenames_string.split(';'):
         root, ext = splitext(basename(filename))
         if root not in file_groups:
-            file_groups[root] = []
-        file_groups[root].append(filename)
+            file_groups[root] = FileGroup(rootname=root)
+        file_groups[root].files.append(FileSpec(name=filename))
     logger.debug(f'Found {len(file_groups.keys())} unique file basename(s)')
     return file_groups
 
@@ -260,6 +279,7 @@ class Row:
         self.number = row_number
         self.data = data
         self.identifier_column = identifier_column
+        self._file_groups = build_file_groups(self.data['FILES'])
 
     def __getitem__(self, item):
         return self.data[item]
@@ -270,7 +290,13 @@ class Row:
     def parse_value(self, column: ColumnSpec) -> List[Union[Literal, URIRef]]:
         return parse_value_string(self[column.header], column)
 
-    def get_object(self, repo: Repository, read_from_repo: bool = False):
+    def get_object(self, repo: Repository, read_from_repo: bool = False) -> RDFResourceType:
+        """Gets an RDF resource to be imported, based on the metadata in this row.
+
+        :param repo: the repository configuration
+        :param read_from_repo: If true, will fetch existing object from the
+                    repository.
+        """
         if self.uri is not None:
             # resource with the URI from the spreadsheet
             resource = repo[self.uri]
@@ -284,7 +310,65 @@ class Row:
             # create a new object (will create in the repo later)
             resource = RepositoryResource(repo=repo)
 
-        return self.spreadsheet.model_class(uri=self.uri, graph=resource.graph)
+        item: RDFResourceType = self.spreadsheet.model_class(uri=self.uri, graph=resource.graph)
+
+        # build the lookup index to map hash URI objects
+        # to their correct positional locations
+        row_index = build_lookup_index(item, self.index_string)
+
+        for attrs, columns in self.spreadsheet.fields.items():  # type: str, List[ColumnSpec]
+            if '.' not in attrs:
+                # simple, non-embedded values
+                # attrs is the entire property name
+                new_values = []
+                # there may be 1 or more physical columns in the metadata spreadsheet
+                # that correspond to a single logical property of the item (e.g., multiple
+                # languages or datatypes)
+                for column in columns:  # type: ColumnSpec
+                    new_values.extend(self.parse_value(column))
+
+                # construct a SPARQL update by diffing for deletions and insertions
+                # update the property and get the sets of values deleted and inserted
+                prop = getattr(item, attrs)
+                prop.update(new_values)
+
+            else:
+                # complex, embedded values
+
+                # if the first portion of the dotted attr notation is a key in the index,
+                # then this column has a different subject than the main uri
+                # correlate positions and urirefs
+                # XXX: for now, assuming only 2 levels of chaining
+                first_attr, next_attrs = attrs.split('.', 1)
+                new_values = defaultdict(list)
+                for column in columns:  # type: ColumnSpec
+                    data_value = self.data[column.header]
+                    if not_empty(data_value):
+                        for i, value_string in enumerate(data_value.split(';')):
+                            new_values[i].extend(parse_value_string(value_string, column))
+
+                if first_attr in row_index:
+                    # existing embedded object
+                    for i, values in new_values.items():
+                        # get the embedded object
+                        obj = row_index[first_attr][i]
+                        prop = getattr(obj, next_attrs)
+                        prop.update(values)
+                else:
+                    # create new embedded objects (a.k.a hash resources) that are not in the index
+                    first_prop: RDFObjectProperty = getattr(item, first_attr)
+                    for i, values in new_values.items():
+                        # we can assume that for any properties with dotted notation,
+                        # all attributes except for the last one are object properties
+                        if first_prop.object_class is not None:
+                            # create a new object
+                            obj = item.get_fragment_resource(first_prop.object_class)
+                            # add the new object to the index
+                            row_index[first_attr][i] = obj
+                            getattr(obj, next_attrs).extend(values)
+                            first_prop.add(obj)
+
+        return item
 
     @property
     def identifier(self):
@@ -309,6 +393,10 @@ class Row:
     @property
     def filenames(self):
         return self.data['FILES'].strip().split(';') if self.has_files else []
+
+    @property
+    def file_groups(self):
+        return self._file_groups
 
     @property
     def item_filenames(self):
@@ -454,118 +542,3 @@ class ImportSpreadsheet:
             # use the final row count as the total count for the
             # job completion message
             self.total = self.row_count
-
-
-def get_item_to_import(repo: Repository, row: Row, validate_only=False) -> RDFResourceBase:
-    """
-    Gets an RDF resource to be imported
-
-    :param repo: the repository configuration
-    :param row: A single plastron.jobs.Row object representing the row
-                 to import
-    :param validate_only: If true, will not fetch existing object from the
-                repository.
-    """
-    fields = row.spreadsheet.fields
-    item = row.get_object(repo, read_from_repo=(not validate_only))
-
-    # track new embedded objects that are added to the graph
-    # so we can ensure that they have at least one statement
-    # where they appear as the subject
-    # new_objects = defaultdict(Graph)
-
-    # build the lookup index to map hash URI objects
-    # to their correct positional locations
-    row_index = build_lookup_index(item, row.index_string)
-
-    for attrs, columns in fields.items():  # type: str, List[ColumnSpec]
-        if '.' not in attrs:
-            # simple, non-embedded values
-            # attrs is the entire property name
-            new_values = []
-            # there may be 1 or more physical columns in the metadata spreadsheet
-            # that correspond to a single logical property of the item (e.g., multiple
-            # languages or datatypes)
-            for column in columns:  # type: ColumnSpec
-                new_values.extend(row.parse_value(column))
-
-            # construct a SPARQL update by diffing for deletions and insertions
-            # update the property and get the sets of values deleted and inserted
-            prop = getattr(item, attrs)
-            prop.update(new_values)
-
-        else:
-            # complex, embedded values
-
-            # if the first portion of the dotted attr notation is a key in the index,
-            # then this column has a different subject than the main uri
-            # correlate positions and urirefs
-            # XXX: for now, assuming only 2 levels of chaining
-            first_attr, next_attrs = attrs.split('.', 1)
-            new_values = defaultdict(list)
-            for column in columns:  # type: ColumnSpec
-                for i, value_string in enumerate(row[column.header].split(';')):
-                    new_values[i].extend(parse_value_string(value_string, column))
-
-            if first_attr in row_index:
-                # existing embedded object
-                for i, values in new_values.items():
-                    # get the embedded object
-                    obj = row_index[first_attr][i]
-                    prop = getattr(obj, next_attrs)
-                    prop.update(values)
-            else:
-                # create new embedded objects (a.k.a hash resources) that are not in the index
-                first_prop: RDFObjectProperty = getattr(item, first_attr)
-                for i, values in new_values.items():
-                    # we can assume that for any properties with dotted notation,
-                    # all attributes except for the last one are object properties
-                    if first_prop.object_class is not None:
-                        # create a new object
-                        obj = item.get_fragment_resource(first_prop.object_class)
-                        # add the new object to the index
-                        row_index[first_attr][i] = obj
-                        getattr(obj, next_attrs).extend(values)
-                        first_prop.add(obj)
-
-    return item
-
-
-class RepoChangeset:
-    """
-    Data object encapsulating the set of changes that need to be made to
-    the repository for a single import
-
-    :param item: a repository model object (i.e. from plastron.models) from
-                 the repository (or an empty object if validation only)
-    """
-    def __init__(self, item):
-        self._item = item
-        self._insert_graph = Graph()
-        for triple in self._item.inserts:
-            self._insert_graph.add(triple)
-        self._delete_graph = Graph()
-        for triple in self._item.deletes:
-            self._delete_graph.add(triple)
-
-    @property
-    def item(self):
-        return self._item
-
-    @property
-    def insert_graph(self):
-        return self._insert_graph
-
-    @property
-    def delete_graph(self):
-        return self._delete_graph
-
-    @property
-    def is_empty(self):
-        return len(self.insert_graph) == 0 and len(self.delete_graph) == 0
-
-    def __bool__(self):
-        return not self.is_empty
-
-    def build_sparql_update(self, client: Client):
-        return client.build_sparql_update(self.delete_graph, self.insert_graph)

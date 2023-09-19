@@ -20,22 +20,24 @@ from zipfile import ZipFile
 import yaml
 from bagit import make_bag
 from paramiko import SFTPClient, SSHException
-from plastron.utils import datetimestamp, ItemLog
-from rdflib import URIRef, Literal
+from rdflib import URIRef
 from requests import ConnectionError
 
-from plastron.client import Client, ClientError, random_slug
+from plastron.client import Client, ClientError
 from plastron.files import get_ssh_client, ZipFileSource, RemoteFileSource, HTTPFileSource, LocalFileSource, \
     BinarySource
-from plastron.models import get_model_class, Item, ModelClassNotFoundError, umdform
-from plastron.models.umd import Page, Proxy, PCDMObject, PCDMFile
-from plastron.rdf.pcdm import File, PreservationMasterFile, Object
 from plastron.jobs.utils import build_file_groups, annotate_from_files, build_fields, ColumnSpec, parse_value_string, \
     Row, ImportSpreadsheet, JobError, JobConfigError, LineReference, InvalidRow
+from plastron.models import get_model_class, Item, ModelClassNotFoundError
+from plastron.models.umd import Page, Proxy, PCDMObject
+from plastron.rdf.pcdm import File, PreservationMasterFile
 from plastron.rdf.rdf import Resource
-from plastron.repo import Repository, DataReadError, ContainerResource, BinaryResource, RDFResourceType
+from plastron.rdfmapping.resources import RDFResourceBase
 from plastron.rdfmapping.validation import ValidationResultsDict, ValidationResult, ValidationSuccess, ValidationFailure
+from plastron.repo import Repository, DataReadError, ContainerResource, RepositoryError
+from plastron.repo.pcdm import PCDMObjectResource
 from plastron.serializers import SERIALIZER_CLASSES, detect_resource_class, EmptyItemListError
+from plastron.utils import datetimestamp, ItemLog
 from plastron.validation import ValidationError
 
 logger = logging.getLogger(__name__)
@@ -66,76 +68,6 @@ def compress_bag(bag, dest, root_dirname=''):
                 src_filename = os.path.join(dirpath, name)
                 archived_name = normpath(os.path.join(root_dirname, relpath(dirpath, start=bag.path), name))
                 zip_file.write(filename=src_filename, arcname=archived_name)
-
-
-def get_new_member(item, rootname, number):
-    # TODO: this should probably be defined in a structural model, or profiles of a descriptive model
-    if isinstance(item, Item) and umdform.pool_reports in item.format:
-        if rootname.startswith('body-'):
-            title = Literal('Body')
-        else:
-            title = Literal(f'Attachment {number - 1}')
-    else:
-        title = Literal(f'Page {number}')
-
-    member = Page(title=title, number=Literal(number), member_of=item)
-
-    # add the member to the item
-    item.has_member.add(member)
-    return member
-
-
-def create_page(
-        container: ContainerResource,
-        parent: RDFResourceType,
-        number: int,
-        file_sources: Mapping[str, BinarySource] = None,
-) -> ContainerResource:
-    """Create a page with the given number, contained in container, as a pcdm:memberOf
-    the parent RDF resource."""
-    if file_sources is None:
-        file_sources = {}
-    logger.debug(f'Creating page {number} for {parent}')
-    page_resource = container.create_child(
-        resource_class=ContainerResource,
-        slug=random_slug(),
-        description=Page(title=f'Page {number}', number=number, member_of=parent),
-    )
-    files_container = page_resource.create_child(resource_class=ContainerResource, slug='f')
-    with page_resource.describe(Page) as page:
-        for filename, source in file_sources.items():
-            file = create_file(container=files_container, source=source, parent=page)
-            page.has_file.add(URIRef(file.url))
-    page_resource.save()
-    return page_resource
-
-
-def create_file(
-        container: ContainerResource,
-        source: BinarySource,
-        parent: RDFResourceType,
-        slug: str = None,
-) -> BinaryResource:
-    """Create a single file"""
-    if slug is None:
-        slug = random_slug()
-    title = basename(source.filename)
-    with source.open() as stream:
-        logger.debug(f'Creating file {source.filename} for {parent}')
-        file_resource = container.create_child(
-            resource_class=BinaryResource,
-            slug=slug,
-            description=PCDMFile(title=title, file_of=parent),
-            data=stream,
-            headers={
-                'Content-Type': source.mimetype(),
-                'Digest': source.digest(),
-                'Content-Disposition': f'attachment; filename="{source.filename}"',
-            },
-        )
-    file_resource.save()
-    logger.debug(f'Created file: {file_resource.url} {title}')
-    return file_resource
 
 
 class ImportedItemStatus(Enum):
@@ -476,74 +408,13 @@ class ImportJob:
 
         return file_class.from_source(title=basename(filename), source=source)
 
-    def add_files(
-            self,
-            item: Object,
-            file_groups: Mapping[str, Any],
-            base_location: str,
-            access: Optional[URIRef] = None,
-            create_pages=True,
-    ) -> int:
-        """
-        Add pages and files to the given item. A page is added for each key (basename) in the file_groups
-        parameter, and a file is added for each element in the value list for that key.
-
-        :param item: PCDM Object to add the pages to.
-        :param file_groups: Dictionary of basename to filename list mappings.
-        :param base_location: Location of the files.
-        :param access: Optional RDF class representing the access level for this item.
-        :param create_pages: Whether to create an intermediate page object for each file group. Defaults to True.
-        :return: The number of files added.
-        """
-        if base_location is None:
-            raise RuntimeError('Must specify a binaries-location')
-
-        if create_pages:
-            logger.debug(f'Creating {len(file_groups.keys())} page(s)')
-
-        count = 0
-
-        previous_proxy: Optional[Proxy] = None
-        for n, (rootname, filenames) in enumerate(file_groups.items(), 1):
-            if create_pages:
-                # create a member object for each rootname
-                # delegate to the item model how to build the member object
-                member = get_new_member(item, rootname, n)
-                proxy = Proxy(proxy_for=member, proxy_in=item)
-                if previous_proxy is not None:
-                    previous_proxy.next = proxy
-                    proxy.prev = previous_proxy
-                else:
-                    item.first = proxy
-                # add the access class to the member resources
-                if access is not None:
-                    member.rdf_type.add(access)
-                    proxy.rdf_type.add(access)
-                file_parent = member
-                previous_proxy = proxy
-            else:
-                # files will be added directly to the item
-                file_parent = item
-
-            # add the files to their parent object (either the item or a member)
-            for filename in filenames:
-                file = self.get_file(base_location, filename)
-                count += 1
-                # file_parent.add_file(file)
-                if access is not None:
-                    file.rdf_type.add(access)
-
-        item.last = previous_proxy
-
-        return count
-
 
 class ImportRow:
     def __init__(self, job: ImportJob, repo: Repository, row: Row):
         self.job = job
         self.row = row
         self.repo = repo
-        self.item = get_item_to_import(repo, row)
+        self.item = row.get_object(repo)
 
     def __str__(self):
         return str(self.item)
@@ -616,39 +487,20 @@ class ImportRow:
                     # create the main resource
                     logger.debug(f'Creating main resource for "{self.item}"')
                     resource = container.create_child(
-                        resource_class=ContainerResource,
+                        resource_class=PCDMObjectResource,
                         description=self.item,
                     )
-                    # hierarchical object: members container under the main resource
-                    logger.debug(f'Creating members container for {resource.path}')
-                    members_container = resource.create_child(resource_class=ContainerResource, slug='m')
-                    proxies_container = resource.create_child(resource_class=ContainerResource, slug='x')
                     # add pages and files to those pages
                     if self.row.has_files:
-                        file_groups = build_file_groups(self.row['FILES'])
                         with resource.describe(PCDMObject) as obj:
                             previous_proxy_resource = None
-                            for n, (rootname, filenames) in enumerate(file_groups.items(), 1):
-                                file_sources = {
-                                    filename: self.job.get_source(self.job.config.binaries_location, filename)
-                                    for filename in filenames
-                                }
-                                page_resource = create_page(
-                                    container=members_container,
-                                    parent=obj,
-                                    number=n,
-                                    file_sources=file_sources,
-                                )
+                            for n, (rootname, file_group) in enumerate(self.row.file_groups.items(), 1):
+                                for file in file_group.files:
+                                    file.source = self.job.get_source(self.job.config.binaries_location, file.name)
+                                page_resource = resource.create_page(number=n, file_group=file_group)
+                                # create proxies and links
                                 with page_resource.describe(Page) as page:
-                                    proxy_resource = proxies_container.create_child(
-                                        resource_class=ContainerResource,
-                                        description=Proxy(
-                                            proxy_for=page,
-                                            proxy_in=obj,
-                                            title=page.title.value,
-                                        ),
-                                        slug=random_slug(),
-                                    )
+                                    proxy_resource = resource.create_proxy(target=page, title=page.title.value)
                                     with proxy_resource.describe(Proxy) as proxy:
                                         if previous_proxy_resource is None:
                                             # first page in sequence
@@ -662,22 +514,14 @@ class ImportRow:
                                                 obj.last = proxy
                                     proxy_resource.save()
                                     previous_proxy_resource = proxy_resource
-                                    obj.has_member.add(page)
-                    """
+                    # item-level files
                     if self.row.has_item_files:
-                        item_files_container = resource.create_child(resource_class=ContainerResource, slug='f')
                         for rootname, filenames in self.row.item_filenames:
                             for filename in filenames:
                                 source = self.job.get_source(self.job.config.binaries_location, filename)
-                                file = create_file(
-                                    container=item_files_container,
-                                    source=source,
-                                    parent=resource.description,
-                                )
-                                resource.description.has_file.add(URIRef(file.url))
-                    """
+                                resource.create_file(source=source)
                     resource.save()
-            except Exception as e:
+            except RepositoryError as e:
                 raise RuntimeError(f'Creating item failed: {e}') from e
 
             logger.info(f'Created {resource.url}')
@@ -686,14 +530,14 @@ class ImportRow:
         elif self.item.has_changes:
             # construct the SPARQL Update query if there are any deletions or insertions
             # then do a PATCH update of an existing item
-            logger.info(f'Sending update for {self.item}')
-            sparql_update = self.repo.client.build_sparql_update(self.item.deletes, self.item.inserts)
-            logger.debug(sparql_update)
             try:
-                self.item.patch(self.repo.client, sparql_update)
-            except ClientError as e:
+                resource = self.repo[self.item.uri:PCDMObjectResource]
+                resource.attach_description(self.item)
+                resource.update()
+            except RepositoryError as e:
                 raise RuntimeError(f'Updating item failed: {e}') from e
 
+            logger.info(f'Updated {resource.url}')
             return ImportedItemStatus.MODIFIED
 
         else:

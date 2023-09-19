@@ -1,13 +1,13 @@
 import logging
 from os.path import basename
-from typing import Optional
+from typing import Optional, Set
 
 from rdflib import Literal
+from urlobject import URLObject
 
 from plastron.client import random_slug
 from plastron.files import BinarySource
 from plastron.jobs.utils import FileGroup
-
 from plastron.models import Item, umdform
 from plastron.models.umd import PCDMObject, PCDMFile, Page, Proxy
 from plastron.rdfmapping.resources import RDFResourceBase
@@ -26,11 +26,25 @@ def get_new_member_title(item: RDFResourceBase, rootname: str, number: int) -> L
         return Literal(f'Page {number}')
 
 
+class WebAnnotationBearingResource(ContainerResource):
+    def __init__(self, repo: Repository, path: str = None):
+        super().__init__(repo, path)
+        self.annotations_container: Optional[ContainerResource] = None
+        self.annotation_urls: Set[URLObject] = set()
+
+
 class PCDMFileBearingResource(ContainerResource):
     """A container that has files, related by the pcdm:hasFile/pcdm:fileOf predicates."""
     def __init__(self, repo: Repository, path: str = None):
         super().__init__(repo, path)
         self.files_container: Optional[ContainerResource] = None
+        self.file_urls: Set[URLObject] = set()
+
+    def read(self):
+        super().read()
+        with self.describe(PCDMObject) as obj:
+            for file_uri in obj.has_file.values:
+                self.file_urls.add(URLObject(file_uri))
 
     def create_file(self, source: BinarySource, slug: str = None) -> BinaryResource:
         """Create a single file from the given source as a pcdm:fileOf this resource.
@@ -60,6 +74,7 @@ class PCDMFileBearingResource(ContainerResource):
             with file_resource.describe(PCDMFile) as file:
                 parent.has_file.add(file)
         file_resource.save()
+        self.file_urls.add(file_resource.url)
         logger.debug(f'Created file: {file_resource.url} {title}')
         return file_resource
 
@@ -68,9 +83,16 @@ class PCDMObjectResource(PCDMFileBearingResource):
     def __init__(self, repo: Repository, path: str = None):
         super().__init__(repo, path)
         self.members_container: Optional[ContainerResource] = None
+        self.member_urls: Set[URLObject] = set()
         self.proxies_container: Optional[ContainerResource] = None
 
-    # TODO: load method that reads the members, files, and proxies
+    def read(self):
+        super().read()
+        with self.describe(PCDMObject) as obj:
+            for member_uri in obj.has_member.values:
+                self.member_urls.add(URLObject(member_uri))
+
+    # TODO: get_sequence() method that walks the proxy sequence and returns an ordered list of resources
 
     def create_page(self, number: int, file_group: FileGroup, slug: str = None) -> 'PCDMPageResource':
         """Create a page with the given number, as a pcdm:memberOf
@@ -115,5 +137,5 @@ class PCDMObjectResource(PCDMFileBearingResource):
         )
 
 
-class PCDMPageResource(PCDMFileBearingResource):
+class PCDMPageResource(PCDMFileBearingResource, WebAnnotationBearingResource):
     pass

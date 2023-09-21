@@ -17,7 +17,7 @@ from plastron.cli import commands
 from plastron.client import Endpoint, Client, RepositoryStructure
 from plastron.client.auth import get_authenticator
 from plastron.utils import DEFAULT_LOGGING_OPTIONS, envsubst
-from plastron.stomp.broker import Broker
+from plastron.stomp.broker import Broker, ServerTuple
 
 logger = logging.getLogger(__name__)
 now = datetime.utcnow().strftime('%Y%m%d%H%M%S')
@@ -141,7 +141,11 @@ def main():
         sys.exit(1)
 
     if broker_config is not None:
-        broker = Broker(broker_config)
+        broker = Broker(
+            server=ServerTuple.from_string(broker_config['SERVER']),
+            message_store_dir=broker_config['MESSAGE_STORE_DIR'],
+            destinations=broker_config['DESTINATIONS'],
+        )
     else:
         broker = None
 

@@ -1,0 +1,36 @@
+[project]
+name = 'plastron-utils'
+version = '4.0.0-dev'
+description = 'Utility for batch operations on a Fedora 4 repository.'
+authors = [
+    { name='University of Maryland Libraries', email='lib-ssdr@umd.edu' },
+]
+classifiers = [
+    'Development Status :: 5 - Production/Stable',
+    'Environment :: Console',
+    'Intended Audience :: Information Technology',
+    'Topic :: Utilities',
+    'License :: OSI Approved :: Apache Software License',
+    'Programming Language :: Python :: 3 :: Only',
+]
+keywords = ['fcrepo', 'repository', 'batch', 'utility']
+dependencies = []
+requires-python = '>=3.8'
+
+[project.optional-dependencies]
+dev = ['pycodestyle']
+test = [
+    'flask',
+    'freezegun',
+    'httpretty',
+    'http-server-mock',
+    'pytest',
+    'pytest-datadir',
+]
+
+[project.scripts]
+
+[project.urls]
+Homepage = 'https://github.com/umd-lib/plastron'
+'Bug Reports' = 'https://github.com/umd-lib/plastron/issues'
+Source = 'https://github.com/umd-lib/plastron'

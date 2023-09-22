@@ -1,0 +1,3 @@
+site_name: Plastron
+markdown_extensions:
+  - plantuml_markdown

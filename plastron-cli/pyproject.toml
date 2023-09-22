@@ -1,0 +1,25 @@
+[project]
+name = "plastron-cli"
+version = "4.0.0-dev"
+requires-python = ">= 3.8"
+dependencies = [
+    "BeautifulSoup4",
+    "lxml",
+    "Pillow",
+    "pyparsing",
+    "pysolr",
+    "PyYAML",
+    "rdflib",
+]
+
+[project.optional-dependencies]
+test = [
+    "pytest",
+    "pytest-cov",
+]
+
+[project.scripts]
+plastron = "plastron.cli:main"
+
+[tool.pytest.ini_options]
+markers = ['jobs_dir']

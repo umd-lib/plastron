@@ -1,10 +1,10 @@
 # Plastron Testing
 
-Plastron uses the [pytest] test framework for its [tests](../tests).
+Plastron uses the [pytest] test framework for its [tests](../plastron-utils/tests).
 
 ## Basic Testing
 
-Ensure that you have all the [modules](../requirements.test.txt) required for
+Ensure that you have all the [modules](../plastron-utils/requirements.test.txt) required for
 testing installed:
 
 ```bash
@@ -19,7 +19,7 @@ pytest
 
 ## Advanced Testing
 
-The Plastron project also includes a [tox.ini](../tox.ini) configuration file
+The Plastron project also includes a [tox.ini](../plastron-utils/tox.ini) configuration file
 for running the test suite against multiple versions of Python. By default, it
 will test against Python 3.6, 3.7, 3.8, 3.9, and 3.10.
 

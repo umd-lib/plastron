@@ -1,0 +1,111 @@
+from functools import lru_cache
+from importlib import import_module
+from typing import Union, Any, Dict, Callable
+
+from rdflib import URIRef, Literal
+
+from plastron.rdfmapping.properties import RDFDataProperty, RDFObjectProperty, RDFProperty
+
+
+class Property:
+    def __init__(
+            self,
+            predicate: URIRef,
+            required: bool = False,
+            repeatable: bool = False,
+            validate: Callable[[Any], bool] = None,
+    ):
+        self.predicate = predicate
+        self.required = required
+        self.repeatable = repeatable
+        self.validate = validate
+
+    def __set_name__(self, owner, name):
+        self.name = name
+
+    @lru_cache(maxsize=None)
+    def __get__(self, instance, owner):
+        if instance is None:
+            return self
+        return RDFProperty(**self._get_property_kwargs(instance))
+
+    def __set__(self, instance, value):
+        prop = self.__get__(instance, instance.__class__)
+        prop.clear()
+        prop.add(value)
+
+    def _get_property_kwargs(self, instance) -> Dict[str, Any]:
+        return {
+            'resource': instance,
+            'attr_name': self.name,
+            'predicate': self.predicate,
+            'required': self.required,
+            'repeatable': self.repeatable,
+            'validate': self.validate,
+        }
+
+
+class ObjectProperty(Property):
+    def __init__(
+            self,
+            predicate: URIRef,
+            required: bool = False,
+            repeatable: bool = False,
+            validate: Callable[[Any], bool] = None,
+            cls: Union[type, str] = None,
+            embed: bool = False,
+    ):
+        super().__init__(predicate, required, repeatable, validate)
+        self.object_class = cls
+        self.embed = embed
+
+    @lru_cache(maxsize=None)
+    def __get__(self, instance, owner):
+        if instance is None:
+            return self
+        if isinstance(self.object_class, str):
+            module = import_module(instance.__module__)
+            self.object_class = getattr(module, self.object_class)
+        return RDFObjectProperty(
+            **self._get_property_kwargs(instance),
+            object_class=self.object_class,
+            embedded=self.embed,
+        )
+
+    def __set__(self, instance, value):
+        # coerce non-URIRef values (e.g., strings) into URIRefs
+        if isinstance(value, URIRef) or hasattr(value, 'uri'):
+            v = value
+        else:
+            v = URIRef(str(value))
+        super().__set__(instance, v)
+
+
+class DataProperty(Property):
+    def __init__(
+            self,
+            predicate: URIRef,
+            required: bool = False,
+            repeatable: bool = False,
+            validate: Callable[[Any], bool] = None,
+            datatype: URIRef = None,
+    ):
+        super().__init__(predicate, required, repeatable, validate)
+        self.datatype = datatype
+
+    @lru_cache(maxsize=None)
+    def __get__(self, instance, owner):
+        if instance is None:
+            return self
+        return RDFDataProperty(
+            **self._get_property_kwargs(instance),
+            datatype=self.datatype,
+        )
+
+    def __set__(self, instance, value):
+        # coerce non-Literal values (e.g., strings) into Literals with the datatype
+        if not isinstance(value, Literal):
+            v = Literal(str(value), datatype=self.datatype)
+        else:
+            v = value
+        super().__set__(instance, v)

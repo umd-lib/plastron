@@ -1,0 +1,22 @@
+[project]
+name = "plastron-web"
+version = "4.0.0-dev"
+requires-python = ">= 3.8"
+dependencies = [
+    "click",
+    "flask",
+    "python-dotenv",
+    "waitress",
+]
+
+[project.optional-dependencies]
+test = [
+    "pytest",
+    "pytest-cov",
+]
+
+[project.scripts]
+plastrond-http = 'plastron.web.server:run'
+
+[tool.pytest.ini_options]
+markers = ['jobs_dir']

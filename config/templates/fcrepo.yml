@@ -1,4 +1,0 @@
-REST_ENDPOINT: http://fcrepodev.lib.umd.edu:8080/fcrepo/rest
-RELPATH: /pcdm
-CLIENT_CERT: 
-CLIENT_KEY: 

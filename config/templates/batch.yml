@@ -1,7 +1,0 @@
-HANDLER: ndnp
-COLLECTION: 
-LOCAL_PATH: /path/to/batch.xml
-LOG_DIR: logs.prod
-LOG_CONFIG: config/logging.yml
-MAPFILE: mapfile.csv
-EXTRA: 

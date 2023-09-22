@@ -1,0 +1,25 @@
+[project]
+name = "plastron-stomp"
+version = "4.0.0-dev"
+requires-python = ">= 3.8"
+dependencies = [
+    "click",
+    "BeautifulSoup4",
+    "pyparsing",
+    "PyYAML",
+    "stomp.py",
+    'watchdog==0.10.3',
+]
+
+[project.optional-dependencies]
+test = [
+    'CoilMQ',
+    "pytest",
+    "pytest-cov",
+]
+
+[project.scripts]
+plastrond-stomp = 'plastron.stomp.daemon:main'
+
+[tool.pytest.ini_options]
+markers = ['jobs_dir']

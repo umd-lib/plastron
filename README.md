@@ -8,19 +8,19 @@ Plastron is composed of several distribution packages:
 
 * **[plastron-client](plastron-client)**: The Fedora repository API client
 * **[plastron-rdf](plastron-rdf)**: RDF-to-Python property mapping
-* **[plastron-models](plastron-models)**: Content models, CSV 
+* **[plastron-models](plastron-models)**: Content models, CSV
   serialization
-* **[plastron-repo](plastron-repo)**: Repository operations and structural 
+* **[plastron-repo](plastron-repo)**: Repository operations and structural
   models (LDP, PCDM, Web Annotations, etc.)
-* **[plastron-cli](plastron-cli)**: Command-line tool. Also includes the 
+* **[plastron-cli](plastron-cli)**: Command-line tool. Also includes the
   handler classes for the `load` command
-* **[plastron-stomp](plastron-stomp)**: STOMP daemon for handling 
+* **[plastron-stomp](plastron-stomp)**: STOMP daemon for handling
   asynchronous operations
-* **[plastron-web](plastron-web)**: Web application for handling 
+* **[plastron-web](plastron-web)**: Web application for handling
   synchronous operations
 * **[plastron-utils](plastron-utils)**: Miscellaneous utilities
 
-The intent is that these distribution packages are independently useful, 
+The intent is that these distribution packages are independently useful,
 either as tools that can be run or libraries to be included in other projects.
 
 ## Installation
@@ -28,7 +28,7 @@ either as tools that can be run or libraries to be included in other projects.
 Requires Python 3.8+
 
 This repository includes a [.python-version](.python-version) file. If you are
-using a tool like [pyenv] to manage your Python versions, it will select 
+using a tool like [pyenv] to manage your Python versions, it will select
 an installed Python 3.8 for you.
 
 ### Install for development
@@ -41,14 +41,14 @@ cd plastron
 python -m venv .venv
 source .venv/bin/activate
 pip install \
-    -e ./plastron-utils[test] \
-    -e ./plastron-client[test] \
-    -e ./plastron-rdf[test] \
-    -e ./plastron-models[test] \
-    -e ./plastron-repo[test] \
-    -e ./plastron-web[test] \
-    -e ./plastron-stomp[test] \
-    -e ./plastron-cli[test]
+    -e './plastron-utils[test]' \
+    -e './plastron-client[test]' \
+    -e './plastron-rdf[test]' \
+    -e './plastron-models[test]' \
+    -e './plastron-repo[test]' \
+    -e './plastron-web[test]' \
+    -e './plastron-stomp[test]' \
+    -e './plastron-cli[test]'
 ```
 
 This allows for in-place editing of Plastron's source code in the git

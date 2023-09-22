@@ -3,11 +3,12 @@ import shutil
 import sys
 from contextlib import contextmanager
 from tempfile import NamedTemporaryFile
-from typing import Optional, Type, Dict, Union, TypeVar, Set
+from typing import Optional, Type, Dict, Union, TypeVar, Set, List, Iterator
 from uuid import uuid4
 
 import yaml
-from rdflib import URIRef
+from math import inf
+from rdflib import URIRef, Namespace
 from requests import Response
 from requests.auth import AuthBase
 from urlobject import URLObject
@@ -19,6 +20,7 @@ from plastron.rdfmapping.resources import RDFResourceBase, RDFResourceType
 from plastron.utils import ItemLog
 
 logger = logging.getLogger(__name__)
+ldp = Namespace('http://www.w3.org/ns/ldp#')
 
 
 def mint_fragment_identifier() -> str:
@@ -229,6 +231,43 @@ class RepositoryResource:
                 raise RepositoryError(f'Unable to update {self.url}: {response}')
         except ClientError as e:
             raise RepositoryError(f'Unable to update {self.url}: {e}') from e
+
+    def delete(self):
+        if not self.exists:
+            logger.info(f'Resource {self.url} does not exist or is already deleted')
+            return
+        try:
+            response = self.client.delete(self.url)
+            if response.ok:
+                logger.info(f'Deleted resource {self.url}')
+            else:
+                raise RepositoryError(f'Unable to delete {self.url}: {response}')
+        except ClientError as e:
+            raise RepositoryError(f'Unable to delete {self.url}: {e}') from e
+
+    def walk(
+            self,
+            traverse: List[URIRef] = None,
+            max_depth: int = inf,
+            min_depth: int = -1,
+            _current_depth: int = 0,
+    ) -> Iterator['RepositoryResource']:
+        if min_depth > max_depth:
+            raise ValueError(f'min_depth ({min_depth}) cannot be greater than max_depth ({max_depth})')
+        if traverse is None:
+            # default to walking the ldp:contains relationships
+            traverse = [ldp.contains]
+        if _current_depth > min_depth:
+            self.read()
+            yield self
+        if traverse and _current_depth < max_depth:
+            for _, p, o in self.graph.triples((URIRef(self.url), None, None)):
+                if p in traverse:
+                    yield from self.repo[str(o)].walk(
+                        traverse=traverse,
+                        max_depth=max_depth,
+                        _current_depth=_current_depth + 1,
+                    )
 
 
 class ContainerResource(RepositoryResource):

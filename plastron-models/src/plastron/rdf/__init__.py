@@ -1,14 +1,15 @@
 from argparse import ArgumentTypeError
-from typing import Tuple
+from typing import Tuple, Optional, List
 
 from rdflib import URIRef, Literal
+from rdflib.term import Node
 from rdflib.util import from_n3
 
 from plastron import namespaces
 from plastron.namespaces import dcterms
 
 
-def parse_predicate_list(string, delimiter=','):
+def parse_predicate_list(string: str, delimiter: str = ',') -> Optional[List[Node]]:
     if string is None:
         return None
     manager = namespaces.get_manager()

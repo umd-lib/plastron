@@ -1,4 +1,7 @@
 from importlib import import_module
+from typing import Optional
+
+from plastron.repo import Repository
 
 
 class BaseCommand:
@@ -6,6 +9,7 @@ class BaseCommand:
         if config is None:
             config = {}
         self.config = config
+        self.repo: Optional[Repository] = None
 
     def repo_config(self, repo_config, args=None):
         """

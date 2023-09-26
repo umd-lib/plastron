@@ -5,10 +5,12 @@ import logging
 import logging.config
 import os
 import sys
-from argparse import ArgumentParser, FileType
+from argparse import ArgumentParser, FileType, Namespace
+from contextlib import nullcontext
 from datetime import datetime
 from importlib import import_module
 from pkgutil import iter_modules
+from typing import Iterable
 
 import pysolr
 import yaml
@@ -16,6 +18,7 @@ import yaml
 from plastron.cli import commands
 from plastron.client import Endpoint, Client, RepositoryStructure
 from plastron.client.auth import get_authenticator
+from plastron.repo import Repository
 from plastron.utils import DEFAULT_LOGGING_OPTIONS, envsubst
 from plastron.stomp.broker import Broker, ServerTuple
 
@@ -41,6 +44,25 @@ def load_commands(subparsers):
             module.configure_cli(subparsers)
             command_modules[name] = module
     return command_modules
+
+
+def get_uris(args: Namespace) -> Iterable[str]:
+    if hasattr(args, 'uris_file') or hasattr(args, 'uris'):
+        if hasattr(args, 'uris_file') and args.uris_file is not None:
+            yield from (line.rstrip() for line in args.uris_file)
+        if hasattr(args, 'uris') and args.uris is not None:
+            yield from args.uris
+    else:
+        # fall back to STDIN
+        yield from (line.rstrip() for line in sys.stdin)
+
+
+def context(repo: Repository, use_transactions: bool = True, dry_run: bool = False):
+    if use_transactions and not dry_run:
+        return repo.transaction()
+    else:
+        # for a dry-run, or if no transactions are requested, use a null context
+        return nullcontext()
 
 
 def main():
@@ -181,6 +203,7 @@ def main():
             raise RuntimeError(f'Unable to execute command {args.cmd_name}')
 
         command = command_module.Command(config=command_config.get(args.cmd_name.upper()))
+        command.repo = Repository(client=client)
         command.endpoint = client
         command.broker = broker
 

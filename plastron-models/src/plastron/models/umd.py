@@ -40,6 +40,7 @@ class AggregationMixin(RDFResourceBase):
 
 @rdf_type(pcdm.Object)
 class PCDMObject(RDFResource, AggregationMixin):
+    title = DataProperty(dcterms.title)
     has_member = ObjectProperty(pcdm.hasMember, repeatable=True, cls='PCDMObject')
     member_of = ObjectProperty(pcdm.memberOf, repeatable=True, cls='PCDMObject')
     has_file = ObjectProperty(pcdm.hasFile, repeatable=True, cls='PCDMFile')

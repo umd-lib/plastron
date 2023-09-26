@@ -1,10 +1,15 @@
+import argparse
 import logging
-from email.utils import parsedate_to_datetime
+from contextlib import nullcontext
+from datetime import datetime
 
-from plastron.client import ClientError
+from plastron.cli import get_uris, context
 from plastron.cli.commands import BaseCommand
-from plastron.rdf import parse_predicate_list, get_title_string
-from plastron.repo import ResourceList
+from plastron.client import ClientError
+from plastron.models.umd import PCDMObject
+from plastron.rdf import parse_predicate_list
+from plastron.repo import RepositoryError
+from plastron.utils import ItemLog
 
 logger = logging.getLogger(__name__)
 
@@ -38,6 +43,8 @@ def configure_cli(subparsers):
     )
     parser.add_argument(
         '-f', '--file',
+        dest='uris_file',
+        type=argparse.FileType(mode='r'),
         help='File containing a list of URIs to delete',
         action='store'
     )
@@ -49,38 +56,43 @@ def configure_cli(subparsers):
 
 
 class Command(BaseCommand):
-    def __call__(self, fcrepo, args):
-        self.repository = fcrepo
-        self.repository.test_connection()
-        self.dry_run = args.dry_run
+    def __call__(self, client, args):
+        client.test_connection()
+        if args.completed:
+            completed_log = ItemLog(args.completed, ['uri', 'title', 'timestamp'], 'uri')
+        else:
+            completed_log = None
 
-        if self.dry_run:
+        if args.dry_run:
             logger.info('Dry run enabled, no actual deletions will take place')
 
-        self.resources = ResourceList(
-            client=self.repository,
-            uri_list=args.uris,
-            file=args.file,
-            completed_file=args.completed
-        )
-        self.resources.process(
-            method=self.delete_item,
-            traverse=parse_predicate_list(args.recursive),
-            use_transaction=args.use_transactions
-        )
-
-    def delete_item(self, resource, graph):
-        if self.resources.completed and resource.uri in self.resources.completed:
-            logger.info(f'Resource {resource.uri} has already been deleted; skipping')
-            return
-        title = get_title_string(graph)
-        if self.dry_run:
-            logger.info(f'Would delete resource {resource} {title}')
+        if args.recursive:
+            traverse = parse_predicate_list(args.recursive)
         else:
-            response = self.repository.delete(resource.uri)
-            if response.status_code == 204:
-                logger.info(f'Deleted resource {resource} {title}')
-                timestamp = parsedate_to_datetime(response.headers['date']).isoformat('T')
-                self.resources.log_completed(resource.uri, title, timestamp)
-            else:
-                raise ClientError(response)
+            # if recursive was not specified, traverse nothing
+            traverse = []
+
+        uris = get_uris(args)
+
+        for uri in uris:
+            with context(repo=self.repo, use_transactions=args.use_transactions, dry_run=args.dry_run):
+                try:
+                    for resource in self.repo[uri].walk(traverse=traverse):
+                        with resource.describe(PCDMObject) as obj:
+                            title = obj.title
+                            if args.dry_run:
+                                logger.info(f'Would delete resource {resource.url} "{title}"')
+                                continue
+                            resource.delete()
+                            if completed_log is not None:
+                                completed_log.append({
+                                    'uri': resource.url,
+                                    'title': str(title),
+                                    'timestamp': datetime.now().isoformat('T'),
+                                })
+                except RepositoryError as e:
+                    if isinstance(e.__cause__, ClientError) and e.__cause__.status_code in (404, 410):
+                        # not a problem to try and delete something that is not there
+                        logger.info(f'Resource {uri} does not exist; skipping')
+                    else:
+                        raise

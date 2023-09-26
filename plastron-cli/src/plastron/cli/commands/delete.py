@@ -3,7 +3,7 @@ import logging
 from contextlib import nullcontext
 from datetime import datetime
 
-from plastron.cli import get_uris
+from plastron.cli import get_uris, context
 from plastron.cli.commands import BaseCommand
 from plastron.client import ClientError
 from plastron.models.umd import PCDMObject
@@ -75,13 +75,7 @@ class Command(BaseCommand):
         uris = get_uris(args)
 
         for uri in uris:
-            if args.use_transactions and not args.dry_run:
-                context = self.repo.transaction()
-            else:
-                # for a dry-run, or if no transactions are requested, use a null context
-                context = nullcontext()
-
-            with context:
+            with context(repo=self.repo, use_transactions=args.use_transactions, dry_run=args.dry_run):
                 try:
                     for resource in self.repo[uri].walk(traverse=traverse):
                         with resource.describe(PCDMObject) as obj:

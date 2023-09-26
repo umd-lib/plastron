@@ -6,6 +6,7 @@ import logging.config
 import os
 import sys
 from argparse import ArgumentParser, FileType, Namespace
+from contextlib import nullcontext
 from datetime import datetime
 from importlib import import_module
 from pkgutil import iter_modules
@@ -54,6 +55,14 @@ def get_uris(args: Namespace) -> Iterable[str]:
     else:
         # fall back to STDIN
         yield from (line.rstrip() for line in sys.stdin)
+
+
+def context(repo: Repository, use_transactions: bool = True, dry_run: bool = False):
+    if use_transactions and not dry_run:
+        return repo.transaction()
+    else:
+        # for a dry-run, or if no transactions are requested, use a null context
+        return nullcontext()
 
 
 def main():

@@ -163,7 +163,7 @@ class RDFObjectProperty(RDFProperty):
         for value in self.values:
             if isinstance(value, Identifier):
                 if value not in self._object_map:
-                    self._object_map[value] = self.object_class(uri=value, graph=self.resource.base_graph)
+                    self._object_map[value] = self.object_class(uri=value, graph=self.resource.graph)
                 yield self._object_map[value]
             else:
                 yield value

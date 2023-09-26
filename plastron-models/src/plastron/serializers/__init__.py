@@ -9,7 +9,8 @@ from rdflib import Literal, Graph, URIRef
 
 from plastron.models import Issue, Letter, Poster
 from plastron.namespaces import get_manager, bibo, rdf, fedora
-from plastron.rdf.rdf import RDFObjectProperty, RDFDataProperty, Resource
+from plastron.rdfmapping.properties import RDFObjectProperty, RDFDataProperty
+from plastron.rdfmapping.resources import RDFResourceBase
 
 logger = logging.getLogger(__name__)
 nsm = get_manager()
@@ -68,8 +69,8 @@ class TurtleSerializer:
     def __enter__(self):
         return self
 
-    def write(self, resource, **_kwargs):
-        self.graph += resource.graph()
+    def write(self, resource: RDFResourceBase, **_kwargs):
+        self.graph += resource.graph
 
     def finish(self):
         with open(os.path.join(self.directory_name, 'metadata.ttl'), mode='wb') as export_file:
@@ -119,7 +120,7 @@ class CSVSerializer:
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.finish()
 
-    def write(self, resource, files=None, binaries_dir=''):
+    def write(self, resource: RDFResourceBase, files=None, binaries_dir=''):
         """
         Serializes the given resource as CSV data rows.
         """
@@ -132,7 +133,7 @@ class CSVSerializer:
                 'rows': []
             }
 
-        graph = resource.graph()
+        graph = resource.graph
         row = {k: ';'.join(v) for k, v in self.flatten(resource, self.content_models[resource_class]).items()}
         row['URI'] = str(resource.uri)
         if files is not None:
@@ -158,17 +159,17 @@ class CSVSerializer:
     }
     DATATYPE_URIS = {name: uri for uri, name in DATATYPE_NAMES.items()}
 
-    def flatten(self, resource: Resource, row_info: dict, prefix=''):
+    def flatten(self, resource: RDFResourceBase, row_info: dict, prefix=''):
         columns = defaultdict(list)
-        for name, prop in resource.props.items():
-            if isinstance(prop, RDFObjectProperty) and prop.is_embedded:
-                for i, obj in enumerate(prop.values):
+        for prop in resource.rdf_properties():
+            if isinstance(prop, RDFObjectProperty) and prop.embedded:
+                for i, obj in enumerate(prop.objects):
                     # record the list position to hash URI correlation
-                    columns['INDEX'].append(f'{name}[{i}]=#{urlparse(obj.uri).fragment}')
-                    for header, value in self.flatten(obj, row_info, prefix=f'{name}.').items():
+                    columns['INDEX'].append(f'{prop.attr_name}[{i}]=#{urlparse(obj.uri).fragment}')
+                    for header, value in self.flatten(obj, row_info, prefix=f'{prop.attr_name}.').items():
                         columns[header].extend(value)
             else:
-                key = prefix + name
+                key = prefix + prop.attr_name
                 if key not in row_info['header_map']:
                     continue
                 header = row_info['header_map'][key]

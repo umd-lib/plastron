@@ -63,10 +63,9 @@ class Command(BaseCommand):
         for _ in self.execute(*args, **kwargs):
             pass
 
-    @staticmethod
-    def execute(client, args):
+    def execute(self, client, args):
         export_job = ExportJob(
-            client=client,
+            repo=self.repo,
             export_binaries=args.export_binaries,
             binary_types=args.binary_types.split(','),
             uris=args.uris,

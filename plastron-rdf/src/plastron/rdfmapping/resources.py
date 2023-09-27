@@ -25,7 +25,7 @@ def is_iterable(value: Any) -> bool:
 
 
 class RDFResourceBase:
-    rdf_property_names = []
+    rdf_property_names = set()
     default_values = defaultdict(set)
     validators = []
 
@@ -34,8 +34,8 @@ class RDFResourceBase:
         # at this point, the Property descriptors' __set_name__ methods
         # have already run, so we retroactively add the names of
         # this class's Property descriptors
-        own_properties = [k for k, v in cls.__dict__.items() if isinstance(v, Property)]
-        cls.rdf_property_names = copy(cls.__base__.rdf_property_names) + own_properties
+        own_properties = {k for k, v in cls.__dict__.items() if isinstance(v, Property)}
+        cls.rdf_property_names = copy(cls.__base__.rdf_property_names) | own_properties
         # default_values and validators are modified by decorators, which
         # run after the __init_subclass__ method
         cls.default_values = deepcopy(cls.__base__.default_values)

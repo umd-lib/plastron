@@ -19,7 +19,7 @@ from plastron.client import Client, ClientError
 from plastron.files import get_ssh_client
 from plastron.models import Item
 from plastron.rdf.pcdm import File
-from plastron.repo import DataReadError
+from plastron.repo import DataReadError, Repository, RepositoryResource
 from plastron.serializers import SERIALIZER_CLASSES, detect_resource_class, EmptyItemListError
 
 UUID_REGEX = re.compile(r'([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})', re.IGNORECASE)
@@ -48,7 +48,7 @@ def compress_bag(bag, dest, root_dirname=''):
 
 @dataclass
 class ExportJob:
-    client: Client
+    repo: Repository
     export_format: str
     export_binaries: bool
     binary_types: str
@@ -110,9 +110,11 @@ class ExportJob:
                     raise DataReadError(f'No UUID found in {uri}')
                 item_dir = match[0]
 
-                _, graph = self.client.get_graph(uri)
-                model_class = detect_resource_class(graph, uri, fallback=Item)
-                obj = model_class.from_graph(graph, uri)
+                resource: RepositoryResource = self.repo.get_resource(path=uri)
+                resource.read()
+
+                model_class = detect_resource_class(resource.graph, resource.url, fallback=Item)
+                obj = resource.describe(model=model_class)
                 binaries = self.list_binaries_to_export(obj)
 
                 # write the metadata for this object

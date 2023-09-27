@@ -9,7 +9,8 @@ from rdflib.util import from_n3
 
 from plastron.cli import ConfigError
 from plastron.files import LocalFileSource, RemoteFileSource
-from plastron.rdf import pcdm, namespaces, rdf
+from plastron.rdf import pcdm, rdf
+from plastron import namespaces
 
 nsm = namespaces.get_manager()
 

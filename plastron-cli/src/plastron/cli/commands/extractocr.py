@@ -1,11 +1,16 @@
+import argparse
 import logging
-import sys
 from datetime import datetime
 
-from plastron.client import Client, TransactionClient, ClientError
+from lxml import etree
+
+from plastron.cli import get_uris, context
 from plastron.cli.commands import BaseCommand
-from plastron.repo import DataReadError
-from plastron.models.newspaper import Page
+from plastron.client import Client
+from plastron.models.annotations import TextblockOnPage
+from plastron.namespaces import pcdmuse
+from plastron.rdf.ocr import ALTOResource
+from plastron.repo.pcdm import PCDMPageResource
 from plastron.utils import ItemLog
 
 logger = logging.getLogger(__name__)
@@ -22,79 +27,81 @@ def configure_cli(subparsers):
         help='file listing items to ignore',
         action='store'
     )
+    parser.add_argument(
+        '--no-transactions', '--no-txn',
+        help='run the annotation process without using transactions',
+        action='store_false',
+        dest='use_transactions'
+    )
+    parser.add_argument(
+        '--completed',
+        help='file recording the URIs of processed resources',
+        action='store'
+    )
+    parser.add_argument(
+        '-f', '--file',
+        dest='uris_file',
+        type=argparse.FileType(mode='r'),
+        help='File containing a list of URIs',
+        action='store'
+    )
+    parser.add_argument(
+        'uris', nargs='*',
+        help='Repository URIs'
+    )
     parser.set_defaults(cmd_name='extractocr')
 
 
 class Command(BaseCommand):
     def __call__(self, client: Client, args):
+        # TODO: create an ExtractOCRJob
+
         fieldnames = ['uri', 'timestamp']
 
         # read the log of completed items
-        try:
-            completed = ItemLog('logs/annotated.csv', fieldnames, 'uri')
-        except Exception as e:
-            logger.error('Non-standard map file specified: {0}'.format(e))
-            raise RuntimeError()
-
-        logger.info('Found {0} completed items'.format(len(completed)))
+        if args.completed:
+            completed = ItemLog(args.completed, fieldnames, 'uri')
+            logger.info(f'Found {len(completed)} completed items')
+        else:
+            completed = []
 
         if args.ignore is not None:
-            try:
-                ignored = ItemLog(args.ignore, fieldnames, 'uri')
-            except Exception as e:
-                logger.error('Non-standard ignore file specified: {0}'.format(e))
-                raise RuntimeError()
+            ignored = ItemLog(args.ignore, fieldnames, 'uri')
         else:
             ignored = []
 
-        skipfile = 'logs/skipped.extractocr.{0}.csv'.format(now)
+        skipfile = f'logs/skipped.extractocr.{now}.csv'
         skipped = ItemLog(skipfile, fieldnames, 'uri')
 
-        for line in sys.stdin:
-            uri = line.rstrip('\n')
+        for uri in get_uris(args):
             if uri in completed:
+                logger.info(f'Resource {uri} has been completed; skipping')
                 continue
             elif uri in ignored:
-                logger.debug('Ignoring {0}'.format(uri))
+                logger.info(f'Ignoring {uri}')
                 continue
 
-            try:
-                is_extracted = extract(client, uri)
-            except ClientError:
-                logger.error(
-                    "Unable to commit or rollback transaction, aborting"
-                )
-                raise RuntimeError()
+            with context(repo=self.repo, use_transactions=args.use_transactions):
+                page_resource = self.repo[uri:PCDMPageResource].read()
+                extracted_text_file = page_resource.get_file(rdf_type=pcdmuse.ExtractedText)
+                if extracted_text_file is None:
+                    logger.error(f'Resource {page_resource.url} has no OCR file; skipping')
+                    skipped.append({'uri': uri, 'timestamp': str(datetime.utcnow())})
+                    continue
 
-            row = {
-                'uri': uri,
-                'timestamp': str(datetime.utcnow())
-            }
+                # TODO: currently assuming all extracted text files are ALTO
+                # TODO: must add format determining code to support hOCR
+                with extracted_text_file.open() as fh:
+                    xmldoc = etree.parse(fh)
 
-            if is_extracted:
-                completed.writerow(row)
-            else:
-                skipped.writerow(row)
-
-
-def extract(client: Client, uri):
-    with client.transaction() as txn_client:  # type: TransactionClient
-        try:
-            logger.info("Getting {0} from repository".format(uri))
-            page = Page.from_repository(txn_client, uri)
-            logger.info("Creating annotations for page {0}".format(page.title))
-            for annotation in page.textblocks():
-                annotation.create(txn_client)
-                annotation.update(txn_client)
-
-            txn_client.commit()
-            return True
-
-        except (ClientError, DataReadError) as e:
-            # if anything fails during item creation or committing the transaction
-            # attempt to roll back the current transaction
-            # failures here will be caught by the main loop's exception handler
-            # and should trigger a system exit
-            logger.error("OCR extraction failed: {0}".format(e))
-            txn_client.rollback()
-            logger.warning('Transaction rolled back. Continuing load.')
+                alto = ALTOResource(xmldoc, (400, 400))
+                for textblock in alto.textblocks():
+                    # TODO: better argument structuring
+                    annotation = TextblockOnPage.from_textblock(
+                        textblock=textblock,
+                        page=page_resource,
+                        scale=alto.scale,
+                        ocr_file=extracted_text_file,
+                    )
+                    annotation_resource = page_resource.create_annotation(description=annotation)
+                    print(annotation_resource.url)

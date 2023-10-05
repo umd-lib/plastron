@@ -2,10 +2,10 @@ import logging
 
 from rdflib import URIRef
 
+from plastron.cli import get_uris, context
 from plastron.cli.commands import BaseCommand
-from plastron.repo import ResourceList
-from plastron.namespaces import rdf
 from plastron.rdf import parse_predicate_list
+from plastron.rdfmapping.resources import RDFResource
 
 logger = logging.getLogger(__name__)
 
@@ -37,28 +37,25 @@ class Command(BaseCommand):
         self.broker.connect()
         self.reindexing_queue = self.broker.destination('reindexing'),
         self.username = args.delegated_user or 'plastron'
-        resources = ResourceList(
-            client=self.repo,
-            uri_list=args.uris
-        )
+        traverse = parse_predicate_list(args.recursive) if args.recursive is not None else []
+        uris = get_uris(args)
 
-        resources.process(
-            method=self.reindex_item,
-            traverse=parse_predicate_list(args.recursive),
-            use_transaction=False
-        )
+        for uri in uris:
+            for resource in self.repo[uri].walk(traverse=traverse):
+                logger.info(f'Reindexing {resource.url}')
+                # types = ','.join(resource.graph.objects(subject=URIRef(uri), predicate=rdf.type))
+                types = ','.join(resource.describe(RDFResource).rdf_type.values)
+                self.broker.send(
+                    destination=self.reindexing_queue,
+                    headers={
+                        'CamelFcrepoUri': resource.url,
+                        'CamelFcrepoPath': resource.path,
+                        'CamelFcrepoResourceType': types,
+                        'CamelFcrepoUser': self.username,
+                        'persistent': 'true'
+                    }
+                )
+
         self.broker.disconnect()
 
-    def reindex_item(self, resource, graph):
-        logger.info(f'Reindexing {resource.uri}')
-        types = ','.join(graph.objects(subject=URIRef(resource.uri), predicate=rdf.type))
-        self.broker.send(
-            destination=self.reindexing_queue,
-            headers={
-                'CamelFcrepoUri': resource.uri,
-                'CamelFcrepoPath': self.repo.repo_path(resource.uri),
-                'CamelFcrepoResourceType': types,
-                'CamelFcrepoUser': self.username,
-                'persistent': 'true'
-            }
-        )
+

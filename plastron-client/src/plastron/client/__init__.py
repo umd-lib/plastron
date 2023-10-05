@@ -7,10 +7,10 @@ from contextlib import contextmanager
 from enum import Enum
 from http import HTTPStatus
 from pathlib import Path
-from typing import Any, Optional, List, Callable, Tuple
+from typing import Any, Optional, List, Callable, NamedTuple, Union
 
 import requests
-from rdflib import Graph, URIRef
+from rdflib import Graph, URIRef, Literal
 from requests import Response
 from requests.auth import AuthBase
 from requests.exceptions import ConnectionError
@@ -37,7 +37,7 @@ def paths_to_create(client: 'Client', path: Path) -> List[Path]:
 
 def serialize(graph: Graph, **kwargs):
     logger.info('Including properties:')
-    for _, p, o in graph:
+    for _, p, o in graph:  # type: _, URIRef, Union[URIRef, Literal]
         pred = p.n3(namespace_manager=graph.namespace_manager)
         obj = o.n3(namespace_manager=graph.namespace_manager)
         logger.info(f'  {pred} {obj}')
@@ -51,6 +51,22 @@ class ResourceURI(namedtuple('Resource', ['uri', 'description_uri'])):
 
     def __str__(self):
         return self.uri
+
+
+class TypedText(NamedTuple):
+    """Data object combining a string value and its media type,
+    expressed as a MIME type string."""
+    media_type: str
+    value: str
+
+    def __str__(self):
+        return self.value
+
+    def __bool__(self):
+        return bool(self.value)
+
+    def __len__(self):
+        return len(self.value)
 
 
 class ClientError(Exception):
@@ -128,6 +144,7 @@ class HierarchicalCreator:
 
 
 class Endpoint:
+    """Conceptual entry point for a Fedora repository."""
     def __init__(self, url: str, default_path: str = '/', external_url: str = None):
         self.url = URLObject(url)
 
@@ -146,16 +163,38 @@ class Endpoint:
 
     def contains(self, uri: str) -> bool:
         """
-        Returns True if the given URI string is contained within this
-        repository, False otherwise
+        Returns ``True`` if the given URI string is contained within this
+        repository, ``False`` otherwise. You may also use the builtin operator
+        ``in`` to do this same check::
+
+            endpoint = Endpoint(url='http://localhost:8080/fcrepo/rest')
+
+            assert endpoint.contains('http://localhost:8080/fcrepo/rest/123')
+            assert 'http://localhost:8080/fcrepo/rest/123' in endpoint
+
+            assert not endpoint.contains('http://example.com/123')
+            assert 'http://example.com/123' not in endpoint
+
+        If ``external_url`` is set, checks that too::
+
+            endpoint = Endpoint(
+                url='http://localhost:8080/fcrepo/rest',
+                external_url='https://repo.example.net',
+            )
+
+            assert 'https://repo.example.net/123' in endpoint
+            assert 'http://localhost:8080/fcrepo/rest/123' in endpoint
         """
         return uri.startswith(self.url) or (self.external_url is not None and uri.startswith(self.external_url))
 
     def repo_path(self, resource_uri: Optional[str]) -> Optional[str]:
         """
         Returns the repository path for the given resource URI, i.e. the
-        path with either the "REST_ENDPOINT" or "REPO_EXTERNAL_URL"
-        removed.
+        path with either the ``url`` or ``external_url`` (if defined)
+        removed. For example::
+
+            endpoint = Endpoint(url='http://localhost:8080/fcrepo/rest')
+            assert endpoint.repo_path('http://localhost:8080/fcrepo/rest/obj/123') == '/obj/123'
         """
         if resource_uri is None:
             return None
@@ -165,7 +204,7 @@ class Endpoint:
             return resource_uri.replace(self.url, '')
 
     @property
-    def transaction_endpoint(self):
+    def transaction_endpoint(self) -> str:
         return os.path.join(self.url, 'fcr:tx')
 
 
@@ -175,6 +214,34 @@ class RepositoryStructure(Enum):
 
 
 class SessionHeaderAttribute:
+    """Descriptor that maps an attribute to a session header name. Requires
+    the instance to have a session attribute whose value is a mapping that
+    supports the methods get and update, plus the del operator. Example::
+
+        from requests import Session
+
+        class Foo:
+            ua_string = SessionHeaderAttribute('User-Agent')
+
+            def __init__(self):
+                self.session = Session()
+
+        # initially not set
+        foo = Foo()
+        assert 'User-Agent' not in foo.session.headers
+
+        # set the header
+        foo.ua_string = 'MyClient/1.0.0'
+        assert foo.session.headers['User-Agent'] == 'MyClient/1.0.0'
+
+        # change the header
+        foo.ua_string = 'OtherAgent/2.0.0'
+        assert foo.session.headers['User-Agent'] == 'OtherAgent/2.0.0'
+
+        # remove the header
+        del foo.ua_string
+        assert 'User-Agent' not in foo.session.headers
+    """
     def __init__(self, header_name: str):
         self.header_name = header_name
 
@@ -198,8 +265,11 @@ class SessionHeaderAttribute:
 
 
 class Client:
+    """HTTP client for interacting with a Fedora repository."""
     ua_string = SessionHeaderAttribute('User-Agent')
     delegated_user = SessionHeaderAttribute('On-Behalf-Of')
+    forwarded_host = SessionHeaderAttribute('X-Forwarded-Host')
+    forwarded_protocol = SessionHeaderAttribute('X-Forwarded-Proto')
 
     def __init__(
             self,
@@ -224,10 +294,8 @@ class Client:
         self.ua_string = ua_string
         self.delegated_user = on_behalf_of
         if self.endpoint.external_url is not None:
-            self.session.headers.update({
-                'X-Forwarded-Host': self.endpoint.external_url.hostname,
-                'X-Forwarded-Proto': self.endpoint.external_url.scheme,
-            })
+            self.forwarded_host = self.endpoint.external_url.hostname
+            self.forwarded_protocol = self.endpoint.external_url.scheme
 
         # set creator strategy for the repository
         if self.structure is RepositoryStructure.HIERARCHICAL:
@@ -237,64 +305,61 @@ class Client:
         else:
             raise RuntimeError(f'Unknown STRUCTURE value: {structure}')
 
-    def request(self, method, url, **kwargs) -> Response:
+    def request(self, method: str, url: str, **kwargs) -> Response:
+        """Send an HTTP request using the configured session. Additional
+        keyword arguments are passed to the underlying Session's ``request``
+        method."""
         logger.debug(f'{method} {url}')
         response = self.session.request(method, url, **kwargs)
         logger.debug(f'{response.status_code} {response.reason}')
         return response
 
-    def post(self, url, **kwargs) -> Response:
+    def post(self, url: str, **kwargs) -> Response:
+        """Send an HTTP POST request using the configured session."""
         return self.request('POST', url, **kwargs)
 
-    def put(self, url, **kwargs) -> Response:
+    def put(self, url: str, **kwargs) -> Response:
+        """Send an HTTP PUT request using the configured session."""
         return self.request('PUT', url, **kwargs)
 
-    def patch(self, url, **kwargs) -> Response:
+    def patch(self, url: str, **kwargs) -> Response:
+        """Send an HTTP PATCH request using the configured session."""
         return self.request('PATCH', url, **kwargs)
 
-    def head(self, url, **kwargs) -> Response:
+    def head(self, url: str, **kwargs) -> Response:
+        """Send an HTTP HEAD request using the configured session."""
         return self.request('HEAD', url, **kwargs)
 
-    def get(self, url, **kwargs) -> Response:
+    def get(self, url: str, **kwargs) -> Response:
+        """Send an HTTP DELETE request using the configured session."""
         return self.request('GET', url, **kwargs)
 
-    def delete(self, url, **kwargs) -> Response:
+    def delete(self, url: str, **kwargs) -> Response:
+        """Send an HTTP DELETE request using the configured session."""
         return self.request('DELETE', url, **kwargs)
 
     def get_description(
             self,
-            uri: str,
-            content_type: str = 'application/n-triples',
+            url: str,
+            accept: str = 'application/n-triples',
             include_server_managed: bool = True
-    ) -> Tuple[ResourceURI, str]:
-        description_uri = self.get_description_uri(uri)
+    ) -> TypedText:
         headers = {
-            'Accept': content_type,
+            'Accept': accept,
         }
         if not include_server_managed:
             headers['Prefer'] = OMIT_SERVER_MANAGED_TRIPLES
-        response = self.get(description_uri, headers=headers, stream=True)
+        response = self.get(url, headers=headers, stream=True)
         if not response.ok:
-            logger.error(f"Unable to get {headers['Accept']} representation of {uri}")
-            raise ClientError(response)
-        resource = ResourceURI(uri=uri, description_uri=description_uri)
-        text = response.text
-        return resource, text
+            logger.error(f"Unable to get {headers['Accept']} representation of {url}")
+            raise ClientError(response=response)
+        return TypedText(response.headers['Content-Type'], response.text)
 
-    def get_graph(self, uri: str, include_server_managed: bool = True) -> Tuple[ResourceURI, Graph]:
-        resource, text = self.get_description(uri, include_server_managed=include_server_managed)
+    def get_graph(self, url: str, include_server_managed: bool = True) -> Graph:
+        text = self.get_description(url, include_server_managed=include_server_managed)
         graph = Graph()
-        graph.parse(data=text, format='nt')
-        return resource, graph
-
-    def recursive_get(self, uri: str, traverse: Optional[List[URIRef]] = None):
-        resource, graph = self.get_graph(uri)
-        yield resource, graph
-        if traverse is not None:
-            for (s, p, o) in graph:
-                if p in traverse:
-                    for (resource, graph) in self.recursive_get(str(o), traverse=traverse):
-                        yield resource, graph
+        graph.parse(data=text.value, format=text.media_type)
+        return graph
 
     def get_description_uri(self, uri: str, response: Response = None) -> str:
         if response is not None:
@@ -340,7 +405,14 @@ class Client:
             logger.warning('No Location header in response')
             return None
 
-    def create(self, path: str = None, url: str = None, container_path: str = None, slug: str = None, **kwargs) -> ResourceURI:
+    def create(
+            self,
+            path: str = None,
+            url: str = None,
+            container_path: str = None,
+            slug: str = None,
+            **kwargs,
+    ) -> ResourceURI:
         if url is not None:
             response = self.put(url, **kwargs)
         elif path is not None:
@@ -519,8 +591,13 @@ class Transaction:
 
 
 class TransactionClient(Client):
+    """HTTP client that transparently handles translating requests and responses
+    sent during a Fedora transaction. Adds and removes the transaction identifier
+    from URIs in graphs sent or returned. Adjusts the request URIs to include the
+    transaction identifier."""
     @classmethod
     def from_client(cls, client: Client):
+        """Build a TransactionClient from a regular Client object."""
         return cls(
             endpoint=client.endpoint,
             structure=client.structure,
@@ -540,15 +617,31 @@ class TransactionClient(Client):
         if self.tx.keep_alive.failed.is_set():
             raise RuntimeError('Transaction keep-alive failed') from self.tx.keep_alive.exception
 
-        target_uri = self.insert_transaction_uri(url)
-        return super().request(method, target_uri, **kwargs)
+        request_url = str(self.insert_transaction_uri(URIRef(url)))
+        return super().request(method, request_url, **kwargs)
 
     def get_location(self, response: Response) -> Optional[str]:
+        """Removes the transaction id from the ``Location`` header returned by requests
+        to create resources."""
         try:
-            return self.remove_transaction_uri(response.headers['Location'])
+            return str(self.remove_transaction_uri(URIRef(response.headers['Location'])))
         except KeyError:
             logger.warning('No Location header in response')
             return None
+
+    def get_description(
+            self,
+            url: str,
+            accept: str = 'application/n-triples',
+            include_server_managed: bool = True,
+    ) -> TypedText:
+        text = super().get_description(
+            url=str(self.insert_transaction_uri(URIRef(url))),
+            accept=accept,
+            include_server_managed=include_server_managed,
+        )
+        graph = self.remove_transaction_uri_for_graph(Graph().parse(data=text.value, format=text.media_type))
+        return TypedText(text.media_type, graph.serialize(format=text.media_type))
 
     def put_graph(self, url, graph: Graph) -> Response:
         return super().put_graph(
@@ -563,17 +656,20 @@ class TransactionClient(Client):
         )
 
     def get_description_uri(self, uri: str, response: Response = None) -> str:
-        return self.remove_transaction_uri(super().get_description_uri(uri=uri, response=response))
+        return str(self.remove_transaction_uri(URIRef(super().get_description_uri(uri=uri, response=response))))
 
-    def insert_transaction_uri(self, uri: str) -> str:
+    def insert_transaction_uri(self, uri: Any) -> Any:
+        if not isinstance(uri, URIRef):
+            return uri
         if uri.startswith(self.tx.uri):
             return uri
-        return self.tx.uri + self.endpoint.repo_path(uri)
+        return URIRef(self.tx.uri + self.endpoint.repo_path(uri))
 
-    def remove_transaction_uri(self, uri: str) -> str:
+    def remove_transaction_uri(self, uri: Any) -> Any:
+        if not isinstance(uri, URIRef):
+            return uri
         if uri.startswith(self.tx.uri):
-            repo_path = uri[len(self.tx.uri):]
-            return self.endpoint.url + repo_path
+            return URIRef(uri.replace(self.tx.uri, self.endpoint.url))
         else:
             return uri
 
@@ -582,8 +678,19 @@ class TransactionClient(Client):
             return None
         new_graph = Graph()
         for s, p, o in graph:
-            s_txn = URIRef(self.insert_transaction_uri(str(s)))
-            new_graph.add((s_txn, p, o))
+            s_txn = self.insert_transaction_uri(s)
+            o_txn = self.insert_transaction_uri(o)
+            new_graph.add((s_txn, p, o_txn))
+        return new_graph
+
+    def remove_transaction_uri_for_graph(self, graph: Optional[Graph]) -> Optional[Graph]:
+        if graph is None:
+            return None
+        new_graph = Graph()
+        for s, p, o in graph:
+            s_txn = self.remove_transaction_uri(s)
+            o_txn = self.remove_transaction_uri(o)
+            new_graph.add((s_txn, p, o_txn))
         return new_graph
 
     def transaction(self, keep_alive: int = 90):

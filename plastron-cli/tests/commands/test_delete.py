@@ -24,7 +24,7 @@ def register_responses(responses, uri):
             'ok',
             {
                 HEAD: {'status': 200},
-                GET: {'status': 200, 'body': ''},
+                GET: {'status': 200, 'adding_headers': {'Content-Type': 'application/n-triples'}, 'body': ''},
                 DELETE: {'status': 204},
             },
             does_not_raise(),
@@ -54,7 +54,7 @@ def register_responses(responses, uri):
             'internal_server_error',
             {
                 HEAD: {'status': 200},
-                GET: {'status': 200, 'body': ''},
+                GET: {'status': 200, 'adding_headers': {'Content-Type': 'application/n-triples'}, 'body': ''},
                 DELETE: {'status': 500},
             },
             pytest.raises(RepositoryError),
@@ -64,7 +64,7 @@ def register_responses(responses, uri):
             'bad_request',
             {
                 HEAD: {'status': 200},
-                GET: {'status': 200, 'body': ''},
+                GET: {'status': 200, 'adding_headers': {'Content-Type': 'application/n-triples'}, 'body': ''},
                 DELETE: {'status': 400},
             },
             pytest.raises(RepositoryError),
@@ -103,7 +103,7 @@ def test_completed_log(datadir, repo, register_transaction):
         uri=url,
         responses={
             HEAD: {'status': 200},
-            GET: {'status': 200, 'body': title_triple},
+            GET: {'status': 200, 'adding_headers': {'Content-Type': 'application/n-triples'}, 'body': title_triple},
             DELETE: {'status': 204},
         },
     )

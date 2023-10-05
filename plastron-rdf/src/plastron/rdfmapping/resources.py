@@ -58,7 +58,7 @@ class RDFResourceBase:
                 self._graph.apply_changes()
         else:
             self._graph = TrackChangesGraph()
-            self.set_properties(**self.default_values)
+        self.set_properties(**self.default_values)
         self.set_properties(**kwargs)
 
     def __enter__(self):
@@ -94,7 +94,6 @@ class RDFResourceBase:
             if is_iterable(value):
                 # value is iterable, add each value separately
                 prop = getattr(self, name)
-                prop.clear()
                 for v in value:
                     prop.add(v)
             else:

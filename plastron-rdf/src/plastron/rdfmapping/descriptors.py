@@ -1,8 +1,10 @@
 from functools import lru_cache
 from importlib import import_module
-from typing import Union, Any, Dict, Callable
+from typing import Union, Any, Dict, Callable, Optional, TypeVar
+from uuid import uuid4
 
 from rdflib import URIRef, Literal
+from urlobject import URLObject
 
 from plastron.rdfmapping.properties import RDFDataProperty, RDFObjectProperty, RDFProperty
 
@@ -45,6 +47,52 @@ class Property:
         }
 
 
+T = TypeVar('T')
+
+
+class EmbeddedObject:
+    """Wrapper object to delay instantiation of inline-specified objects
+    that should be embedded in their parent instance (i.e., share a graph
+    object)."""
+    def __init__(self, cls: T, fragment_id: Optional[str] = None, **kwargs):
+        self.cls = cls
+        self.fragment_id = fragment_id or str(uuid4())
+        self.kwargs = kwargs
+
+    def embed(self, instance):
+        """Instantiate an object with the stored class and keyword arguments,
+        with a URI from the instance object plus the stored fragment ID."""
+        return self.cls(
+            uri=URIRef(URLObject(instance.uri).with_fragment(self.fragment_id)),
+            graph=instance.graph,
+            **self.kwargs,
+        )
+
+
+def embedded(cls: T) -> Callable[..., EmbeddedObject]:
+    """Function to support an alternative syntax of calling the EmbeddedObject
+    constructor. Instead of::
+
+        r = MyModel(
+            prop=EmbeddedObject(
+                MyOtherModel,
+                foo=Literal('bar'),
+            ),
+        )
+
+    You can use::
+
+        r = MyModel(
+            prop=embedded(MyOtherModel)(
+                foo=Literal('bar'),
+            ),
+        )
+    """
+    def _embedded(**kwargs):
+        return EmbeddedObject(cls, **kwargs)
+    return _embedded
+
+
 class ObjectProperty(Property):
     def __init__(
             self,
@@ -73,10 +121,16 @@ class ObjectProperty(Property):
         )
 
     def __set__(self, instance, value):
-        # coerce non-URIRef values (e.g., strings) into URIRefs
-        if isinstance(value, URIRef) or hasattr(value, 'uri'):
+        if isinstance(value, URIRef):
             v = value
+        elif isinstance(value, EmbeddedObject):
+            # here we finally instantiate the embedded object, linking its graph
+            # to this instance's graph
+            v = value.embed(instance)
+        elif hasattr(value, 'uri'):
+            v = URIRef(value.uri)
         else:
+            # coerce non-URIRef values (e.g., strings) into URIRefs
             v = URIRef(str(value))
         super().__set__(instance, v)
 

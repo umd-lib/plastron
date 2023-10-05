@@ -1,6 +1,6 @@
 from rdflib import Namespace
 
-from plastron.namespaces import dc, dcterms, edm, rdfs, owl, ldp, fabio, pcdm, iana, ore
+from plastron.namespaces import dc, dcterms, edm, rdfs, owl, ldp, fabio, pcdm, iana, ore, ebucore, premis
 from plastron.rdfmapping.decorators import rdf_type
 from plastron.rdfmapping.descriptors import ObjectProperty, DataProperty
 from plastron.rdfmapping.resources import RDFResource, RDFResourceBase
@@ -8,7 +8,6 @@ from plastron.rdfmapping.resources import RDFResource, RDFResourceBase
 # from plastron.rdf.authority import LabeledThing
 # from plastron.rdf.pcdm import Page
 from plastron.validation import is_edtf_formatted, is_valid_iso639_code, is_handle
-from plastron.validation.vocabularies import get_subjects
 
 umdtype = Namespace('http://vocab.lib.umd.edu/datatype#')
 umdform = Namespace('http://vocab.lib.umd.edu/form#')
@@ -50,6 +49,9 @@ class PCDMObject(RDFResource, AggregationMixin):
 class PCDMFile(RDFResource):
     title = DataProperty(dcterms.title)
     file_of = ObjectProperty(pcdm.fileOf, repeatable=True, cls=PCDMObject)
+    mime_type = DataProperty(ebucore.hasMimeType)
+    filename = DataProperty(ebucore.filename)
+    size = DataProperty(premis.hasSize)
 
     def __str__(self):
         return str(self.title or self.uri)

@@ -4,14 +4,21 @@ from rdflib import Graph, URIRef
 from rdflib.term import Node
 
 
-def update_node(node: Node, old_uri: URIRef, new_uri: URIRef) -> Optional[URIRef]:
+def update_node(node: Node, old_uri: URIRef, new_uri: URIRef) -> Node:
     """If ``node`` equals the ``old_uri`` (with an optional fragment identifier),
     replace ``old_uri`` with ``new_uri`` and return a new URIRef object. Otherwise,
     return ``None``."""
     if node == old_uri or str(node).startswith(old_uri + '#'):
         return URIRef(str(node).replace(old_uri, new_uri))
     else:
-        return None
+        return node
+
+
+def new_triple(old_uri, new_uri, s, p, o):
+    new_s = update_node(s, old_uri, new_uri)
+    new_p = update_node(p, old_uri, new_uri)
+    new_o = update_node(o, old_uri, new_uri)
+    return new_s, new_p, new_o
 
 
 class TrackChangesGraph(Graph):
@@ -27,12 +34,19 @@ class TrackChangesGraph(Graph):
 
         This object is updated in place."""
         for s, p, o in self:
-            new_s = update_node(s, old_uri, new_uri)
-            new_p = update_node(p, old_uri, new_uri)
-            new_o = update_node(o, old_uri, new_uri)
-            if new_s or new_p or new_o:
-                super().remove((s, p, o))
-                super().add((new_s or s, new_p or p, new_o or o))
+            new_s, new_p, new_o = new_triple(old_uri, new_uri, s, p, o)
+            super().remove((s, p, o))
+            super().add((new_s, new_p, new_o))
+
+        for s, p, o in self.inserts:
+            new_s, new_p, new_o = new_triple(old_uri, new_uri, s, p, o)
+            self.inserts.remove((s, p, o))
+            self.inserts.add((new_s, new_p, new_o))
+
+        for s, p, o in self.deletes:
+            new_s, new_p, new_o = new_triple(old_uri, new_uri, s, p, o)
+            self.deletes.remove((s, p, o))
+            self.deletes.add((new_s, new_p, new_o))
 
     def add(self, triple):
         try:

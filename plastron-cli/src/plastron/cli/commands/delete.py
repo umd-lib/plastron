@@ -1,9 +1,9 @@
 import argparse
 import logging
-from contextlib import nullcontext
 from datetime import datetime
 
-from plastron.cli import get_uris, context
+from plastron.cli import get_uris
+from plastron.repo.utils import context
 from plastron.cli.commands import BaseCommand
 from plastron.client import ClientError
 from plastron.models.umd import PCDMObject
@@ -78,18 +78,18 @@ class Command(BaseCommand):
             with context(repo=self.repo, use_transactions=args.use_transactions, dry_run=args.dry_run):
                 try:
                     for resource in self.repo[uri].walk(traverse=traverse):
-                        with resource.describe(PCDMObject) as obj:
-                            title = obj.title
-                            if args.dry_run:
-                                logger.info(f'Would delete resource {resource.url} "{title}"')
-                                continue
-                            resource.delete()
-                            if completed_log is not None:
-                                completed_log.append({
-                                    'uri': resource.url,
-                                    'title': str(title),
-                                    'timestamp': datetime.now().isoformat('T'),
-                                })
+                        obj = resource.describe(PCDMObject)
+                        title = obj.title
+                        if args.dry_run:
+                            logger.info(f'Would delete resource {resource.url} "{title}"')
+                            continue
+                        resource.delete()
+                        if completed_log is not None:
+                            completed_log.append({
+                                'uri': resource.url,
+                                'title': str(title),
+                                'timestamp': datetime.now().isoformat('T'),
+                            })
                 except RepositoryError as e:
                     if isinstance(e.__cause__, ClientError) and e.__cause__.status_code in (404, 410):
                         # not a problem to try and delete something that is not there

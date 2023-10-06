@@ -6,7 +6,7 @@ from uuid import uuid4
 from rdflib import Graph, URIRef
 
 from plastron.rdfmapping.descriptors import ObjectProperty, Property, DataProperty
-from plastron.rdfmapping.graph import TrackChangesGraph
+from plastron.rdfmapping.graph import TrackChangesGraph, copy_triples
 from plastron.rdfmapping.properties import RDFProperty
 from plastron.rdfmapping.validation import ValidationResultsDict
 
@@ -53,20 +53,13 @@ class RDFResourceBase:
                 self._graph = graph
             else:
                 self._graph = TrackChangesGraph()
-                for triple in graph:
-                    self._graph.add(triple)
-                self._graph.apply_changes()
+                copy_triples(graph, self._graph)
+                copy_triples(graph, self._graph.original)
         else:
             self._graph = TrackChangesGraph()
         self.set_properties(**self.default_values)
         self.set_properties(**kwargs)
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        if exc_type is None:
-            self.apply_changes()
+        self.apply_changes()
 
     def get_fragment_resource(
             self,
@@ -99,8 +92,6 @@ class RDFResourceBase:
             else:
                 # this is non-iterable, set a single value
                 setattr(self, name, value)
-
-        self.apply_changes()
 
     @property
     def graph(self) -> TrackChangesGraph:

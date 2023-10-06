@@ -33,7 +33,7 @@ class RDFProperty:
     @property
     def values(self) -> Iterable:
         """Values of this property"""
-        return self.resource.graph.with_changes().objects(self.resource.uri, self.predicate)
+        return self.resource.graph.objects(self.resource.uri, self.predicate)
 
     @property
     def value(self):

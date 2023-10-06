@@ -2,14 +2,14 @@ import importlib.metadata
 import logging
 import os
 from concurrent.futures import ThreadPoolExecutor
-from typing import Dict, Any, Callable
+from typing import Dict, Any, Callable, Generator, Iterator
 
 from stomp.listener import ConnectionListener
 
 from plastron.client import RepositoryStructure
 from plastron.repo import Repository
 from plastron.stomp.broker import Broker, Destination
-from plastron.stomp.commands import get_command_class
+from plastron.stomp.commands import get_command_module, get_module_name
 from plastron.stomp.handlers import AsynchronousResponseHandler, SynchronousResponseHandler
 from plastron.stomp.inbox_watcher import InboxWatcher
 from plastron.stomp.messages import MessageBox, PlastronCommandMessage, PlastronMessage
@@ -99,22 +99,22 @@ class CommandListener(ConnectionListener):
             self.after_disconnected()
 
 
+def get_command(command_name: str) -> Callable[..., Generator[Dict, None, Dict]]:
+    module_name = get_module_name(command_name)
+    module = get_command_module(command_name)
+    command = getattr(module, module_name, None)
+    if command is None:
+        raise RuntimeError(f'Command function "{module_name}" not found in {module.__name__}')
+    return command
+
+
 class MessageProcessor:
     def __init__(self, command_config, repo_config):
         self.command_config = command_config
         self.repo_config = repo_config
         # cache for command instances
         self.commands = {}
-
-    def get_command(self, command_name: str):
-        if command_name not in self.commands:
-            # get the configuration options for this command
-            config = self.command_config.get(command_name.upper(), {})
-            command_class = get_command_class(command_name)
-            # cache an instance of this command
-            self.commands[command_name] = command_class(config)
-
-        return self.commands[command_name]
+        self.result = None
 
     def configure_repo(self, message: PlastronCommandMessage) -> Repository:
         repo = Repository.from_config(self.repo_config)
@@ -136,12 +136,21 @@ class MessageProcessor:
         repo = self.configure_repo(message)
 
         # determine which command to load to process the message
-        command = self.get_command(message.command)
+        command = get_command(message.command)
+        # get the configuration options for this command
+        config = self.command_config.get(message.command.upper(), {})
 
-        for status in command(repo, message):
+        # run the command, and send a progress message over STOMP every time it yields
+        # the _run() delegating generator captures the final status in self.result
+        for status in self._run(command(repo, config, message)):
             progress_topic.send(PlastronMessage(job_id=message.job_id, body=status))
 
         logger.info(f'Job {message.job_id} complete')
 
         # default message state is "Done"
-        return message.response(state=command.result.get('type', 'Done'), body=command.result)
+        return message.response(state=self.result.get('type', 'Done'), body=self.result)
+
+    def _run(self, command: Generator[Dict, None, Dict]) -> Iterator[Dict[str, Any]]:
+        # delegating generator; each progress step is passed to the calling
+        # method, and the return value from the command is stored as the result
+        self.result = yield from command

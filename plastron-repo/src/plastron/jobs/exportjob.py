@@ -1,13 +1,14 @@
 import logging
 import os
 import re
+from collections import Counter
 from dataclasses import dataclass
 from datetime import datetime
 from email.utils import parsedate
 from os.path import normpath, relpath, splitext, basename
 from tempfile import TemporaryDirectory
 from time import mktime
-from typing import Optional, List
+from typing import Optional, List, Generator, Dict, Any, Iterator
 from urllib.parse import urlsplit
 from zipfile import ZipFile
 
@@ -15,11 +16,12 @@ from bagit import make_bag
 from paramiko import SFTPClient, SSHException
 from requests import ConnectionError
 
-from plastron.client import Client, ClientError
+from plastron.client import ClientError
 from plastron.files import get_ssh_client
 from plastron.models import Item
-from plastron.rdf.pcdm import File
-from plastron.repo import DataReadError, Repository, RepositoryResource
+from plastron.models.umd import PCDMFile
+from plastron.repo import DataReadError, Repository, BinaryResource
+from plastron.repo.pcdm import PCDMObjectResource, AggregationResource, PCDMFileBearingResource
 from plastron.serializers import SERIALIZER_CLASSES, detect_resource_class, EmptyItemListError
 
 UUID_REGEX = re.compile(r'([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})', re.IGNORECASE)
@@ -35,6 +37,8 @@ def format_size(size: int, decimal_places: Optional[int] = None):
 
     if decimal_places is not None:
         return round(size, decimal_places), unit
+    else:
+        return size, unit
 
 
 def compress_bag(bag, dest, root_dirname=''):
@@ -44,6 +48,26 @@ def compress_bag(bag, dest, root_dirname=''):
                 src_filename = os.path.join(dirpath, name)
                 archived_name = normpath(os.path.join(root_dirname, relpath(dirpath, start=bag.path), name))
                 zip_file.write(filename=src_filename, arcname=archived_name)
+
+
+def gather_files(resource: AggregationResource, mime_type: str = None) -> Iterator[BinaryResource]:
+    for page_url in resource.get_sequence():
+        page_resource = resource.repo[page_url:PCDMFileBearingResource]
+        for file in page_resource.get_files(mime_type=mime_type):
+            yield file
+
+
+class Stopwatch:
+    def __init__(self):
+        self._start = datetime.now().timestamp()
+
+    def now(self) -> Dict[str, float]:
+        now = datetime.now().timestamp()
+        return {
+            'started': self._start,
+            'now': now,
+            'elapsed': now - self._start
+        }
 
 
 @dataclass
@@ -57,7 +81,7 @@ class ExportJob:
     uris: List[str]
     key: str
 
-    def list_binaries_to_export(self, obj) -> Optional[List[File]]:
+    def list_binaries_to_export(self, resource: PCDMObjectResource) -> Optional[List[BinaryResource]]:
         if self.export_binaries and self.binary_types is not None:
             # filter files by their MIME type
             def mime_type_filter(file):
@@ -68,9 +92,9 @@ class ExportJob:
             mime_type_filter = None
 
         if self.export_binaries:
-            logger.info(f'Gathering binaries for {obj.uri}')
-            binaries = list(filter(mime_type_filter, obj.gather_files(self.client)))
-            total_size = sum(int(file.size[0]) for file in binaries)
+            logger.info(f'Gathering binaries for {resource.url}')
+            binaries = list(filter(mime_type_filter, gather_files(resource)))
+            total_size = sum(file_resource.size for file_resource in binaries)
             size, unit = format_size(total_size, decimal_places=2)
             logger.info(f'Total size of binaries: {size} {unit}')
         else:
@@ -78,13 +102,16 @@ class ExportJob:
 
         return binaries
 
-    def run(self):
+    def run(self) -> Generator[Dict[str, Any], None, Dict[str, Any]]:
         logger.info(f'Requested export format is {self.export_format}')
 
-        start_time = datetime.now().timestamp()
-        count = 0
-        errors = 0
-        total = len(self.uris)
+        timer = Stopwatch()
+        count = Counter(
+            total=len(self.uris),
+            exported=0,
+            errors=0,
+        )
+
         try:
             serializer_class = SERIALIZER_CLASSES[self.export_format]
         except KeyError:
@@ -100,7 +127,7 @@ class ExportJob:
         serializer = serializer_class(directory=export_dir, public_uri_template=self.uri_template)
         for uri in self.uris:
             try:
-                logger.info(f'Exporting item {count + 1}/{total}: {uri}')
+                logger.info(f'Exporting item {count["exported"] + 1}/{count["total"]}: {uri}')
 
                 # derive an item-level directory name from the URI
                 # currently this is hard-coded to look for a UUID
@@ -110,27 +137,26 @@ class ExportJob:
                     raise DataReadError(f'No UUID found in {uri}')
                 item_dir = match[0]
 
-                resource: RepositoryResource = self.repo.get_resource(path=uri)
-                resource.read()
+                resource = self.repo[uri:PCDMObjectResource].read()
 
                 model_class = detect_resource_class(resource.graph, resource.url, fallback=Item)
-                obj = resource.describe(model=model_class)
-                binaries = self.list_binaries_to_export(obj)
+                binaries = self.list_binaries_to_export(resource)
 
                 # write the metadata for this object
+                obj = resource.describe(model=model_class)
                 serializer.write(obj, files=binaries, binaries_dir=item_dir)
 
                 if binaries is not None:
                     binaries_dir = os.path.join(export_dir, item_dir)
                     os.makedirs(binaries_dir, exist_ok=True)
-                    for file in binaries:
-                        response = self.client.head(file.uri)
-                        accessed = parsedate(response.headers['Date'])
-                        modified = parsedate(response.headers['Last-Modified'])
+                    for file_resource in binaries:
+                        accessed = parsedate(file_resource.headers['Date'])
+                        modified = parsedate(file_resource.headers['Last-Modified'])
+                        file = file_resource.describe(PCDMFile)
 
                         binary_filename = os.path.join(binaries_dir, str(file.filename))
                         with open(binary_filename, mode='wb') as binary:
-                            with file.source as stream:
+                            with file_resource.open() as stream:
                                 for chunk in stream:
                                     binary.write(chunk)
 
@@ -139,30 +165,21 @@ class ExportJob:
                         os.utime(binary_filename, times=(mktime(accessed), mktime(modified)))
                         logger.debug(f'Copied {file.uri} to {binary.name}')
 
-                count += 1
+                count['exported'] += 1
 
             except DataReadError as e:
                 # log the failure, but continue to attempt to export the rest of the URIs
                 logger.error(f'Export of {uri} failed: {e}')
-                errors += 1
+                count['errors'] += 1
             except (ClientError, ConnectionError) as e:
                 # log the failure, but continue to attempt to export the rest of the URIs
                 logger.error(f'Unable to retrieve {uri}: {e}')
-                errors += 1
+                count['errors'] += 1
 
             # update the status
-            now = datetime.now().timestamp()
             yield {
-                'time': {
-                    'started': start_time,
-                    'now': now,
-                    'elapsed': now - start_time
-                },
-                'count': {
-                    'total': total,
-                    'exported': count,
-                    'errors': errors
-                }
+                'time': timer.now(),
+                'count': count,
             }
 
         try:
@@ -170,7 +187,7 @@ class ExportJob:
         except EmptyItemListError:
             logger.error("No items could be exported; skipping writing file")
 
-        logger.info(f'Exported {count} of {total} items')
+        logger.info(f'Exported {count["exported"]} of {count["total"]} items')
 
         # save the BagIt bag to send to the output destination
         bag.save(manifests=True)
@@ -196,12 +213,8 @@ class ExportJob:
         compress_bag(bag, destination, root)
 
         return {
-            'type': 'export_complete' if count == total else 'partial_export',
+            'type': 'export_complete' if count["exported"] == count["total"] else 'partial_export',
             'content_type': serializer.content_type,
             'file_extension': serializer.file_extension,
-            'count': {
-                'total': total,
-                'exported': count,
-                'errors': errors
-            }
+            'count': count,
         }

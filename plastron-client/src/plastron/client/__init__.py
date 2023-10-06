@@ -264,6 +264,27 @@ class SessionHeaderAttribute:
             pass
 
 
+def build_sparql_update(delete_graph: Graph = None, insert_graph: Graph = None) -> str:
+    if delete_graph is not None and len(delete_graph) > 0:
+        deletes = delete_graph.serialize(format='nt').strip()
+    else:
+        deletes = None
+
+    if insert_graph is not None and len(insert_graph) > 0:
+        inserts = insert_graph.serialize(format='nt').strip()
+    else:
+        inserts = None
+
+    if deletes is not None and inserts is not None:
+        return f"DELETE {{ {deletes} }} INSERT {{ {inserts} }} WHERE {{}}"
+    elif deletes is not None:
+        return f"DELETE DATA {{ {deletes} }}"
+    elif inserts is not None:
+        return f"INSERT DATA {{ {inserts} }}"
+    else:
+        return ''
+
+
 class Client:
     """HTTP client for interacting with a Fedora repository."""
     ua_string = SessionHeaderAttribute('User-Agent')
@@ -513,25 +534,16 @@ class Client:
             data=graph.serialize(format='application/n-triples')
         )
 
-    def build_sparql_update(self, delete_graph: Graph = None, insert_graph: Graph = None) -> str:
-        if delete_graph is not None:
-            deletes = delete_graph.serialize(format='nt').strip()
-        else:
-            deletes = None
-
-        if insert_graph is not None:
-            inserts = insert_graph.serialize(format='nt').strip()
-        else:
-            inserts = None
-
-        if deletes is not None and inserts is not None:
-            return f"DELETE {{ {deletes} }} INSERT {{ {inserts} }} WHERE {{}}"
-        elif deletes is not None:
-            return f"DELETE DATA {{ {deletes} }}"
-        elif inserts is not None:
-            return f"INSERT DATA {{ {inserts} }}"
-        else:
-            return ''
+    def patch_graph(self, url, deletes: Graph, inserts: Graph) -> Response:
+        sparql_update = build_sparql_update(deletes, inserts)
+        logger.debug(sparql_update)
+        return self.patch(
+            url,
+            headers={
+                'Content-Type': 'application/sparql-update'
+            },
+            data=sparql_update,
+        )
 
     @contextmanager
     def transaction(self, keep_alive: int = 90):
@@ -649,10 +661,11 @@ class TransactionClient(Client):
             graph=self.insert_transaction_uri_for_graph(graph),
         )
 
-    def build_sparql_update(self, delete_graph: Graph = None, insert_graph: Graph = None) -> str:
-        return super().build_sparql_update(
-            delete_graph=self.insert_transaction_uri_for_graph(delete_graph),
-            insert_graph=self.insert_transaction_uri_for_graph(insert_graph),
+    def patch_graph(self, url, deletes: Graph, inserts: Graph) -> Response:
+        return super().patch_graph(
+            url=url,
+            deletes=self.insert_transaction_uri_for_graph(deletes),
+            inserts=self.insert_transaction_uri_for_graph(inserts),
         )
 
     def get_description_uri(self, uri: str, response: Response = None) -> str:

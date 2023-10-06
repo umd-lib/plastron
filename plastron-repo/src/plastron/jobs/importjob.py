@@ -10,7 +10,7 @@ from enum import Enum
 from os.path import basename
 from pathlib import Path
 from shutil import copyfileobj
-from typing import List, Mapping, Optional, Type, Union, Any, IO, Generator, Iterable
+from typing import List, Mapping, Optional, Type, Union, Any, IO, Generator, Iterable, Dict
 
 import yaml
 from rdflib import URIRef
@@ -170,7 +170,7 @@ class ImportJob:
             binaries_location: str = None,
             extract_text_types: str = None,
             **kwargs,
-    ) -> Generator[Any, None, Counter]:
+    ) -> Generator[Any, None, Dict[str, Any]]:
         self.save_config({
             'model': model,
             'access': access,
@@ -180,9 +180,9 @@ class ImportJob:
             'extract_text_types': extract_text_types,
         })
 
-        return (yield from self.import_items(repo=repo, **kwargs))
+        return self.import_items(repo=repo, **kwargs)
 
-    def resume(self, repo: Repository, **kwargs) -> Generator[Any, None, Counter]:
+    def resume(self, repo: Repository, **kwargs) -> Generator[Any, None, Dict[str, Any]]:
         if not self.dir_exists:
             raise RuntimeError(f'Cannot resume job "{self.id}": no such job directory: "{self.dir}"')
 
@@ -193,7 +193,7 @@ class ImportJob:
         except FileNotFoundError:
             raise RuntimeError(f'Cannot resume job {self.id}: no config.yml found in {self.dir}')
 
-        return (yield from self.import_items(repo=repo, **kwargs))
+        return self.import_items(repo=repo, **kwargs)
 
     def import_items(
             self,
@@ -202,7 +202,7 @@ class ImportJob:
             percentage=None,
             validate_only: bool = False,
             import_file: IO = None,
-    ) -> Generator[Any, None, Counter]:
+    ) -> Generator[Any, None, Dict[str, Any]]:
         start_time = datetime.now().timestamp()
 
         if percentage:
@@ -300,7 +300,24 @@ class ImportJob:
                 'count': count,
             }
 
-        return count
+        if validate_only:
+            # validate phase
+            if count['invalid_items'] == 0:
+                result_type = 'validate_success'
+            else:
+                result_type = 'validate_failed'
+        else:
+            # import phase
+            if len(self.completed_log) == count['total_items']:
+                result_type = 'import_complete'
+            else:
+                result_type = 'import_incomplete'
+
+        return {
+            'type': result_type,
+            'validation': self.validation_reports,
+            'count': count,
+        }
 
     @property
     def access(self) -> Optional[URIRef]:
@@ -458,7 +475,6 @@ class ImportRow:
             logger.debug(f"Creating resources in container: {container.path}")
 
             try:
-                self.item.apply_changes()
                 with self.repo.transaction():
                     # create the main resource
                     logger.debug(f'Creating main resource for "{self.item}"')
@@ -468,35 +484,39 @@ class ImportRow:
                     )
                     # add pages and files to those pages
                     if self.row.has_files:
-                        with resource.describe(PCDMObject) as obj:
-                            previous_proxy_resource = None
-                            for n, (rootname, file_group) in enumerate(self.row.file_groups.items(), 1):
-                                for file in file_group.files:
-                                    file.source = self.job.get_source(self.job.config.binaries_location, file.name)
-                                page_resource = resource.create_page(number=n, file_group=file_group)
-                                # create proxies and links
-                                with page_resource.describe(Page) as page:
-                                    proxy_resource = resource.create_proxy(target=page, title=page.title.value)
-                                    with proxy_resource.describe(Proxy) as proxy:
-                                        if previous_proxy_resource is None:
-                                            # first page in sequence
-                                            obj.first = proxy
-                                            obj.last = proxy
-                                        else:
-                                            with previous_proxy_resource.describe(Proxy) as previous_proxy:
-                                                previous_proxy.next = proxy
-                                                proxy.prev = previous_proxy
-                                                previous_proxy_resource.save()
-                                                obj.last = proxy
-                                    proxy_resource.save()
-                                    previous_proxy_resource = proxy_resource
+                        proxy_sequence = []
+                        obj = resource.describe(PCDMObject)
+                        for n, (rootname, file_group) in enumerate(self.row.file_groups.items(), 1):
+                            for file in file_group.files:
+                                file.source = self.job.get_source(self.job.config.binaries_location, file.name)
+                            page_resource = resource.create_page(number=n, file_group=file_group)
+                            page = page_resource.read().describe(Page)
+                            proxy_sequence.append(resource.create_proxy(
+                                proxy_for=page,
+                                title=page.title.value,
+                            ))
+
+                        if len(proxy_sequence) > 0:
+                            obj.first = URIRef(proxy_sequence[0].url)
+                            obj.last = URIRef(proxy_sequence[-1].url)
+
+                        for n, proxy_resource in enumerate(proxy_sequence):
+                            proxy = proxy_resource.describe(Proxy)
+                            if n > 0:
+                                # has a previous resource
+                                proxy.prev = URIRef(proxy_sequence[n - 1].url)
+                            if n < len(proxy_sequence) - 1:
+                                # has a next resource
+                                proxy.next = URIRef(proxy_sequence[n + 1].url)
+                            proxy_resource.update()
+                        resource.update()
+
                     # item-level files
                     if self.row.has_item_files:
-                        for rootname, filenames in self.row.item_filenames:
-                            for filename in filenames:
-                                source = self.job.get_source(self.job.config.binaries_location, filename)
-                                resource.create_file(source=source)
-                    resource.save()
+                        for filename in self.row.item_filenames:
+                            source = self.job.get_source(self.job.config.binaries_location, filename)
+                            resource.create_file(source=source)
+
             except RepositoryError as e:
                 raise JobError(f'Creating item failed: {e}') from e
 

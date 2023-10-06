@@ -1,17 +1,16 @@
 import copy
 import csv
 import logging
-from argparse import FileType, ArgumentTypeError
+from argparse import FileType, ArgumentTypeError, Namespace
 from typing import TextIO
 
 from plastron.cli.commands import BaseCommand
 from plastron.client import Client
-from plastron.utils import datetimestamp
 from plastron.jobs.importjob import ImportJob, ModelClassNotFoundError
 from plastron.models import get_model_class
 from plastron.namespaces import get_manager
 from plastron.rdf import uri_or_curie
-from plastron.repo import Repository
+from plastron.utils import datetimestamp
 
 nsm = get_manager()
 logger = logging.getLogger(__name__)
@@ -147,10 +146,6 @@ class Command(BaseCommand):
         self.ssh_private_key = self.config.get('SSH_PRIVATE_KEY')
         self.jobs_dir = self.config.get('JOBS_DIR', 'jobs')
 
-    def __call__(self, *args, **kwargs):
-        for _ in self.execute(*args, **kwargs):
-            pass
-
     def repo_config(self, repo_config, args=None):
         """
         Returns a deep copy of the provided repo_config, updated with
@@ -182,7 +177,7 @@ class Command(BaseCommand):
         """
         return ImportJob(job_id, jobs_dir=jobs_dir)
 
-    def execute(self, client: Client, args):
+    def __call__(self, client: Client, args: Namespace):
         """
         Performs the import
 
@@ -207,18 +202,17 @@ class Command(BaseCommand):
             # TODO: generate a more unique id? add in user and hostname?
             args.job_id = f"import-{datetimestamp()}"
 
-        repo = Repository(client=client)
         job = ImportJob(args.job_id, self.jobs_dir)
         if args.resume:
-            count = yield from job.resume(
-                repo=repo,
+            self.run(job.resume(
+                repo=self.repo,
                 limit=args.limit,
                 percentage=args.percentage,
                 validate_only=args.validate_only,
-            )
+            ))
         else:
-            count = yield from job.start(
-                repo=repo,
+            self.run(job.start(
+                repo=self.repo,
                 import_file=args.import_file,
                 model=args.model,
                 access=args.access,
@@ -228,26 +222,7 @@ class Command(BaseCommand):
                 limit=args.limit,
                 percentage=args.percentage,
                 validate_only=args.validate_only,
-            )
+            ))
 
-        for key, value in count.items():
+        for key, value in self.result['count'].items():
             logger.info(f"{key.title().replace('_', ' ')}: {value}")
-
-        if args.validate_only:
-            # validate phase
-            if count['invalid_items'] == 0:
-                result_type = 'validate_success'
-            else:
-                result_type = 'validate_failed'
-        else:
-            # import phase
-            if len(job.completed_log) == count['total_items']:
-                result_type = 'import_complete'
-            else:
-                result_type = 'import_incomplete'
-
-        self.result = {
-            'type': result_type,
-            'validation': job.validation_reports,
-            'count': count,
-        }

@@ -1,7 +1,14 @@
-from typing import Optional
+import pathlib
+from typing import Optional, Union, IO, TextIO, BinaryIO, Any
 
 from rdflib import Graph, URIRef
+from rdflib.parser import InputSource
 from rdflib.term import Node
+
+
+def copy_triples(src: Graph, dest: Graph):
+    for triple in src:
+        dest.add(triple)
 
 
 def update_node(node: Node, old_uri: URIRef, new_uri: URIRef) -> Node:
@@ -24,8 +31,24 @@ def new_triple(old_uri, new_uri, s, p, o):
 class TrackChangesGraph(Graph):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.inserts = Graph()
-        self.deletes = Graph()
+        self.original = Graph()
+
+    def parse(
+        self,
+        source: Optional[
+            Union[IO[bytes], TextIO, InputSource, str, bytes, pathlib.PurePath]
+        ] = None,
+        publicID: Optional[str] = None,  # noqa: N803
+        format: Optional[str] = None,
+        location: Optional[str] = None,
+        file: Optional[Union[BinaryIO, TextIO]] = None,
+        data: Optional[Union[str, bytes]] = None,
+        **args: Any,
+    ) -> 'TrackChangesGraph':
+        super().parse(source, publicID, format, location, file, data, **args)
+        self.original = Graph()
+        copy_triples(self, self.original)
+        return self
 
     def change_uri(self, old_uri: URIRef, new_uri: URIRef):
         """Change occurrences of ``old_uri`` to ``new_uri`` in this graph.
@@ -35,56 +58,22 @@ class TrackChangesGraph(Graph):
         This object is updated in place."""
         for s, p, o in self:
             new_s, new_p, new_o = new_triple(old_uri, new_uri, s, p, o)
-            super().remove((s, p, o))
-            super().add((new_s, new_p, new_o))
+            self.remove((s, p, o))
+            self.add((new_s, new_p, new_o))
 
-        for s, p, o in self.inserts:
-            new_s, new_p, new_o = new_triple(old_uri, new_uri, s, p, o)
-            self.inserts.remove((s, p, o))
-            self.inserts.add((new_s, new_p, new_o))
+    @property
+    def inserts(self) -> Graph:
+        return self - self.original
 
-        for s, p, o in self.deletes:
-            new_s, new_p, new_o = new_triple(old_uri, new_uri, s, p, o)
-            self.deletes.remove((s, p, o))
-            self.deletes.add((new_s, new_p, new_o))
-
-    def add(self, triple):
-        try:
-            self.deletes.remove(triple)
-        except KeyError:
-            # this is the case where this triple has not been deleted
-            pass
-        self.inserts.add(triple)
-
-    def remove(self, triple):
-        try:
-            self.inserts.remove(triple)
-        except KeyError:
-            # this is the case where this triple has not been inserted
-            pass
-        self.deletes.add(triple)
+    @property
+    def deletes(self) -> Graph:
+        return self.original - self
 
     @property
     def has_changes(self) -> bool:
         return len(self.inserts) > 0 or len(self.deletes) > 0
 
-    def with_changes(self) -> Graph:
-        graph = Graph()
-        for triple in self:
-            graph.add(triple)
-        for triple in self.deletes:
-            graph.remove(triple)
-        for triple in self.inserts:
-            graph.add(triple)
-        return graph
-
     def apply_changes(self):
-        for triple in self.deletes:
-            super().remove(triple)
-        for triple in self.inserts:
-            super().add(triple)
-        self.clear_changes()
-
-    def clear_changes(self):
-        self.inserts = Graph()
-        self.deletes = Graph()
+        graph = Graph()
+        copy_triples(self, graph)
+        self.original = graph

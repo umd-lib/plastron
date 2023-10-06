@@ -152,11 +152,10 @@ obj.rdf_type.add(URIRef('http://pcdm.org/models#Object'))
 
 assert obj.has_changes
 
-# applies the changes to the in-memory graph shared by obj and resource
-obj.apply_changes()
-
-# sends a PUT request to the repository with the updated graph
-resource.save()
+# sends a PATCH request to the repository with a SPARQL
+# update query built from the differences between the
+# graph read from the repo and the current graph
+resource.update()
 ```
 
 ## Binaries

@@ -1,7 +1,9 @@
 import logging
+from argparse import Namespace
 
 from plastron.cli.commands import BaseCommand
 from plastron.jobs.exportjob import ExportJob
+from plastron.repo import Repository
 from plastron.serializers import SERIALIZER_CLASSES
 
 logger = logging.getLogger(__name__)
@@ -59,19 +61,15 @@ class Command(BaseCommand):
         self.ssh_private_key = self.config.get('SSH_PRIVATE_KEY')
         self.result = None
 
-    def __call__(self, *args, **kwargs):
-        for _ in self.execute(*args, **kwargs):
-            pass
-
-    def execute(self, client, args):
+    def __call__(self, repo: Repository, args: Namespace):
         export_job = ExportJob(
             repo=self.repo,
             export_binaries=args.export_binaries,
-            binary_types= args.binary_types.split(',') if isinstance(args.binary_types, str) else None,
+            binary_types=args.binary_types,
             uris=args.uris,
             export_format=args.format,
             output_dest=args.output_dest,
             uri_template=args.uri_template,
             key=args.key,
         )
-        yield from export_job.run()
+        self.run(export_job.run())

@@ -41,7 +41,7 @@ def test_cannot_resume_without_job_id(client):
     args = argparse.Namespace(resume=True, job_id=None)
 
     with pytest.raises(RuntimeError) as excinfo:
-        for _ in command.execute(client, args):
+        for _ in command(client, args):
             pass
 
     assert "Resuming a job requires a job id" in str(excinfo.value)
@@ -57,7 +57,7 @@ def test_cannot_resume_without_job_directory(client):
     args.resume = True
 
     with pytest.raises(RuntimeError) as excinfo:
-        for _ in command.execute(client, args):
+        for _ in command(client, args):
             pass
 
     assert "no such job directory" in str(excinfo.value)
@@ -80,7 +80,7 @@ def test_cannot_resume_without_config_file(client):
         command = Command(config)
 
         with pytest.raises(JobConfigError) as excinfo:
-            for _ in command.execute(client, args):
+            for _ in command(client, args):
                 pass
 
         assert "config.yml is missing" in str(excinfo.value)
@@ -96,7 +96,7 @@ def test_model_is_required_unless_resuming(client):
 
     command = Command(config)
     with pytest.raises(RuntimeError) as excinfo:
-        for _ in command.execute(client, args):
+        for _ in command(client, args):
             pass
 
     assert "A model is required unless resuming an existing job" in str(excinfo.value)
@@ -112,7 +112,7 @@ def test_import_file_is_required_unless_resuming(datadir, client):
 
     command = Command(config)
     with pytest.raises(RuntimeError) as excinfo:
-        for _ in command.execute(client, args):
+        for _ in command(client, args):
             pass
 
     assert "An import file is required unless resuming an existing job" in str(excinfo.value)
@@ -149,7 +149,7 @@ def test_exception_when_no_validation_ruleset(MockImportJob, client, monkeypatch
     command = Command(config={})
 
     with pytest.raises(RuntimeError) as excinfo:
-        for _ in command.execute(client, args):
+        for _ in command(client, args):
             pass
 
     assert "Unable to run validation" in str(excinfo.value)
@@ -174,9 +174,7 @@ def test_invalid_item_added_to_drop_invalid_log(MockImportJob, datadir, client, 
 
     args = create_args(job.id)
     command = Command({})
-
-    for _ in command.execute(client, args):
-        pass
+    command(client, args)
 
     mock_run.drop_invalid.assert_called_once()
     mock_run.drop_failed.assert_not_called()
@@ -207,9 +205,7 @@ def test_failed_item_added_to_drop_failed_log(MockImportJob, MockImportRow, clie
 
     args = create_args(job.id)
     command = Command({})
-
-    for _ in command.execute(client, args):
-        pass
+    command(client, args)
 
     mock_run.drop_failed.assert_called_once()
     mock_run.drop_invalid.assert_not_called()

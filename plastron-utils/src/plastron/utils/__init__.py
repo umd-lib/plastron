@@ -2,6 +2,7 @@ import csv
 import logging
 import os
 import re
+from abc import ABC
 from collections.abc import Sequence
 from datetime import datetime
 from pathlib import Path
@@ -120,7 +121,26 @@ def strtobool(val):
         raise ValueError("invalid truth value %r" % (val,))
 
 
-class ItemLog(Sequence):
+class AppendableSequence(Sequence, ABC):
+    def append(self, _value):
+        raise NotImplementedError
+
+
+class NullLog(AppendableSequence):
+    def __len__(self) -> int:
+        return 0
+
+    def __getitem__(self, item):
+        raise IndexError
+
+    def __contains__(self, item):
+        return False
+
+    def append(self, _value):
+        pass
+
+
+class ItemLog(AppendableSequence):
     def __init__(self, filename, fieldnames, keyfield, header=True):
         self.filename = Path(filename)
         self.fieldnames = fieldnames

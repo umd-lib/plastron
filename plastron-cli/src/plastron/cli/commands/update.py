@@ -157,11 +157,11 @@ class Command(BaseCommand):
                         logger.info(f'Updated resource {resource} {title}')
                         timestamp = parsedate_to_datetime(response.headers['date']).isoformat('T')
                         if completed_log is not None:
-                                completed_log.append({
-                                    'uri': resource.url,
-                                    'title': str(title),
-                                    'timestamp': timestamp,
-                                })
+                            completed_log.append({
+                                'uri': resource.url,
+                                'title': str(title),
+                                'timestamp': timestamp,
+                            })
                         self.stats['updated'].append(uri)
                     else:
                         self.stats['errors'][uri].append(str(response))
@@ -176,26 +176,3 @@ class Command(BaseCommand):
             'stats': self.stats
         }
         logger.debug(self.stats)
-
-    @staticmethod
-    def parse_message(message):
-        message.body = message.body.encode('utf-8').decode('utf-8-sig')
-        body = json.loads(message.body)
-        uris = body['uris']
-        sparql_update = body['sparql_update']
-        dry_run = bool(strtobool(message.args.get('dry-run', 'false')))
-        do_validate = bool(strtobool(message.args.get('validate', 'false')))
-        # Default to no transactions, due to LIBFCREPO-842
-        use_transactions = not bool(strtobool(message.args.get('no-transactions', 'true')))
-
-        return Namespace(
-            dry_run=dry_run,
-            validate=do_validate,
-            model=message.args.get('model', None),
-            recursive=message.args.get('recursive', None),
-            use_transactions=use_transactions,
-            uris=uris,
-            update_file=io.StringIO(sparql_update),
-            file=None,
-            completed=None
-        )

@@ -56,7 +56,7 @@ To install Plastron in [development mode], do the following:
 ```bash
 git clone git@github.com:umd-lib/plastron.git
 cd plastron
-pip install -e .[dev,test]
+pip install -e '.[dev,test]'
 ```
 
 This allows for in-place editing of Plastron's source code in the git

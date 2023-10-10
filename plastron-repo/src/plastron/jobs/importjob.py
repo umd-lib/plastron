@@ -486,7 +486,7 @@ class ImportRow:
                                             with previous_proxy_resource.describe(Proxy) as previous_proxy:
                                                 previous_proxy.next = proxy
                                                 proxy.prev = previous_proxy
-                                                previous_proxy.save()
+                                                previous_proxy_resource.save()
                                                 obj.last = proxy
                                     proxy_resource.save()
                                     previous_proxy_resource = proxy_resource

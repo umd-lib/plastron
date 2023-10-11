@@ -1,13 +1,15 @@
 import logging
-from io import BytesIO
-
+from argparse import Namespace
 from bs4 import BeautifulSoup
+from rdflib import URIRef
 
+from plastron.cli import get_uris, context
 from plastron.cli.commands import BaseCommand
-from plastron.namespaces import prov, sc
-from plastron.rdf import rdf
-from plastron.rdf.oa import Annotation, SpecificResource, TextualBody
-from plastron.rdf.pcdm import File, Object
+from plastron.client import Client
+from plastron.models.annotations import FullTextAnnotation, TextualBody
+from plastron.namespaces import sc
+from plastron.rdfmapping.descriptors import embedded
+from plastron.repo.pcdm import PCDMPageResource
 
 
 logger = logging.getLogger(__name__)
@@ -25,48 +27,29 @@ def configure_cli(subparsers):
     parser.set_defaults(cmd_name='annotate')
 
 
-@rdf.object_property('derived_from', prov.wasDerivedFrom)
-class FullTextAnnotation(Annotation):
-    pass
-
-
 class Command(BaseCommand):
     def __init__(self, config=None):
         super().__init__(config)
         self.result = None
 
-    def __call__(self, *args, **kwargs):
-        for _ in self.execute(*args, **kwargs):
-            pass
+    def __call__(self, client: Client, args: Namespace):
+        uris = get_uris(args)
+        client.test_connection()
+        for uri in uris:
+            with context(repo=self.repo):
+                obj = self.repo[uri:PCDMPageResource]
+                for file_resource in obj.read().get_files(mime_type='text/html'):
+                    with file_resource.open() as stream:
+                        text = BeautifulSoup(stream, features='lxml').get_text()
 
-    def execute(self, repo, args):
-        for target_uri in args.uris:
-            obj = Object.from_repository(repo, target_uri)
-            for file_uri in obj.files:
-                file = File.from_repository(repo, file_uri)
+                    annotation = FullTextAnnotation(
+                        motivation=sc.painting,
+                        derived_from=URIRef(file_resource.url),
+                        body=embedded(TextualBody)(
+                            value=text,
+                            content_type='text/plain'
+                        ),
+                        target=URIRef(obj.url)
+                    )
 
-                if str(file.mimetype) == 'text/html':
-                    # get text from HTML
-                    with file.source as stream:
-                        text = BeautifulSoup(BytesIO(b''.join(stream)), features='lxml').get_text()
-                else:
-                    logger.debug(f'Skipping file with MIME type {file.mimetype}')
-                    continue
-
-                annotation = FullTextAnnotation(
-                    motivation=sc.painting,
-                    derived_from=file
-                )
-
-                # don't embed full resources
-                if not isinstance(obj, SpecificResource):
-                    annotation.props['target'].is_embedded = False
-
-                annotation.add_target(target=obj)
-                annotation.add_body(TextualBody(value=text, content_type='text/plain'))
-
-                obj.annotations.append(annotation)
-                repo.create_annotations(obj)
-                obj.update_annotations(repo)
-
-            yield target_uri
+                    obj.create_annotation(description=annotation)

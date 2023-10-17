@@ -6,11 +6,11 @@ commands, but the bodies have command-specific formats.
 
 ## Headers
 
-| Header            | Message Type       | Usage |
-|-------------------|--------------------|-------|
-|`PlastronJobId`    |progress, completion|URI that identifies the job|
-|`PlastronJobState` |completion          |Job state as of the end of this run|
-|`PlastronJobError` |completion          |Error message, if the job had a fatal exception|
+| Header             | Message Type         | Usage                                           |
+|--------------------|----------------------|-------------------------------------------------|
+| `PlastronJobId`    | progress, completion | URI that identifies the job                     |
+| `PlastronJobState` | completion           | Job state as of the end of this run             |
+| `PlastronJobError` | completion           | Error message, if the job had a fatal exception |
 
 ## Bodies
 

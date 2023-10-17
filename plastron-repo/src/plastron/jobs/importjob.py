@@ -14,6 +14,7 @@ from typing import List, Mapping, Optional, Type, Union, Any, IO, Generator, Ite
 
 import yaml
 from rdflib import URIRef
+from urlobject import URLObject
 
 from plastron.files import ZipFileSource, RemoteFileSource, HTTPFileSource, LocalFileSource, \
     BinarySource
@@ -456,7 +457,7 @@ class ImportRow:
 
         :returns: ImportedItemStatus
         """
-        if self.item.uri.startswith('urn:uuid:'):
+        if self.item.uri.startswith('urn:uuid:') or not self.repo[self.item.uri].exists:
             # if an item is new, don't construct a SPARQL Update query
             # instead, just create and update normally
             # create new item in the repo
@@ -474,11 +475,18 @@ class ImportRow:
             container: ContainerResource = self.repo[self.job.config.container:ContainerResource]
             logger.debug(f"Creating resources in container: {container.path}")
 
+            # allow for pre-specified HTTP URLs
+            if self.item.uri.startswith('http:') or self.item.uri.startswith('https:'):
+                url = URLObject(self.item.uri)
+            else:
+                url = None
+
             try:
                 with self.repo.transaction():
                     # create the main resource
                     logger.debug(f'Creating main resource for "{self.item}"')
                     resource = container.create_child(
+                        url=url,
                         resource_class=PCDMObjectResource,
                         description=self.item,
                     )

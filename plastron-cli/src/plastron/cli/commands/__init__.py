@@ -1,5 +1,5 @@
 from importlib import import_module
-from typing import Optional
+from typing import Optional, Generator
 
 from plastron.repo import Repository
 
@@ -10,6 +10,7 @@ class BaseCommand:
             config = {}
         self.config = config
         self.repo: Optional[Repository] = None
+        self.result = None
 
     def repo_config(self, repo_config, args=None):
         """
@@ -20,6 +21,18 @@ class BaseCommand:
         repo_config dictionary without change
         """
         return repo_config
+
+    def _run(self, command: Generator):
+        # delegating generator; each progress step is passed to the calling
+        # method, and the return value from the command is stored as the result
+        self.result = yield from command
+
+    def run(self, command: Generator):
+        # Run the delegating generator to exhaustion, discarding the intermediate
+        # yielded values. Return the final result.
+        for _ in self._run(command):
+            pass
+        return self.result
 
 
 def get_command_class(command_name: str):

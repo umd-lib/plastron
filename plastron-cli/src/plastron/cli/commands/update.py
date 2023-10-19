@@ -1,20 +1,12 @@
-import importlib
-import io
-import json
 import logging
 from argparse import FileType, Namespace
-from collections import defaultdict
-from email.utils import parsedate_to_datetime
 
-from pyparsing import ParseException
-
-from plastron.client import Client, ClientError
-from plastron.cli import get_uris, context
 from plastron.cli.commands import BaseCommand
-from plastron.utils import strtobool, ItemLog
-from plastron.validation import validate
-from plastron.repo import RepositoryError, RepositoryResource
-from plastron.rdf import parse_predicate_list, get_title_string
+from plastron.client import Client
+from plastron.jobs.updatejob import UpdateJob
+from plastron.models import get_model_class
+from plastron.rdf import parse_predicate_list
+from plastron.utils import ItemLog
 
 logger = logging.getLogger(__name__)
 
@@ -76,103 +68,34 @@ def configure_cli(subparsers):
 
 
 class Command(BaseCommand):
-    def __init__(self, config=None):
-        super().__init__(config=config)
-
-    def __call__(self, client: Client, args):
+    def __call__(self, client: Client, args: Namespace):
         client.test_connection()
-        self.stats = {
-            'updated': [],
-            'invalid': defaultdict(list),
-            'errors': defaultdict(list)
-        }
 
         if args.validate and args.model is None:
             raise RuntimeError("Model must be provided when performing validation")
 
-        if args.model is not None:
-            # Retrieve the model to use for validation
-            logger.debug(f'Loading model class "{args.model}"')
-            try:
-                self.model_class = getattr(importlib.import_module("plastron.models"), args.model)
-            except AttributeError as e:
-                raise RuntimeError(f'Unable to load model "{args.model}"') from e
+        # Retrieve the model to use for validation
+        model_class = get_model_class(args.model) if args.model else None
 
-        self.sparql_update = args.update_file.read().encode('utf-8')
-
-        logger.debug(
-            f'SPARQL Update query:\n'
-            f'====BEGIN====\n'
-            f'{self.sparql_update.decode()}\n'
-            f'=====END====='
-        )
+        sparql_update = args.update_file.read().encode('utf-8')
 
         if args.dry_run:
             logger.info('Dry run enabled, no actual updates will take place')
 
-        if args.completed:
+        if args.completed and not args.dry_run:
             completed_log = ItemLog(args.completed, ['uri', 'title', 'timestamp'], 'uri')
         else:
             completed_log = None
 
         traverse = parse_predicate_list(args.recursive) if args.recursive is not None else []
-        uris = get_uris(args)
 
-        for uri in uris:
-            with context(repo=self.repo, use_transactions=args.use_transactions, dry_run=args.dry_run):
-                for resource in self.repo[uri].walk(traverse=traverse):
-
-                    if completed_log is not None and uri in completed_log:
-                        logger.info(f'Resource {uri} has already been updated; skipping')
-                        return
-
-                    headers = {'Content-Type': 'application/sparql-update'}
-                    title = get_title_string(resource.graph)
-
-                    if args.validate:
-                        try:
-                            # Apply the update in-memory to the resource graph
-                            resource.graph.update(self.sparql_update.decode())
-                        except ParseException as parse_error:
-                            self.stats['errors'][uri].append(str(parse_error))
-                            return
-
-                        # Validate the updated in-memory Graph using the model
-                        item = self.model_class.from_graph(resource.graph, subject=uri)
-                        validation_result = validate(item)
-
-                        if not validation_result.is_valid():
-                            logger.warning(f'Resource {uri} failed validation')
-                            self.stats['invalid'][uri].extend(str(failed) for failed in validation_result.failed())
-                            return
-
-                    if args.dry_run:
-                        logger.info(f'Would update resource {resource} {title}')
-                        return
-
-                    request_url = resource.description_url or resource.url
-
-                    response = client.patch(request_url, data=self.sparql_update, headers=headers)
-                    if response.status_code == 204:
-                        logger.info(f'Updated resource {resource} {title}')
-                        timestamp = parsedate_to_datetime(response.headers['date']).isoformat('T')
-                        if completed_log is not None:
-                            completed_log.append({
-                                'uri': resource.url,
-                                'title': str(title),
-                                'timestamp': timestamp,
-                            })
-                        self.stats['updated'].append(uri)
-                    else:
-                        self.stats['errors'][uri].append(str(response))
-
-        if len(self.stats['errors']) == 0 and len(self.stats['invalid']) == 0:
-            state = 'update_complete'
-        else:
-            state = 'update_incomplete'
-
-        self.result = {
-            'type': state,
-            'stats': self.stats
-        }
-        logger.debug(self.stats)
+        update_job = UpdateJob(
+            repo=self.repo,
+            uris=args.uris,
+            sparql_update=sparql_update,
+            model_class=model_class,
+            traverse=traverse,
+            completed=completed_log,
+            dry_run=args.dry_run,
+        )
+        self.run(update_job.run())

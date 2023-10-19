@@ -1,6 +1,6 @@
 from rdflib import Namespace
 
-from plastron.namespaces import dc, dcterms, edm, rdfs, owl, ldp, fabio, pcdm, iana, ore, ebucore, premis
+from plastron.namespaces import dc, dcterms, edm, rdfs, owl, ldp, fabio, pcdm, iana, ore, ebucore, premis, xsd
 from plastron.rdfmapping.decorators import rdf_type
 from plastron.rdfmapping.descriptors import ObjectProperty, DataProperty
 from plastron.rdfmapping.resources import RDFResource, RDFResourceBase
@@ -51,7 +51,7 @@ class PCDMFile(RDFResource):
     file_of = ObjectProperty(pcdm.fileOf, repeatable=True, cls=PCDMObject)
     mime_type = DataProperty(ebucore.hasMimeType)
     filename = DataProperty(ebucore.filename)
-    size = DataProperty(premis.hasSize)
+    size = DataProperty(premis.hasSize, datatype=xsd.long)
 
     def __str__(self):
         return str(self.title or self.uri)

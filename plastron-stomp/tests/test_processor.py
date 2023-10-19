@@ -1,11 +1,8 @@
 import pytest
 
 from plastron.client import RepositoryStructure
-from plastron.stomp.commands import importcommand
 from plastron.stomp.listeners import MessageProcessor
 from plastron.stomp.messages import PlastronCommandMessage
-
-cmd = importcommand.Command()
 
 # "Flat" layout config
 flat_repo_config = {

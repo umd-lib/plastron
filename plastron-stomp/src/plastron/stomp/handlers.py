@@ -10,7 +10,7 @@ class AsynchronousResponseHandler:
     def __init__(self, listener, message: PlastronMessage):
         self.listener = listener
         self.message = message
-        self.reply_queue: Destination = listener.status_queue
+        self.reply_queue: Destination = listener.broker['JOB_STATUS']
 
     def __call__(self, future):
         e = future.exception()

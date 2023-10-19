@@ -10,11 +10,13 @@ from enum import Enum
 from os.path import basename
 from pathlib import Path
 from shutil import copyfileobj
-from typing import List, Mapping, Optional, Type, Union, Any, IO, Generator, Iterable
+from typing import List, Mapping, Optional, Type, Union, Any, IO, Generator, Iterable, Dict
 
 import yaml
 from rdflib import URIRef
+from urlobject import URLObject
 
+from plastron.client import ClientError
 from plastron.files import ZipFileSource, RemoteFileSource, HTTPFileSource, LocalFileSource, \
     BinarySource
 from plastron.jobs.utils import annotate_from_files, Row, ImportSpreadsheet, JobError, JobConfigError, LineReference, \
@@ -170,7 +172,7 @@ class ImportJob:
             binaries_location: str = None,
             extract_text_types: str = None,
             **kwargs,
-    ) -> Generator[Any, None, Counter]:
+    ) -> Generator[Any, None, Dict[str, Any]]:
         self.save_config({
             'model': model,
             'access': access,
@@ -180,9 +182,9 @@ class ImportJob:
             'extract_text_types': extract_text_types,
         })
 
-        return (yield from self.import_items(repo=repo, **kwargs))
+        return self.import_items(repo=repo, **kwargs)
 
-    def resume(self, repo: Repository, **kwargs) -> Generator[Any, None, Counter]:
+    def resume(self, repo: Repository, **kwargs) -> Generator[Any, None, Dict[str, Any]]:
         if not self.dir_exists:
             raise RuntimeError(f'Cannot resume job "{self.id}": no such job directory: "{self.dir}"')
 
@@ -193,7 +195,7 @@ class ImportJob:
         except FileNotFoundError:
             raise RuntimeError(f'Cannot resume job {self.id}: no config.yml found in {self.dir}')
 
-        return (yield from self.import_items(repo=repo, **kwargs))
+        return self.import_items(repo=repo, **kwargs)
 
     def import_items(
             self,
@@ -202,7 +204,7 @@ class ImportJob:
             percentage=None,
             validate_only: bool = False,
             import_file: IO = None,
-    ) -> Generator[Any, None, Counter]:
+    ) -> Generator[Any, None, Dict[str, Any]]:
         start_time = datetime.now().timestamp()
 
         if percentage:
@@ -286,7 +288,7 @@ class ImportJob:
                     raise RuntimeError(f'Unknown status "{status}" returned when importing "{import_row.item}"')
             except JobError as e:
                 count['items_with_errors'] += 1
-                logger.error(f'{import_row.item} import failed: {e}')
+                logger.error(f'{import_row} import failed: {e}')
                 import_run.drop_failed(import_row.item, row.line_reference, reason=str(e))
 
             # update the status
@@ -300,7 +302,24 @@ class ImportJob:
                 'count': count,
             }
 
-        return count
+        if validate_only:
+            # validate phase
+            if count['invalid_items'] == 0:
+                result_type = 'validate_success'
+            else:
+                result_type = 'validate_failed'
+        else:
+            # import phase
+            if len(self.completed_log) == count['total_items']:
+                result_type = 'import_complete'
+            else:
+                result_type = 'import_incomplete'
+
+        return {
+            'type': result_type,
+            'validation': self.validation_reports,
+            'count': count,
+        }
 
     @property
     def access(self) -> Optional[URIRef]:
@@ -393,7 +412,7 @@ class ImportRow:
         self.item = row.get_object(repo)
 
     def __str__(self):
-        return str(self.item)
+        return str(self.row.line_reference)
 
     def validate_item(self) -> ValidationResultsDict:
         """Validate the item for this import row, and check that all files
@@ -439,7 +458,7 @@ class ImportRow:
 
         :returns: ImportedItemStatus
         """
-        if self.item.uri.startswith('urn:uuid:'):
+        if self.item.uri.startswith('urn:uuid:') or not self.repo[self.item.uri].exists:
             # if an item is new, don't construct a SPARQL Update query
             # instead, just create and update normally
             # create new item in the repo
@@ -457,48 +476,58 @@ class ImportRow:
             container: ContainerResource = self.repo[self.job.config.container:ContainerResource]
             logger.debug(f"Creating resources in container: {container.path}")
 
-            try:
-                self.item.apply_changes()
-                with self.repo.transaction():
+            # allow for pre-specified HTTP URLs
+            if self.item.uri.startswith('http:') or self.item.uri.startswith('https:'):
+                url = URLObject(self.item.uri)
+            else:
+                url = None
+
+            with self.repo.transaction():
+                try:
                     # create the main resource
                     logger.debug(f'Creating main resource for "{self.item}"')
                     resource = container.create_child(
+                        url=url,
                         resource_class=PCDMObjectResource,
                         description=self.item,
                     )
                     # add pages and files to those pages
                     if self.row.has_files:
-                        with resource.describe(PCDMObject) as obj:
-                            previous_proxy_resource = None
-                            for n, (rootname, file_group) in enumerate(self.row.file_groups.items(), 1):
-                                for file in file_group.files:
-                                    file.source = self.job.get_source(self.job.config.binaries_location, file.name)
-                                page_resource = resource.create_page(number=n, file_group=file_group)
-                                # create proxies and links
-                                with page_resource.describe(Page) as page:
-                                    proxy_resource = resource.create_proxy(target=page, title=page.title.value)
-                                    with proxy_resource.describe(Proxy) as proxy:
-                                        if previous_proxy_resource is None:
-                                            # first page in sequence
-                                            obj.first = proxy
-                                            obj.last = proxy
-                                        else:
-                                            with previous_proxy_resource.describe(Proxy) as previous_proxy:
-                                                previous_proxy.next = proxy
-                                                proxy.prev = previous_proxy
-                                                previous_proxy_resource.save()
-                                                obj.last = proxy
-                                    proxy_resource.save()
-                                    previous_proxy_resource = proxy_resource
+                        proxy_sequence = []
+                        obj = resource.describe(PCDMObject)
+                        for n, (rootname, file_group) in enumerate(self.row.file_groups.items(), 1):
+                            for file in file_group.files:
+                                file.source = self.job.get_source(self.job.config.binaries_location, file.name)
+                            page_resource = resource.create_page(number=n, file_group=file_group)
+                            page = page_resource.read().describe(Page)
+                            proxy_sequence.append(resource.create_proxy(
+                                proxy_for=page,
+                                title=page.title.value,
+                            ))
+
+                        if len(proxy_sequence) > 0:
+                            obj.first = URIRef(proxy_sequence[0].url)
+                            obj.last = URIRef(proxy_sequence[-1].url)
+
+                        for n, proxy_resource in enumerate(proxy_sequence):
+                            proxy = proxy_resource.describe(Proxy)
+                            if n > 0:
+                                # has a previous resource
+                                proxy.prev = URIRef(proxy_sequence[n - 1].url)
+                            if n < len(proxy_sequence) - 1:
+                                # has a next resource
+                                proxy.next = URIRef(proxy_sequence[n + 1].url)
+                            proxy_resource.update()
+                        resource.update()
+
                     # item-level files
                     if self.row.has_item_files:
-                        for rootname, filenames in self.row.item_filenames:
-                            for filename in filenames:
-                                source = self.job.get_source(self.job.config.binaries_location, filename)
-                                resource.create_file(source=source)
-                    resource.save()
-            except RepositoryError as e:
-                raise JobError(f'Creating item failed: {e}') from e
+                        for filename in self.row.item_filenames:
+                            source = self.job.get_source(self.job.config.binaries_location, filename)
+                            resource.create_file(source=source)
+
+                except (ClientError, RepositoryError) as e:
+                    raise JobError(self.job, f'Creating item failed: {e}', e.response.text) from e
 
             logger.info(f'Created {resource.url}')
             return ImportedItemStatus.CREATED

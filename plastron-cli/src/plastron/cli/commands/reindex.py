@@ -2,7 +2,8 @@ import logging
 
 from rdflib import URIRef
 
-from plastron.cli import get_uris, context
+from plastron.cli import get_uris
+from plastron.repo.utils import context
 from plastron.cli.commands import BaseCommand
 from plastron.rdf import parse_predicate_list
 from plastron.rdfmapping.resources import RDFResource

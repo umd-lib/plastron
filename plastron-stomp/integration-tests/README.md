@@ -48,13 +48,13 @@ MESSAGE_BROKER:
    nc localhost 61613 <stomp-import
    ```
 5. Confirm that there is an imported item at 
-   <http://fcrepo-local:8080/fcrepo/rest/import-test>
+   <http://fcrepo-local:8080/fcrepo/rest/b4a968dd-dbc6-42a0-9799-760266d44cd4>
 6. Send the update command:
    ```bash
    nc localhost 61613 <stomp-update
    ```
 7. Confirm that the previously imported item at
-   <http://fcrepo-local:8080/fcrepo/rest/import-test>
+   <http://fcrepo-local:8080/fcrepo/rest/b4a968dd-dbc6-42a0-9799-760266d44cd4>
    now also has a `dcterms:title` value of "Moonpig"
 8. Send the export command:
    ```bash

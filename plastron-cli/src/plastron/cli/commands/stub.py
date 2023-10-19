@@ -6,14 +6,14 @@ from argparse import FileType, Namespace
 from typing import Optional
 from rdflib import URIRef
 
-from plastron.cli import get_uris, context
 from plastron.cli.commands import BaseCommand
 from plastron.client import Client, ClientError
 from plastron.files import BinarySource, HTTPFileSource, LocalFileSource
-from plastron.models.umd import Stub
+from plastron.models.umd import Stub, Item
 from plastron.rdf import uri_or_curie
-from plastron.rdf.pcdm import File, Object
-from plastron.repo.pcdm import PCDMFileBearingResource, PCDMFile
+from plastron.repo import ContainerResource
+from plastron.repo.utils import context
+from plastron.repo.pcdm import PCDMFileBearingResource
 
 logger = logging.getLogger(__name__)
 
@@ -134,6 +134,8 @@ class Command(BaseCommand):
         csv_writer = csv.DictWriter(output_file, fieldnames=csv_file.fieldnames)
 
         write_csv_header(csv_file, args, csv_writer)
+        container_path = args.container_path or self.repo.endpoint.relpath
+        container_resource: ContainerResource = self.repo[container_path:ContainerResource].read()
 
         for _, row in enumerate(csv_file, start=1):
             identifier = row[args.identifier_column]
@@ -155,10 +157,12 @@ class Command(BaseCommand):
                     try:
                         access_types = [args.access] if args.access is not None else []
 
-                        resource = self.repo.create(resource_class=PCDMFileBearingResource)
+                        resource = container_resource.create_child(
+                            resource_class=PCDMFileBearingResource,
+                            description=item
+                        )
                         resource.create_file(source, rdf_types=access_types)
                         resource.attach_description(item)
-                        resource.update()
 
                         row[args.binary_column] = resource.url
                         csv_writer.writerow(row)

@@ -16,6 +16,7 @@ import yaml
 from rdflib import URIRef
 from urlobject import URLObject
 
+from plastron.client import ClientError
 from plastron.files import ZipFileSource, RemoteFileSource, HTTPFileSource, LocalFileSource, \
     BinarySource
 from plastron.jobs.utils import annotate_from_files, Row, ImportSpreadsheet, JobError, JobConfigError, LineReference, \
@@ -287,7 +288,7 @@ class ImportJob:
                     raise RuntimeError(f'Unknown status "{status}" returned when importing "{import_row.item}"')
             except JobError as e:
                 count['items_with_errors'] += 1
-                logger.error(f'{import_row.item} import failed: {e}')
+                logger.error(f'{import_row} import failed: {e}')
                 import_run.drop_failed(import_row.item, row.line_reference, reason=str(e))
 
             # update the status
@@ -411,7 +412,7 @@ class ImportRow:
         self.item = row.get_object(repo)
 
     def __str__(self):
-        return str(self.item)
+        return str(self.row.line_reference)
 
     def validate_item(self) -> ValidationResultsDict:
         """Validate the item for this import row, and check that all files
@@ -481,8 +482,8 @@ class ImportRow:
             else:
                 url = None
 
-            try:
-                with self.repo.transaction():
+            with self.repo.transaction():
+                try:
                     # create the main resource
                     logger.debug(f'Creating main resource for "{self.item}"')
                     resource = container.create_child(
@@ -525,8 +526,8 @@ class ImportRow:
                             source = self.job.get_source(self.job.config.binaries_location, filename)
                             resource.create_file(source=source)
 
-            except RepositoryError as e:
-                raise JobError(f'Creating item failed: {e}') from e
+                except (ClientError, RepositoryError) as e:
+                    raise JobError(self.job, f'Creating item failed: {e}', e.response.text) from e
 
             logger.info(f'Created {resource.url}')
             return ImportedItemStatus.CREATED

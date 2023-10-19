@@ -1,17 +1,19 @@
 import csv
 import logging
 import sys
+
 from argparse import FileType, Namespace
 from typing import Optional
-
 from rdflib import URIRef
 
-from plastron.client import Client, TransactionClient, ClientError
+from plastron.cli import get_uris, context
 from plastron.cli.commands import BaseCommand
+from plastron.client import Client, ClientError
 from plastron.files import BinarySource, HTTPFileSource, LocalFileSource
-from plastron.models import Item
-from plastron.rdf.pcdm import File
+from plastron.models.umd import Stub
 from plastron.rdf import uri_or_curie
+from plastron.rdf.pcdm import File, Object
+from plastron.repo.pcdm import PCDMFileBearingResource, PCDMFile
 
 logger = logging.getLogger(__name__)
 
@@ -133,7 +135,7 @@ class Command(BaseCommand):
 
         write_csv_header(csv_file, args, csv_writer)
 
-        for n, row in enumerate(csv_file, start=1):
+        for _, row in enumerate(csv_file, start=1):
             identifier = row[args.identifier_column]
             source = get_source(row[args.binary_column])
             if not source:
@@ -141,34 +143,29 @@ class Command(BaseCommand):
                 csv_writer.writerow(row)
                 continue
 
-            item = Item(identifier=identifier, title=f'Stub for {identifier}')
-            file = File()
-            file.source = source
-            item.add_file(file)
+            item = Stub(title=f'Stub for {identifier}', identifier=identifier)
+
             if args.member_of is not None:
                 item.member_of = URIRef(args.member_of)
             if args.access is not None:
-                item.rdf_type.append(args.access)
-                file.rdf_type.append(args.access)
+                item.rdf_type.add(args.access)
+
             try:
-                with client.transaction() as txn_client:  # type: TransactionClient
+                with context(repo=self.repo):
                     try:
-                        item.create(txn_client, container_path=args.container_path)
-                        item.update(txn_client)
-                        # update the CSV with the new URI
-                        row[args.binary_column] = file.uri
+                        access_types = [args.access] if args.access is not None else []
+
+                        resource = self.repo.create(resource_class=PCDMFileBearingResource)
+                        resource.create_file(source, rdf_types=access_types)
+                        resource.attach_description(item)
+                        resource.update()
+
+                        row[args.binary_column] = resource.url
                         csv_writer.writerow(row)
-                        txn_client.commit()
                     except (ClientError, FileNotFoundError) as e:
-                        # if anything fails during item creation or committing the transaction
-                        # attempt to roll back the current transaction
-                        # failures here will be caught by the main loop's exception handler
-                        # and should trigger a system exit
                         logger.error(f'{item.identifier} not created: {e}')
-                        txn_client.rollback()
                     except KeyboardInterrupt:
                         logger.warning("Load interrupted")
-                        txn_client.rollback()
                         raise
 
             except ClientError as e:

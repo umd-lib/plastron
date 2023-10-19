@@ -1,6 +1,6 @@
 import logging
 from os.path import basename
-from typing import Optional, Set, List, Iterator
+from typing import Optional, Set, List, Iterable, Iterator
 
 from rdflib import Literal, URIRef
 from urlobject import URLObject
@@ -74,7 +74,7 @@ class PCDMFileBearingResource(ContainerResource):
             self.file_urls.add(URLObject(file_uri))
         return self
 
-    def create_file(self, source: BinarySource, slug: str = None) -> BinaryResource:
+    def create_file(self, source: BinarySource, slug: Optional[str]=None, rdf_types: Optional[Iterable[URIRef]]=None) -> BinaryResource:
         """Create a single file from the given source as a pcdm:fileOf this resource.
         If no slug is provided, one is generated using random_slug()."""
         if slug is None:
@@ -99,13 +99,17 @@ class PCDMFileBearingResource(ContainerResource):
                     'Content-Disposition': f'attachment; filename="{source.filename}"',
                 },
             )
+
         # then add its metadata description
         file = file_resource.describe(PCDMFile)
         file.title = title
         file.file_of.add(parent)
         parent.has_file.add(file)
+        file.rdf_type.extend(rdf_types or [])
+
         file_resource.update()
         self.update()
+
         self.file_urls.add(file_resource.url)
         logger.debug(f'Created file: {file_resource.url} {title}')
         return file_resource

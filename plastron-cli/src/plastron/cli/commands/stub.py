@@ -1,19 +1,19 @@
 import csv
 import logging
 import sys
-
 from argparse import FileType, Namespace
 from typing import Optional
+
 from rdflib import URIRef
 
 from plastron.cli.commands import BaseCommand
 from plastron.client import Client, ClientError
 from plastron.files import BinarySource, HTTPFileSource, LocalFileSource
-from plastron.models.umd import Stub, Item
+from plastron.models.umd import Stub
 from plastron.rdf import uri_or_curie
 from plastron.repo import ContainerResource
-from plastron.repo.utils import context
 from plastron.repo.pcdm import PCDMFileBearingResource
+from plastron.repo.utils import context
 
 logger = logging.getLogger(__name__)
 
@@ -152,28 +152,22 @@ class Command(BaseCommand):
             if args.access is not None:
                 item.rdf_type.add(args.access)
 
-            try:
-                with context(repo=self.repo):
-                    try:
-                        access_types = [args.access] if args.access is not None else []
+            with context(repo=self.repo):
+                try:
+                    access_types = [args.access] if args.access is not None else []
 
-                        resource = container_resource.create_child(
-                            resource_class=PCDMFileBearingResource,
-                            description=item
-                        )
-                        resource.create_file(source, rdf_types=access_types)
-                        resource.attach_description(item)
+                    resource = container_resource.create_child(
+                        resource_class=PCDMFileBearingResource,
+                        description=item
+                    )
+                    resource.create_file(source, rdf_types=access_types)
 
-                        row[args.binary_column] = resource.url
-                        csv_writer.writerow(row)
-                    except (ClientError, FileNotFoundError) as e:
-                        logger.error(f'{item.identifier} not created: {e}')
-                    except KeyboardInterrupt:
-                        logger.warning("Load interrupted")
-                        raise
-
-            except ClientError as e:
-                raise RuntimeError(f'Transaction rollback failed: {e}') from e
+                    row[args.binary_column] = resource.url
+                    csv_writer.writerow(row)
+                except (ClientError, FileNotFoundError) as e:
+                    logger.error(f'{item.identifier} not created: {e}')
+                else:
+                    logger.info(f'Created {resource.url}')
 
         if output_file is not sys.stdout:
             output_file.close()

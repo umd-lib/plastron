@@ -4,6 +4,14 @@ STOMP listener client for asynchronous and synchronous operations
 
 ## Running with Python
 
+As a Python module:
+
+```bash
+python -m plastron.stomp.daemon -c <config file>
+```
+
+Using the console script entrypoint:
+
 ```bash
 plastrond-stomp -c <config file>
 ```

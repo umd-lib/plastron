@@ -67,11 +67,7 @@ docker stack deploy -c docker-compose.yml plastrond
 To watch the logs:
 
 ```
-# STOMP
 docker service logs -f plastrond_plastrond-stomp
-
-# HTTP
-docker service logs -f plastrond_plastrond-http
 ```
 
 ## Configuration

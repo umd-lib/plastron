@@ -29,6 +29,7 @@ def get_new_member_title(item: RDFResourceBase, rootname: str, number: int) -> L
 
 class WebAnnotationBearingResource(ContainerResource):
     """A container that has an annotations container, containing Web Annotations."""
+
     def __init__(self, repo: Repository, path: str = None):
         super().__init__(repo, path)
         self.annotations_container = self.get_resource('a', ContainerResource)
@@ -62,6 +63,7 @@ class WebAnnotationBearingResource(ContainerResource):
 
 class PCDMFileBearingResource(ContainerResource):
     """A container that has files, related by the pcdm:hasFile/pcdm:fileOf predicates."""
+
     def __init__(self, repo: Repository, path: str = None):
         super().__init__(repo, path)
         self.files_container = self.get_resource('f', ContainerResource)
@@ -74,7 +76,12 @@ class PCDMFileBearingResource(ContainerResource):
             self.file_urls.add(URLObject(file_uri))
         return self
 
-    def create_file(self, source: BinarySource, slug: Optional[str]=None, rdf_types: Optional[Iterable[URIRef]]=None) -> BinaryResource:
+    def create_file(
+            self,
+            source: BinarySource,
+            slug: Optional[str] = None,
+            rdf_types: Optional[Iterable[URIRef]] = None,
+    ) -> BinaryResource:
         """Create a single file from the given source as a pcdm:fileOf this resource.
         If no slug is provided, one is generated using random_slug()."""
         if slug is None:
@@ -94,7 +101,7 @@ class PCDMFileBearingResource(ContainerResource):
                 slug=slug,
                 data=stream,
                 headers={
-                    'Content-Type': source.mimetype(),
+                    'Content-Type': source.mimetype() or 'application/octet-stream',
                     'Digest': source.digest(),
                     'Content-Disposition': f'attachment; filename="{source.filename}"',
                 },

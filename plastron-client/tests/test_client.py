@@ -339,3 +339,18 @@ def test_get_graph_not_found(monkeypatch, client):
     monkeypatch.setattr(requests.Session, 'request', mock_request(MockNotFoundResponse()))
     with pytest.raises(ClientError):
         client.get_graph('http://localhost:9999/fcrepo/rest/123')
+
+
+@pytest.mark.parametrize(
+    ('url', 'external_url', 'forwarded_host', 'forwarded_protocol'),
+    [
+        ('http://localhost:8080', 'http://fcrepo-local', 'fcrepo-local', 'http'),
+        ('http://localhost:8080', 'https://fcrepo-local', 'fcrepo-local', 'https'),
+        ('http://localhost:8080', 'http://fcrepo-local:8080', 'fcrepo-local:8080', 'http'),
+    ]
+)
+def test_forwarded_headers(url, external_url, forwarded_host, forwarded_protocol):
+    endpoint = Endpoint(url=url, external_url=external_url)
+    client = Client(endpoint=endpoint)
+    assert client.forwarded_host == forwarded_host
+    assert client.forwarded_protocol == forwarded_protocol

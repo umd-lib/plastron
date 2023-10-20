@@ -1,8 +1,8 @@
-# Dockerfile for the generating the Docker image for the Plastron STOMP Daemon (plastrond-stomp)
+# Dockerfile for the generating the Docker image for the Plastron HTTP Daemon (plastrond-http)
 #
 # To build, from the main plastron project directory, run:
 #
-# docker build -t docker.lib.umd.edu/plastrond-stomp:<VERSION> -f plastron-stomp/Dockerfile .
+# docker build -t docker.lib.umd.edu/plastrond-http:<VERSION> -f plastron-web/Dockerfile .
 #
 # where <VERSION> is the Docker image version to create.
 
@@ -14,8 +14,8 @@ COPY plastron-client /opt/plastron/plastron-client
 COPY plastron-models /opt/plastron/plastron-models
 COPY plastron-rdf /opt/plastron/plastron-rdf
 COPY plastron-repo /opt/plastron/plastron-repo
-COPY plastron-stomp /opt/plastron/plastron-stomp
 COPY plastron-utils /opt/plastron/plastron-utils
+COPY plastron-web /opt/plastron/plastron-web
 
 WORKDIR /opt/plastron
 RUN pip install \
@@ -24,10 +24,12 @@ RUN pip install \
     './plastron-rdf' \
     './plastron-models' \
     './plastron-repo' \
-    './plastron-stomp'
+    './plastron-web'
 
 ENV PYTHONUNBUFFERED=1
 VOLUME /var/opt/plastron/msg
 VOLUME /var/opt/plastron/jobs
 
-ENTRYPOINT ["plastrond-stomp", "-c", "/etc/plastrond.yml", "-v"]
+EXPOSE 5000
+
+ENTRYPOINT ["plastrond-http"]

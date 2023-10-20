@@ -85,10 +85,14 @@ class Repository:
         """
         if resource_class is None:
             resource_class = RepositoryResource
+
         if path.startswith(self.endpoint.url):
             path = path[len(self.endpoint.url):]
+        elif self.endpoint.external_url is not None and path.startswith(self.endpoint.external_url):
+            path = path[len(self.endpoint.external_url):]
         else:
             path = path
+
         try:
             return resource_class(repo=self, path=path)
         except TypeError as e:
@@ -126,9 +130,14 @@ class Repository:
 
     @contextmanager
     def transaction(self, keep_alive: int = 90):
-        with self.client.transaction(keep_alive) as txn_client:
-            self._txn_client = txn_client
-            yield self._txn_client
+        try:
+            with self.client.transaction(keep_alive) as txn_client:
+                self._txn_client = txn_client
+                yield self._txn_client
+        finally:
+            # always clear the transaction client; otherwise the client
+            # will raise an exception the next time it tries to create
+            # a transaction
             self._txn_client = None
 
     def create(self, resource_class: Type[ResourceType] = None, **kwargs) -> ResourceType:

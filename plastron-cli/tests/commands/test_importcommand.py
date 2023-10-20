@@ -22,18 +22,6 @@ def client():
     return Client(endpoint=Endpoint(url='http://localhost:8080/fcrepo/rest'))
 
 
-def test_create_import_job():
-    # Verifies "create_import_job" method creates an InputJob with the expected
-    # value
-    job_id = 'test_job_id'
-    jobs_dir = '/test_jobs_dir'
-
-    import_job = Command.create_import_job(job_id, jobs_dir)
-    assert import_job.id == job_id
-    assert import_job.safe_id == job_id
-    assert str(import_job.dir) == os.path.join(jobs_dir, job_id)
-
-
 def test_cannot_resume_without_job_id(client):
     # Verifies that the import command throws RuntimeError when resuming a
     # job and the job id is not provided

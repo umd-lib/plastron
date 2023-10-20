@@ -1,0 +1,17 @@
+version: "3.7"
+services:
+  http:
+    image: docker.lib.umd.edu/plastrond-http
+    volumes:
+      - plastrond-jobs:/var/opt/plastron/jobs
+    environment:
+      - JOBS_DIR=/var/opt/plastron/jobs
+    ports:
+      - "5000:5000"
+volumes:
+  plastrond-jobs:
+  plastrond-messages:
+networks:
+  default:
+    external: true
+    name: umd-fcrepo_default

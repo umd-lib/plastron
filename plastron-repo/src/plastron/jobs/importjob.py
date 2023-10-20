@@ -22,7 +22,6 @@ from plastron.files import ZipFileSource, RemoteFileSource, HTTPFileSource, Loca
 from plastron.jobs.utils import annotate_from_files, Row, ImportSpreadsheet, JobError, JobConfigError, LineReference, \
     InvalidRow
 from plastron.models import get_model_class, ModelClassNotFoundError
-from plastron.models.umd import Page, Proxy, PCDMObject
 from plastron.rdf.pcdm import File, PreservationMasterFile
 from plastron.rdf.rdf import Resource
 from plastron.rdfmapping.resources import RDFResourceBase
@@ -482,8 +481,8 @@ class ImportRow:
             else:
                 url = None
 
-            with self.repo.transaction():
-                try:
+            try:
+                with self.repo.transaction():
                     # create the main resource
                     logger.debug(f'Creating main resource for "{self.item}"')
                     resource = container.create_child(
@@ -493,32 +492,11 @@ class ImportRow:
                     )
                     # add pages and files to those pages
                     if self.row.has_files:
-                        proxy_sequence = []
-                        obj = resource.describe(PCDMObject)
-                        for n, (rootname, file_group) in enumerate(self.row.file_groups.items(), 1):
+                        # update the file_groups to have a source
+                        for file_group in self.row.file_groups.values():
                             for file in file_group.files:
                                 file.source = self.job.get_source(self.job.config.binaries_location, file.name)
-                            page_resource = resource.create_page(number=n, file_group=file_group)
-                            page = page_resource.read().describe(Page)
-                            proxy_sequence.append(resource.create_proxy(
-                                proxy_for=page,
-                                title=page.title.value,
-                            ))
-
-                        if len(proxy_sequence) > 0:
-                            obj.first = URIRef(proxy_sequence[0].url)
-                            obj.last = URIRef(proxy_sequence[-1].url)
-
-                        for n, proxy_resource in enumerate(proxy_sequence):
-                            proxy = proxy_resource.describe(Proxy)
-                            if n > 0:
-                                # has a previous resource
-                                proxy.prev = URIRef(proxy_sequence[n - 1].url)
-                            if n < len(proxy_sequence) - 1:
-                                # has a next resource
-                                proxy.next = URIRef(proxy_sequence[n + 1].url)
-                            proxy_resource.update()
-                        resource.update()
+                        resource.create_page_sequence(self.row.file_groups)
 
                     # item-level files
                     if self.row.has_item_files:
@@ -526,11 +504,11 @@ class ImportRow:
                             source = self.job.get_source(self.job.config.binaries_location, filename)
                             resource.create_file(source=source)
 
-                except (ClientError, RepositoryError) as e:
-                    raise JobError(self.job, f'Creating item failed: {e}', e.response.text) from e
-
-            logger.info(f'Created {resource.url}')
-            return ImportedItemStatus.CREATED
+            except ClientError as e:
+                raise JobError(self.job, f'Creating item failed: {e}', e.response.text) from e
+            else:
+                logger.info(f'Created {resource.url}')
+                return ImportedItemStatus.CREATED
 
         elif self.item.has_changes:
             # construct the SPARQL Update query if there are any deletions or insertions

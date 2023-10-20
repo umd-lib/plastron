@@ -26,3 +26,12 @@ def test_contains_with_external_url():
 
     assert 'https://repo.example.net/123' in endpoint
     assert 'http://localhost:8080/fcrepo/rest/123' in endpoint
+
+
+def test_default_path_adds_slash():
+    endpoint = Endpoint(url='http://localhost:8080/fcrepo/rest', default_path='foo')
+    assert endpoint.relpath == '/foo'
+
+
+def test_transaction_endpoint(endpoint):
+    assert endpoint.transaction_endpoint == 'http://localhost:8080/fcrepo/rest/fcr:tx'

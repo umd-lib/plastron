@@ -166,17 +166,6 @@ class Command(BaseCommand):
 
         return result_config
 
-    @staticmethod
-    def create_import_job(job_id, jobs_dir):
-        """
-        Returns an ImportJob with the given parameters
-
-        :param job_id: the job id for the import job
-        :param jobs_dir: the base directory where job information is stored
-        :return: An ImportJob with the given parameters
-        """
-        return ImportJob(job_id, jobs_dir=jobs_dir)
-
     def __call__(self, client: Client, args: Namespace):
         """
         Performs the import

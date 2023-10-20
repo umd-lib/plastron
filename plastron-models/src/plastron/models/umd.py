@@ -13,6 +13,13 @@ umdtype = Namespace('http://vocab.lib.umd.edu/datatype#')
 umdform = Namespace('http://vocab.lib.umd.edu/form#')
 
 
+@rdf_type(pcdm.Object)
+class Stub(RDFResource):
+    title = DataProperty(dcterms.title, required=True)
+    identifier = DataProperty(dcterms.identifier, required=True)
+    member_of = ObjectProperty(pcdm.memberOf)
+
+
 class LabeledThing(RDFResource):
     label = DataProperty(rdfs.label, required=True)
     same_as = ObjectProperty(owl.sameAs)

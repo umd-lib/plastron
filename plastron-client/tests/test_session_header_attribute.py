@@ -26,3 +26,15 @@ def test_session_header_attribute():
     # remove the header
     del foo.x_test_header
     assert 'X-Header' not in foo.session.headers
+
+
+def test_delete_nonexistent_session_header():
+    foo = Foo()
+    del foo.x_test_header
+
+
+def test_get_session_header():
+    foo = Foo()
+    foo.x_test_header = 'ABC'
+    assert foo.x_test_header == 'ABC'
+

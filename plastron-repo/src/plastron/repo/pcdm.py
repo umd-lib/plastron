@@ -1,6 +1,6 @@
 import logging
 from os.path import basename
-from typing import Optional, Set, List, Iterable, Iterator
+from typing import Optional, Set, List, Iterable, Iterator, Dict
 
 from rdflib import Literal, URIRef
 from urlobject import URLObject
@@ -179,6 +179,30 @@ class AggregationResource(ContainerResource):
             slug=random_slug(),
         )
 
+    def create_sequence(self, descriptions: Iterable[PCDMObject]):
+        proxy_sequence = []
+        obj = self.describe(PCDMObject)
+        for item in descriptions:
+            proxy_sequence.append(self.create_proxy(
+                proxy_for=item,
+                title=item.title.value,
+            ))
+
+        if len(proxy_sequence) > 0:
+            obj.first = URIRef(proxy_sequence[0].url)
+            obj.last = URIRef(proxy_sequence[-1].url)
+
+        for n, proxy_resource in enumerate(proxy_sequence):
+            proxy = proxy_resource.describe(Proxy)
+            if n > 0:
+                # has a previous resource
+                proxy.prev = URIRef(proxy_sequence[n - 1].url)
+            if n < len(proxy_sequence) - 1:
+                # has a next resource
+                proxy.next = URIRef(proxy_sequence[n + 1].url)
+            proxy_resource.update()
+        self.update()
+
 
 class PCDMObjectResource(PCDMFileBearingResource, AggregationResource):
     def __init__(self, repo: Repository, path: str = None):
@@ -221,6 +245,14 @@ class PCDMObjectResource(PCDMFileBearingResource, AggregationResource):
         self.member_urls.add(page_resource.url)
         logger.debug(f'Created page: {page_resource.url} {title}')
         return page_resource
+
+    def create_page_sequence(self, file_groups: Dict[str, FileGroup]):
+        def create_pages() -> Iterator[PCDMObject]:
+            for n, (rootname, file_group) in enumerate(file_groups.items(), 1):
+                page_resource = self.create_page(number=n, file_group=file_group)
+                yield page_resource.read().describe(Page)
+
+        self.create_sequence(create_pages())
 
 
 class ProxyIterator(Iterator[URLObject]):

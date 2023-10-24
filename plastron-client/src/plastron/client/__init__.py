@@ -255,7 +255,7 @@ class SessionHeaderAttribute:
 
     def __set__(self, instance, value):
         if value is not None:
-            instance.session.headers.update({self.header_name: value})
+            instance.session.headers.update({self.header_name: str(value)})
 
     def __delete__(self, instance):
         try:
@@ -315,7 +315,11 @@ class Client:
         self.ua_string = ua_string
         self.delegated_user = on_behalf_of
         if self.endpoint.external_url is not None:
-            self.forwarded_host = self.endpoint.external_url.hostname
+            if self.endpoint.external_url.port:
+                # fcrepo expects hostname and port in the X-Forwarded-Host header
+                self.forwarded_host = f'{self.endpoint.external_url.hostname}:{self.endpoint.external_url.port}'
+            else:
+                self.forwarded_host = self.endpoint.external_url.hostname
             self.forwarded_protocol = self.endpoint.external_url.scheme
 
         # set creator strategy for the repository
@@ -560,6 +564,7 @@ class Client:
                 yield txn_client
             except ClientError:
                 txn_client.rollback()
+                raise
             else:
                 txn_client.commit()
             finally:

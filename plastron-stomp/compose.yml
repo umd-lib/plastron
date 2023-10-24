@@ -1,6 +1,6 @@
 version: "3.7"
 services:
-  plastrond-stomp:
+  stomp:
     image: docker.lib.umd.edu/plastrond-stomp
     configs:
       - source: plastrond
@@ -13,11 +13,11 @@ services:
       - plastrond-messages:/var/opt/plastron/msg
 configs:
   plastrond:
-    file: docker-plastron.yml
+    file: ../docker-plastron.yml
   archelon_id:
     # Private key for archelon SFTP
     # The corresponding public key should be added to Archelon
-    file: archelon_id
+    file: ../archelon_id
 volumes:
   plastrond-jobs:
   plastrond-messages:

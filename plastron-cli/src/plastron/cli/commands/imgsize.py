@@ -1,8 +1,13 @@
+import logging
 from PIL import Image
+from argparse import Namespace
 
 from plastron.cli.commands import BaseCommand
-from plastron.files import RepositoryFileSource
-import logging
+from plastron.client import Client
+from plastron.models.umd import PCDMImageFile
+from plastron.repo import BinaryResource
+from plastron.repo.utils import context
+
 
 Image.MAX_IMAGE_PIXELS = None
 
@@ -23,31 +28,24 @@ def configure_cli(subparsers):
 
 
 class Command(BaseCommand):
-    def __call__(self, fcrepo, args):
+    def __call__(self, client: Client, args: Namespace):
         for uri in args.uris:
-            source = RepositoryFileSource(fcrepo, uri)
-            if source.mimetype().startswith('image/'):
-                logger.info(f'Reading image data from {uri}')
 
-                image = Image.open(source.open())
+            file_resource: BinaryResource = self.repo[uri:BinaryResource].read()
+            file = file_resource.describe(PCDMImageFile)
 
-                logger.info(f'URI: {uri}, Width: {image.width}, Height: {image.height}')
+            # source = RepositoryFileSource(client, uri)
+            if file.mime_type.value.startswith('image/'): # ?
+                with context(repo=self.repo):
+                    logger.info(f'Reading image data from {uri}')
 
-                # construct SPARQL query to replace image size metadata
-                prolog = 'PREFIX ebucore: <http://www.ebu.ch/metadata/ontologies/ebucore/ebucore#>'
-                delete = 'DELETE { <> ebucore:width ?w ; ebucore:height ?h }'
-                statements = f'<> ebucore:width {image.width} ; ebucore:height {image.height}'
-                insert = 'INSERT { ' + statements + ' }'
-                where = 'WHERE {}'
-                sparql = '\n'.join((prolog, delete, insert, where))
+                    with file_resource.open() as file_contents:
+                        image = Image.open(file_contents)
 
-                # update the metadata
-                headers = {'Content-Type': 'application/sparql-update'}
-                response = fcrepo.patch(source.metadata_uri, data=sparql, headers=headers)
-                if response.status_code == 204:
-                    logger.info(f'Updated image dimensions on {uri}')
-                else:
-                    logger.warning(f'Unable to update {uri}')
+                    logger.info(f'URI: {uri}, Width: {image.width}, Height: {image.height}')
+                    file.width = image.width
+                    file.height = image.height
+                    file_resource.update()
 
             else:
                 logger.warning(f'{uri} is not of type image/*; skipping')

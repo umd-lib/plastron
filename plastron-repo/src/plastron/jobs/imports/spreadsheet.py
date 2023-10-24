@@ -1,79 +1,36 @@
 import csv
 import logging
 import re
-from collections import OrderedDict, defaultdict
-from dataclasses import dataclass, field
+from collections import defaultdict, OrderedDict
+from dataclasses import dataclass
 from os.path import splitext, basename
 from pathlib import Path
-from typing import Optional, Dict, List, Union, Mapping, NamedTuple, Iterator, Sequence, Type
+from typing import Optional, Dict, List, Union, Mapping, Type, Sequence, Iterator, NamedTuple
+from uuid import uuid4
 
-from bs4 import BeautifulSoup
-from rdflib import Literal, URIRef
+from rdflib import URIRef, Literal
 from rdflib.util import from_n3
 
-from plastron.files import BinarySource
-from plastron.namespaces import sc, get_manager
-from plastron.rdf import rdf
-from plastron.rdf.oa import TextualBody, FullTextAnnotation
-from plastron.rdfmapping.descriptors import DataProperty, Property
-from plastron.rdfmapping.properties import RDFObjectProperty
+from plastron.jobs import JobError, FileSpec, FileGroup
+from plastron.namespaces import get_manager
+from plastron.rdfmapping.descriptors import Property, DataProperty
+from plastron.rdfmapping.embed import EmbeddedObject
 from plastron.rdfmapping.resources import RDFResourceType
 from plastron.repo import DataReadError, Repository, RepositoryResource
 from plastron.serializers import CSVSerializer
+from plastron.serializers.csv import flatten_headers, unflatten, not_empty, split_escaped, build_lookup_index
 
-logger = logging.getLogger(__name__)
 nsm = get_manager()
+logger = logging.getLogger(__name__)
 
 
-def get_property_type(model_class: rdf.Resource, attrs):
-    if '.' in attrs:
-        first, rest = attrs.split('.', 2)
-        return get_property_type(model_class.name_to_prop[first].obj_class, rest)
-    else:
-        return model_class.name_to_prop[attrs]
-
-
-def build_lookup_index(item: RDFResourceType, index_string: str):
-    """
-    Build a lookup dictionary for embedded object properties of an item.
-
-    :param item:
-    :param index_string:
-    :return:
-    """
-    index = defaultdict(dict)
-    if index_string is None:
-        return index
-
-    pattern = r'([\w]+)\[(\d+)\]'
-    for entry in index_string.split(';'):
-        key, uriref = entry.split('=')
-        m = re.search(pattern, key)
-        attr = m[1]
-        i = int(m[2])
-        prop = getattr(item, attr)
-        try:
-            index[attr][i] = prop[URIRef(item.uri + uriref)]
-        except IndexError:
-            # need to create an object with that URI
-            obj = prop.obj_class(uri=URIRef(item.uri + uriref))
-            # TODO: what if i > 0?
-            prop.values.append(obj)
-            index[attr][i] = obj
-    return index
-
-
-class JobError(Exception):
-    def __init__(self, job, *args):
-        super().__init__(*args)
-        self.job = job
-
-    def __str__(self):
-        return f'Job {self.job} error: {super().__str__()}'
-
-
-class JobConfigError(JobError):
-    pass
+@dataclass
+class ColumnSpec:
+    attrs: str
+    header: str
+    prop: Property
+    lang_code: Optional[str] = None
+    datatype: Optional[URIRef] = None
 
 
 class MetadataError(JobError):
@@ -88,17 +45,8 @@ class LineReference(NamedTuple):
         return f'{self.filename}:{self.line_number}'
 
 
-@dataclass
-class ColumnSpec:
-    attrs: str
-    header: str
-    prop: Property
-    lang_code: Optional[str] = None
-    datatype: Optional[URIRef] = None
-
-
 def build_fields(fieldnames, model_class) -> Dict[str, List[ColumnSpec]]:
-    property_attrs = {header: attrs for attrs, header in model_class.HEADER_MAP.items()}
+    property_attrs = flatten_headers(model_class.HEADER_MAP)
     fields = defaultdict(list)
     # group typed and language-tagged columns by their property attribute
     for header in fieldnames:
@@ -177,25 +125,6 @@ def get_final_prop(model_class, attrs):
     return get_final_prop(next_attr.object_class, attrs)
 
 
-@dataclass
-class FileSpec:
-    name: str
-    source: BinarySource = None
-
-    def __str__(self):
-        return self.name
-
-
-@dataclass
-class FileGroup:
-    rootname: str
-    files: List[FileSpec] = field(default_factory=list)
-
-    def __str__(self):
-        extensions = list(map(lambda f: str(f).replace(self.rootname, ''), self.files))
-        return f'{self.rootname}{{{",".join(extensions)}}}'
-
-
 def build_file_groups(filenames_string: str) -> Dict[str, FileGroup]:
     file_groups = OrderedDict()
     if filenames_string.strip() == '':
@@ -207,19 +136,6 @@ def build_file_groups(filenames_string: str) -> Dict[str, FileGroup]:
         file_groups[root].files.append(FileSpec(name=filename))
     logger.debug(f'Found {len(file_groups.keys())} unique file basename(s)')
     return file_groups
-
-
-def not_empty(value):
-    return value is not None and value != ''
-
-
-def split_escaped(string: str, separator: str = '|'):
-    # uses a negative look-behind to only split on separator characters
-    # that are NOT preceded by an escape character (the backslash)
-    pattern = re.compile(r'(?<!\\)' + re.escape(separator))
-    values = pattern.split(string)
-    # remove the escape character
-    return [re.sub(r'\\(.)', r'\1', v) for v in values]
 
 
 def parse_value_string(value_string, column: ColumnSpec) -> List[Union[Literal, URIRef]]:
@@ -235,43 +151,26 @@ def parse_value_string(value_string, column: ColumnSpec) -> List[Union[Literal, 
     return values
 
 
-def annotate_from_files(item, mime_types):
-    for member in item.has_member.objects:
-        # extract text from HTML files
-        for file in filter(lambda f: str(f.mimetype) in mime_types, member.has_file.objects):
-            if str(file.mimetype) == 'text/html':
-                # get text from HTML
-                with file.source as stream:
-                    text = BeautifulSoup(b''.join(stream), features='lxml').get_text()
-            else:
-                logger.warning(f'Extracting text from {file.mimetype} is not supported')
-                continue
-
-            annotation = FullTextAnnotation(
-                target=member,
-                body=TextualBody(value=text, content_type='text/plain'),
-                motivation=sc.painting,
-                derived_from=file
-            )
-            # don't embed full resources
-            annotation.props['target'].is_embedded = False
-
-            member.annotations.append(annotation)
-
-
 @dataclass
 class InvalidRow:
     line_reference: LineReference
     reason: str
 
 
+def create_embedded_object(first_attr, item):
+    # create new embedded objects (a.k.a hash resources) that are not in the index
+    fragment_id = str(uuid4())
+    obj = EmbeddedObject(getattr(item, first_attr).object_class, fragment_id=fragment_id).embed(item)
+    return fragment_id, obj
+
+
 class Row:
     def __init__(
             self,
-            spreadsheet: 'ImportSpreadsheet',
+            spreadsheet: 'MetadataSpreadsheet',
             line_reference: LineReference,
             row_number: int,
-            data: Mapping,
+            data: Mapping[str, str],
             identifier_column: str,
     ):
         self.spreadsheet = spreadsheet
@@ -310,63 +209,11 @@ class Row:
             # create a new object (will create in the repo later)
             resource = RepositoryResource(repo=repo)
 
-        item: RDFResourceType = self.spreadsheet.model_class(uri=self.uri, graph=resource.graph)
-
         # build the lookup index to map hash URI objects
         # to their correct positional locations
-        row_index = build_lookup_index(item, self.index_string)
-
-        for attrs, columns in self.spreadsheet.fields.items():  # type: str, List[ColumnSpec]
-            if '.' not in attrs:
-                # simple, non-embedded values
-                # attrs is the entire property name
-                new_values = []
-                # there may be 1 or more physical columns in the metadata spreadsheet
-                # that correspond to a single logical property of the item (e.g., multiple
-                # languages or datatypes)
-                for column in columns:  # type: ColumnSpec
-                    new_values.extend(self.parse_value(column))
-
-                # construct a SPARQL update by diffing for deletions and insertions
-                # update the property and get the sets of values deleted and inserted
-                prop = getattr(item, attrs)
-                prop.update(new_values)
-
-            else:
-                # complex, embedded values
-
-                # if the first portion of the dotted attr notation is a key in the index,
-                # then this column has a different subject than the main uri
-                # correlate positions and urirefs
-                # XXX: for now, assuming only 2 levels of chaining
-                first_attr, next_attrs = attrs.split('.', 1)
-                new_values = defaultdict(list)
-                for column in columns:  # type: ColumnSpec
-                    data_value = self.data[column.header]
-                    if not_empty(data_value):
-                        for i, value_string in enumerate(data_value.split(';')):
-                            new_values[i].extend(parse_value_string(value_string, column))
-
-                if first_attr in row_index:
-                    # existing embedded object
-                    for i, values in new_values.items():
-                        # get the embedded object
-                        obj = row_index[first_attr][i]
-                        prop = getattr(obj, next_attrs)
-                        prop.update(values)
-                else:
-                    # create new embedded objects (a.k.a hash resources) that are not in the index
-                    first_prop: RDFObjectProperty = getattr(item, first_attr)
-                    for i, values in new_values.items():
-                        # we can assume that for any properties with dotted notation,
-                        # all attributes except for the last one are object properties
-                        if first_prop.object_class is not None:
-                            # create a new object
-                            obj = item.get_fragment_resource(first_prop.object_class)
-                            # add the new object to the index
-                            row_index[first_attr][i] = obj
-                            getattr(obj, next_attrs).extend(values)
-                            first_prop.add(obj)
+        row_index = build_lookup_index(self.index_string)
+        params = unflatten(self.data, self.spreadsheet.model_class, self.spreadsheet.model_class.HEADER_MAP, row_index)
+        item: RDFResourceType = self.spreadsheet.model_class(uri=self.uri, graph=resource.graph, **params)
 
         return item
 
@@ -407,7 +254,7 @@ class Row:
         return self.data.get('INDEX')
 
 
-class ImportSpreadsheet:
+class MetadataSpreadsheet:
     """
     Iterable sequence of rows from the metadata CSV file of an import job.
     """

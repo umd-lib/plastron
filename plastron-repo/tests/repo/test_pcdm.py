@@ -6,7 +6,7 @@ import pytest
 
 from plastron.client import Client, Endpoint
 from plastron.files import StringSource
-from plastron.jobs.utils import FileGroup, FileSpec
+from plastron.jobs import FileSpec, FileGroup
 from plastron.repo import Repository, ResourceType
 from plastron.repo.pcdm import PCDMObjectResource
 

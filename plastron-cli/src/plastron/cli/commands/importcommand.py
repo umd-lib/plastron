@@ -6,8 +6,8 @@ from typing import TextIO
 
 from plastron.cli.commands import BaseCommand
 from plastron.client import Client
-from plastron.jobs.importjob import ImportJob, ModelClassNotFoundError
-from plastron.models import get_model_class
+from plastron.jobs.imports import ImportJob
+from plastron.models import get_model_class, ModelClassNotFoundError
 from plastron.namespaces import get_manager
 from plastron.rdf import uri_or_curie
 from plastron.utils import datetimestamp

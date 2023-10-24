@@ -9,7 +9,7 @@ from plastron.cli.commands import BaseCommand
 from plastron.client import Client
 from plastron.models.annotations import FullTextAnnotation, TextualBody
 from plastron.namespaces import sc
-from plastron.rdfmapping.descriptors import embedded
+from plastron.rdfmapping.embed import embedded
 from plastron.repo.pcdm import PCDMPageResource
 
 

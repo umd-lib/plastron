@@ -101,7 +101,7 @@ class Item(PCDMObject):
     accession_number = DataProperty(dcterms.identifier, datatype=umdtype.accessionNumber)
     handle = DataProperty(dcterms.identifier, datatype=umdtype.handle, validate=is_handle)
 
-    HEADER_MAP = {
+    _ORIGINAL_HEADER_MAP = {
         'object_type': 'Object Type',
         'identifier': 'Identifier',
         'rights': 'Rights Statement',
@@ -122,6 +122,43 @@ class Item(PCDMObject):
         'subject.label': 'Subject',
         'language': 'Language',
         'rights_holder.label': 'Rights Holder',
+        'bibliographic_citation': 'Collection Information',
+        'accession_number': 'Accession Number',
+        'handle': 'Handle',
+    }
+    HEADER_MAP = {
+        'object_type': 'Object Type',
+        'identifier': 'Identifier',
+        'rights': 'Rights Statement',
+        'title': 'Title',
+        'format': 'Format',
+        'archival_collection': 'Archival Collection',
+        'date': 'Date',
+        'description': 'Description',
+        'alternate_title': 'Alternate Title',
+        'creator': {
+            'label': 'Creator',
+            'same_as': 'Creator URI',
+        },
+        'contributor': {
+            'label': 'Contributor',
+            'same_as': 'Contributor URI',
+        },
+        'publisher': {
+            'label': 'Publisher',
+            'same_as': 'Publisher URI',
+        },
+        'location': {
+            'label': 'Location',
+        },
+        'extent': 'Extent',
+        'subject': {
+            'label': 'Subject',
+        },
+        'language': 'Language',
+        'rights_holder': {
+            'label': 'Rights Holder',
+        },
         'bibliographic_citation': 'Collection Information',
         'accession_number': 'Accession Number',
         'handle': 'Handle',

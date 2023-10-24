@@ -7,7 +7,7 @@ from urlobject import URLObject
 
 from plastron.client import random_slug
 from plastron.files import BinarySource
-from plastron.jobs.utils import FileGroup
+from plastron.jobs import FileGroup
 from plastron.models import Item, umdform
 from plastron.models.annotations import Annotation
 from plastron.models.umd import PCDMObject, PCDMFile, Page, Proxy, LDPContainer

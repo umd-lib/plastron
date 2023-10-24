@@ -22,7 +22,8 @@ from plastron.models import Item
 from plastron.models.umd import PCDMFile
 from plastron.repo import DataReadError, Repository, BinaryResource
 from plastron.repo.pcdm import PCDMObjectResource, AggregationResource, PCDMFileBearingResource
-from plastron.serializers import SERIALIZER_CLASSES, detect_resource_class, EmptyItemListError
+from plastron.serializers import SERIALIZER_CLASSES, detect_resource_class
+from plastron.serializers.csv import EmptyItemListError
 
 UUID_REGEX = re.compile(r'([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})', re.IGNORECASE)
 
@@ -83,9 +84,11 @@ class ExportJob:
 
     def list_binaries_to_export(self, resource: PCDMObjectResource) -> Optional[List[BinaryResource]]:
         if self.export_binaries and self.binary_types is not None:
+            accepted_types = self.binary_types.split(',')
+
             # filter files by their MIME type
             def mime_type_filter(file):
-                return str(file.mimetype) in self.binary_types.split(',')
+                return str(file.headers['Content-Type']) in accepted_types
         else:
             # default filter is None; in this case filter() will return
             # all items that evaluate to true

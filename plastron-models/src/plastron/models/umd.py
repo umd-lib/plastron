@@ -63,6 +63,10 @@ class PCDMFile(RDFResource):
     def __str__(self):
         return str(self.title or self.uri)
 
+class PCDMImageFile(PCDMFile):
+    height = DataProperty(ebucore.height)
+    width = DataProperty(ebucore.width)
+
 
 class Item(PCDMObject):
     object_type = ObjectProperty(

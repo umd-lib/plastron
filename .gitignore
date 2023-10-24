@@ -1,14 +1,11 @@
 *.egg-info
 .pytest_cache
-.venv
 build
 config
 dist
 /jobs/
 logs
-
-.coverage
-.env
+msg
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

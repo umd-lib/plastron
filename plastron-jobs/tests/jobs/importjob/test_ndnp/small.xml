@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ndnp:batch name="batch_mdu_diamondbackfy16_Sample" awardee="mdu"
+    awardYear="2015" xmlns:ndnp="http://www.loc.gov/ndnp">
+    <ndnp:issue lccn="sn90057049" issueDate="1926-01-12" editionOrder="1">sn90057049/7637/1926011201/1926011201_1.xml</ndnp:issue>
+    <!-- repeating the same XML for the others so that we do not have to create a large test fixture -->
+    <ndnp:issue lccn="sn90057049" issueDate="1926-01-19" editionOrder="1">sn90057049/7637/1926011201/1926011201_1.xml</ndnp:issue>
+    <ndnp:issue lccn="sn90057049" issueDate="1926-01-26" editionOrder="1">sn90057049/7637/1926011201/1926011201_1.xml</ndnp:issue>
+    <ndnp:issue lccn="sn90057049" issueDate="1926-02-02" editionOrder="1">sn90057049/7637/1926011201/1926011201_1.xml</ndnp:issue>
+    <ndnp:issue lccn="sn90057049" issueDate="1926-02-09" editionOrder="1">sn90057049/7637/1926011201/1926011201_1.xml</ndnp:issue>
+    <ndnp:reel reelNumber="7637">sn90057049/7637/7637_1.xml</ndnp:reel>
+</ndnp:batch>

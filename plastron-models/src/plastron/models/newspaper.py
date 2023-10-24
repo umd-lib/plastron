@@ -45,6 +45,10 @@ class Issue(ContentModeledResource, PCDMObject, HandleBearingResource, FedoraRes
         'presentation_set': 'Presentation Set',
         'copyright_notice': 'Copyright Notice',
         'terms_of_use': 'Terms of Use',
+        'rights': 'Rights Statement',
+        'rights_holder': {
+            'label': 'Rights Holder',
+        },
     }
 
 

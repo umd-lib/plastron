@@ -4,6 +4,7 @@ from argparse import FileType, ArgumentTypeError, Namespace
 from typing import TextIO
 
 from plastron.cli.commands import BaseCommand
+from plastron.jobs.importjob.ndnp import NDNPBatch, write_import_csv
 from plastron.jobs.importjob import ImportConfig, ImportJob
 from plastron.jobs import Jobs
 from plastron.models import get_model_from_name, ModelClassNotFoundError
@@ -93,6 +94,20 @@ def configure_cli(subparsers):
         action='store'
     )
     parser.add_argument(
+        '--convert-from',
+        help='use a pre-processor to transform another data format into an import job',
+        choices=['ndnp'],
+        action='store',
+    )
+    parser.add_argument(
+        '--convert-option', '-o',
+        help='set a parameter to used by the --convert-from pre-processor; repeatable',
+        dest='convert_params',
+        nargs=2,
+        metavar=('NAME', 'VALUE'),
+        action='append',
+    )
+    parser.add_argument(
         '--access',
         help='URI or CURIE of the access class to apply to new items',
         type=uri_or_curie,
@@ -159,6 +174,11 @@ def configure_cli(subparsers):
     parser.set_defaults(cmd_name='import')
 
 
+def create_job_id() -> str:
+    # TODO: generate a more unique id? add in user and hostname?
+    return f"import-{datetimestamp()}"
+
+
 class Command(BaseCommand):
     @property
     def jobs_dir(self):
@@ -175,6 +195,7 @@ class Command(BaseCommand):
             return
 
         jobs = Jobs(self.jobs_dir)
+
         if args.resume:
             if args.job_id is None:
                 raise RuntimeError('Resuming a job requires a job id')
@@ -182,31 +203,50 @@ class Command(BaseCommand):
             logger.info(f'Resuming saved job {args.job_id}')
             job = jobs.get_job(ImportJob, args.job_id)
         else:
-            if args.import_file is None:
-                raise RuntimeError('An import file is required unless resuming an existing job')
-
-            if args.model is None:
-                raise RuntimeError('A model is required unless resuming an existing job')
-
             if args.container is None:
                 raise RuntimeError('A container is required unless resuming an existing job')
 
             if args.job_id is None:
-                # TODO: generate a more unique id? add in user and hostname?
-                args.job_id = f"import-{datetimestamp()}"
+                args.job_id = create_job_id()
+
+            if args.convert_from is not None:
+                if args.convert_from == 'ndnp':
+                    params = dict(args.convert_params or [])
+                    batch = NDNPBatch(params['dir'], params['batch_file'])
+                    logger.info(f'Converting NDNP batch at {batch.batch_file} to import job {args.job_id}')
+                    job = jobs.create_job(job_class=ImportJob, config=ImportConfig(
+                        job_id=args.job_id,
+                        model='Issue',
+                        access=args.access,
+                        member_of=args.member_of,
+                        container=args.container,
+                        binaries_location=str(batch.root_dir),
+                    ))
+                    with job.metadata_file.open(mode='w') as fh:
+                        write_import_csv(batch, fh)
+                else:
+                    raise RuntimeError(f'Unrecognized import converter "{args.convert_from}"')
+            else:
                 logger.info(f'Creating new job {args.job_id}')
 
-            job = jobs.create_job(
-                job_class=ImportJob,
-                config=ImportConfig(
-                    job_id=args.job_id,
-                    model=args.model,
-                    access=args.access,
-                    member_of=args.member_of,
-                    container=args.container,
-                    binaries_location=args.binaries_location,
-                ),
-            )
+                if args.import_file is None:
+                    raise RuntimeError('An import file is required unless resuming an existing job')
+
+                if args.model is None:
+                    raise RuntimeError('A model is required unless resuming an existing job')
+
+                job = jobs.create_job(
+                    job_class=ImportJob,
+                    config=ImportConfig(
+                        job_id=args.job_id,
+                        model=args.model,
+                        access=args.access,
+                        member_of=args.member_of,
+                        container=args.container,
+                        binaries_location=args.binaries_location,
+                    ),
+                )
+
 
         logger.debug(f'Running job {job.id}')
         self.run(job.run(

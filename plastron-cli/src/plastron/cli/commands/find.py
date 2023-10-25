@@ -1,12 +1,13 @@
+import logging
+from argparse import Namespace
 from typing import List, Tuple, Union
-
 from rdflib import URIRef, Literal
 
-import logging
 from plastron.cli.commands import BaseCommand
+from plastron.client import Client
 from plastron.namespaces import get_manager, rdf
+from plastron.models.umd import PCDMObject
 from plastron.rdf import parse_predicate_list, parse_data_property, parse_object_property, uri_or_curie
-from plastron.repo import ResourceList
 
 logger = logging.getLogger(__name__)
 manager = get_manager()
@@ -82,7 +83,7 @@ def configure_cli(subparsers):
 
 
 class Command(BaseCommand):
-    def __call__(self, fcrepo, args):
+    def __call__(self, client: Client, args: Namespace):
         self.properties: List[Tuple[URIRef, Union[Literal, URIRef]]] = [
             *(parse_data_property(p, o) for p, o in args.data_properties),
             *(parse_object_property(p, o) for p, o in args.object_properties)
@@ -104,27 +105,20 @@ class Command(BaseCommand):
 
         self.resource_count = 0
 
-        resources = ResourceList(
-            client=fcrepo,
-            uri_list=args.uris
-        )
-
-        resources.process(
-            method=self.find,
-            traverse=parse_predicate_list(args.recursive),
-            use_transaction=False
-        )
+        for uri in args.uris:
+            traverse = parse_predicate_list(args.recursive) if args.recursive else []
+            for resource in self.repo[uri].walk(traverse=traverse):
+                description = resource.describe(PCDMObject)
+                if len(self.properties) > 0:
+                    subject = URIRef(resource.url)
+                    if self.match((subject, p, o) in description.graph for p, o in self.properties):
+                        self.resource_count += 1
+                        print(resource.url)
+                else:
+                    # with no filters specified, list all resources found
+                    # this mimics the behavior of the Linux "find" command
+                    self.resource_count += 1
+                    print(resource.url)
 
         logger.info(f'Found {self.resource_count} resource(s)')
 
-    def find(self, resource, graph):
-        if len(self.properties) > 0:
-            subject = URIRef(resource.uri)
-            if self.match((subject, p, o) in graph for p, o in self.properties):
-                self.resource_count += 1
-                print(resource)
-        else:
-            # with no filters specified, list all resources found
-            # this mimics the behavior of the Linux "find" command
-            self.resource_count += 1
-            print(resource)

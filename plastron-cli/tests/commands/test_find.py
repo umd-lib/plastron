@@ -1,39 +1,29 @@
+import httpretty
 import pytest
 from rdflib import Graph, Literal
 
-from plastron.client import ResourceURI
-from plastron.cli.commands.find import Command
-from plastron.namespaces import rdf, pcdm, dcterms
-
-
-@pytest.fixture
-def resources(datadir):
-    source_graph = Graph()
-    source_graph.parse(datadir / 'graph.ttl', format='turtle')
-
-    resource_graphs = []
-    for subject in set(source_graph.subjects()):
-        graph = Graph()
-        for triple in source_graph.triples((subject, None, None)):
-            graph.add(triple)
-        resource_graphs.append((ResourceURI(subject, subject), graph))
-    return resource_graphs
+from plastron.cli.commands.find import find
+from plastron.namespaces import rdf, pcdm, dcterms, ldp
 
 
 @pytest.mark.parametrize(
-    ['match_condition', 'property_filter', 'expected_count'],
+    ['matcher', 'properties', 'expected_count'],
     [
-        (all, [], 2),
+        (all, [], 3),
         (all, [(rdf.type, pcdm.Object)], 1),
         (all, [(rdf.type, pcdm.Object), (dcterms.title, Literal('Moonpig'))], 0),
         (any, [(rdf.type, pcdm.Object), (dcterms.title, Literal('Moonpig'))], 2),
     ]
 )
-def test_find(resources, match_condition, property_filter, expected_count):
-    cmd = Command()
-    cmd.resource_count = 0
-    cmd.properties = property_filter
-    cmd.match = match_condition
-    for resource, graph in resources:
-        cmd.find(resource, graph)
-    assert cmd.resource_count == expected_count
+@httpretty.activate
+def test_find(datadir, repo, register_root, simulate_repo, matcher, properties, expected_count):
+    register_root()
+    graph = Graph().parse(file=(datadir / 'graph.ttl').open())
+    simulate_repo(graph)
+    resources = list(find(
+        start_resource=repo['/container'],
+        matcher=matcher,
+        traverse=[ldp.contains],
+        properties=properties,
+    ))
+    assert len(resources) == expected_count

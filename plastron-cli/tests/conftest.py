@@ -55,12 +55,13 @@ def register_root(endpoint: Endpoint):
 
 
 @pytest.fixture
-def simulate_repo() -> Callable[[Graph], None]:
+def simulate_repo(register_root) -> Callable[[Graph], None]:
     """Pytest fixture that uses HTTPretty to simulate a read-only repository.
     The repository is defined using a Graph. Each unique subject in that graph
     is assumed to be its own resource. Each resource will respond to HEAD and
     GET requests with 200 OK and Content-Type application/n-triples."""
     def _register_repo(graph: Graph):
+        register_root()
         subjects = set(graph.subjects())
         for subject in subjects:
             resource_graph = Graph()

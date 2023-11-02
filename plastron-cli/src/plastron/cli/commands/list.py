@@ -1,8 +1,10 @@
 import logging
+from argparse import Namespace
 
+from plastron.cli import Client
 from plastron.cli.commands import BaseCommand
-from plastron.rdf import parse_predicate_list, get_title_string
-from plastron.repo import ResourceList
+from plastron.models.umd import PCDMFile
+from plastron.namespaces import ldp
 
 logger = logging.getLogger(__name__)
 
@@ -20,11 +22,6 @@ def configure_cli(subparsers):
         action='store_true'
     )
     parser.add_argument(
-        '-R', '--recursive',
-        help='List additional objects found by traversing the given predicate(s)',
-        action='store'
-    )
-    parser.add_argument(
         'uris', nargs='*',
         help='URIs of repository objects to list'
     )
@@ -32,23 +29,20 @@ def configure_cli(subparsers):
 
 
 class Command(BaseCommand):
-    def __call__(self, fcrepo, args):
+    def __call__(self, client: Client, args: Namespace):
         self.long = args.long
 
-        resources = ResourceList(
-            client=fcrepo,
-            uri_list=args.uris
-        )
+        for uri in args.uris:
+            resource = self.repo[uri].read()
 
-        resources.process(
-            method=self.list_item,
-            traverse=parse_predicate_list(args.recursive),
-            use_transaction=False
-        )
+            if resource.is_binary:
+                print(uri)
+                continue
 
-    def list_item(self, resource, graph):
-        if self.long:
-            title = get_title_string(graph)
-            print(f'{resource} {title}')
-        else:
-            print(resource)
+            for child_resource in resource.walk(min_depth=1, max_depth=1, traverse=[ldp.contains]):
+                if self.long:
+                    description = child_resource.describe(PCDMFile)
+                    title = str(description.title)
+                    print(f'{child_resource.url} {title}')
+                else:
+                    print(child_resource.url)

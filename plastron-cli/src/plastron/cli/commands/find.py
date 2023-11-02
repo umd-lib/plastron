@@ -1,12 +1,14 @@
-from typing import List, Tuple, Union
+import logging
+from argparse import Namespace
+from typing import List, Tuple, Union, Iterator, Callable, Iterable
 
 from rdflib import URIRef, Literal
 
-import logging
 from plastron.cli.commands import BaseCommand
+from plastron.client import Client
 from plastron.namespaces import get_manager, rdf
 from plastron.rdf import parse_predicate_list, parse_data_property, parse_object_property, uri_or_curie
-from plastron.repo import ResourceList
+from plastron.repo import RepositoryResource
 
 logger = logging.getLogger(__name__)
 manager = get_manager()
@@ -82,7 +84,7 @@ def configure_cli(subparsers):
 
 
 class Command(BaseCommand):
-    def __call__(self, fcrepo, args):
+    def __call__(self, client: Client, args: Namespace):
         self.properties: List[Tuple[URIRef, Union[Literal, URIRef]]] = [
             *(parse_data_property(p, o) for p, o in args.data_properties),
             *(parse_object_property(p, o) for p, o in args.object_properties)
@@ -104,27 +106,36 @@ class Command(BaseCommand):
 
         self.resource_count = 0
 
-        resources = ResourceList(
-            client=fcrepo,
-            uri_list=args.uris
-        )
-
-        resources.process(
-            method=self.find,
-            traverse=parse_predicate_list(args.recursive),
-            use_transaction=False
-        )
+        traverse = parse_predicate_list(args.recursive) if args.recursive else []
+        for uri in args.uris:
+            for resource in find(
+                start_resource=self.repo[uri],
+                matcher=self.match,
+                traverse=traverse,
+                properties=self.properties,
+            ):
+                self.resource_count += 1
+                print(resource.url)
 
         logger.info(f'Found {self.resource_count} resource(s)')
 
-    def find(self, resource, graph):
-        if len(self.properties) > 0:
-            subject = URIRef(resource.uri)
-            if self.match((subject, p, o) in graph for p, o in self.properties):
-                self.resource_count += 1
-                print(resource)
+
+def find(
+        start_resource: RepositoryResource,
+        matcher: Callable[[Iterable], bool],
+        traverse: List[URIRef] = None,
+        properties: List[Tuple] = None
+) -> Iterator[RepositoryResource]:
+    if traverse is None:
+        traverse = []
+    if properties is None:
+        properties = []
+    for resource in start_resource.walk(traverse=traverse):
+        if len(properties) > 0:
+            subject = URIRef(resource.url)
+            if matcher((subject, p, o) in resource.graph for p, o in properties):
+                yield resource
         else:
             # with no filters specified, list all resources found
             # this mimics the behavior of the Linux "find" command
-            self.resource_count += 1
-            print(resource)
+            yield resource

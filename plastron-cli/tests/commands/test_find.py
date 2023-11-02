@@ -1,39 +1,84 @@
+from argparse import Namespace
+
+import httpretty
 import pytest
 from rdflib import Graph, Literal
 
-from plastron.client import ResourceURI
-from plastron.cli.commands.find import Command
-from plastron.namespaces import rdf, pcdm, dcterms
-
-
-@pytest.fixture
-def resources(datadir):
-    source_graph = Graph()
-    source_graph.parse(datadir / 'graph.ttl', format='turtle')
-
-    resource_graphs = []
-    for subject in set(source_graph.subjects()):
-        graph = Graph()
-        for triple in source_graph.triples((subject, None, None)):
-            graph.add(triple)
-        resource_graphs.append((ResourceURI(subject, subject), graph))
-    return resource_graphs
+from plastron.cli.commands.find import find, Command
+from plastron.namespaces import rdf, pcdm, dcterms, ldp
 
 
 @pytest.mark.parametrize(
-    ['match_condition', 'property_filter', 'expected_count'],
+    ['matcher', 'properties', 'expected_count'],
     [
-        (all, [], 2),
+        (all, [], 3),
         (all, [(rdf.type, pcdm.Object)], 1),
         (all, [(rdf.type, pcdm.Object), (dcterms.title, Literal('Moonpig'))], 0),
         (any, [(rdf.type, pcdm.Object), (dcterms.title, Literal('Moonpig'))], 2),
     ]
 )
-def test_find(resources, match_condition, property_filter, expected_count):
+@httpretty.activate
+def test_find(datadir, repo, simulate_repo, matcher, properties, expected_count):
+    graph = Graph().parse(file=(datadir / 'graph.ttl').open())
+    simulate_repo(graph)
+    resources = list(find(
+        start_resource=repo['/container'],
+        matcher=matcher,
+        traverse=[ldp.contains],
+        properties=properties,
+    ))
+    assert len(resources) == expected_count
+
+
+@pytest.mark.parametrize(
+    ('args', 'expected_paths'),
+    [
+        (
+            Namespace(
+                recursive='ldp:contains',
+                data_properties=[],
+                object_properties=[],
+                types=[],
+                match_all=True,
+                match_any=False,
+                uris=['/container'],
+            ),
+            ['/container', '/container/1', '/container/2'],
+        ),
+        (
+            Namespace(
+                recursive='ldp:contains',
+                data_properties=[],
+                object_properties=[],
+                types=['pcdm:Object'],
+                match_all=True,
+                match_any=False,
+                uris=['/container'],
+            ),
+            ['/container/1']
+        ),
+        (
+            Namespace(
+                recursive='ldp:contains',
+                data_properties=[('dcterms:title', 'Moonpig')],
+                object_properties=[],
+                types=['pcdm:Object'],
+                match_all=False,
+                match_any=True,
+                uris=['/container'],
+            ),
+            ['/container/1', '/container/2']
+        ),
+    ]
+)
+@httpretty.activate
+def test_find_command(capsys, datadir, repo, simulate_repo, args, expected_paths):
+    graph = Graph().parse(file=(datadir / 'graph.ttl').open())
+    simulate_repo(graph)
     cmd = Command()
-    cmd.resource_count = 0
-    cmd.properties = property_filter
-    cmd.match = match_condition
-    for resource, graph in resources:
-        cmd.find(resource, graph)
-    assert cmd.resource_count == expected_count
+    cmd.repo = repo
+    cmd(client=repo.client, args=args)
+    captured = capsys.readouterr()
+    assert len(captured.out.splitlines()) == len(expected_paths)
+    for path in expected_paths:
+        assert f'http://localhost:9999{path}\n' in captured.out

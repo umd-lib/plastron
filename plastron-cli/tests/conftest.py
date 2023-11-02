@@ -1,8 +1,10 @@
 import re
+from typing import Callable
 from uuid import uuid4
 
 import pytest
 from httpretty import httpretty
+from rdflib import Graph
 
 from plastron.client import Endpoint, Client
 from plastron.client.auth import get_authenticator
@@ -50,6 +52,40 @@ def register_root(endpoint: Endpoint):
             status=status,
         )
     return _register_root
+
+
+@pytest.fixture
+def simulate_repo(register_root) -> Callable[[Graph], None]:
+    """Pytest fixture that uses HTTPretty to simulate a read-only repository.
+    The repository is defined using a Graph. Each unique subject in that graph
+    is assumed to be its own resource. Each resource will respond to HEAD and
+    GET requests with 200 OK and Content-Type application/n-triples."""
+    def _register_repo(graph: Graph):
+        register_root()
+        subjects = set(graph.subjects())
+        for subject in subjects:
+            resource_graph = Graph()
+            for triple in graph.triples((subject, None, None)):
+                resource_graph.add(triple)
+            body = resource_graph.serialize(format='application/n-triples')
+            httpretty.register_uri(
+                method=httpretty.HEAD,
+                uri=subject,
+                status=200,
+                adding_headers={
+                    'Content-Type': 'application/n-triples',
+                },
+            )
+            httpretty.register_uri(
+                method=httpretty.GET,
+                uri=subject,
+                status=200,
+                body=body,
+                adding_headers={
+                    'Content-Type': 'application/n-triples',
+                },
+            )
+    return _register_repo
 
 
 @pytest.fixture

@@ -1,13 +1,14 @@
 import logging
 from argparse import Namespace
-from typing import List, Tuple, Union
+from typing import List, Tuple, Union, Iterator, Callable, Iterable
+
 from rdflib import URIRef, Literal
 
 from plastron.cli.commands import BaseCommand
 from plastron.client import Client
 from plastron.namespaces import get_manager, rdf
-from plastron.models.umd import PCDMObject
 from plastron.rdf import parse_predicate_list, parse_data_property, parse_object_property, uri_or_curie
+from plastron.repo import RepositoryResource
 
 logger = logging.getLogger(__name__)
 manager = get_manager()
@@ -105,20 +106,36 @@ class Command(BaseCommand):
 
         self.resource_count = 0
 
+        traverse = parse_predicate_list(args.recursive) if args.recursive else []
         for uri in args.uris:
-            traverse = parse_predicate_list(args.recursive) if args.recursive else []
-            for resource in self.repo[uri].walk(traverse=traverse):
-                description = resource.describe(PCDMObject)
-                if len(self.properties) > 0:
-                    subject = URIRef(resource.url)
-                    if self.match((subject, p, o) in description.graph for p, o in self.properties):
-                        self.resource_count += 1
-                        print(resource.url)
-                else:
-                    # with no filters specified, list all resources found
-                    # this mimics the behavior of the Linux "find" command
-                    self.resource_count += 1
-                    print(resource.url)
+            for resource in find(
+                start_resource=self.repo[uri],
+                matcher=self.match,
+                traverse=traverse,
+                properties=self.properties,
+            ):
+                self.resource_count += 1
+                print(resource.url)
 
         logger.info(f'Found {self.resource_count} resource(s)')
 
+
+def find(
+        start_resource: RepositoryResource,
+        matcher: Callable[[Iterable], bool],
+        traverse: List[URIRef] = None,
+        properties: List[Tuple] = None
+) -> Iterator[RepositoryResource]:
+    if traverse is None:
+        traverse = []
+    if properties is None:
+        properties = []
+    for resource in start_resource.walk(traverse=traverse):
+        if len(properties) > 0:
+            subject = URIRef(resource.url)
+            if matcher((subject, p, o) in resource.graph for p, o in properties):
+                yield resource
+        else:
+            # with no filters specified, list all resources found
+            # this mimics the behavior of the Linux "find" command
+            yield resource

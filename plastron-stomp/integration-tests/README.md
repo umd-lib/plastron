@@ -3,8 +3,6 @@
 ## Prerequisites
 
 * a running fcrepo Docker stack
-* the [netcat] (`nc`) command line tool
-  * Mac users can install via Homebrew: `brew install netcat`
 
 ### Required Configuration
 
@@ -43,52 +41,40 @@ MESSAGE_BROKER:
    ```bash
    cd plastron-stomp/integration-tests
    ```
-4. Send the import command:
+4. Enable the integration tests:
    ```bash
-   nc localhost 61613 <stomp-import
+   export INTEGRATION_TESTS=1
    ```
-5. Confirm that there is an imported item at 
-   <http://fcrepo-local:8080/fcrepo/rest/b4a968dd-dbc6-42a0-9799-760266d44cd4>
-6. Send the update command:
+5. Send the import command:
    ```bash
-   nc localhost 61613 <stomp-update
+   pytest test_import.py
    ```
-7. Confirm that the previously imported item at
-   <http://fcrepo-local:8080/fcrepo/rest/b4a968dd-dbc6-42a0-9799-760266d44cd4>
-   now also has a `dcterms:title` value of "Moonpig"
-8. Send the export command:
+6. Check the Plastron STOMP Daemon logs to find the URI of the newly 
+   imported it. Confirm that it exists.
+7. Export the URI value in bash:
    ```bash
-   nc localhost 61613 <stomp-export
+   export URI={value copied from log}
    ```
-9. Verify that there is an exported _test-export.tar.gz_
-   file in the current directory. List the contents using
-   `tar tzf test-export.tar.gz` and you should see:
+8. Send the update command:
+   ```bash
+   pytest test_update.py
    ```
-   test-export.tar/bagit.txt
-   test-export.tar/bag-info.txt
-   test-export.tar/manifest-sha512.txt
-   test-export.tar/tagmanifest-sha256.txt
-   test-export.tar/tagmanifest-sha512.txt
-   test-export.tar/manifest-sha256.txt
-   test-export.tar/data/metadata.ttl
-   test-export.tar/data/b4a968dd-dbc6-42a0-9799-760266d44cd4/labor-087802-0001.tif
-   ```
-
-## Editing the Test Files
-
-The _stomp-*_ test files are text files containing the raw STOMP message 
-sequences that are sent to the STOMP server, and must follow all the rules
-of the STOMP wire protocol. In particular, each message (or "frame", in
-STOMP parlance) must end with a NULL character (codepoint 0x00). This
-can be problematic for some text editors to read, write, or even
-display.
-
-### Editor Support
-
-| Editor  | Support? | Display | Input                                                             |
-|---------|----------|---------|-------------------------------------------------------------------|
-| Vim     | Yes      | `^@`    | <kbd>Ctrl</kbd>+<kbd>V</kbd> <kbd>x</kbd><kbd>0</kbd><kbd>0</kbd> |
-| VS Code | Partial  | `␀`     | _Unknown_                                                         |
-| PyCharm | No       | —       | —                                                                 |
-
-[netcat]: https://en.wikipedia.org/wiki/Netcat
+9. Confirm that the previously imported item now also has a `dcterms:title`
+   value of "Moonpig"
+10. Send the export command:
+    ```bash
+    pytest test_export.py
+    ```
+11. Verify that there is an exported _test-export.tar.gz_
+    file in the current directory. List the contents using
+    `tar tzf test-export.tar.gz` and you should see:
+    ```
+    test-export.tar/bagit.txt
+    test-export.tar/bag-info.txt
+    test-export.tar/manifest-sha512.txt
+    test-export.tar/tagmanifest-sha256.txt
+    test-export.tar/tagmanifest-sha512.txt
+    test-export.tar/manifest-sha256.txt
+    test-export.tar/data/metadata.ttl
+    test-export.tar/data/{SOME UUID}/labor-087802-0001.tif
+    ```

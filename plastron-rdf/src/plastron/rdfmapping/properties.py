@@ -3,6 +3,7 @@ from typing import Set, Tuple, Callable, Any, Iterable, TypeVar
 from rdflib import Literal, URIRef
 from rdflib.term import Identifier, BNode
 
+from plastron.rdfmapping.embed import EmbeddedObject
 from plastron.rdfmapping.validation import ValidationResult, ValidationFailure, ValidationSuccess
 
 ObjectType = TypeVar('ObjectType')
@@ -177,12 +178,16 @@ class RDFObjectProperty(RDFProperty):
 
     def add(self, value):
         if hasattr(value, 'uri'):
-            obj = URIRef(value.uri)
+            uri = URIRef(value.uri)
             if self.object_class is not None:
-                self._object_map[obj] = value
+                self._object_map[uri] = value
+        elif isinstance(value, EmbeddedObject):
+            obj = value.embed(self.resource)
+            uri = obj.uri
+            self._object_map[uri] = obj
         else:
-            obj = value
-        super().add(obj)
+            uri = value
+        super().add(uri)
 
     def remove(self, value):
         if hasattr(value, 'uri'):

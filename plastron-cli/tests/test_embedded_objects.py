@@ -1,6 +1,6 @@
 import pytest
 
-from plastron.jobs.utils import ImportSpreadsheet
+from plastron.jobs.imports.spreadsheet import MetadataSpreadsheet
 from plastron.models import Item
 from plastron.repo import Repository
 
@@ -17,7 +17,7 @@ def csv_filename(datadir):
 
 @pytest.fixture
 def spreadsheet(csv_filename):
-    return ImportSpreadsheet(metadata_filename=csv_filename, model_class=Item)
+    return MetadataSpreadsheet(metadata_filename=csv_filename, model_class=Item)
 
 
 @pytest.fixture

@@ -2,19 +2,12 @@ import argparse
 import os
 import tempfile
 from io import StringIO
-from unittest.mock import MagicMock, patch
 
 import pytest
 
-import plastron.jobs.utils
 from plastron.cli.commands.importcommand import Command
 from plastron.client import Client, Endpoint
-from plastron.jobs.importjob import JobConfigError, Row, ImportRun, ImportJob, ImportRow
-from plastron.jobs.utils import ImportSpreadsheet, InvalidRow, LineReference
-from plastron.models.umd import Item
-from plastron.rdfmapping.validation import ValidationResultsDict
-from plastron.repo import Repository
-from plastron.validation import ValidationError
+from plastron.jobs import JobConfigError
 
 
 @pytest.fixture
@@ -104,99 +97,6 @@ def test_import_file_is_required_unless_resuming(datadir, client):
             pass
 
     assert "An import file is required unless resuming an existing job" in str(excinfo.value)
-
-
-@patch('plastron.cli.commands.importcommand.ImportJob')
-def test_exception_when_no_validation_ruleset(MockImportJob, client, monkeypatch, datadir):
-    # Verifies that the import command throws RuntimeError if item
-    # validation throws a NoValidationRulesetException
-    mock_item = MagicMock(spec=Item)
-    mock_item.validate.side_effect = ValidationError('Unable to run validation')
-    mock_run = MagicMock(spec=ImportRun)
-    mock_run.start.return_value = mock_run
-    mock_spreadsheet = MagicMock(spec=ImportSpreadsheet)
-    mock_spreadsheet.has_binaries = False
-    mock_spreadsheet.total = 1
-    row = Row(
-        data={'id': 'foo', 'FILES': ''},
-        line_reference=LineReference('foo', 1),
-        spreadsheet=mock_spreadsheet,
-        identifier_column='id',
-        row_number=1
-    )
-    monkeypatch.setattr(row, 'get_object', lambda _repo: mock_item)
-    mock_spreadsheet.rows = MagicMock(return_value=[row])
-    job = ImportJob(job_id='123', jobs_dir=datadir)
-    import_row = ImportRow(job=job, repo=MagicMock(spec=Repository), row=row)
-    monkeypatch.setattr(job, 'new_run', lambda: mock_run)
-    monkeypatch.setattr(job, 'get_metadata', lambda: mock_spreadsheet)
-    monkeypatch.setattr(job, 'get_import_row', lambda _repo, _row: import_row)
-    MockImportJob.return_value = job
-
-    args = create_args(job.id)
-    command = Command(config={})
-
-    with pytest.raises(RuntimeError) as excinfo:
-        for _ in command(client, args):
-            pass
-
-    assert "Unable to run validation" in str(excinfo.value)
-
-
-@patch('plastron.cli.commands.importcommand.ImportJob')
-def test_invalid_item_added_to_drop_invalid_log(MockImportJob, datadir, client, monkeypatch):
-    # Verifies that the import command adds an invalid item to the
-    # drop-invalid log
-    # mock the ImportRun so that we can see if the drop_invalid method was called
-    mock_run = MagicMock(spec=ImportRun)
-    mock_run.start.return_value = mock_run
-    # mock a spreadsheet with get_rows() that yields an InvalidRow
-    mock_spreadsheet = MagicMock(spec=ImportSpreadsheet)
-    mock_spreadsheet.has_binaries = False
-    mock_spreadsheet.total = 1
-    mock_spreadsheet.rows = MagicMock(return_value=[InvalidRow(LineReference('foo', 1), 'test')])
-    job = ImportJob(job_id='123', jobs_dir=datadir)
-    monkeypatch.setattr(job, 'new_run', lambda: mock_run)
-    monkeypatch.setattr(job, 'get_metadata', lambda: mock_spreadsheet)
-    MockImportJob.return_value = job
-
-    args = create_args(job.id)
-    command = Command({})
-    command(client, args)
-
-    mock_run.drop_invalid.assert_called_once()
-    mock_run.drop_failed.assert_not_called()
-
-
-@patch('plastron.jobs.importjob.ImportRow')
-@patch('plastron.cli.commands.importcommand.ImportJob')
-def test_failed_item_added_to_drop_failed_log(MockImportJob, MockImportRow, client, monkeypatch, datadir):
-    # Verifies that the import command adds a failed item to the
-    # drop-failed log
-    # mock the ImportRun so that we can see if the drop_failed method was called
-    mock_run = MagicMock(spec=ImportRun)
-    mock_run.start.return_value = mock_run
-    mock_row = MagicMock(spec=Row, data=['foo'], line_reference=LineReference('foo', 1))
-    mock_spreadsheet = MagicMock(spec=ImportSpreadsheet)
-    mock_spreadsheet.has_binaries = False
-    mock_spreadsheet.total = 1
-    mock_spreadsheet.rows = MagicMock(return_value=[mock_row])
-    mock_import_row = MagicMock(spec=ImportRow)
-    mock_import_row.validate_item.return_value = ValidationResultsDict()
-    mock_import_row.update_repo.side_effect = plastron.jobs.importjob.JobError('test')
-    mock_import_row.item = 'Foobar'
-    job = ImportJob(job_id='123', jobs_dir=datadir)
-    monkeypatch.setattr(job, 'new_run', lambda: mock_run)
-    monkeypatch.setattr(job, 'get_metadata', lambda: mock_spreadsheet)
-    MockImportJob.return_value = job
-    MockImportRow.return_value = mock_import_row
-
-    args = create_args(job.id)
-    command = Command({})
-    command(client, args)
-
-    mock_run.drop_failed.assert_called_once()
-    mock_run.drop_invalid.assert_not_called()
 
 
 def create_args(job_id):

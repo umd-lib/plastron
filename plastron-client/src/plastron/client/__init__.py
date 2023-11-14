@@ -86,6 +86,7 @@ class FlatCreator:
     However, proxies and annotations are still created within child containers
     of the item.
     """
+
     def __init__(self, client: 'Client'):
         self.client = client
 
@@ -120,6 +121,7 @@ class HierarchicalCreator:
     Related items, however, are created in the same container as the initial
     item.
     """
+
     def __init__(self, client: 'Client'):
         self.client = client
 
@@ -145,8 +147,9 @@ class HierarchicalCreator:
 
 class Endpoint:
     """Conceptual entry point for a Fedora repository."""
+
     def __init__(self, url: str, default_path: str = '/', external_url: str = None):
-        self.url = URLObject(url)
+        self.internal_url = URLObject(url)
 
         # default container path
         self.relpath = default_path
@@ -157,6 +160,10 @@ class Endpoint:
             self.external_url = URLObject(external_url)
         else:
             self.external_url: Optional[URLObject] = None
+
+    @property
+    def url(self):
+        return self.external_url or self.internal_url
 
     def __contains__(self, item):
         return self.contains(item)
@@ -185,7 +192,8 @@ class Endpoint:
             assert 'https://repo.example.net/123' in endpoint
             assert 'http://localhost:8080/fcrepo/rest/123' in endpoint
         """
-        return uri.startswith(self.url) or (self.external_url is not None and uri.startswith(self.external_url))
+        return uri.startswith(self.internal_url) \
+            or (self.external_url is not None and uri.startswith(self.external_url))
 
     def repo_path(self, resource_uri: Optional[str]) -> Optional[str]:
         """
@@ -242,6 +250,7 @@ class SessionHeaderAttribute:
         del foo.ua_string
         assert 'User-Agent' not in foo.session.headers
     """
+
     def __init__(self, header_name: str):
         self.header_name = header_name
 
@@ -612,6 +621,7 @@ class TransactionClient(Client):
     sent during a Fedora transaction. Adds and removes the transaction identifier
     from URIs in graphs sent or returned. Adjusts the request URIs to include the
     transaction identifier."""
+
     @classmethod
     def from_client(cls, client: Client):
         """Build a TransactionClient from a regular Client object."""

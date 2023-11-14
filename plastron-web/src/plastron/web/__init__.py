@@ -6,7 +6,8 @@ from pathlib import Path
 from flask import Flask, url_for
 from werkzeug.exceptions import NotFound
 
-from plastron.jobs.importjob import JobConfigError, ImportJob, JobError
+from plastron.jobs.imports import ImportJob
+from plastron.jobs import JobError, JobConfigError
 
 logger = logging.getLogger(__name__)
 
@@ -40,7 +41,7 @@ def create_app():
 
     def get_job(job_id: str):
         job = ImportJob(urllib.parse.unquote(job_id), str(jobs_dir))
-        if not job.dir_exists:
+        if not job.exists:
             raise NotFound
         return job
 

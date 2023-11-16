@@ -1,3 +1,4 @@
+""".. include:: ../../../docs/serializers.md"""
 import logging
 
 from rdflib import URIRef

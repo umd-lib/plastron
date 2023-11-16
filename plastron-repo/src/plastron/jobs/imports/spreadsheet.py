@@ -38,6 +38,8 @@ class MetadataError(JobError):
 
 
 class LineReference(NamedTuple):
+    """Filename-line number pairing. Stringifies to `{filename}:{line number}`
+    (e.g., `job-0123/import.csv:29`)"""
     filename: str
     line_number: int
 

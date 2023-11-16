@@ -1,4 +1,4 @@
-from typing import Set, Tuple, Callable, Any, Iterable, TypeVar
+from typing import Set, Tuple, Callable, Any, Iterable, TypeVar, Type, Iterator
 
 from rdflib import Literal, URIRef
 from rdflib.term import Identifier, BNode
@@ -6,10 +6,11 @@ from rdflib.term import Identifier, BNode
 from plastron.rdfmapping.embed import EmbeddedObject
 from plastron.rdfmapping.validation import ValidationResult, ValidationFailure, ValidationSuccess
 
-ObjectType = TypeVar('ObjectType')
+T = TypeVar('T')
 
 
 class RDFProperty:
+    """An RDF property"""
     def __init__(
             self,
             resource,
@@ -38,6 +39,7 @@ class RDFProperty:
 
     @property
     def value(self):
+        """The first value of this property, or `None` if `values` is empty."""
         try:
             return next(iter(self.values))
         except StopIteration:
@@ -84,11 +86,24 @@ class RDFProperty:
         return deleted_values, inserted_values
 
     def extend(self, values: Iterable):
+        """Add each value in the `values` iterable to this property"""
         for value in values:
             self.add(value)
 
     @property
     def is_valid(self) -> ValidationResult:
+        """Checks the validity of this property.
+
+        * If the property is required, there must be at least one value
+        * If the property is not repeatable, there must be no more than one value
+        * All additional validation functions, such as that given in the `validate`
+          parameter of the constructor, must return true values
+
+        If all of these conditions are met, returns a
+        `plastron.rdfmapping.validation.ValidationSuccess` object.
+        Otherwise, returns a
+        `plastron.rdfmapping.validation.ValidationFailure` object.
+        """
         if self.required and len(self) == 0:
             return ValidationFailure(self, 'is required')
         if not self.repeatable and len(self) > 1:
@@ -102,6 +117,7 @@ class RDFProperty:
 
 
 class RDFDataProperty(RDFProperty):
+    """An RDF property whose values are always RDF literals"""
     def __init__(
             self,
             resource,
@@ -113,18 +129,28 @@ class RDFDataProperty(RDFProperty):
             datatype: URIRef = None,
     ):
         super().__init__(resource, attr_name, predicate, required, repeatable, validate)
-        self.datatype = datatype
+        self.datatype: URIRef = datatype
+        """The datatype of this property"""
 
     @property
-    def values(self):
+    def values(self) -> Iterator[Literal]:
         return filter(lambda v: v.datatype == self.datatype, super().values)
 
     @property
-    def languages(self):
+    def languages(self) -> Iterator[str]:
+        """Returns an iterator over the language tags of this property's values."""
         return iter(v.language for v in self.values)
 
     @property
     def is_valid(self) -> ValidationResult:
+        """Checks the validity of this property.
+
+        Performs all the validity checks from `RDFProperty.is_valid()`, plus
+        requires that all values are RDF literals.
+
+        Even if this property is not marked as repeatable, more than one value
+        is allowed so long as each value has a different language tag.
+        """
         is_valid_result = super().is_valid
         if not is_valid_result:
             # exception to the superclass rule: if repeatable is False but the only difference
@@ -141,6 +167,7 @@ class RDFDataProperty(RDFProperty):
 
 
 class RDFObjectProperty(RDFProperty):
+    """An RDF property whose values are always URIRefs or RDF blank nodes"""
     def __init__(
             self,
             resource,
@@ -149,7 +176,7 @@ class RDFObjectProperty(RDFProperty):
             required: bool = False,
             repeatable: bool = False,
             validate: Callable[[Any], bool] = None,
-            object_class: ObjectType = None,
+            object_class: Type[T] = None,
             embedded: bool = False,
     ):
         super().__init__(resource, attr_name, predicate, required, repeatable, validate)
@@ -158,7 +185,9 @@ class RDFObjectProperty(RDFProperty):
         self._object_map = {}
 
     @property
-    def objects(self) -> Iterable[ObjectType]:
+    def objects(self) -> Iterable[T]:
+        """Values of this property, represented as full objects. Requires that this property
+        has its `object_class` set; otherwise, it raises an `RDFPropertyError`."""
         if self.object_class is None:
             raise RDFPropertyError(f'No object class defined for the property with predicate {self.predicate}')
         for value in self.values:
@@ -170,7 +199,9 @@ class RDFObjectProperty(RDFProperty):
                 yield value
 
     @property
-    def object(self) -> ObjectType:
+    def object(self) -> T:
+        """The first value of this property, represented as an object, or `None` if `values`
+        is empty."""
         try:
             return next(iter(self.objects))
         except StopIteration:
@@ -200,6 +231,11 @@ class RDFObjectProperty(RDFProperty):
 
     @property
     def is_valid(self) -> ValidationResult:
+        """Checks the validity of this property.
+
+        Performs all the validity checks from `RDFProperty.is_valid()`, plus
+        requires that all values are either URIRefs or RDF blank nodes.
+        """
         is_valid_result = super().is_valid
         if not is_valid_result:
             return is_valid_result

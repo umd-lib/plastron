@@ -1,16 +1,9 @@
-from rdflib import Namespace
-
-from plastron.namespaces import dc, dcterms, edm, rdfs, owl, ldp, fabio, pcdm, iana, ore, ebucore, premis, xsd
+from plastron.namespaces import dc, dcterms, edm, rdfs, owl, ldp, fabio, pcdm, iana, ore, ebucore, premis, xsd, umdtype
 from plastron.rdfmapping.decorators import rdf_type
 from plastron.rdfmapping.descriptors import ObjectProperty, DataProperty
 from plastron.rdfmapping.resources import RDFResource, RDFResourceBase
-# from plastron.rdf import pcdm, rdf
-# from plastron.rdf.authority import LabeledThing
-# from plastron.rdf.pcdm import Page
 from plastron.validation import is_edtf_formatted, is_valid_iso639_code, is_handle
-
-umdtype = Namespace('http://vocab.lib.umd.edu/datatype#')
-umdform = Namespace('http://vocab.lib.umd.edu/form#')
+from plastron.validation.vocabularies import get_subjects
 
 
 @rdf_type(pcdm.Object)
@@ -26,10 +19,10 @@ class LabeledThing(RDFResource):
 
 
 def is_from_vocabulary(vocab_uri):
-    #subjects = get_subjects(vocab_uri)
+    subjects = get_subjects(vocab_uri)
 
     def _value_from_vocab(value):
-        return True  # value in subjects
+        return value in subjects
 
     _value_from_vocab.__doc__ = f'from vocabulary {vocab_uri}'
     return _value_from_vocab
@@ -62,6 +55,7 @@ class PCDMFile(RDFResource):
 
     def __str__(self):
         return str(self.title or self.uri)
+
 
 class PCDMImageFile(PCDMFile):
     height = DataProperty(ebucore.height)

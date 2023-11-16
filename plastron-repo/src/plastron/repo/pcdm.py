@@ -8,9 +8,10 @@ from urlobject import URLObject
 from plastron.client import random_slug
 from plastron.files import BinarySource
 from plastron.jobs import FileGroup
-from plastron.models import Item, umdform
+from plastron.models import Item
 from plastron.models.annotations import Annotation
 from plastron.models.umd import PCDMObject, PCDMFile, Page, Proxy, LDPContainer
+from plastron.namespaces import umdform
 from plastron.rdfmapping.resources import RDFResourceBase
 from plastron.repo import ContainerResource, Repository, BinaryResource
 
@@ -154,6 +155,7 @@ class PCDMFileBearingResource(ContainerResource):
 
 
 class AggregationResource(ContainerResource):
+    """An [ORE Aggregation](http://openarchives.org/ore/1.0/datamodel#Aggregation) resource"""
     def __init__(self, repo: Repository, path: str = None):
         super().__init__(repo, path)
         self.proxies_container: Optional[ContainerResource] = None
@@ -205,6 +207,7 @@ class AggregationResource(ContainerResource):
 
 
 class PCDMObjectResource(PCDMFileBearingResource, AggregationResource):
+    """A PCDM Object resource"""
     def __init__(self, repo: Repository, path: str = None):
         super().__init__(repo, path)
         self.members_container = self.get_resource('m', ContainerResource)
@@ -256,21 +259,29 @@ class PCDMObjectResource(PCDMFileBearingResource, AggregationResource):
 
 
 class ProxyIterator(Iterator[URLObject]):
+    """Iterator over the sequence of proxied resources of an `AggregationResource`.
+    It begins by following the `iana:first` relation from the `resource` to the
+    first proxy, and then follows the `iana:next` relations between the subsequent
+    proxy resources.
+
+    For each proxy in the sequence, it yields the value of its `ore:proxyFor`
+    relation as a `URLObject`."""
     def __init__(self, resource: AggregationResource):
-        self.resource = resource
-        self.repo = resource.repo
-        self.next_proxy_uri = None
+        self.resource: AggregationResource = resource
+        """Aggregation resource"""
+        self._repo: Repository = resource.repo
+        self._next_proxy_uri = None
 
     def __iter__(self):
         self.resource.read()
-        self.next_proxy_uri = self.resource.describe(PCDMObject).first.value
+        self._next_proxy_uri = self.resource.describe(PCDMObject).first.value
         return self
 
     def __next__(self):
-        if self.next_proxy_uri is None:
+        if self._next_proxy_uri is None:
             raise StopIteration
-        current_proxy = self.repo[self.next_proxy_uri:ContainerResource].read().describe(Proxy)
-        self.next_proxy_uri = current_proxy.next.value
+        current_proxy = self._repo[self._next_proxy_uri:ContainerResource].read().describe(Proxy)
+        self._next_proxy_uri = current_proxy.next.value
         return URLObject(current_proxy.proxy_for.value)
 
 

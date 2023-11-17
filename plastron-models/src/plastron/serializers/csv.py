@@ -11,13 +11,11 @@ from rdflib import URIRef, Literal
 from urlobject import URLObject
 
 from plastron.models.umd import PCDMFile
-from plastron.namespaces import fedora, get_manager
+from plastron.namespaces import fedora
 from plastron.rdfmapping.descriptors import ObjectProperty
 from plastron.rdfmapping.embed import EmbeddedObject
 from plastron.rdfmapping.properties import RDFObjectProperty, RDFDataProperty
 from plastron.rdfmapping.resources import RDFResourceBase
-
-nsm = get_manager()
 
 
 def not_empty(value):

@@ -4,13 +4,11 @@ from argparse import ArgumentTypeError
 from typing import Generator, Any, Dict
 
 from plastron.jobs.imports import ImportJob
-from plastron.namespaces import get_manager
 from plastron.rdf import uri_or_curie
 from plastron.repo import Repository
 from plastron.stomp.messages import PlastronCommandMessage
 from plastron.utils import datetimestamp
 
-nsm = get_manager()
 logger = logging.getLogger(__name__)
 
 

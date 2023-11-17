@@ -68,8 +68,27 @@ information.
 
 ## Running
 
-* [Command-line client](plastron-cli/docs/cli.md)
-* [Server](plastron-stomp/docs/daemon.md)
+* [Command-line client](plastron-cli/README.md)
+* [STOMP daemon](plastron-stomp/README.md)
+* [HTTP webapp](plastron-web/README.md)
+
+## API Documentation
+
+To generate API documentation from the code, use [pdoc]:
+
+```bash
+pip install pdoc
+```
+
+To use the built-in, live-reloading web server to generate and browse the 
+documentation, use:
+
+```bash
+pdoc plastron
+```
+
+The generated HTML documentation will be available at 
+<http://localhost:8080/plastron.html>.
 
 ## Name
 
@@ -86,3 +105,4 @@ limitations (Apache 2.0).
 [development mode]: https://packaging.python.org/tutorials/installing-packages/#installing-from-vcs
 [pytest]: https://pypi.org/project/pytest/
 [pyenv]: https://github.com/pyenv/pyenv
+[pdoc]: https://pdoc.dev/

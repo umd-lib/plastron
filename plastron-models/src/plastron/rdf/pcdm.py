@@ -1,8 +1,8 @@
 from PIL import Image
 
 from plastron.files import LocalFileSource, RepositoryFileSource
-from plastron.rdf import ldp, ore, rdf
 from plastron.namespaces import dcterms, ebucore, fabio, pcdm, pcdmuse, premis
+from plastron.rdf import ldp, ore, rdf
 
 # alias the rdflib Namespace
 ns = pcdm
@@ -69,7 +69,7 @@ class File(ldp.NonRdfSource):
     @classmethod
     def from_repository(cls, client, uri, include_server_managed=True):
         obj = super().from_repository(client, uri, include_server_managed)
-        obj.source = RepositoryFileSource(client, uri)
+        obj.source = RepositoryFileSource(uri=uri, client=client)
         return obj
 
     @classmethod

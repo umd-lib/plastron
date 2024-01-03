@@ -2,19 +2,23 @@ import hashlib
 import io
 import urllib
 import zipfile
+from http import HTTPStatus
 from mimetypes import guess_type
 from os.path import basename, isfile
-from typing import Mapping, Any
+from typing import Mapping, Any, Protocol, Union
 from urllib.parse import urlsplit
 
-import requests
 from paramiko import SFTPClient, SSHClient, AutoAddPolicy, SSHException
 from paramiko.config import SSH_PORT
-from rdflib import URIRef
-from requests import Response
+from requests import Response, Session
 
 
-def get_ssh_client(sftp_uri, **kwargs):
+def get_ssh_client(sftp_uri: Union[str, urllib.parse.SplitResult], **kwargs) -> SSHClient:
+    """Create, connect, and return an `SSHClient` object. The username and hostname (and,
+    optionally, the port) to connect to are taken from the `sftp_uri`. Additional keyword
+    arguments in `**kwargs` are passed directly to the `SSHClient.connect()` method.
+
+    Raises a `RuntimeError` if there are problems establishing the connection."""
     if isinstance(sftp_uri, str):
         sftp_uri = urlsplit(sftp_uri)
     if not isinstance(sftp_uri, urllib.parse.SplitResult):
@@ -32,6 +36,14 @@ def get_ssh_client(sftp_uri, **kwargs):
         return ssh_client
     except SSHException as e:
         raise RuntimeError(str(e)) from e
+
+
+class DoesHTTPRequest(Protocol):
+    """[Structural subtype](https://docs.python.org/3/library/typing.html#typing.Protocol)
+    for HTTP client-like objects with a `request()` method that takes (at minimum) a `method`
+    and `uri` argument, and returns a `requests.Response` object."""
+    def request(self, method: str, uri: str, **kwargs) -> Response:
+        ...
 
 
 class BinarySourceError(Exception):
@@ -171,23 +183,15 @@ class HTTPFileSource(BinarySource):
         self.filename = basename(self.uri)
         """Filename-only portion of `uri`."""
         self._mimetype = None
+        self._client = Session()
 
     def __str__(self):
         return str(self.uri)
 
     def request(self, method: str, stream: bool = False) -> Response:
         """Send an HTTP request with the given `method` to this source's `uri`, and
-        return the response. If the response status is `404 Not Found`, raises a
-        `BinarySourceNotFoundError`. If the response status is any other error status
-        (>= 400), raises a `BinarySourceError`."""
-        response = requests.request(method, self.uri, **self.kwargs, stream=stream)
-
-        if response.status_code == 404:
-            raise BinarySourceNotFoundError(f'{response.status_code} {response.reason}: {self.uri}')
-        if response.status_code != 200:
-            raise BinarySourceError(response)
-
-        return response
+        return the response."""
+        return self._client.request(method, self.uri, **self.kwargs, stream=stream)
 
     def mimetype(self) -> str:
         """Returns the `Content-Type` header for a `HEAD` request to `uri`."""
@@ -197,9 +201,19 @@ class HTTPFileSource(BinarySource):
         return self._mimetype
 
     def open(self, chunk_size: int = 512):
-        """Returns an iterator over the response data, with the given
-        `chunk_size` (defaults to `512`)."""
-        return self.request('GET', stream=True).iter_content(chunk_size)
+        """Returns an iterator over the source's data, with the given
+        `chunk_size` (defaults to `512`).
+
+        If the response to the request is `404 Not Found`, raises a
+        `BinarySourceNotFoundError`. If the response status is any other
+        error status (>= 400), raises a `BinarySourceError`."""
+        response = self.request('GET', stream=True)
+        if not response.ok:
+            if response.status_code == HTTPStatus.NOT_FOUND:
+                raise BinarySourceNotFoundError(f'{response.status_code} {response.reason}: {self.uri}')
+            else:
+                raise BinarySourceError(response)
+        return response.iter_content(chunk_size)
 
     def close(self):
         """This method does nothing (there is no special cleanup for HTTP requests)."""
@@ -210,45 +224,15 @@ class HTTPFileSource(BinarySource):
         return self.request('HEAD').ok
 
 
-class RepositoryFileSource(BinarySource):
-    """
-    A binary stored in a repository.
-    """
-    def __init__(self, repo, file_uri):
-        file_uri = URIRef(file_uri)
-        response = repo.head(file_uri)
-
-        if response.status_code == 404:
-            raise BinarySourceNotFoundError(f'{response.status_code} {response.reason}: {file_uri}')
-        if response.status_code != 200:
-            raise RuntimeError(f'{file_uri} not found')
-
-        self._mimetype = response.headers['Content-Type']
-
-        self.repo = repo
-        self.file_uri = file_uri
-
-    def __str__(self):
-        return str(self.file_uri)
-
-    def mimetype(self):
-        return self._mimetype
-
-    def open(self, chunk_size=512):
-        return self.repo.get(self.file_uri, stream=True).iter_content(chunk_size)
-
-    def close(self):
-        # no special cleanup for HTTP requests
-        pass
-
-    def exists(self):
-        return self.repo.exists(self.file_uri)
+class RepositoryFileSource(HTTPFileSource):
+    """A binary stored in a repository."""
+    def __init__(self, uri: str, client: DoesHTTPRequest, **kwargs):
+        super().__init__(uri, **kwargs)
+        self._client = client
 
 
 class RemoteFileSource(BinarySource):
-    """
-    A binary retrievable by SFTP.
-    """
+    """A binary retrievable over SFTP."""
     def __init__(self, location: str, mimetype: str = None, ssh_options: Mapping[str, Any] = None):
         """
         :param location: the SFTP URI to the binary source, e.g., `sftp://user@example.com/path/to/file`
@@ -256,14 +240,14 @@ class RemoteFileSource(BinarySource):
             the `file` utility over an SSH connection.
         :param ssh_options: additional options to pass as keyword arguments to `SSHClient.connect()`
         """
-        self.ssh_client = None
-        self.sftp_client = None
+        self._ssh_client = None
+        self._sftp_client = None
         self.location = location
         self.sftp_uri = urlsplit(location)
         self.filename = basename(self.sftp_uri.path)
         self._mimetype = mimetype
         self.ssh_options = ssh_options or {}
-        self.file = None
+        self._file = None
 
     def __str__(self):
         return self.location
@@ -272,25 +256,25 @@ class RemoteFileSource(BinarySource):
         """
         Closes the remote file handle and the SFTP and SSH clients.
         """
-        if self.file is not None:
-            self.file.close()
-            self.file = None
-        if self.sftp_client is not None:
-            self.sftp_client.close()
-            self.sftp_client = None
-        if self.ssh_client is not None:
-            self.ssh_client.close()
-            self.ssh_client = None
+        if self._file is not None:
+            self._file.close()
+            self._file = None
+        if self._sftp_client is not None:
+            self._sftp_client.close()
+            self._sftp_client = None
+        if self._ssh_client is not None:
+            self._ssh_client.close()
+            self._ssh_client = None
 
     def ssh(self) -> SSHClient:
-        if self.ssh_client is None:
-            self.ssh_client = get_ssh_client(self.sftp_uri, **self.ssh_options)
-        return self.ssh_client
+        if self._ssh_client is None:
+            self._ssh_client = get_ssh_client(self.sftp_uri, **self.ssh_options)
+        return self._ssh_client
 
     def sftp(self) -> SFTPClient:
-        if self.sftp_client is None:
-            self.sftp_client = SFTPClient.from_transport(self.ssh().get_transport())
-        return self.sftp_client
+        if self._sftp_client is None:
+            self._sftp_client = SFTPClient.from_transport(self.ssh().get_transport())
+        return self._sftp_client
 
     def ssh_exec(self, cmd) -> str:
         """Execute `cmd` over SSH, and return the first line of the remote STDOUT. Trailing
@@ -299,13 +283,15 @@ class RemoteFileSource(BinarySource):
         return stdout.readline().rstrip('\n')
 
     def open(self):
+        """Open the file over SFTP and return it as an `SFTPFile` object."""
         try:
-            self.file = self.sftp().open(self.sftp_uri.path, mode='rb')
-            return self.file
+            self._file = self.sftp().open(self.sftp_uri.path, mode='rb')
+            return self._file
         except IOError as e:
             raise BinarySourceNotFoundError(str(e)) from e
 
     def mimetype(self) -> str:
+        """Return the MIME type, as determined by running the `file` utility over SSH."""
         if self._mimetype is None:
             self._mimetype = self.ssh_exec(f'file --mime-type -F "" "{self.sftp_uri.path}"').split()[1]
         return self._mimetype

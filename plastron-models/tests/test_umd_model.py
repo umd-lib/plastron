@@ -1,6 +1,7 @@
 from rdflib import Graph, Literal, Namespace, URIRef
 
-from plastron.models.umd import Item, umdform
+from plastron.models.umd import Item
+from plastron.namespaces import umdform
 from plastron.repo.pcdm import get_new_member_title
 
 rdf = (

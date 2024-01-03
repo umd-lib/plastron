@@ -4,7 +4,7 @@ from typing import Type
 from plastron.models.letter import Letter
 from plastron.models.newspaper import Issue
 from plastron.models.poster import Poster
-from plastron.models.umd import Item, umdtype, umdform
+from plastron.models.umd import Item
 from plastron.rdfmapping.resources import RDFResourceBase
 
 

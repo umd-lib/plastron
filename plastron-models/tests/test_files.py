@@ -1,8 +1,11 @@
+from http import HTTPStatus
 from pathlib import Path
 from unittest.mock import MagicMock
 from tempfile import TemporaryFile
 from uuid import uuid4
 from zipfile import ZipFile
+
+import httpretty
 
 from plastron.files import HTTPFileSource, LocalFileSource, RemoteFileSource, ZipFileSource
 
@@ -42,7 +45,7 @@ def test_http_file():
 def test_nonexistent_local_file_source():
     # pick a random filename string that is unlikely to exist
     f = LocalFileSource(str(uuid4()))
-    assert f.exists() is False
+    assert not f.exists()
 
 
 def test_nonexistent_zip_file_source():
@@ -50,14 +53,19 @@ def test_nonexistent_zip_file_source():
     with TemporaryFile() as tmp_file:
         with ZipFile(tmp_file, mode='w') as zip_file:
             f = ZipFileSource(zip_file, 'foo.jpg')
-            assert f.exists() is False
+            assert not f.exists()
 
 
+@httpretty.activate
 def test_nonexistent_http_file_source():
-    # pick a random filename string that is unlikely to exist
     uri = f'http://www.example.com/{uuid4()}'
+    httpretty.register_uri(
+        uri=uri,
+        method=httpretty.HEAD,
+        status=HTTPStatus.NOT_FOUND,
+    )
     f = HTTPFileSource(uri)
-    assert f.exists() is False
+    assert not f.exists()
 
 
 def test_zip_file_source_exists(datadir):

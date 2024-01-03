@@ -3,10 +3,8 @@ import time
 from argparse import Namespace
 
 from plastron.cli.commands import BaseCommand
-from plastron.namespaces import get_manager
 
 
-nsm = get_manager()
 logger = logging.getLogger(__name__)
 
 

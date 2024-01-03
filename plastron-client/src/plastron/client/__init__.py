@@ -1,3 +1,4 @@
+""".. include:: ../../../README.md"""
 import logging
 import os
 import threading
@@ -11,7 +12,7 @@ from typing import Any, Optional, List, Callable, NamedTuple, Union
 
 import requests
 from rdflib import Graph, URIRef, Literal
-from requests import Response
+from requests import Response, Session
 from requests.auth import AuthBase
 from requests.exceptions import ConnectionError
 from urlobject import URLObject
@@ -55,9 +56,49 @@ class ResourceURI(namedtuple('Resource', ['uri', 'description_uri'])):
 
 class TypedText(NamedTuple):
     """Data object combining a string value and its media type,
-    expressed as a MIME type string."""
+    expressed as a MIME type string.
+
+    ```pycon
+    >>> json_data = TypedText('application/json', '{"foo": 1, "bar": "two"}')
+    >>> json_data
+    TypedText(media_type='application/json', value='{"foo": 1, "bar": "two"}')
+    ```
+
+    Supports `str()`, `len()`, and `bool()`. Returns the string value, the
+    length of the string value, and the boolean cast of the string value,
+    respectively:
+
+    ```pycon
+    >>> str(json_data)
+    '{"foo": 1, "bar": "two"}'
+
+    >>> len(json_data)
+    24
+
+    >>> bool(json_data)
+    True
+    ```
+
+    Two `TypedText` objects are only equal if both the string value
+    and the media type match:
+
+    ```pycon
+    >>> json_data = TypedText('application/json', '{"foo": 1, "bar": "two"}')
+    >>> text_data = TypedText('text/plain', '{"foo": 1, "bar": "two"}')
+
+    >>> json_data.value == text_data.value
+    True
+
+    >>> json_data == text_data
+    False
+    ```
+    """
+
     media_type: str
+    """MIME type, e.g. "text/plain" or "application/ld+json" """
+
     value: str
+    """string value"""
 
     def __str__(self):
         return self.value
@@ -70,11 +111,22 @@ class TypedText(NamedTuple):
 
 
 class ClientError(Exception):
+    """Raised when a `Client` receives an HTTP error response (4xx or 5xx)."""
     def __init__(self, response: Response, *args):
         super().__init__(*args)
-        self.response = response
+
+        self.response: Response = response
+        """The Requests `Response` object from the failed request."""
+
         self.status_code = self.response.status_code
+        """The numeric HTTP status code (e.g., 404) for the failed request."""
+
         self.reason = self.response.reason or HTTPStatus(self.status_code).phrase
+        """The reason phrase (e.g., "Not Found") for the failed request. If
+        the `response` does not have a reason code, use the standard status
+        phrase from the built-in
+        [`HTTPStatus`](https://docs.python.org/3.8/library/http.html#http.HTTPStatus)
+        enumeration corresponding to the `status_code`."""
 
     def __str__(self):
         return f'{self.status_code} {self.reason}'
@@ -151,18 +203,18 @@ class Endpoint:
     def __init__(self, url: str, default_path: str = '/', external_url: str = None):
         self.internal_url = URLObject(url)
 
-        # default container path
         self.relpath = default_path
+        """Default container path"""
+
         if not self.relpath.startswith('/'):
             self.relpath = '/' + self.relpath
 
-        if external_url is not None:
-            self.external_url = URLObject(external_url)
-        else:
-            self.external_url: Optional[URLObject] = None
+        self.external_url: URLObject = URLObject(external_url) if external_url is not None else None
 
     @property
-    def url(self):
+    def url(self) -> URLObject:
+        """Endpoint URL. If `external_url` is set, returns that. Otherwise, returns
+        the `internal_url`."""
         return self.external_url or self.internal_url
 
     def __contains__(self, item):
@@ -170,27 +222,40 @@ class Endpoint:
 
     def contains(self, uri: str) -> bool:
         """
-        Returns ``True`` if the given URI string is contained within this
-        repository, ``False`` otherwise. You may also use the builtin operator
-        ``in`` to do this same check::
+        Returns `True` if the given URI string is contained within this
+        repository, `False` otherwise. You may also use the builtin operator
+        `in` to do this same check::
 
-            endpoint = Endpoint(url='http://localhost:8080/fcrepo/rest')
+        ```pycon
+        >>> endpoint = Endpoint(url='http://localhost:8080/fcrepo/rest')
 
-            assert endpoint.contains('http://localhost:8080/fcrepo/rest/123')
-            assert 'http://localhost:8080/fcrepo/rest/123' in endpoint
+        >>> endpoint.contains('http://localhost:8080/fcrepo/rest/123')
+        True
 
-            assert not endpoint.contains('http://example.com/123')
-            assert 'http://example.com/123' not in endpoint
+        >>> 'http://localhost:8080/fcrepo/rest/123' in endpoint
+        True
 
-        If ``external_url`` is set, checks that too::
+        >>> endpoint.contains('http://example.com/123')
+        False
 
-            endpoint = Endpoint(
-                url='http://localhost:8080/fcrepo/rest',
-                external_url='https://repo.example.net',
-            )
+        >>> 'http://example.com/123' in endpoint
+        False
+        ```
 
-            assert 'https://repo.example.net/123' in endpoint
-            assert 'http://localhost:8080/fcrepo/rest/123' in endpoint
+        If `external_url` is set, checks that too::
+
+        ```python
+        >>> endpoint = Endpoint(
+        ...     url='http://localhost:8080/fcrepo/rest',
+        ...     external_url='https://repo.example.net',
+        ... )
+
+        >>> 'https://repo.example.net/123' in endpoint
+        True
+
+        >>> 'http://localhost:8080/fcrepo/rest/123' in endpoint
+        True
+        ```
         """
         return uri.startswith(self.internal_url) \
             or (self.external_url is not None and uri.startswith(self.external_url))
@@ -199,10 +264,14 @@ class Endpoint:
         """
         Returns the repository path for the given resource URI, i.e. the
         path with either the ``url`` or ``external_url`` (if defined)
-        removed. For example::
+        removed. For example:
 
-            endpoint = Endpoint(url='http://localhost:8080/fcrepo/rest')
-            assert endpoint.repo_path('http://localhost:8080/fcrepo/rest/obj/123') == '/obj/123'
+        ```pycon
+        >>> endpoint = Endpoint(url='http://localhost:8080/fcrepo/rest')
+
+        >>> endpoint.repo_path('http://localhost:8080/fcrepo/rest/obj/123')
+        '/obj/123'
+        ```
         """
         if resource_uri is None:
             return None
@@ -213,6 +282,7 @@ class Endpoint:
 
     @property
     def transaction_endpoint(self) -> str:
+        """Send an HTTP POST request to this URL to create a new transaction."""
         return os.path.join(self.url, 'fcr:tx')
 
 
@@ -223,36 +293,40 @@ class RepositoryStructure(Enum):
 
 class SessionHeaderAttribute:
     """Descriptor that maps an attribute to a session header name. Requires
-    the instance to have a session attribute whose value is a mapping that
-    supports the methods get and update, plus the del operator. Example::
+    the instance to have a `session` attribute with a `headers` attribute whose
+    value is a mapping that supports the methods `get()` and `update()`, plus
+    the `del` operator. For example:
 
-        from requests import Session
+    ```python
+    from requests import Session
 
-        class Foo:
-            ua_string = SessionHeaderAttribute('User-Agent')
+    class Foo:
+        ua_string = SessionHeaderAttribute('User-Agent')
 
-            def __init__(self):
-                self.session = Session()
+        def __init__(self):
+            self.session = Session()
 
-        # initially not set
-        foo = Foo()
-        assert 'User-Agent' not in foo.session.headers
+    # initially not set
+    foo = Foo()
+    assert 'User-Agent' not in foo.session.headers
 
-        # set the header
-        foo.ua_string = 'MyClient/1.0.0'
-        assert foo.session.headers['User-Agent'] == 'MyClient/1.0.0'
+    # set the header
+    foo.ua_string = 'MyClient/1.0.0'
+    assert foo.session.headers['User-Agent'] == 'MyClient/1.0.0'
 
-        # change the header
-        foo.ua_string = 'OtherAgent/2.0.0'
-        assert foo.session.headers['User-Agent'] == 'OtherAgent/2.0.0'
+    # change the header
+    foo.ua_string = 'OtherAgent/2.0.0'
+    assert foo.session.headers['User-Agent'] == 'OtherAgent/2.0.0'
 
-        # remove the header
-        del foo.ua_string
-        assert 'User-Agent' not in foo.session.headers
+    # remove the header
+    del foo.ua_string
+    assert 'User-Agent' not in foo.session.headers
+    ```
     """
 
     def __init__(self, header_name: str):
         self.header_name = header_name
+        """The HTTP header name"""
 
     def __set_name__(self, owner, name):
         self.name = name
@@ -274,6 +348,15 @@ class SessionHeaderAttribute:
 
 
 def build_sparql_update(delete_graph: Graph = None, insert_graph: Graph = None) -> str:
+    """Build a SPARQL Update Query given the two graphs:
+
+    * If there are no deletes (i.e., `delete_graph` contains no triples, or
+      is set to `None`), returns an `INSERT DATA { ... }` statement;
+    * If there are no inserts (i.e., `insert_graph` contains no triples, or
+      is set to `None`), returns a `DELETE DATA { ... }` statement;
+    * If there are both deletes and inserts, returns a full `DELETE { ... } INSERT { ... }
+      WHERE {}` statement (the `WHERE` clause is always empty);
+    * If there are neither inserts nor deletes, returns the empty string."""
     if delete_graph is not None and len(delete_graph) > 0:
         deletes = delete_graph.serialize(format='nt').strip()
     else:
@@ -297,9 +380,15 @@ def build_sparql_update(delete_graph: Graph = None, insert_graph: Graph = None) 
 class Client:
     """HTTP client for interacting with a Fedora repository."""
     ua_string = SessionHeaderAttribute('User-Agent')
+    """`User-Agent` header value"""
     delegated_user = SessionHeaderAttribute('On-Behalf-Of')
+    """`On-Behalf-Of` header value"""
     forwarded_host = SessionHeaderAttribute('X-Forwarded-Host')
+    """`X-Forwarded-Host` header value. This is automatically set if the
+    `endpoint` has an `external_url`."""
     forwarded_protocol = SessionHeaderAttribute('X-Forwarded-Proto')
+    """`X-Forwarded-Proto` header value. This is automatically set if the
+    `endpoint` has an `external_url`."""
 
     def __init__(
             self,
@@ -311,11 +400,14 @@ class Client:
             on_behalf_of: str = None,
             load_binaries: bool = True,
     ):
-        self.endpoint = endpoint
-        self.structure = structure
-        self.load_binaries = load_binaries
+        self.endpoint: Endpoint = endpoint
+        """Fedora repository endpoint"""
+        self.structure: RepositoryStructure = structure
+        self.load_binaries: bool = load_binaries
 
-        self.session = requests.Session()
+        self.session: Session = Session()
+        """Underlying Requests library
+        [Session object](https://requests.readthedocs.io/en/latest/user/advanced/#session-objects)"""
         self.session.auth = auth
         if server_cert is not None:
             self.session.verify = server_cert
@@ -340,8 +432,8 @@ class Client:
             raise RuntimeError(f'Unknown STRUCTURE value: {structure}')
 
     def request(self, method: str, url: str, **kwargs) -> Response:
-        """Send an HTTP request using the configured session. Additional
-        keyword arguments are passed to the underlying Session's ``request``
+        """Send an HTTP request using the configured `session`. Additional
+        keyword arguments are passed to the underlying `session.request()`
         method."""
         logger.debug(f'{method} {url}')
         response = self.session.request(method, url, **kwargs)
@@ -407,16 +499,18 @@ class Client:
         # only if we didn't get a response argument do we make a request
         return self.get_description_uri(uri, response=self.head(uri))
 
-    def is_reachable(self):
+    def is_reachable(self) -> bool:
+        """Returns `True` if an HTTP HEAD request to the configured `endpoint`
+        yields a non-error response, and `False` otherwise."""
         try:
-            response = self.head(self.endpoint.url)
-            return response.status_code == 200
+            return self.head(self.endpoint.url).ok
         except requests.exceptions.ConnectionError as e:
             logger.error(str(e))
             return False
 
     def test_connection(self):
-        # test connection to fcrepo
+        """Test the connection to the repository using `is_reachable()`. If
+        it returns false, raises a `ConnectionError`."""
         logger.debug(f"Endpoint = {self.endpoint.url}")
         logger.debug(f"Default container path = {self.endpoint.relpath}")
         logger.info(f"Testing connection to {self.endpoint.url}")
@@ -433,6 +527,8 @@ class Client:
         return self.exists(self.endpoint.url + path, **kwargs)
 
     def get_location(self, response: Response) -> Optional[str]:
+        """Return the value of the `Location` HTTP header in `response`,
+        or `None` if there is no such header."""
         try:
             return response.headers['Location']
         except KeyError:
@@ -585,10 +681,10 @@ class Client:
 
 
 class Transaction:
-    def __init__(self, client: 'TransactionClient', uri: str, keep_alive=90, active: bool = True):
-        self.uri = uri
-        self.keep_alive = TransactionKeepAlive(client, keep_alive)
-        self.active = active
+    def __init__(self, client: 'TransactionClient', uri: str, keep_alive: int = 90, active: bool = True):
+        self.uri: str = uri
+        self.keep_alive: TransactionKeepAlive = TransactionKeepAlive(client, keep_alive)
+        self.active: bool = active
         if self.active:
             self.keep_alive.start()
 
@@ -596,20 +692,23 @@ class Transaction:
         return self.uri
 
     @property
-    def maintenance_uri(self):
+    def maintenance_url(self):
+        """Send a POST request to this URL to keep the transaction alive."""
         return os.path.join(self.uri, 'fcr:tx')
 
     @property
-    def commit_uri(self):
+    def commit_url(self):
+        """Send a POST request to this URL to commit the transaction."""
         return os.path.join(self.uri, 'fcr:tx/fcr:commit')
 
     @property
-    def rollback_uri(self):
+    def rollback_url(self):
+        """Send a POST request to this URL to roll back the transaction."""
         return os.path.join(self.uri, 'fcr:tx/fcr:rollback')
 
     def stop(self):
         """
-        Stop the keep-alive thread and set the active flag to False. This should
+        Stop the keep-alive thread and set the `active` flag to `False`. This should
         always be called before committing or rolling back a transaction.
         """
         self.keep_alive.stop()
@@ -624,7 +723,7 @@ class TransactionClient(Client):
 
     @classmethod
     def from_client(cls, client: Client):
-        """Build a TransactionClient from a regular Client object."""
+        """Build a `TransactionClient` from a regular `Client` object."""
         return cls(
             endpoint=client.endpoint,
             structure=client.structure,
@@ -637,10 +736,14 @@ class TransactionClient(Client):
 
     def __init__(self, endpoint: Endpoint, **kwargs):
         super().__init__(endpoint, **kwargs)
-        self.tx = None
+        self.tx: Optional[Transaction] = None
+        """The transaction"""
 
-    def request(self, method, url, **kwargs):
-        # make sure the transaction keep-alive thread hasn't failed
+    def request(self, method: str, url: str, **kwargs) -> Response:
+        """Makes sure the transaction keep-alive thread hasn't failed, and inserts the transaction
+        id into the request URL. Then calls the `Client.request()` method with the same arguments.
+
+        Raises a `RuntimeError` if the transaction keep-alive thread has failed."""
         if self.tx.keep_alive.failed.is_set():
             raise RuntimeError('Transaction keep-alive failed') from self.tx.keep_alive.exception
 
@@ -722,22 +825,28 @@ class TransactionClient(Client):
         return new_graph
 
     def transaction(self, keep_alive: int = 90):
+        """Immediately raises a `TransactionError`, since you cannot nest transactions."""
         raise TransactionError('Cannot nest transactions')
 
     @property
     def active(self):
+        """Whether a transaction is set and active."""
         return self.tx and self.tx.active
 
     def begin(self, uri: str, keep_alive: int = 90):
+        """Create a `Transaction` object and assign it to `tx`."""
         self.tx = Transaction(client=self, uri=uri, keep_alive=keep_alive)
 
     def maintain(self):
+        """Sends an empty POST request to the `Transaction.maintenance_url` to keep it alive.
+        Raises a `TransactionError` if the transaction is inactive, or there is a connection error
+        or non-OK HTTP response from the repository server."""
         logger.info(f'Maintaining transaction {self}')
         if not self.active:
             raise TransactionError(f'Cannot maintain inactive transaction: {self.tx}')
 
         try:
-            response = self.post(self.tx.maintenance_uri)
+            response = self.post(self.tx.maintenance_url)
         except ConnectionError as e:
             raise TransactionError(f'Failed to maintain transaction {self.tx}: {e}') from e
         if response.status_code == HTTPStatus.NO_CONTENT:
@@ -748,13 +857,16 @@ class TransactionClient(Client):
             )
 
     def commit(self):
+        """Commits the transaction. Raises a `TransactionError` if the transaction is
+        inactive, or there is a connection error or non-OK HTTP response from the repository
+        server."""
         logger.info(f'Committing transaction {self.tx}')
         if not self.active:
             raise TransactionError(f'Cannot commit inactive transaction: {self.tx}')
 
         self.tx.stop()
         try:
-            response = self.post(self.tx.commit_uri)
+            response = self.post(self.tx.commit_url)
         except ConnectionError as e:
             raise TransactionError(f'Failed to commit transaction {self.tx}: {e}') from e
         if response.status_code == HTTPStatus.NO_CONTENT:
@@ -766,13 +878,16 @@ class TransactionClient(Client):
             )
 
     def rollback(self):
+        """Rolls back the transaction. Raises a `TransactionError` if the transaction is
+        inactive, or there is a connection error or non-OK HTTP response from the repository
+        server."""
         logger.info(f'Rolling back transaction {self.tx}')
         if not self.tx.active:
             raise TransactionError(f'Cannot roll back inactive transaction: {self.tx}')
 
         self.tx.stop()
         try:
-            response = self.post(self.tx.rollback_uri)
+            response = self.post(self.tx.rollback_url)
         except ConnectionError as e:
             raise TransactionError(f'Failed to roll back transaction {self}: {e}') from e
         if response.status_code == HTTPStatus.NO_CONTENT:
@@ -786,15 +901,31 @@ class TransactionClient(Client):
 
 # based on https://stackoverflow.com/a/12435256/5124907
 class TransactionKeepAlive(threading.Thread):
+    """Thread to run in the background while a long-running transaction is being
+    processed, to ensure that the transaction does not time out due to inactivity."""
     def __init__(self, txn_client: TransactionClient, interval: int):
+        """Create a transaction keep-alive thread."""
         super().__init__(name='TransactionKeepAlive')
-        self.txn_client = txn_client
-        self.interval = interval
-        self.stopped = threading.Event()
-        self.failed = threading.Event()
-        self.exception = None
+        self.txn_client: TransactionClient = txn_client
+        """The transaction client."""
+
+        self.interval: int = interval
+        """Time between transaction maintenance requests."""
+
+        self.stopped: threading.Event = threading.Event()
+        """Flag indicating whether this transaction has been stopped."""
+
+        self.failed: threading.Event = threading.Event()
+        """Flag indicating whether this transaction has failed."""
+
+        self.exception: Optional[TransactionError] = None
+        """If this transaction could not be maintained, this holds the
+        raised `TransactionError`."""
 
     def run(self):
+        """Send a transaction maintenance request every `interval` seconds.
+        If there is a `TransactionError` raised, set the `stopped` and `failed`
+        flags on this thread, and store the raised exception as `exception`."""
         while not self.stopped.wait(self.interval):
             try:
                 self.txn_client.maintain()
@@ -807,8 +938,10 @@ class TransactionKeepAlive(threading.Thread):
                 self.failed.set()
 
     def stop(self):
+        """Set the `stopped` flag on this thread."""
         self.stopped.set()
 
 
 class TransactionError(Exception):
+    """Raised when a transaction fails."""
     pass

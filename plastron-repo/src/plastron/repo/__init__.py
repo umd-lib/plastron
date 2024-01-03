@@ -1,9 +1,6 @@
 import logging
-import shutil
-import sys
 from contextlib import contextmanager
 from io import BytesIO
-from tempfile import NamedTemporaryFile
 from typing import Optional, Type, Dict, Union, TypeVar, Set, List, Iterator
 from uuid import uuid4
 
@@ -14,11 +11,10 @@ from requests import Response
 from requests.auth import AuthBase
 from urlobject import URLObject
 
-from plastron.client import Client, Endpoint, ClientError, TransactionClient, RepositoryStructure
+from plastron.client import Client, Endpoint, ClientError, RepositoryStructure
 from plastron.client.auth import get_authenticator
 from plastron.rdfmapping.graph import TrackChangesGraph
 from plastron.rdfmapping.resources import RDFResourceBase, RDFResourceType
-from plastron.utils import ItemLog
 
 logger = logging.getLogger(__name__)
 ldp = Namespace('http://www.w3.org/ns/ldp#')
@@ -59,7 +55,7 @@ class Repository:
         return cls(client=client)
 
     @classmethod
-    def from_url(cls, url: str, auth: Optional[AuthBase] = None) -> 'Repository':
+    def from_url(cls, url: str, auth: AuthBase = None) -> 'Repository':
         endpoint = Endpoint(url=url)
         client = Client(endpoint=endpoint, auth=auth)
         return cls(client=client)
@@ -76,11 +72,11 @@ class Repository:
     def get_resource(self, path: str, resource_class: Type[ResourceType] = None) -> ResourceType:
         """Get an object representing a resource at a particular path with this repository.
 
-        By default, returns an object of type RepositoryResource, but you may pass a different
-        resource class in the resource_class parameter. That class must support a constructor
-        with keyword arguments "repo" and "path".
+        By default, returns an object of type `RepositoryResource`, but you may pass a different
+        resource class in the `resource_class` parameter. That class must support a constructor
+        with keyword arguments `repo` and `path`.
 
-        :returns: RepositoryResource instance, or an instance of the resource_class, if provided
+        :return: a `RepositoryResource` instance, or an instance of the `resource_class`, if provided
         :raises RepositoryError: if it cannot instantiate an instance of the resource class
         """
         if resource_class is None:
@@ -99,15 +95,16 @@ class Repository:
             raise RepositoryError(f'Cannot get "{path}" as type "{resource_class.__name__}": {e}"') from e
 
     def __getitem__(self, item: Union[str, slice]) -> ResourceType:
-        """Syntactic sugar for the get_resource method. It accepts either a string or a slice.
+        """Syntactic sugar for the `get_resource method`. It accepts either a string or a slice.
 
         If a string is used, it is used as the path, and the resource class defaults to
-        RepositoryResource.
+        `RepositoryResource`.
 
         If a slice is used, the "start" segment is used as the path and the "stop" segment
-        is used as the resource class. If it is None, defaults to RepositoryResource.
+        is used as the resource class. If the "stop" segment is None, the resource class
+        defaults to `RepositoryResource`.
 
-        Examples::
+        Examples:
 
             # get resource at "/foo" as a RepositoryResource object
             r = repo['/foo']
@@ -146,7 +143,7 @@ class Repository:
 
 
 class RepositoryResource:
-    """A single HTTP/LDP resource within a repository."""
+    """An [LDP Resource](https://www.w3.org/TR/ldp/#ldpr) within a repository."""
 
     def __init__(self, repo: Repository, path: str = None):
         self.repo = repo
@@ -284,7 +281,7 @@ class RepositoryResource:
 
 
 class ContainerResource(RepositoryResource):
-    """An LDP container resource."""
+    """An [LDP Container](https://www.w3.org/TR/ldp/#ldpc) resource."""
 
     def create_child(
             self,
@@ -312,12 +309,15 @@ class ContainerResource(RepositoryResource):
 
 
 class BinaryResource(RepositoryResource):
+    """An [LDP Non-RDF Source](https://www.w3.org/TR/ldp/#ldpnr) resource."""
     @property
     def size(self) -> int:
+        """Size of the resource in bytes, as reported by the HTTP `Content-Length` header."""
         return int(self._headers['Content-Length'])
 
     @contextmanager
     def open(self):
+        """Request the resource, and return a `BytesIO` object of its content."""
         response = self.client.get(self.url, stream=True)
         if response.ok:
             yield BytesIO(response.content)
@@ -327,11 +327,8 @@ class RepositoryError(Exception):
     def __init__(self, *args, response: Response = None):
         super().__init__(*args)
         self.response = response
+        """HTTP response that triggered this error."""
 
 
 class DataReadError(Exception):
-    def __init__(self, message):
-        self.message = message
-
-    def __str__(self):
-        return self.message
+    pass

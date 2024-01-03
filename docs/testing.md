@@ -1,15 +1,11 @@
 # Plastron Testing
 
-Plastron uses the [pytest] test framework for its [tests](../plastron-utils/tests).
+Plastron uses the [pytest] test framework for its tests.
 
 ## Basic Testing
 
-Ensure that you have all the [modules](../plastron-utils/requirements.test.txt) required for
-testing installed:
-
-```bash
-pip install -r requirements.test.txt
-```
+Ensure that you have installed all the packages with the `[test]` extra, 
+as described in [README § Install for development].
 
 Run pytest:
 
@@ -62,6 +58,7 @@ To test against a single version of Python, supply an `-e` argument:
 tox -e py38
 ```
 
+[README § Install for development]: index.md#install-for-development
 [pytest]: https://pypi.org/project/pytest/
 [pyenv]: https://github.com/pyenv/pyenv
 [tox]: https://pypi.org/project/tox/

@@ -1,3 +1,8 @@
 site_name: Plastron
+nav:
+  - README: index.md
+  - Architecture: architecture.md
+  - Configuration: configuration.md
+  - Testing: testing.md
 markdown_extensions:
   - plantuml_markdown

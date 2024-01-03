@@ -4,6 +4,7 @@ import re
 from collections import defaultdict
 from contextlib import contextmanager
 from itertools import zip_longest
+from pathlib import Path
 from typing import List, Union, Dict, Type, NamedTuple, Mapping, Iterable
 from urllib.parse import urlparse
 
@@ -11,20 +12,31 @@ from rdflib import URIRef, Literal
 from urlobject import URLObject
 
 from plastron.models.umd import PCDMFile
-from plastron.namespaces import fedora, get_manager
+from plastron.namespaces import fedora
 from plastron.rdfmapping.descriptors import ObjectProperty
 from plastron.rdfmapping.embed import EmbeddedObject
 from plastron.rdfmapping.properties import RDFObjectProperty, RDFDataProperty
 from plastron.rdfmapping.resources import RDFResourceBase
-
-nsm = get_manager()
+from plastron.repo import BinaryResource
 
 
 def not_empty(value):
+    """Returns true if `value` is not `None` and is not the empty string."""
     return value is not None and value != ''
 
 
 def split_escaped(string: str, separator: str = '|') -> List[str]:
+    """Split a string on the separator, taking into account escaped instances
+    of the separator.
+
+    ```pycon
+    >>> split_escaped('foo|bar')
+    ['foo', 'bar']
+
+    >>> split_escaped('foo\|bar|alpha')
+    ['foo|bar', 'alpha']
+    ```
+    """
     if string is None or string == '':
         return []
     # uses a negative look-behind to only split on separator characters
@@ -36,6 +48,22 @@ def split_escaped(string: str, separator: str = '|') -> List[str]:
 
 
 def join_values(values: List[Union[list, str]]) -> str:
+    """Join either a list of strings, or a list of lists of strings. A list of
+    strings will be separated with "|". A list of lists will be separated by ";".
+
+    A list of strings represents a single property of a single subject that has
+    multiple values. A list of lists represents a several instances of the same
+    property, each belonging to a different subject. This latter case is used for
+    embedded objects.
+
+    ```pycon
+    >>> join_values(['foo', 'bar'])
+    'foo|bar'
+
+    >>> join_values([['foo', 'bar'], ['delta']])
+    'foo|bar;delta'
+    ```
+    """
     if values is None or len(values) == 0:
         return ''
     elif isinstance(values[0], list):
@@ -45,11 +73,27 @@ def join_values(values: List[Union[list, str]]) -> str:
 
 
 def build_lookup_index(index_string: str) -> Dict[str, Dict[int, str]]:
-    """
-    Build a lookup dictionary for embedded object properties of an item.
+    """Build a lookup dictionary for embedded object properties of an item.
 
-    :param index_string:
-    :return:
+    From this `index_string`:
+
+    ```python
+    'author[0]=#alpha;author[1]=#beta;subject[0]=#delta'
+    ```
+
+    Returns this dictionary:
+
+    ```python
+    {
+        'author': {
+            0: 'alpha',
+            1: 'beta',
+        },
+        'subject': {
+            0: 'delta',
+        },
+    }
+    ```
     """
     index = defaultdict(dict)
     if index_string is None or index_string == '':
@@ -66,6 +110,22 @@ def build_lookup_index(index_string: str) -> Dict[str, Dict[int, str]]:
 
 
 def flatten_headers(header_map: Dict[str, Union[str, dict]], prefix='') -> Dict[str, str]:
+    """Transform a possibly nested mapping of attribute name to header label into a
+    flat mapping of header label to attribute name. Nesting of the attribute names is
+    indicated by a ".".
+
+    ```pycon
+    >>> header_mapping = {
+    ...     'title': 'Title',
+    ...     'creator': {
+    ...         'label': 'Creator',
+    ...         'same_as': 'Creator URI',
+    ...     },
+    ... }
+    >>> flatten_headers(header_mapping)
+    {'Title': 'title', 'Creator': 'creator.label', 'Creator URI': 'creator.same_as'}
+    ```
+    """
     headers = {}
     for attr, header in header_map.items():
         if isinstance(header, dict):
@@ -77,7 +137,7 @@ def flatten_headers(header_map: Dict[str, Union[str, dict]], prefix='') -> Dict[
 
 def flatten(description: RDFResourceBase, header_map: Dict[str, Union[str, dict]]) -> Dict[str, List[str]]:
     """Convert an RDF description to a dictionary with string header keys and list values.
-    RDF attributes of the description object are mapped to the header keys by the header_map."""
+    RDF attributes of the description object are mapped to the header keys by the `header_map`."""
     columns = defaultdict(list)
     for attr, header in header_map.items():
         if isinstance(header, dict):
@@ -85,6 +145,7 @@ def flatten(description: RDFResourceBase, header_map: Dict[str, Union[str, dict]
             base_prop = getattr(description, attr)
             assert isinstance(base_prop, RDFObjectProperty), f'"{attr}" must be an object property'
             for n, obj in enumerate(base_prop.objects):
+                # add this embedded object to the index for this row
                 columns['INDEX'].append([f'{attr}[{n}]=#{URLObject(obj.uri).fragment}'])
                 for key, values in flatten(obj, header).items():
                     columns[key].append(values)
@@ -105,11 +166,24 @@ def flatten(description: RDFResourceBase, header_map: Dict[str, Union[str, dict]
 
 
 class ColumnHeader(NamedTuple):
+    """A column header with an optional language."""
     label: str
+    """Column header"""
     language: str = None
+    """Language (may be `None`)"""
 
     @classmethod
     def from_string(cls, header: str) -> 'ColumnHeader':
+        """Parse the given string to get the label and language.
+
+        ```pycon
+        >>> ColumnHeader.from_string('Title [en]')
+        ColumnHeader(label='Title', language='en')
+
+        >>> ColumnHeader.from_string('Author')
+        ColumnHeader(label='Author', language=None)
+        ```
+        """
         m = re.match(r'^([^[]*)(?: \[(.*)])?$', header)
         return cls(label=m[1], language=m[2])
 
@@ -118,6 +192,19 @@ class ColumnHeader(NamedTuple):
 
 
 def get_column_headers(headers: Iterable[str], base_header: str) -> List[ColumnHeader]:
+    """From `headers`, return a column `ColumnHeader` for each header whose label is `base_header`.
+
+    ```pycon
+    >>> get_column_headers(['Title [en]', 'Title [de]', 'Author'], 'Title')
+    [ColumnHeader(label='Title', language='en'), ColumnHeader(label='Title', language='de')]
+
+    >>> get_column_headers(['Title [en]', 'Title [de]', 'Author'], 'Author')
+    [ColumnHeader(label='Author', language=None)]
+
+    >>> get_column_headers(['Title [en]', 'Title [de]', 'Author'], 'Date')
+    []
+    ```
+    """
     return [
         ColumnHeader.from_string(h)
         for h in headers
@@ -129,26 +216,30 @@ def get_embedded_params(row: Mapping[str, str], header_labels: Iterable[str]) ->
     """From a data row and a set of header labels, construct a list of parameter
     dictionaries for one or more parallel embedded objects.
 
-    For example, for this CSV::
+    For example, for this CSV:
 
-        Title,Subject,Subject URI
-        Foo,Linguistics;Philosophy,http://example.com/term/ling;http://example.com/term/phil
+    ```csv
+    Title,Subject,Subject URI
+    Foo,Linguistics;Philosophy,http://example.com/term/ling;http://example.com/term/phil
+    ```
 
-    Supplying the first row to this function, with the header labels ["Subject", "Subject URI"],
-    will yield this list::
+    Supplying the first row to this function, with `header_labels=["Subject", "Subject URI"]`,
+    will yield this list:
 
-        [
-            {
-                "Subject": "Linguistics",
-                "Subject URI": "http://example.com/ling",
-            },
-            {
-                "Subject": "Philosophy",
-                "Subject URI": "http://example.com/phil",
-            },
-        ]
+    ```python
+    [
+        {
+            "Subject": "Linguistics",
+            "Subject URI": "http://example.com/ling",
+        },
+        {
+            "Subject": "Philosophy",
+            "Subject URI": "http://example.com/phil",
+        },
+    ]
+    ```
 
-    Which is suitable for passing to unflatten() for building the embedded objects themselves.
+    Which is suitable for passing to `unflatten()` for building the embedded objects themselves.
     """
     params = defaultdict(list)
     for header in header_labels:
@@ -164,7 +255,10 @@ def unflatten(
         resource_class: Type[RDFResourceBase],
         header_map: Mapping[str, Union[str, dict]],
         index: Mapping[str, Mapping[int, str]] = None,
-) -> dict:
+) -> Dict[str, List[Union[Literal, URIRef, EmbeddedObject]]]:
+    """Transform a mapping of column headers to values (such as would be returned by a
+    `csv.DictReader`) into a dictionary of parameters that can be passed to the constructor
+    of an RDF description class to create an RDF description object."""
     if index is None:
         index = {}
     params = defaultdict(list)
@@ -237,11 +331,17 @@ def write_csv_file(row_info, file):
 
 
 class CSVSerializer:
+    """Serializer that encodes metadata records with a defined content model as CSV files."""
+
     SYSTEM_HEADERS = ['URI', 'PUBLIC URI', 'CREATED', 'MODIFIED', 'INDEX', 'FILES', 'ITEM_FILES']
 
-    def __init__(self, directory=None, public_uri_template=None):
-        self.directory_name = directory or os.path.curdir
-        self.content_models = {}
+    def __init__(self, directory: Union[str, Path] = None, public_uri_template: str = None):
+        self.directory = Path(directory) or Path.cwd()
+        """Destination directory for the CSV file(s)"""
+
+        self.rows_by_content_model = {}
+        """Internal accumulator of row data"""
+
         self.content_type = 'text/csv'
         self.file_extension = '.csv'
         self.public_uri_template = public_uri_template
@@ -253,13 +353,15 @@ class CSVSerializer:
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.finish()
 
-    def write(self, resource: RDFResourceBase, files=None, binaries_dir=''):
+    def write(self, resource: RDFResourceBase, files: Iterable[BinaryResource] = None, binaries_dir=''):
         """
-        Serializes the given resource as CSV data rows.
+        Serializes the given resource as a CSV row using the `flatten()` function. The resulting row is
+        added to an internal accumulator. The CSV file or files themselves are not actually written until
+        the `finish()` method is called.
         """
         resource_class = type(resource)
-        if resource_class not in self.content_models:
-            self.content_models[resource_class] = {
+        if resource_class not in self.rows_by_content_model:
+            self.rows_by_content_model[resource_class] = {
                 'header_map': resource_class.HEADER_MAP,
                 'headers': list(flatten_headers(resource_class.HEADER_MAP).keys()) + self.SYSTEM_HEADERS,
                 'extra_headers': defaultdict(set),
@@ -275,11 +377,12 @@ class CSVSerializer:
         row['CREATED'] = str(graph.value(resource.uri, fedora.created))
         row['MODIFIED'] = str(graph.value(resource.uri, fedora.lastModified))
         if self.public_uri_template is not None:
+            # TODO: more generic transform function than hardwired to look for a uuid
             uri = urlparse(resource.uri)
             uuid = os.path.basename(uri.path)
             row['PUBLIC URI'] = self.public_uri_template.format(uuid=uuid)
 
-        self.content_models[resource_class]['rows'].append(row)
+        self.rows_by_content_model[resource_class]['rows'].append(row)
 
     LANGUAGE_NAMES = {
         'ja': 'Japanese',
@@ -295,14 +398,17 @@ class CSVSerializer:
 
     def finish(self):
         """
-        Writes the actual CSV file(s)
+        Writes the actual CSV file(s). For each detected content model, this will write
+        a CSV file with the name `{ModelName}_metadata.csv` to the directory `directory`.
+
+        Raises an `EmptyItemListError` if there are no items to export.
         """
-        if len(self.content_models) == 0:
+        if len(self.rows_by_content_model) == 0:
             raise EmptyItemListError()
 
-        for resource_class, row_info in self.content_models.items():
-            metadata_filename = os.path.join(self.directory_name, resource_class.__name__ + '_metadata.csv')
-            with open(metadata_filename, mode='w') as metadata_file:
+        for resource_class, row_info in self.rows_by_content_model.items():
+            metadata_filename = resource_class.__name__ + '_metadata.csv'
+            with (self.directory / metadata_filename).open(mode='w') as metadata_file:
                 # write a CSV file for this model
                 write_csv_file(row_info, metadata_file)
 

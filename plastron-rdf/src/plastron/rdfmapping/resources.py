@@ -12,6 +12,9 @@ from plastron.rdfmapping.validation import ValidationResultsDict
 
 
 def is_iterable(value: Any) -> bool:
+    """Returns `True` if `value` is iterable, but not a string. While strings
+    in Python are technically iterable, there are many cases where we would
+    prefer to not treat them as such."""
     try:
         iter(value)
     except TypeError:
@@ -25,6 +28,7 @@ def is_iterable(value: Any) -> bool:
 
 
 class RDFResourceBase:
+    """Base class for RDF description classes."""
     rdf_property_names = set()
     default_values = defaultdict(set)
     validators = []
@@ -41,7 +45,7 @@ class RDFResourceBase:
         cls.default_values = deepcopy(cls.__base__.default_values)
         cls.validators = deepcopy(cls.__base__.validators)
 
-    def __init__(self, uri: Union[URIRef, str] = None, graph: Optional[Graph] = None, **kwargs):
+    def __init__(self, uri: Union[URIRef, str] = None, graph: Graph = None, **kwargs):
         if uri is not None:
             self._uri = URIRef(uri)
         else:

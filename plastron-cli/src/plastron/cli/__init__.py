@@ -194,7 +194,7 @@ def main():
             raise RuntimeError(f'Unable to execute command {args.cmd_name}')
 
         command = command_module.Command(config=command_config.get(args.cmd_name.upper()))
-        command._repo = Repository(client=client)
+        command.repo = Repository(client=client)
         command.endpoint = client
         command.broker = broker
 

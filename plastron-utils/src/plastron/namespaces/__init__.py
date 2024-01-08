@@ -93,6 +93,9 @@ sc = Namespace('http://www.shared-canvas.org/ns/')
 skos = Namespace('http://www.w3.org/2004/02/skos/core#')
 """[Simple Knowledge Organization System (SKOS)](https://www.w3.org/TR/skos-reference/)"""
 
+umd = Namespace('http://vocab.lib.umd.edu/model#')
+"""[UMD Content Models Vocabulary](http://vocab.lib.umd.edu/model)"""
+
 umdaccess = Namespace('http://vocab.lib.umd.edu/access#')
 """[UMD Access Classes Vocabulary](http://vocab.lib.umd.edu/access)"""
 

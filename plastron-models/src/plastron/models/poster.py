@@ -1,34 +1,36 @@
-from rdflib import Namespace
+from rdflib import URIRef
 
-from plastron.rdf import pcdm, rdf
+from plastron.models.umd import PCDMObject
+from plastron.namespaces import dcterms, dc, edm, bibo, geo, umd, umdtype
+from plastron.rdfmapping.decorators import rdf_type
+from plastron.rdfmapping.descriptors import ObjectProperty, DataProperty
 from plastron.validation import is_edtf_formatted, is_handle
-from plastron.namespaces import dcterms, dc, edm, bibo, geo
-
-umdtype = Namespace('http://vocab.lib.umd.edu/datatype#')
 
 
-@rdf.object_property('place', dcterms.spatial)
-@rdf.object_property('rights', dcterms.rights)
-@rdf.data_property('identifier', dcterms.identifier)
-# must use the subscripting syntax, since dc.format returns the format method of Namespace
-@rdf.data_property('format', dc['format'])
-@rdf.data_property('type', edm.hasType)
-@rdf.data_property('subject', dc.subject)
-@rdf.data_property('location', dc.coverage)
-@rdf.data_property('date', dc.date)
-@rdf.data_property('language', dc.language)
-@rdf.data_property('description', dcterms.description)
-@rdf.data_property('extent', dcterms.extent)
-@rdf.data_property('issue', bibo.issue)
-@rdf.data_property('locator', bibo.locator)
-@rdf.data_property('latitude', geo.lat)
-@rdf.data_property('longitude', geo.long)
-@rdf.data_property('part_of', dcterms.isPartOf)
-@rdf.data_property('publisher', dc.publisher)
-@rdf.data_property('alternative', dcterms.alternative)
-@rdf.data_property('handle', dcterms.identifier, datatype=umdtype.handle)
-@rdf.rdf_class(bibo.Image)
-class Poster(pcdm.Object):
+@rdf_type(bibo.Image)
+class Poster(PCDMObject):
+    title = DataProperty(dcterms.title, required=True)
+    alternative = DataProperty(dcterms.alternative)
+    publisher = DataProperty(dc.publisher)
+    part_of = DataProperty(dcterms.isPartOf, required=True)
+    # use the full URI since "dc.format" returns the format method of Namespace
+    format = DataProperty(URIRef('http://purl.org/dc/elements/1.1/format'), required=True)
+    type = DataProperty(edm.hasType, required=True)
+    date = DataProperty(dc.date, validate=is_edtf_formatted)
+    language = DataProperty(dc.language, required=True)
+    description = DataProperty(dcterms.description)
+    extent = DataProperty(dcterms.extent)
+    issue = DataProperty(bibo.issue)
+    locator = DataProperty(bibo.locator, required=True)
+    location = DataProperty(dc.coverage)
+    longitude = DataProperty(geo.long)
+    latitude = DataProperty(geo.lat)
+    subject = DataProperty(dc.subject)
+    rights = ObjectProperty(dcterms.rights, required=True)
+    identifier = DataProperty(dcterms.identifier, required=True)
+    handle = DataProperty(dcterms.identifier, validate=is_handle, datatype=umdtype.handle)
+    place = ObjectProperty(dcterms.spatial)
+
     HEADER_MAP = {
         'title': 'Title',
         'alternative': 'Alternate Title',
@@ -49,76 +51,4 @@ class Poster(pcdm.Object):
         'rights': 'Rights',
         'identifier': 'Identifier',
         'handle': 'Handle'
-    }
-    VALIDATION_RULESET = {
-        'title': {
-            'required': True
-        },
-        'alternative': {
-        },
-        # "place" is not currently exported
-        'place': {},
-        'rights': {
-            'required': True,
-            'exactly': 1
-        },
-        # "identifier" is not currently exported
-        'identifier': {
-            'required': True,
-            'exactly': 1
-        },
-        'format': {
-            'required': True,
-            'exactly': 1
-        },
-        'type': {
-            'required': True,
-            # Can't do "exactly 1", because existing records have
-            # multiple entries
-            # 'exactly': 1,
-        },
-        'subject': {
-        },
-        'location': {
-        },
-        'date': {
-            # Can't do "exactly 1", because that makes it required
-            # 'exactly': 1,
-            'function': is_edtf_formatted
-        },
-        'language': {
-            'required': True,
-            'exactly': 1
-        },
-        'description': {},
-        'extent': {
-            # Can't do "exactly 1", because that makes it required
-            # 'exactly': 1,
-        },
-        'issue': {
-            # Can't do "exactly 1", because that makes it required
-            # 'exactly': 1,
-        },
-        'locator': {
-            'required': True,
-            'exactly': 1
-        },
-        'latitude': {
-            # Can't do "exactly 1", because that makes it required
-            # 'exactly': 1,
-        },
-        'longitude': {
-            # Can't do "exactly 1", because that makes it required
-            # 'exactly': 1,
-        },
-        'part_of': {
-            'required': True
-        },
-        'publisher': {
-        },
-        'handle': {
-            'required': False,
-            # 'exactly': 1,
-            'function': is_handle
-        },
     }

@@ -1,5 +1,6 @@
 from plastron.handles import HandleBearingResource
-from plastron.namespaces import dc, dcterms, edm, rdfs, owl, ldp, fabio, pcdm, iana, ore, ebucore, premis, xsd, umdtype
+from plastron.namespaces import dc, dcterms, edm, rdfs, owl, ldp, fabio, pcdm, iana, ore, ebucore, premis, xsd, \
+    umdtype, umd
 from plastron.rdfmapping.decorators import rdf_type
 from plastron.rdfmapping.descriptors import ObjectProperty, DataProperty
 from plastron.rdfmapping.resources import RDFResource, RDFResourceBase
@@ -63,6 +64,7 @@ class PCDMImageFile(PCDMFile):
     width = DataProperty(ebucore.width)
 
 
+@rdf_type(umd.Item)
 class Item(PCDMObject, HandleBearingResource):
     object_type = ObjectProperty(
         dcterms.type,

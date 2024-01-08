@@ -4,7 +4,7 @@ from plastron.rdfmapping.decorators import rdf_type
 from plastron.rdfmapping.descriptors import ObjectProperty, DataProperty
 from plastron.rdfmapping.resources import RDFResource
 from plastron.validation import is_edtf_formatted, is_handle
-from plastron.namespaces import bibo, dc, dcmitype, dcterms, edm, geo, rel, skos, owl
+from plastron.namespaces import bibo, dc, dcmitype, dcterms, edm, geo, rel, skos, owl, umd
 
 umdtype = Namespace('http://vocab.lib.umd.edu/datatype#')
 
@@ -34,7 +34,7 @@ class Collection(AuthorityRecord):
     pass
 
 
-@rdf_type(bibo.Letter)
+@rdf_type(bibo.Letter, umd.Letter)
 class Letter(RDFResource):
     title = DataProperty(dcterms.title, required=True)
     author = ObjectProperty(rel.aut, repeatable=True, embed=True, cls=Agent)

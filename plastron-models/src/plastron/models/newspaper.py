@@ -4,7 +4,7 @@ from lxml.etree import parse, XMLSyntaxError
 
 from plastron.models.annotations import TextblockOnPage
 from plastron.models.umd import PCDMObject, PCDMFile
-from plastron.namespaces import bibo, carriers, dc, dcterms, fabio, ndnp, pcdmuse, umdtype, pcdm
+from plastron.namespaces import bibo, carriers, dc, dcterms, fabio, ndnp, pcdmuse, umdtype, pcdm, umd
 from plastron.rdf.ocr import ALTOResource
 from plastron.rdfmapping.decorators import rdf_type
 from plastron.rdfmapping.descriptors import DataProperty, ObjectProperty
@@ -17,7 +17,7 @@ def is_iso_8601_date(value: str) -> bool:
     return bool(re.match(r'^\d\d\d\d-\d\d-\d\d$', value))
 
 
-@rdf_type(bibo.Issue)
+@rdf_type(bibo.Issue, umd.Newspaper)
 class Issue(PCDMObject):
     """Newspaper issue"""
     title = DataProperty(dcterms.title, required=True)

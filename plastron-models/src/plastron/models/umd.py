@@ -4,8 +4,7 @@ from plastron.namespaces import dc, dcterms, edm, rdfs, owl, ldp, fabio, pcdm, i
 from plastron.rdfmapping.decorators import rdf_type
 from plastron.rdfmapping.descriptors import ObjectProperty, DataProperty
 from plastron.rdfmapping.resources import RDFResource, RDFResourceBase
-from plastron.validation import is_edtf_formatted, is_valid_iso639_code
-from plastron.validation.vocabularies import get_subjects
+from plastron.validation.rules import is_edtf_formatted, is_valid_iso639_code, is_from_vocabulary
 
 
 @rdf_type(pcdm.Object)
@@ -18,16 +17,6 @@ class Stub(RDFResource):
 class LabeledThing(RDFResource):
     label = DataProperty(rdfs.label, required=True)
     same_as = ObjectProperty(owl.sameAs)
-
-
-def is_from_vocabulary(vocab_uri):
-    subjects = get_subjects(vocab_uri)
-
-    def _value_from_vocab(value):
-        return value in subjects
-
-    _value_from_vocab.__doc__ = f'from vocabulary {vocab_uri}'
-    return _value_from_vocab
 
 
 class LDPContainer(RDFResource):

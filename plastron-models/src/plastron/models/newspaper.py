@@ -1,5 +1,3 @@
-import re
-
 from lxml.etree import parse, XMLSyntaxError
 
 from plastron.models.annotations import TextblockOnPage
@@ -9,12 +7,7 @@ from plastron.rdf.ocr import ALTOResource
 from plastron.rdfmapping.decorators import rdf_type
 from plastron.rdfmapping.descriptors import DataProperty, ObjectProperty
 from plastron.repo import DataReadError
-from plastron.validation import is_handle
-
-
-def is_iso_8601_date(value: str) -> bool:
-    """an ISO 8601 date string (YYYY-MM-DD)"""
-    return bool(re.match(r'^\d\d\d\d-\d\d-\d\d$', value))
+from plastron.validation.rules import is_handle, is_iso_8601_date
 
 
 @rdf_type(bibo.Issue, umd.Newspaper)

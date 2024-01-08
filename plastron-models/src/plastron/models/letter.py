@@ -3,7 +3,7 @@ from rdflib import Namespace
 from plastron.rdfmapping.decorators import rdf_type
 from plastron.rdfmapping.descriptors import ObjectProperty, DataProperty
 from plastron.rdfmapping.resources import RDFResource
-from plastron.validation import is_edtf_formatted, is_handle
+from plastron.validation.rules import is_edtf_formatted, is_handle
 from plastron.namespaces import bibo, dc, dcmitype, dcterms, edm, geo, rel, skos, owl, umd
 
 umdtype = Namespace('http://vocab.lib.umd.edu/datatype#')

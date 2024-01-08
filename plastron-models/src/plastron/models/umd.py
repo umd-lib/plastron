@@ -97,31 +97,6 @@ class Item(PCDMObject, HandleBearingResource):
     bibliographic_citation = DataProperty(dcterms.bibliographicCitation)
     accession_number = DataProperty(dcterms.identifier, datatype=umdtype.accessionNumber)
 
-    _ORIGINAL_HEADER_MAP = {
-        'object_type': 'Object Type',
-        'identifier': 'Identifier',
-        'rights': 'Rights Statement',
-        'title': 'Title',
-        'format': 'Format',
-        'archival_collection': 'Archival Collection',
-        'date': 'Date',
-        'description': 'Description',
-        'alternate_title': 'Alternate Title',
-        'creator.label': 'Creator',
-        'creator.same_as': 'Creator URI',
-        'contributor.label': 'Contributor',
-        'contributor.same_as': 'Contributor URI',
-        'publisher.label': 'Publisher',
-        'publisher.same_as': 'Publisher URI',
-        'location.label': 'Location',
-        'extent': 'Extent',
-        'subject.label': 'Subject',
-        'language': 'Language',
-        'rights_holder.label': 'Rights Holder',
-        'bibliographic_citation': 'Collection Information',
-        'accession_number': 'Accession Number',
-        'handle': 'Handle',
-    }
     HEADER_MAP = {
         'object_type': 'Object Type',
         'identifier': 'Identifier',

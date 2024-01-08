@@ -1,23 +1,32 @@
-from lxml.etree import parse, XMLSyntaxError
-from rdflib import URIRef, Namespace
+import re
 
+from lxml.etree import parse, XMLSyntaxError
+
+from plastron.models.annotations import TextblockOnPage
+from plastron.models.umd import PCDMObject, PCDMFile
+from plastron.namespaces import bibo, carriers, dc, dcterms, fabio, ndnp, pcdmuse, umdtype, pcdm
+from plastron.rdf.ocr import ALTOResource
+from plastron.rdfmapping.decorators import rdf_type
+from plastron.rdfmapping.descriptors import DataProperty, ObjectProperty
 from plastron.repo import DataReadError
 from plastron.validation import is_handle
-from plastron.namespaces import bibo, carriers, dc, dcterms, fabio, ndnp, pcdmuse, prov, sc
-from plastron.rdf import pcdm, ocr, oa, rdf
-
-umdtype = Namespace('http://vocab.lib.umd.edu/datatype#')
 
 
-@rdf.data_property('title', dcterms.title)
-@rdf.data_property('date', dc.date)
-@rdf.data_property('volume', bibo.volume)
-@rdf.data_property('issue', bibo.issue)
-@rdf.data_property('edition', bibo.edition)
-@rdf.data_property('handle', dcterms.identifier, datatype=umdtype.handle)
-@rdf.rdf_class(bibo.Issue)
-class Issue(pcdm.Object):
+def is_iso_8601_date(value: str) -> bool:
+    """an ISO 8601 date string (YYYY-MM-DD)"""
+    return bool(re.match(r'^\d\d\d\d-\d\d-\d\d$', value))
+
+
+@rdf_type(bibo.Issue)
+class Issue(PCDMObject):
     """Newspaper issue"""
+    title = DataProperty(dcterms.title, required=True)
+    date = DataProperty(dc.date, required=True, validate=is_iso_8601_date)
+    volume = DataProperty(bibo.volume, required=True)
+    issue = DataProperty(bibo.issue, required=True)
+    edition = DataProperty(bibo.edition, required=True)
+    handle = DataProperty(dcterms.identifier, datatype=umdtype.handle, validate=is_handle)
+
     HEADER_MAP = {
         'title': 'Title',
         'date': 'Date',
@@ -26,102 +35,26 @@ class Issue(pcdm.Object):
         'edition': 'Edition',
         'handle': 'Handle'
     }
-    VALIDATION_RULESET = {
-        'title': {
-            'required': True,
-            'exactly': 1
-        },
-        'date': {
-            'required': True,
-            'exactly': 1,
-            'value_pattern': r'^\d\d\d\d-\d\d-\d\d$'
-        },
-        'volume': {
-            'required': True,
-            'exactly': 1
-        },
-        'issue': {
-            'required': True,
-            'exactly': 1
-        },
-        'edition': {
-            'required': True,
-            'exactly': 1
-        },
-        'handle': {
-            'required': False,
-            # 'exactly': 1,
-            'function': is_handle
-        },
-    }
 
 
-@rdf.object_property('derived_from', prov.wasDerivedFrom, embed=True)
-class TextblockOnPage(oa.Annotation):
-    def __init__(self, textblock, page):
-        super().__init__()
-        self.add_body(
-            oa.TextualBody(
-                value=textblock.text(scale=page.ocr.scale),
-                content_type='text/plain'
-            )
-        )
-        xywh = ','.join([str(i) for i in textblock.xywh(page.ocr.scale)])
-        self.add_target(
-            oa.SpecificResource(
-                source=page,
-                selector=[oa.FragmentSelector(
-                    value=f'xywh={xywh}',
-                    conforms_to=URIRef('http://www.w3.org/TR/media-frags/')
-                )]
-            )
-        )
-        self.derived_from = oa.SpecificResource(
-            source=page.ocr_file,
-            selector=[oa.XPathSelector(value=f'//*[@ID="{textblock.id}"]')]
-        )
-        self.motivation = sc.painting
-
-
-@rdf.rdf_class(fabio.Metadata)
-class IssueMetadata(pcdm.Object):
+@rdf_type(fabio.Metadata)
+class IssueMetadata(PCDMObject):
     """Additional metadata about an issue"""
-
-    def __init__(self, file, title=None):
-        super(IssueMetadata, self).__init__()
-        self.add_file(file)
-        if title is not None:
-            self.title = title
-        else:
-            self.title = file.title
+    pass
 
 
-@rdf.rdf_class(fabio.MetadataDocument)
-class MetadataFile(pcdm.File):
+@rdf_type(fabio.MetadataDocument)
+class MetadataFile(PCDMFile):
     """A binary file containing metadata in non-RDF formats (METS, MODS, etc.)"""
     pass
 
 
-@rdf.object_property('issue', pcdm.ns.memberOf)
-@rdf.data_property('number', ndnp.number)
-@rdf.data_property('frame', ndnp.sequence)
-@rdf.rdf_class(ndnp.Page)
-class Page(pcdm.Object):
+@rdf_type(ndnp.Page)
+class Page(PCDMObject):
     """Newspaper page"""
-
-    @classmethod
-    def from_repository(cls, client, page_uri):
-        page = cls.from_graph(client.get_graph(page_uri))
-        page.uri = page_uri
-        page.created = True
-        page.updated = True
-
-        # map file URIs to File objects
-        page.files = list(map(lambda f: File.from_repository(client, f), page.files))
-
-        page.parse_ocr()
-
-        return page
+    issue = ObjectProperty(pcdm.memberOf, cls=Issue)
+    number = DataProperty(ndnp.number)
+    frame = DataProperty(ndnp.sequence)
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -149,14 +82,14 @@ class Page(pcdm.Object):
         # read in resolution from issue METS data
         master = next(self.files_for('master'))
         self.ocr_file = ocr_file
-        self.ocr = ocr.ALTOResource(tree, master.resolution)
+        self.ocr = ALTOResource(tree, master.resolution)
 
     def textblocks(self):
         if self.ocr is None:
             raise StopIteration()
         # extract text blocks from ALTO XML for this page
         for textblock in self.ocr.textblocks():
-            yield TextblockOnPage(textblock, self)
+            yield TextblockOnPage.from_textblock(textblock, page=self, scale=self.ocr.scale, ocr_file=self.ocr_file)
 
     def files_for(self, use):
         for f in self.files:
@@ -164,7 +97,7 @@ class Page(pcdm.Object):
                 yield f
 
 
-class File(pcdm.File):
+class File(PCDMFile):
     """Newspaper file"""
 
     @classmethod
@@ -186,24 +119,18 @@ class File(pcdm.File):
         return obj
 
 
-@rdf.object_property('issue', pcdm.ns.memberOf)
-@rdf.data_property('start_page', bibo.pageStart)
-@rdf.data_property('end_page', bibo.pageEnd)
-@rdf.rdf_class(bibo.Article)
-class Article(pcdm.Object):
+@rdf_type(bibo.Article)
+class Article(PCDMObject):
     """Newspaper article"""
-
-    def __init__(self, pages=None, **kwargs):
-        super().__init__(**kwargs)
-        if pages is not None:
-            self.start_page = pages[0]
-            self.end_page = pages[-1]
+    issue = ObjectProperty(pcdm.memberOf, cls=Issue)
+    start_page = DataProperty(bibo.pageStart)
+    end_page = DataProperty(bibo.pageEnd)
 
 
-@rdf.data_property('id', dcterms.identifier)
-@rdf.rdf_class(carriers.hd)
-class Reel(pcdm.Object):
+@rdf_type(carriers.hd)
+class Reel(PCDMObject):
     """NDNP reel is an ordered sequence of frames"""
+    id = DataProperty(dcterms.identifier)
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)

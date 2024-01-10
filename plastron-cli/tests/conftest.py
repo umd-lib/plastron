@@ -6,6 +6,7 @@ import pytest
 from httpretty import httpretty
 from rdflib import Graph
 
+from plastron.cli import PlastronContext
 from plastron.client import Endpoint, Client
 from plastron.client.auth import get_authenticator
 from plastron.repo import Repository
@@ -20,6 +21,11 @@ def repo_base_config():
         'LOG_DIR': '/logs',
         'AUTH_TOKEN': 'foobar'
     }
+
+
+@pytest.fixture
+def plastron_context(repo_base_config, repo):
+    return PlastronContext(config={'REPOSITORY': repo_base_config})
 
 
 @pytest.fixture

@@ -5,13 +5,12 @@ from typing import Iterable, Tuple, Dict, Type
 
 from rdflib import Literal
 
-from plastron.cli import PlastronContext
 from plastron.cli.commands import BaseCommand
 from plastron.models import get_model_class
 from plastron.rdf import uri_or_curie
 from plastron.rdfmapping.descriptors import DataProperty, ObjectProperty
 from plastron.rdfmapping.resources import RDFResourceBase
-from plastron.repo import Repository, RepositoryResource
+from plastron.repo import RepositoryResource
 
 logger = logging.getLogger(__name__)
 
@@ -47,9 +46,9 @@ def configure_cli(subparsers):
 
 
 class Command(BaseCommand):
-    def __call__(self, fcrepo: Repository, args: Namespace):
+    def __call__(self, args: Namespace):
         # mimicking a click.Context object to bridge between argparse and click commands
-        ctx = Namespace(obj=PlastronContext(repo=self.repo))
+        ctx = Namespace(obj=self.context)
         return set_fields(ctx, args.model_name, args.fields_to_set, args.uris)
 
 

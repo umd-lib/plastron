@@ -32,11 +32,6 @@ def configure_cli(subparsers):
 
 
 class Command(BaseCommand):
-    def __init__(self, config=None):
-        super().__init__(config=config)
-        self.result = None
-        self.ssh_private_key = self.config.get('SSH_PRIVATE_KEY')
-
     def __call__(self, *args, **kwargs):
         self.execute(*args, **kwargs)
         print(self.result)

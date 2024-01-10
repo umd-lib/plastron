@@ -2,7 +2,6 @@ import logging
 from argparse import FileType, Namespace
 
 from plastron.cli.commands import BaseCommand
-from plastron.client import Client
 from plastron.jobs.updatejob import UpdateJob
 from plastron.models import get_model_class
 from plastron.rdf import parse_predicate_list
@@ -68,8 +67,8 @@ def configure_cli(subparsers):
 
 
 class Command(BaseCommand):
-    def __call__(self, client: Client, args: Namespace):
-        client.test_connection()
+    def __call__(self, args: Namespace):
+        self.context.client.test_connection()
 
         if args.validate and args.model is None:
             raise RuntimeError("Model must be provided when performing validation")
@@ -90,7 +89,7 @@ class Command(BaseCommand):
         traverse = parse_predicate_list(args.recursive) if args.recursive is not None else []
 
         update_job = UpdateJob(
-            repo=self.repo,
+            repo=self.context.repo,
             uris=args.uris,
             sparql_update=sparql_update,
             model_class=model_class,

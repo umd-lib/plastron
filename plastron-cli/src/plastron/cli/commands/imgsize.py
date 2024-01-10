@@ -1,13 +1,12 @@
 import logging
-from PIL import Image
 from argparse import Namespace
 
+from PIL import Image
+
 from plastron.cli.commands import BaseCommand
-from plastron.client import Client
 from plastron.models.umd import PCDMImageFile
 from plastron.repo import BinaryResource
 from plastron.repo.utils import context
-
 
 Image.MAX_IMAGE_PIXELS = None
 
@@ -28,15 +27,15 @@ def configure_cli(subparsers):
 
 
 class Command(BaseCommand):
-    def __call__(self, client: Client, args: Namespace):
+    def __call__(self, args: Namespace):
         for uri in args.uris:
 
-            file_resource: BinaryResource = self.repo[uri:BinaryResource].read()
+            file_resource: BinaryResource = self.context.repo[uri:BinaryResource].read()
             file = file_resource.describe(PCDMImageFile)
 
             # source = RepositoryFileSource(client, uri)
-            if file.mime_type.value.startswith('image/'): # ?
-                with context(repo=self.repo):
+            if file.mime_type.value.startswith('image/'):  # ?
+                with context(repo=self.context.repo):
                     logger.info(f'Reading image data from {uri}')
 
                     with file_resource.open() as file_contents:

@@ -72,7 +72,7 @@ def register_responses(responses, uri):
     ]
 )
 @httpretty.activate
-def test_delete_command(repo, register_transaction, path, responses, expectation):
+def test_delete_command(plastron_context, register_transaction, path, responses, expectation):
     txn_url = register_transaction()
     uri = txn_url.add_path_segment(path)
     register_responses(
@@ -80,21 +80,22 @@ def test_delete_command(repo, register_transaction, path, responses, expectation
         responses=responses,
     )
     args = argparse.Namespace(
+        delegated_user=None,
         completed=None,
         dry_run=False,
         uris=[f'/{path}'],
         use_transactions=True,
         recursive=None,
     )
+    plastron_context.args = args
 
-    cmd = Command()
-    cmd.repo = repo
+    cmd = Command(context=plastron_context)
     with expectation:
-        cmd(repo.client, args)
+        cmd(args)
 
 
 @httpretty.activate
-def test_completed_log(datadir, repo, register_transaction):
+def test_completed_log(datadir, repo, plastron_context, register_transaction):
     txn_url = register_transaction()
     url = txn_url.add_path_segment('test')
     deleted_url = str(repo['/test'].url)
@@ -109,16 +110,17 @@ def test_completed_log(datadir, repo, register_transaction):
     )
     completed_log_path: Path = datadir / 'completed.csv'
     args = argparse.Namespace(
+        delegated_user=None,
         completed=completed_log_path,
         dry_run=False,
         uris=['/test'],
         use_transactions=True,
         recursive=None,
     )
+    plastron_context.args = args
 
-    cmd = Command()
-    cmd.repo = repo
-    cmd(repo.client, args)
+    cmd = Command(context=plastron_context)
+    cmd(args)
 
     assert completed_log_path.exists()
     completed_log = ItemLog(filename=completed_log_path, fieldnames=['uri', 'title', 'timestamp'], keyfield='uri')

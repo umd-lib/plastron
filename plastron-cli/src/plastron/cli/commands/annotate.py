@@ -29,16 +29,12 @@ def configure_cli(subparsers):
 
 
 class Command(BaseCommand):
-    def __init__(self, config=None):
-        super().__init__(config)
-        self.result = None
-
-    def __call__(self, client: Client, args: Namespace):
+    def __call__(self, args: Namespace):
         uris = get_uris(args)
-        client.test_connection()
+        self.context.client.test_connection()
         for uri in uris:
-            with context(repo=self.repo):
-                obj = self.repo[uri:PCDMPageResource]
+            with context(repo=self.context.repo):
+                obj = self.context.repo[uri:PCDMPageResource]
                 for file_resource in obj.read().get_files(mime_type='text/html'):
                     with file_resource.open() as stream:
                         text = BeautifulSoup(stream, features='lxml').get_text()

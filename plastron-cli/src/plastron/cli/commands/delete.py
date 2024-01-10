@@ -1,5 +1,5 @@
-import argparse
 import logging
+from argparse import FileType, Namespace
 from datetime import datetime
 
 from plastron.cli import get_uris
@@ -44,7 +44,7 @@ def configure_cli(subparsers):
     parser.add_argument(
         '-f', '--file',
         dest='uris_file',
-        type=argparse.FileType(mode='r'),
+        type=FileType(mode='r'),
         help='File containing a list of URIs to delete',
         action='store'
     )
@@ -56,8 +56,8 @@ def configure_cli(subparsers):
 
 
 class Command(BaseCommand):
-    def __call__(self, client, args):
-        client.test_connection()
+    def __call__(self, args: Namespace):
+        self.context.client.test_connection()
         if args.completed:
             completed_log = ItemLog(args.completed, ['uri', 'title', 'timestamp'], 'uri')
         else:
@@ -75,9 +75,9 @@ class Command(BaseCommand):
         uris = get_uris(args)
 
         for uri in uris:
-            with context(repo=self.repo, use_transactions=args.use_transactions, dry_run=args.dry_run):
+            with context(repo=self.context.repo, use_transactions=args.use_transactions, dry_run=args.dry_run):
                 try:
-                    for resource in self.repo[uri].walk(traverse=traverse):
+                    for resource in self.context.repo[uri].walk(traverse=traverse):
                         obj = resource.describe(PCDMObject)
                         title = obj.title
                         if args.dry_run:

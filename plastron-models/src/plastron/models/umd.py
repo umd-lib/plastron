@@ -34,8 +34,8 @@ class LDPContainer(RDFResource):
 
 
 class AggregationMixin(RDFResourceBase):
-    first = ObjectProperty(iana.first, required=True, cls='Proxy')
-    last = ObjectProperty(iana.last, required=True, cls='Proxy')
+    first = ObjectProperty(iana.first, cls='Proxy')
+    last = ObjectProperty(iana.last, cls='Proxy')
 
 
 @rdf_type(pcdm.Object)

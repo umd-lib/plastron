@@ -1,5 +1,6 @@
 from collections import defaultdict
 from copy import deepcopy, copy
+from functools import reduce
 from typing import List, Optional, Union, Any, Type, TypeVar
 from uuid import uuid4
 
@@ -36,14 +37,16 @@ class RDFResourceBase:
     def __init_subclass__(cls, **kwargs):
         # make new copies of the class variables for the subclasses
         # at this point, the Property descriptors' __set_name__ methods
-        # have already run, so we retroactively add the names of
-        # this class's Property descriptors
-        own_properties = {k for k, v in cls.__dict__.items() if isinstance(v, Property)}
-        cls.rdf_property_names = copy(cls.__base__.rdf_property_names) | own_properties
-        # default_values and validators are modified by decorators, which
-        # run after the __init_subclass__ method
-        cls.default_values = deepcopy(cls.__base__.default_values)
-        cls.validators = deepcopy(cls.__base__.validators)
+        # have already run, so we start with the names of this class's
+        # own Property descriptors
+        cls.rdf_property_names = {k for k, v in cls.__dict__.items() if isinstance(v, Property)}
+        base_classes = list(filter(lambda c: issubclass(c, RDFResourceBase), cls.__mro__))
+        for base_class in base_classes:
+            cls.rdf_property_names |= copy(base_class.rdf_property_names)
+            # default_values and validators are modified by decorators, which
+            # run after the __init_subclass__ method
+            cls.default_values.update(deepcopy(base_class.default_values))
+            cls.validators.extend(deepcopy(base_class.validators))
 
     def __init__(self, uri: Union[URIRef, str] = None, graph: Graph = None, **kwargs):
         if uri is not None:

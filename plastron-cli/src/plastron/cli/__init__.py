@@ -6,10 +6,11 @@ import logging.config
 import os
 import sys
 from argparse import ArgumentParser, FileType, Namespace
+from dataclasses import dataclass
 from datetime import datetime
 from importlib import import_module
 from pkgutil import iter_modules
-from typing import Iterable
+from typing import Iterable, Dict, Any
 
 import pysolr
 import yaml
@@ -239,6 +240,12 @@ def print_footer(args):
 
 if __name__ == "__main__":
     main()
+
+
+@dataclass
+class PlastronContext:
+    config: Dict[Any, Any] = None
+    repo: Repository = None
 
 
 class ConfigError(Exception):

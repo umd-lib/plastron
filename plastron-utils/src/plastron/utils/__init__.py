@@ -1,4 +1,4 @@
-import collections
+import collections.abc
 import csv
 import logging
 import os
@@ -137,7 +137,7 @@ def strtobool(val: str) -> int:
         raise ValueError("invalid truth value %r" % (val,))
 
 
-class AppendableSequence(collections.Sequence, ABC):
+class AppendableSequence(collections.abc.Sequence, ABC):
     """Abstract base class for appendable sequences"""
     def append(self, _value):
         raise NotImplementedError

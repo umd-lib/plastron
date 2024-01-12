@@ -1,0 +1,10 @@
+Object Type,Identifier,Rights Statement,Title,Format,Archival Collection,Date,Description,Alternate Title,Creator,Creator URI,Contributor,Contributor URI,Publisher,Publisher URI,Location,Extent,Subject,Language,Rights Holder,Collection Information,Accession Number,Handle,PUBLISH,HIDDEN
+http://purl.org/dc/dcmitype/Text,test-unmarked,http://vocab.lib.umd.edu/rightsStatement#InC-NC,Test Item,,,,,,,,,,,,,,,,,,,,,
+http://purl.org/dc/dcmitype/Text,test-publish,http://vocab.lib.umd.edu/rightsStatement#InC-NC,Test Item,,,,,,,,,,,,,,,,,,,,True,
+http://purl.org/dc/dcmitype/Text,test-hidden,http://vocab.lib.umd.edu/rightsStatement#InC-NC,Test Item,,,,,,,,,,,,,,,,,,,,,True
+http://purl.org/dc/dcmitype/Text,test-publish-hidden,http://vocab.lib.umd.edu/rightsStatement#InC-NC,Test Item,,,,,,,,,,,,,,,,,,,,True,True
+http://purl.org/dc/dcmitype/Text,test-not-publish,http://vocab.lib.umd.edu/rightsStatement#InC-NC,Test Item,,,,,,,,,,,,,,,,,,,,False,
+http://purl.org/dc/dcmitype/Text,test-not-hidden,http://vocab.lib.umd.edu/rightsStatement#InC-NC,Test Item,,,,,,,,,,,,,,,,,,,,,False
+http://purl.org/dc/dcmitype/Text,test-not-publish-not-hidden,http://vocab.lib.umd.edu/rightsStatement#InC-NC,Test Item,,,,,,,,,,,,,,,,,,,,False,False
+http://purl.org/dc/dcmitype/Text,test-not-publish-hidden,http://vocab.lib.umd.edu/rightsStatement#InC-NC,Test Item,,,,,,,,,,,,,,,,,,,,False,True
+http://purl.org/dc/dcmitype/Text,test-publish-not-hidden,http://vocab.lib.umd.edu/rightsStatement#InC-NC,Test Item,,,,,,,,,,,,,,,,,,,,True,False

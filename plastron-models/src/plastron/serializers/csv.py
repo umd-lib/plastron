@@ -333,7 +333,9 @@ def write_csv_file(row_info, file):
 class CSVSerializer:
     """Serializer that encodes metadata records with a defined content model as CSV files."""
 
-    SYSTEM_HEADERS = ['URI', 'PUBLIC URI', 'CREATED', 'MODIFIED', 'INDEX', 'FILES', 'ITEM_FILES']
+    SYSTEM_HEADERS = [
+        'URI', 'PUBLIC URI', 'CREATED', 'MODIFIED', 'INDEX', 'FILES', 'ITEM_FILES', 'PUBLISH', 'HIDDEN'
+    ]
 
     def __init__(self, directory: Union[str, Path] = None, public_uri_template: str = None):
         self.directory = Path(directory) or Path.cwd()

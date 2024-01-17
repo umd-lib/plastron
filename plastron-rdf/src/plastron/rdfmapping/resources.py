@@ -1,7 +1,6 @@
 from collections import defaultdict
 from copy import deepcopy, copy
-from functools import reduce
-from typing import List, Optional, Union, Any, Type, TypeVar
+from typing import List, Optional, Union, Any, Type, TypeVar, Set, Dict, Callable
 from uuid import uuid4
 
 from rdflib import Graph, URIRef
@@ -30,9 +29,9 @@ def is_iterable(value: Any) -> bool:
 
 class RDFResourceBase:
     """Base class for RDF description classes."""
-    rdf_property_names = set()
-    default_values = defaultdict(set)
-    validators = []
+    rdf_property_names: Set = set()
+    default_values: Dict[Any, Set] = defaultdict(set)
+    validators: List[Callable[['RDFResourceBase'], bool]] = []
 
     def __init_subclass__(cls, **kwargs):
         # make new copies of the class variables for the subclasses
@@ -40,6 +39,8 @@ class RDFResourceBase:
         # have already run, so we start with the names of this class's
         # own Property descriptors
         cls.rdf_property_names = {k for k, v in cls.__dict__.items() if isinstance(v, Property)}
+        cls.default_values = defaultdict(set)
+        cls.validators = []
         base_classes = list(filter(lambda c: issubclass(c, RDFResourceBase), cls.__mro__))
         for base_class in base_classes:
             cls.rdf_property_names |= copy(base_class.rdf_property_names)

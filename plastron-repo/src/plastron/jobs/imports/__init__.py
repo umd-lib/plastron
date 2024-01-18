@@ -158,6 +158,7 @@ class ImportJob:
             percentage: int = None,
             validate_only: bool = False,
             import_file: IO = None,
+            publish: bool = False,
     ) -> Generator[Dict[str, Any], None, Dict[str, Any]]:
         run = self.new_run()
         return run(
@@ -166,6 +167,7 @@ class ImportJob:
             percentage=percentage,
             validate_only=validate_only,
             import_file=import_file,
+            publish=publish,
         )
 
     @property
@@ -252,11 +254,13 @@ class ImportJob:
 
 
 class ImportRow:
-    def __init__(self, job: ImportJob, repo: Repository, row: Row, validate_only: bool = False):
+    def __init__(self, job: ImportJob, repo: Repository, row: Row, validate_only: bool = False, publish: bool = False):
         self.job = job
         self.row = row
         self.repo = repo
         self.item = row.get_object(repo, read_from_repo=not validate_only)
+        if publish:
+            self.item.rdf_type.add(umdaccess.Published)
 
     def __str__(self):
         return str(self.row.line_reference)
@@ -423,6 +427,7 @@ class ImportRun:
             percentage: int = None,
             validate_only: bool = False,
             import_file: IO = None,
+            publish: bool = False,
     ) -> Generator[Dict[str, Any], None, Dict[str, Any]]:
         """Execute this import run. Returns a generator that yields a dictionary of
         current status after each item. The generator also returns a final status
@@ -454,6 +459,8 @@ class ImportRun:
             logger.info(f'Loading {percentage}% of the total items')
         if validate_only:
             logger.info('Validation-only mode, skipping imports')
+        if publish:
+            logger.info('Publishing all imported items')
 
         # if an import file was provided, save that as the new CSV metadata file
         if import_file is not None:
@@ -490,7 +497,7 @@ class ImportRun:
                 continue
 
             logger.debug(f'Row data: {row.data}')
-            import_row = ImportRow(self.job, repo, row, validate_only)
+            import_row = ImportRow(self.job, repo, row, validate_only, publish)
 
             # count the number of files referenced in this row
             count['files'] += len(row.filenames)

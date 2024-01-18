@@ -127,6 +127,11 @@ def configure_cli(subparsers):
         action='store'
     )
     parser.add_argument(
+        '--publish',
+        help='automatically publish all items in this import',
+        action='store_true',
+    )
+    parser.add_argument(
         'import_file', nargs='?',
         help='name of the file to import from',
         type=FileType('r', encoding='utf-8-sig'),
@@ -186,6 +191,7 @@ class Command(BaseCommand):
             limit=args.limit,
             percentage=args.percentage,
             validate_only=args.validate_only,
+            publish=args.publish,
         ))
 
         for key, value in self.result['count'].items():

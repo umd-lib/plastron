@@ -1,30 +1,42 @@
 from contextlib import nullcontext
+from pathlib import Path
 from unittest.mock import MagicMock
 
+import pytest
+
 from plastron.cli.commands.publish import get_publication_status
-from plastron.jobs.imports import ImportJob
+from plastron.jobs.imports import ImportJobs, ImportConfig
 from plastron.repo import Repository, RepositoryResource
 
 
-def test_safe_job_id():
-    job = ImportJob('foo', '/tmp')
-    assert job.id == 'foo'
-    assert job.safe_id == 'foo'
+@pytest.fixture
+def jobs_dir(datadir) -> Path:
+    return datadir
 
 
-def test_job_id_with_slashes():
-    job = ImportJob('foo/bar', '/tmp')
-    assert job.id == 'foo/bar'
-    assert job.safe_id == 'foo%2Fbar'
+@pytest.fixture
+def jobs(jobs_dir) -> ImportJobs:
+    return ImportJobs(jobs_dir)
 
 
-def test_uri_as_job_id():
-    job = ImportJob('http://localhost:3000/import-jobs/17', '/tmp')
-    assert job.id == 'http://localhost:3000/import-jobs/17'
-    assert job.safe_id == 'http%3A%2F%2Flocalhost%3A3000%2Fimport-jobs%2F17'
+@pytest.mark.parametrize(
+    ('job_id', 'safe_id'),
+    [
+        # basic
+        ('foo', 'foo'),
+        # with slashes
+        ('foo/bar', 'foo%2Fbar'),
+        # URI as job ID
+        ('http://localhost:3000/import-jobs/17', 'http%3A%2F%2Flocalhost%3A3000%2Fimport-jobs%2F17'),
+    ]
+)
+def test_safe_job_id(jobs, job_id, safe_id):
+    job = jobs.create_job(job_id=job_id)
+    assert job.id == job_id
+    assert job.dir == jobs.dir / safe_id
 
 
-def test_import_job_create_resource(datadir):
+def test_import_job_create_resource(datadir, jobs):
     class MockContainer:
         obj = None
         _resource_class = None
@@ -51,8 +63,8 @@ def test_import_job_create_resource(datadir):
         'UnpublishedHidden',
         'Published',
     ]
-    import_job = ImportJob('123', datadir)
+    import_job = jobs.create_job(config=ImportConfig(job_id='123', model='Item'))
     import_file = datadir / 'item.csv'
-    for i, stats in enumerate(import_job.start(repo=mock_repo, model='Item', import_file=import_file.open())):
+    for i, stats in enumerate(import_job.run(repo=mock_repo, import_file=import_file.open())):
         assert mock_container.obj is not None
         assert get_publication_status(mock_container.obj) == expected_publication_statuses[i]

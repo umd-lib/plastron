@@ -6,8 +6,8 @@ from pathlib import Path
 from flask import Flask, url_for
 from werkzeug.exceptions import NotFound
 
-from plastron.jobs.imports import ImportJob
-from plastron.jobs import JobError, JobConfigError
+from plastron.jobs.imports import ImportJob, ImportJobs
+from plastron.jobs import JobError, JobConfigError, JobNotFoundError
 
 logger = logging.getLogger(__name__)
 
@@ -38,12 +38,10 @@ def latest_dropped_items(job: ImportJob):
 def create_app():
     app = Flask(__name__)
     jobs_dir = Path(os.environ.get('JOBS_DIR', 'jobs'))
+    jobs = ImportJobs(directory=jobs_dir)
 
     def get_job(job_id: str):
-        job = ImportJob(urllib.parse.unquote(job_id), str(jobs_dir))
-        if not job.exists:
-            raise NotFound
-        return job
+        return jobs.get_job(urllib.parse.unquote(job_id))
 
     @app.route('/jobs')
     def list_jobs():
@@ -55,11 +53,14 @@ def create_app():
 
     @app.route('/jobs/<path:job_id>')
     def show_job(job_id):
-        job = get_job(job_id)
         try:
+            job = get_job(job_id)
             job.load_config()
+        except JobNotFoundError:
+            logger.warning(f'Job {job_id} not found')
+            raise NotFound
         except JobConfigError:
-            logger.warning(f'Cannot open config file {job.config_filename} for job {job}')
+            logger.warning(f'Cannot open config file for job {job_id}')
             # TODO: more complete information in the response body?
             raise NotFound
 

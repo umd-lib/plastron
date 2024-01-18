@@ -7,7 +7,7 @@ import pytest
 
 from plastron.cli.commands.importcommand import Command
 from plastron.client import Client, Endpoint
-from plastron.jobs import JobConfigError
+from plastron.jobs import JobConfigError, JobNotFoundError
 
 
 @pytest.fixture
@@ -38,11 +38,11 @@ def test_cannot_resume_without_job_directory(plastron_context):
     plastron_context.args = args
     command = Command(context=plastron_context)
 
-    with pytest.raises(RuntimeError) as excinfo:
+    with pytest.raises(JobNotFoundError) as excinfo:
         for _ in command(args):
             pass
 
-    assert "no such job directory" in str(excinfo.value)
+    assert "does not exist" in str(excinfo.value)
 
 
 def test_cannot_resume_without_config_file(plastron_context):

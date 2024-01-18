@@ -3,7 +3,7 @@ import logging
 from argparse import ArgumentTypeError
 from typing import Generator, Any, Dict
 
-from plastron.jobs.imports import ImportJob
+from plastron.jobs.imports import ImportJobs, ImportConfig
 from plastron.rdf import uri_or_curie
 from plastron.repo import Repository
 from plastron.stomp.messages import PlastronCommandMessage
@@ -13,9 +13,9 @@ logger = logging.getLogger(__name__)
 
 
 def importcommand(
-        repo: Repository,
-        config: Dict[str, Any],
-        message: PlastronCommandMessage,
+    repo: Repository,
+    config: Dict[str, Any],
+    message: PlastronCommandMessage,
 ) -> Generator[Any, None, Dict[str, Any]]:
     """
     Performs the import
@@ -56,28 +56,24 @@ def importcommand(
         # TODO: generate a more unique id? add in user and hostname?
         job_id = f"import-{datetimestamp()}"
 
-    job = ImportJob(
-        job_id=job_id,
-        jobs_dir=config.get('JOBS_DIR', 'jobs'),
-        ssh_private_key=config.get('SSH_PRIVATE_KEY', None),
-    )
+    jobs = ImportJobs(directory=config.get('JOBS_DIR', 'jobs'))
     if resume:
-        return job.resume(
-            repo=repo,
-            limit=limit,
-            percentage=percentage,
-            validate_only=validate_only,
-        )
+        job = jobs.get_job(job_id=job_id)
+        job.ssh_private_key = config.get('SSH_PRIVATE_KEY', None)
     else:
-        return job.start(
-            repo=repo,
-            import_file=import_file,
+        job = jobs.create_job(config=ImportConfig(
+            job_id=job_id,
             model=model,
             access=access_uri,
             member_of=member_of,
             container=container,
             binaries_location=binaries_location,
-            limit=limit,
-            percentage=percentage,
-            validate_only=validate_only,
-        )
+        ))
+
+    return job.run(
+        repo=repo,
+        import_file=import_file,
+        limit=limit,
+        percentage=percentage,
+        validate_only=validate_only,
+    )

@@ -4,7 +4,7 @@ from argparse import FileType, ArgumentTypeError, Namespace
 from typing import TextIO
 
 from plastron.cli.commands import BaseCommand
-from plastron.jobs.importjob import ImportJob
+from plastron.jobs.importjob import ImportConfig, ImportJobs
 from plastron.models import get_model_class, ModelClassNotFoundError
 from plastron.rdf import uri_or_curie
 from plastron.utils import datetimestamp
@@ -164,27 +164,29 @@ class Command(BaseCommand):
             # TODO: generate a more unique id? add in user and hostname?
             args.job_id = f"import-{datetimestamp()}"
 
-        job = ImportJob(args.job_id, self.jobs_dir)
+        jobs = ImportJobs(self.jobs_dir)
         if args.resume:
-            self.run(job.resume(
-                repo=self.context.repo,
-                limit=args.limit,
-                percentage=args.percentage,
-                validate_only=args.validate_only,
-            ))
+            logger.info(f'Resuming saved job {args.job_id}')
+            job = jobs.get_job(args.job_id)
         else:
-            self.run(job.start(
-                repo=self.context.repo,
-                import_file=args.import_file,
+            logger.info(f'Creating new job {args.job_id}')
+            job = jobs.create_job(config=ImportConfig(
+                job_id=args.job_id,
                 model=args.model,
                 access=args.access,
                 member_of=args.member_of,
                 container=args.container,
                 binaries_location=args.binaries_location,
-                limit=args.limit,
-                percentage=args.percentage,
-                validate_only=args.validate_only,
             ))
+
+        logger.debug(f'Running job {job.id}')
+        self.run(job.run(
+            repo=self.context.repo,
+            import_file=args.import_file,
+            limit=args.limit,
+            percentage=args.percentage,
+            validate_only=args.validate_only,
+        ))
 
         for key, value in self.result['count'].items():
             logger.info(f"{key.title().replace('_', ' ')}: {value}")

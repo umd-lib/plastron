@@ -41,7 +41,7 @@ def test_build_fields_without_default_datatype():
     ]
 )
 def test_get_source(datadir, base_location, path, expected_class):
-    job = ImportJob(job_id='foo', jobs_dir=datadir)
+    job = ImportJob(job_id='foo', job_dir=datadir)
     assert isinstance(job.get_source(base_location, path), expected_class)
 
 

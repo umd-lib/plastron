@@ -21,6 +21,10 @@ class JobConfigError(JobError):
     pass
 
 
+class JobNotFoundError(JobError):
+    pass
+
+
 def annotate_from_files(item, mime_types):
     for member in item.has_member.objects:
         # extract text from HTML files

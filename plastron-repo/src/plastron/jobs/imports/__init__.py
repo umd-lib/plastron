@@ -198,130 +198,6 @@ class ImportJob:
         run = self.new_run()
         return run.start(repo=repo, **kwargs)
 
-    def import_items(
-            self,
-            repo: Repository,
-            limit: int = None,
-            percentage=None,
-            validate_only: bool = False,
-            import_file: IO = None,
-    ) -> Generator[Any, None, Dict[str, Any]]:
-        start_time = datetime.now().timestamp()
-
-        if percentage:
-            logger.info(f'Loading {percentage}% of the total items')
-        if validate_only:
-            logger.info('Validation-only mode, skipping imports')
-
-        # if an import file was provided, save that as the new CSV metadata file
-        if import_file is not None:
-            self.store_metadata_file(import_file)
-
-        try:
-            metadata = self.get_metadata()
-        except ModelClassNotFoundError as e:
-            raise RuntimeError(f'Model class {e.model_name} not found') from e
-        except JobError as e:
-            raise RuntimeError(str(e)) from e
-
-        if metadata.has_binaries and self.config.binaries_location is None:
-            raise RuntimeError('Must specify --binaries-location if the metadata has a FILES column')
-
-        count = Counter(
-            total_items=metadata.total,
-            rows=0,
-            errors=0,
-            initially_completed_items=len(self.completed_log),
-            files=0,
-            valid_items=0,
-            invalid_items=0,
-            created_items=0,
-            updated_items=0,
-            unchanged_items=0,
-            skipped_items=0,
-        )
-        logger.info(f'Found {count["initially_completed_items"]} completed items')
-
-        import_run = self.new_run().start()
-        for row in metadata.rows(limit=limit, percentage=percentage, completed=self.completed_log):
-            if isinstance(row, InvalidRow):
-                import_run.drop_invalid(item=None, line_reference=row.line_reference, reason=row.reason)
-                continue
-
-            logger.debug(f'Row data: {row.data}')
-            import_row = ImportRow(self, repo, row, validate_only)
-
-            # count the number of files referenced in this row
-            count['files'] += len(row.filenames)
-
-            # validate metadata and files
-            validation = import_row.validate_item()
-            if validation.ok:
-                count['valid_items'] += 1
-                logger.info(f'"{import_row}" is valid')
-            else:
-                # drop invalid items
-                count['invalid_items'] += 1
-                logger.warning(f'"{import_row}" is invalid, skipping')
-                reasons = [f'{name} {result}' for name, result in validation.failures()]
-                import_run.drop_invalid(
-                    item=import_row.item,
-                    line_reference=row.line_reference,
-                    reason=f'Validation failures: {"; ".join(reasons)}'
-                )
-                continue
-
-            if validate_only:
-                # validation-only mode
-                continue
-
-            try:
-                status = import_row.update_repo()
-                self.complete(import_row.item, row.line_reference, status)
-                if status == ImportedItemStatus.CREATED:
-                    count['created_items'] += 1
-                elif status == ImportedItemStatus.MODIFIED:
-                    count['updated_items'] += 1
-                elif status == ImportedItemStatus.UNCHANGED:
-                    count['unchanged_items'] += 1
-                    count['skipped_items'] += 1
-                else:
-                    raise RuntimeError(f'Unknown status "{status}" returned when importing "{import_row.item}"')
-            except JobError as e:
-                count['items_with_errors'] += 1
-                logger.error(f'{import_row} import failed: {e}')
-                import_run.drop_failed(import_row.item, row.line_reference, reason=str(e))
-
-            # update the status
-            now = datetime.now().timestamp()
-            yield {
-                'time': {
-                    'started': start_time,
-                    'now': now,
-                    'elapsed': now - start_time
-                },
-                'count': count,
-            }
-
-        if validate_only:
-            # validate phase
-            if count['invalid_items'] == 0:
-                result_type = 'validate_success'
-            else:
-                result_type = 'validate_failed'
-        else:
-            # import phase
-            if len(self.completed_log) == count['total_items']:
-                result_type = 'import_complete'
-            else:
-                result_type = 'import_incomplete'
-
-        return {
-            'type': result_type,
-            'validation': self.validation_reports,
-            'count': count,
-        }
-
     @property
     def access(self) -> Optional[URIRef]:
         if self.config.access is not None:
@@ -527,6 +403,15 @@ class ImportRow:
             return resource
 
 
+def get_loggable_uri(item):
+    uri = getattr(item, 'uri', '')
+    if uri.startswith('urn:uuid:'):
+        # if the URI is a placeholder urn:uuid:, omit it from the log since
+        # it has no meaning outside this particular running import job
+        return ''
+    return uri
+
+
 class ImportRun:
     """
     A single run of an import job. Records the logs of invalid and failed items (if any).
@@ -719,7 +604,7 @@ class ImportRun:
             'id': getattr(item, 'identifier', line_reference),
             'timestamp': datetimestamp(digits_only=False),
             'title': getattr(item, 'title', ''),
-            'uri': getattr(item, 'uri', ''),
+            'uri': get_loggable_uri(item),
             'reason': reason
         })
 
@@ -739,7 +624,7 @@ class ImportRun:
             'id': getattr(item, 'identifier', line_reference),
             'timestamp': datetimestamp(digits_only=False),
             'title': getattr(item, 'title', ''),
-            'uri': getattr(item, 'uri', ''),
+            'uri': get_loggable_uri(item),
             'reason': reason
         })
 

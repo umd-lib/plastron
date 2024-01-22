@@ -10,7 +10,7 @@ from enum import Enum
 from os.path import basename
 from pathlib import Path
 from shutil import copyfileobj
-from typing import Optional, Union, Any, IO, List, Type, Generator, Dict, Iterable
+from typing import Optional, Union, Any, IO, List, Generator, Dict, Iterable
 
 import yaml
 from rdflib import URIRef
@@ -20,8 +20,8 @@ from plastron.files import BinarySource, ZipFileSource, RemoteFileSource, HTTPFi
 from plastron.jobs import JobConfigError, JobError, annotate_from_files
 from plastron.jobs.imports.spreadsheet import LineReference, MetadataSpreadsheet, InvalidRow, Row
 from plastron.models import get_model_class, ModelClassNotFoundError
+from plastron.namespaces import umdaccess
 from plastron.rdf.pcdm import File, PreservationMasterFile
-from plastron.rdf.rdf import Resource
 from plastron.rdfmapping.resources import RDFResourceBase
 from plastron.rdfmapping.validation import ValidationResultsDict, ValidationResult, ValidationSuccess, ValidationFailure
 from plastron.repo import Repository, RepositoryError, ContainerResource
@@ -80,8 +80,6 @@ class ImportJob:
         self.id = job_id
         # URL-escaped ID that can be used as a path segment on a filesystem or URL
         self.safe_id = urllib.parse.quote(job_id, safe='')
-        # use a timestamp to differentiate different runs of the same import job
-        self.run_timestamp = datetimestamp()
         self.dir = Path(jobs_dir) / self.safe_id
         self.config = ImportConfig(job_id=job_id)
         self._model_class = None
@@ -159,14 +157,14 @@ class ImportJob:
     def start(
             self,
             repo: Repository,
-            model: Type[Resource],
+            model: str,
             access: URIRef = None,
             member_of: URIRef = None,
             container: str = None,
             binaries_location: str = None,
             extract_text_types: str = None,
             **kwargs,
-    ) -> Generator[Any, None, Dict[str, Any]]:
+    ) -> Generator[Dict[str, Any], None, Dict[str, Any]]:
         config = {
             'model': model,
             'access': access,
@@ -182,9 +180,9 @@ class ImportJob:
         self.config.save(self.config_filename)
 
         run = self.new_run()
-        return run.start(repo=repo, **kwargs)
+        return run(repo=repo, **kwargs)
 
-    def resume(self, repo: Repository, **kwargs) -> Generator[Any, None, Dict[str, Any]]:
+    def resume(self, repo: Repository, **kwargs) -> Generator[Dict[str, Any], None, Dict[str, Any]]:
         if not self.exists:
             raise RuntimeError(f'Cannot resume job "{self.id}": no such job directory: "{self.dir}"')
 
@@ -196,131 +194,7 @@ class ImportJob:
             raise RuntimeError(f'Cannot resume job {self.id}: no config.yml found in {self.dir}')
 
         run = self.new_run()
-        return run.start(repo=repo, **kwargs)
-
-    def import_items(
-            self,
-            repo: Repository,
-            limit: int = None,
-            percentage=None,
-            validate_only: bool = False,
-            import_file: IO = None,
-    ) -> Generator[Any, None, Dict[str, Any]]:
-        start_time = datetime.now().timestamp()
-
-        if percentage:
-            logger.info(f'Loading {percentage}% of the total items')
-        if validate_only:
-            logger.info('Validation-only mode, skipping imports')
-
-        # if an import file was provided, save that as the new CSV metadata file
-        if import_file is not None:
-            self.store_metadata_file(import_file)
-
-        try:
-            metadata = self.get_metadata()
-        except ModelClassNotFoundError as e:
-            raise RuntimeError(f'Model class {e.model_name} not found') from e
-        except JobError as e:
-            raise RuntimeError(str(e)) from e
-
-        if metadata.has_binaries and self.config.binaries_location is None:
-            raise RuntimeError('Must specify --binaries-location if the metadata has a FILES column')
-
-        count = Counter(
-            total_items=metadata.total,
-            rows=0,
-            errors=0,
-            initially_completed_items=len(self.completed_log),
-            files=0,
-            valid_items=0,
-            invalid_items=0,
-            created_items=0,
-            updated_items=0,
-            unchanged_items=0,
-            skipped_items=0,
-        )
-        logger.info(f'Found {count["initially_completed_items"]} completed items')
-
-        import_run = self.new_run().start()
-        for row in metadata.rows(limit=limit, percentage=percentage, completed=self.completed_log):
-            if isinstance(row, InvalidRow):
-                import_run.drop_invalid(item=None, line_reference=row.line_reference, reason=row.reason)
-                continue
-
-            logger.debug(f'Row data: {row.data}')
-            import_row = ImportRow(self, repo, row, validate_only)
-
-            # count the number of files referenced in this row
-            count['files'] += len(row.filenames)
-
-            # validate metadata and files
-            validation = import_row.validate_item()
-            if validation.ok:
-                count['valid_items'] += 1
-                logger.info(f'"{import_row}" is valid')
-            else:
-                # drop invalid items
-                count['invalid_items'] += 1
-                logger.warning(f'"{import_row}" is invalid, skipping')
-                reasons = [f'{name} {result}' for name, result in validation.failures()]
-                import_run.drop_invalid(
-                    item=import_row.item,
-                    line_reference=row.line_reference,
-                    reason=f'Validation failures: {"; ".join(reasons)}'
-                )
-                continue
-
-            if validate_only:
-                # validation-only mode
-                continue
-
-            try:
-                status = import_row.update_repo()
-                self.complete(import_row.item, row.line_reference, status)
-                if status == ImportedItemStatus.CREATED:
-                    count['created_items'] += 1
-                elif status == ImportedItemStatus.MODIFIED:
-                    count['updated_items'] += 1
-                elif status == ImportedItemStatus.UNCHANGED:
-                    count['unchanged_items'] += 1
-                    count['skipped_items'] += 1
-                else:
-                    raise RuntimeError(f'Unknown status "{status}" returned when importing "{import_row.item}"')
-            except JobError as e:
-                count['items_with_errors'] += 1
-                logger.error(f'{import_row} import failed: {e}')
-                import_run.drop_failed(import_row.item, row.line_reference, reason=str(e))
-
-            # update the status
-            now = datetime.now().timestamp()
-            yield {
-                'time': {
-                    'started': start_time,
-                    'now': now,
-                    'elapsed': now - start_time
-                },
-                'count': count,
-            }
-
-        if validate_only:
-            # validate phase
-            if count['invalid_items'] == 0:
-                result_type = 'validate_success'
-            else:
-                result_type = 'validate_failed'
-        else:
-            # import phase
-            if len(self.completed_log) == count['total_items']:
-                result_type = 'import_complete'
-            else:
-                result_type = 'import_incomplete'
-
-        return {
-            'type': result_type,
-            'validation': self.validation_reports,
-            'count': count,
-        }
+        return run(repo=repo, **kwargs)
 
     @property
     def access(self) -> Optional[URIRef]:
@@ -417,10 +291,7 @@ class ImportRow:
 
     def validate_item(self) -> ValidationResultsDict:
         """Validate the item for this import row, and check that all files
-        listed are present.
-
-        :returns: ValidationResult
-        """
+        listed are present."""
         try:
             results: ValidationResultsDict = self.item.validate()
         except ValidationError as e:
@@ -433,10 +304,7 @@ class ImportRow:
 
     def validate_files(self, filenames: Iterable[str]) -> ValidationResult:
         """Check that a file exists in the job's binaries location for each
-        file name given.
-
-        :returns: ValidationResult
-        """
+        file name given."""
         missing_files = [
             name for name in filenames
             if not self.job.get_source(self.job.config.binaries_location, name).exists()
@@ -453,12 +321,8 @@ class ImportRow:
             )
 
     def update_repo(self) -> ImportedItemStatus:
-        """
-        Either creates a new item, updates an existing item, or does nothing
-        to an existing item (if there are no changes).
-
-        :returns: ImportedItemStatus
-        """
+        """Either creates a new item, updates an existing item, or does nothing
+        to an existing item (if there are no changes)."""
         if self.item.uri.startswith('urn:uuid:'):
             resource = self.create_resource()
             logger.info(f'Created {resource.url}')
@@ -482,16 +346,23 @@ class ImportRow:
             return ImportedItemStatus.UNCHANGED
 
     def create_resource(self) -> PCDMObjectResource:
+        """Create a new item in the repository."""
+
         # if an item is new, don't construct a SPARQL Update query
         # instead, just create and update normally
-        # create new item in the repo
         logger.debug('Creating a new item')
         # add the access class
         if self.job.access is not None:
-            self.item.rdf_type.append(self.job.access)
+            self.item.rdf_type.add(self.job.access)
         # add the collection membership
         if self.job.member_of is not None:
             self.item.member_of = self.job.member_of
+        # set publication status
+        if self.row.publish:
+            self.item.rdf_type.add(umdaccess.Published)
+        # set visibility
+        if self.row.hidden:
+            self.item.rdf_type.add(umdaccess.Hidden)
 
         if self.job.extract_text_types is not None:
             annotate_from_files(self.item, self.job.extract_text_types)
@@ -570,18 +441,35 @@ class ImportRun:
             self._failed_items = ItemLog(self.dir / 'dropped-failed.log.csv', DROPPED_FAILED_FIELDNAMES, 'id')
         return self._failed_items
 
-    def start(
+    def __call__(self, *args, **kwargs):
+        return self.run(*args, **kwargs)
+
+    def run(
             self,
             repo: Repository,
             limit: int = None,
             percentage=None,
             validate_only: bool = False,
             import_file: IO = None,
-    ) -> Generator[Any, None, Dict[str, Any]]:
-        """
-        Sets the timestamp for this run, and creates the log directory for it.
+    ) -> Generator[Dict[str, Any], None, Dict[str, Any]]:
+        """Execute this import run. Returns a generator that yields a dictionary of
+        current status after each item. The generator also returns a final status
+        dictionary after the run has completed. This value can be captured using
+        a delegating generator and Python's `yield from` syntax:
 
-        :return:
+        ```python
+        import_run = ImportRun(job)
+        result = None
+
+        # this is the delegated generator function
+        def generator(repo):
+            result = yield from import_run.run(repo)
+
+        for status in generator(repo):
+            print(status['count'], 'items completed')
+
+        print('job status', result['type'])
+        ```
         """
         if self.dir is not None:
             raise RuntimeError('Run completed, cannot start again')
@@ -745,7 +633,7 @@ class ImportRun:
 
     def complete(self, item, line_reference, status):
         """
-        Delegates to the `plastron.jobs.ImportJob.complete()` method.
+        Delegates to the `ImportJob.complete()` method.
 
         :param item:
         :param line_reference:

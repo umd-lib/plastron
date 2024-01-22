@@ -2,10 +2,11 @@ import csv
 import logging
 import re
 from collections import defaultdict, OrderedDict
+from collections.abc import Sized, Container
 from dataclasses import dataclass
 from os.path import splitext, basename
 from pathlib import Path
-from typing import Optional, Dict, List, Union, Mapping, Type, Sequence, Iterator, NamedTuple
+from typing import Optional, Dict, List, Tuple, Union, Mapping, Type, Iterator, NamedTuple, Protocol
 from uuid import uuid4
 
 from rdflib import URIRef, Literal
@@ -15,10 +16,11 @@ from plastron.jobs import JobError, FileSpec, FileGroup
 from plastron.namespaces import get_manager
 from plastron.rdfmapping.descriptors import Property, DataProperty
 from plastron.rdfmapping.embed import EmbeddedObject
-from plastron.rdfmapping.resources import RDFResourceType
+from plastron.rdfmapping.resources import RDFResourceBase, RDFResourceType
 from plastron.repo import DataReadError, Repository, RepositoryResource
 from plastron.serializers import CSVSerializer
 from plastron.serializers.csv import flatten_headers, unflatten, not_empty, split_escaped, build_lookup_index
+from plastron.utils import strtobool
 
 nsm = get_manager()
 logger = logging.getLogger(__name__)
@@ -159,11 +161,15 @@ class InvalidRow:
     reason: str
 
 
-def create_embedded_object(first_attr, item):
+def create_embedded_object(attr: str, item: RDFResourceBase) -> Tuple[str, RDFResourceBase]:
     # create new embedded objects (a.k.a hash resources) that are not in the index
     fragment_id = str(uuid4())
-    obj = EmbeddedObject(getattr(item, first_attr).object_class, fragment_id=fragment_id).embed(item)
+    obj = EmbeddedObject(getattr(item, attr).object_class, fragment_id=fragment_id).embed(item)
     return fragment_id, obj
+
+
+class Bucket(Sized, Container, Protocol):
+    pass
 
 
 class Row:
@@ -180,7 +186,7 @@ class Row:
         self.number = row_number
         self.data = data
         self.identifier_column = identifier_column
-        self._file_groups = build_file_groups(self.data['FILES'])
+        self._file_groups = build_file_groups(self.data.get('FILES', ''))
 
     def __getitem__(self, item):
         return self.data[item]
@@ -255,6 +261,14 @@ class Row:
     def index_string(self):
         return self.data.get('INDEX')
 
+    @property
+    def publish(self) -> bool:
+        return bool(strtobool(self.data.get('PUBLISH', 'False') or 'False'))
+
+    @property
+    def hidden(self) -> bool:
+        return bool(strtobool(self.data.get('HIDDEN', 'False') or 'False'))
+
 
 class MetadataSpreadsheet:
     """
@@ -319,14 +333,14 @@ class MetadataSpreadsheet:
             self,
             limit: int = None,
             percentage: int = None,
-            completed: Sequence = None,
+            completed: Bucket = None,
     ) -> Iterator[Union[Row, InvalidRow]]:
         """Iterator over the rows in this spreadsheet.
 
         :param limit: maximum row number to return
         :param percentage: percentage of rows to load, as an integer 1-100
         :param completed: record of already completed items; typically an ItemLog instance, but it
-          only has to support ``__len__()`` and "__contains__(identifier)"
+          only has to support `__len__()` and `__contains__(identifier)`
         """
 
         if completed is None:

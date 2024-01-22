@@ -6,21 +6,16 @@ import logging.config
 import os
 import sys
 from argparse import ArgumentParser, FileType, Namespace
-from dataclasses import dataclass
 from datetime import datetime
 from importlib import import_module
 from pkgutil import iter_modules
-from typing import Iterable, Dict, Any
+from typing import Iterable
 
-import pysolr
 import yaml
 
 from plastron.cli import commands
-from plastron.client import Endpoint, Client, RepositoryStructure
-from plastron.client.auth import get_authenticator
-from plastron.repo import Repository
+from plastron.cli.context import PlastronContext
 from plastron.utils import DEFAULT_LOGGING_OPTIONS, envsubst
-from plastron.stomp.broker import Broker, ServerTuple
 
 logger = logging.getLogger(__name__)
 now = datetime.utcnow().strftime('%Y%m%d%H%M%S')
@@ -67,11 +62,6 @@ def main():
     parser.set_defaults(cmd_name=None)
 
     common_required = parser.add_mutually_exclusive_group(required=True)
-    common_required.add_argument(
-        '-r', '--repo',
-        help='Path to repository configuration file.',
-        action='store'
-    )
     common_required.add_argument(
         '-c', '--config',
         help='Path to configuration file.',
@@ -123,46 +113,12 @@ def main():
         parser.print_help()
         sys.exit(0)
 
-    if args.config_file is not None:
-        # new-style, combined config file (a la plastron.daemon)
-        config = envsubst(yaml.safe_load(args.config_file))
-        repo_config = config['REPOSITORY']
-        broker_config = config.get('MESSAGE_BROKER', None)
-        command_config = config.get('COMMANDS') or {}
-    else:
-        # old-style, repository-only config file
-        with open(args.repo, 'r') as repo_config_file:
-            repo_config = yaml.safe_load(repo_config_file)
-        broker_config = None
-        command_config = {}
+    # new-style, combined config file (a la plastron.daemon)
+    config = envsubst(yaml.safe_load(args.config_file))
+    plastron_context = PlastronContext(config=config, args=args)
+    repo_config: dict = config['REPOSITORY']
 
-    try:
-        repo = Endpoint(
-            url=repo_config['REST_ENDPOINT'],
-            default_path=repo_config.get('RELPATH', '/'),
-            external_url=repo_config.get('REPO_EXTERNAL_URL'),
-        )
-        # TODO: respect the batch mode flag when getting the authenticator
-        client = Client(
-            endpoint=repo,
-            auth=get_authenticator(repo_config),
-            ua_string=f'plastron/{version}',
-            on_behalf_of=args.delegated_user,
-            structure=RepositoryStructure[repo_config.get('STRUCTURE', 'flat').upper()]
-        )
-    except ConfigError as e:
-        logger.error(str(e))
-        sys.exit(1)
-
-    if broker_config is not None:
-        broker = Broker(
-            server=ServerTuple.from_string(broker_config['SERVER']),
-            message_store_dir=broker_config['MESSAGE_STORE_DIR'],
-            destinations=broker_config['DESTINATIONS'],
-        )
-    else:
-        broker = None
-
+    # TODO: put these into their own "LOGGING" config section
     # get basic logging options
     if 'LOGGING_CONFIG' in repo_config:
         with open(repo_config.get('LOGGING_CONFIG'), 'r') as logging_config_file:
@@ -190,29 +146,18 @@ def main():
     # get the selected subcommand
     command_module = command_modules[args.cmd_name]
 
+    # dispatch to the selected subcommand
     try:
         if not hasattr(command_module, 'Command'):
             raise RuntimeError(f'Unable to execute command {args.cmd_name}')
 
-        command = command_module.Command(config=command_config.get(args.cmd_name.upper()))
-        command.repo = Repository(client=client)
-        command.endpoint = client
-        command.broker = broker
+        command = command_module.Command(context=plastron_context)
 
-        # The SOLR configuration would only be necessary for the verify command, so it can be optional
-        # Verify will check if solr got initialized and fail if it wasn't.
-        if 'SOLR' in config and 'URL' in config['SOLR']:
-            address = config['SOLR']['URL']
-            command.solr = pysolr.Solr(address, always_commit=True, timeout=10)
-        else:
-            command.solr = None
-
-        # dispatch to the selected subcommand
         print_header(args)
-        logger.info(f'Loaded repo configuration from {args.repo or args.config_file.name}')
+        logger.info(f'Loaded repo configuration from {args.config_file.name}')
         if args.delegated_user is not None:
             logger.info(f'Running repository operations on behalf of {args.delegated_user}')
-        command(client, args)
+        command(args)
         print_footer(args)
     except RuntimeError as e:
         # something failed, exit with non-zero status
@@ -240,12 +185,6 @@ def print_footer(args):
 
 if __name__ == "__main__":
     main()
-
-
-@dataclass
-class PlastronContext:
-    config: Dict[Any, Any] = None
-    repo: Repository = None
 
 
 class ConfigError(Exception):

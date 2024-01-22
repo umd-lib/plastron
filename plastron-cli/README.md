@@ -265,6 +265,29 @@ required arguments:
                         path to batch configuration file
 ```
 
+#### Batch Configuration
+
+##### Required
+
+| Option       | Description                                                        |
+|--------------|--------------------------------------------------------------------|
+| `BATCH_FILE` | The "main" file of the batch                                       |
+| `COLLECTION` | URI of the repository collection that the objects will be added to |
+| `HANDLER`    | The handler to use                                                 |
+
+##### Optional
+
+| Option            | Description                                                                                             | Default                                               |
+|-------------------|---------------------------------------------------------------------------------------------------------|-------------------------------------------------------|
+| `ROOT_DIR`        |                                                                                                         | The directory containing the batch configuration file |
+| `DATA_DIR`        | Where to find the data files for the batch; relative paths are relative to `ROOT_DIR`                   | `data`                                                |
+| `LOG_DIR`         | Where to write the mapfile, skipfile, and other logging info; relative paths are relative to `ROOT_DIR` | `logs`                                                |
+| `MAPFILE`         | Where to store the record of completed items in this batch; relative paths are relative to `LOG_DIR`    | `mapfile.csv`                                         |
+| `HANDLER_OPTIONS` | Any additional options required by the handler                                                          |                                                       |
+
+**Note:** The `plastron.load.*.log` files are currently written to the
+repository log directory, *not* to batch log directory.
+
 ### Ping (ping)
 
 ```text
@@ -385,36 +408,6 @@ optional arguments:
   -l LOG, --log LOG  completed log file from an import job
 ```
 
-## Configuration
-
-### Repository Configuration
-
-The repository connection is configured in a YAML file and passed to `plastron`
-with the `-r` or `--repo` option. These are the recognized configuration keys:
-
-### Batch Configuration
-
-#### Required
-
-| Option       | Description                                                        |
-|--------------|--------------------------------------------------------------------|
-| `BATCH_FILE` | The "main" file of the batch                                       |
-| `COLLECTION` | URI of the repository collection that the objects will be added to |
-| `HANDLER`    | The handler to use                                                 |
-
-#### Optional
-
-| Option            | Description                                                                                             | Default                                               |
-|-------------------|---------------------------------------------------------------------------------------------------------|-------------------------------------------------------|
-| `ROOT_DIR`        |                                                                                                         | The directory containing the batch configuration file |
-| `DATA_DIR`        | Where to find the data files for the batch; relative paths are relative to `ROOT_DIR`                   | `data`                                                |
-| `LOG_DIR`         | Where to write the mapfile, skipfile, and other logging info; relative paths are relative to `ROOT_DIR` | `logs`                                                |
-| `MAPFILE`         | Where to store the record of completed items in this batch; relative paths are relative to `LOG_DIR`    | `mapfile.csv`                                         |
-| `HANDLER_OPTIONS` | Any additional options required by the handler                                                          |                                                       |
-
-**Note:** The `plastron.load.*.log` files are currently written to the 
-repository log directory, *not* to batch log directory.
-
 ## Extending
 
 ### Adding Commands
@@ -428,38 +421,79 @@ creates and configures a subparser to handle its specific command-line
 arguments.
 
 The `Command` class should inherit from `plastron.cli.BaseCommand`, and must
-have a `__call__` method that takes a `plastron.client.Client` object and an
-[argparse.Namespace] object, and executes the actual command.
+have a `__call__` method that takes an [argparse.Namespace] object, and
+executes the actual command.
 
-For a simple example, see the `ping` command, as implemented in
-[`plastron.cli.commands.ping`](src/plastron/cli/commands/ping.py):
+For a simple example, see the `list` command, as implemented in
+[`plastron.cli.commands.list`](src/plastron/cli/commands/list.py):
 
 ```python
-from requests.exceptions import ConnectionError
+import logging
+from argparse import Namespace
 
 from plastron.cli.commands import BaseCommand
+from plastron.models.umd import PCDMFile
+from plastron.namespaces import ldp
+
+logger = logging.getLogger(__name__)
 
 
 def configure_cli(subparsers):
-    parser_ping = subparsers.add_parser(
-        name='ping',
-        description='Check connection to the repository'
+    parser = subparsers.add_parser(
+        name='list',
+        aliases=['ls'],
+        description='List objects in the repository'
     )
-    parser_ping.set_defaults(cmd_name='ping')
+    # long mode to print more than just the URIs (name modeled after ls -l)
+    parser.add_argument(
+        '-l', '--long',
+        help='Display additional information besides the URI',
+        action='store_true'
+    )
+    parser.add_argument(
+        'uris', nargs='*',
+        help='URIs of repository objects to list'
+    )
+    parser.set_defaults(cmd_name='list')
 
 
 class Command(BaseCommand):
-    def __call__(self, fcrepo, args):
-        try:
-            fcrepo.test_connection()
-        except ConnectionError as e:
-            raise RuntimeError(str(e)) from e
+    def __call__(self, args: Namespace):
+        self.long = args.long
+
+        for uri in args.uris:
+            resource = self.context.repo[uri].read()
+
+            if resource.is_binary:
+                print(uri)
+                continue
+
+            for child_resource in resource.walk(min_depth=1, max_depth=1, traverse=[ldp.contains]):
+                if self.long:
+                    description = child_resource.describe(PCDMFile)
+                    title = str(description.title)
+                    print(f'{child_resource.url} {title}')
+                else:
+                    print(child_resource.url)
 ```
 
-The `RuntimeError` is caught by the `plastron` script and causes it to exit
-with a status code of 1. Any `KeyboardInterrupt` exceptions (for instance, 
-due to the user pressing <kbd>Ctrl+C</kbd>) are also caught by the 
-`plastron` script and cause it to exit with a status code of 2.
+The `Command` class has a `context` attribute that contains a 
+`PlastronContext` object. This context object provides the following 
+objects, configured using the current config file and arguments:
+
+| Attribute       | Type                                 |
+|-----------------|--------------------------------------|
+| `endpoint`      | plastron.client.Endpoint             |
+| `client`        | plastron.client.Client               |
+| `repo`          | plastron.repo.Repository             |
+| `broker`        | plastron.stomp.broker.Broker         |
+| `handle_client` | plastron.handles.HandleServiceClient |
+
+Any `RuntimeError` exceptions are caught by the `plastron` script and 
+cause it to exit with a status code of 1. Any `KeyboardInterrupt` 
+exceptions (for instance, due to the user pressing <kbd>Ctrl+C</kbd>) are 
+also caught by the `plastron` script and cause it to exit with a status 
+code of 2.
 
 [argparse subparsers object]: https://docs.python.org/3/library/argparse.html#sub-commands
 [argparse.Namespace]: https://docs.python.org/3/library/argparse.html#the-namespace-object

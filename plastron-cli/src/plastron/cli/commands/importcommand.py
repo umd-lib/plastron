@@ -1,11 +1,9 @@
-import copy
 import csv
 import logging
 from argparse import FileType, ArgumentTypeError, Namespace
 from typing import TextIO
 
 from plastron.cli.commands import BaseCommand
-from plastron.client import Client
 from plastron.jobs.imports import ImportJob
 from plastron.models import get_model_class, ModelClassNotFoundError
 from plastron.rdf import uri_or_curie
@@ -138,37 +136,14 @@ def configure_cli(subparsers):
 
 
 class Command(BaseCommand):
-    def __init__(self, config=None):
-        super().__init__(config=config)
-        self.result = None
-        self.ssh_private_key = self.config.get('SSH_PRIVATE_KEY')
-        self.jobs_dir = self.config.get('JOBS_DIR', 'jobs')
+    @property
+    def jobs_dir(self):
+        return self.config.get('JOBS_DIR', 'jobs')
 
-    def repo_config(self, repo_config, args=None):
-        """
-        Returns a deep copy of the provided repo_config, updated with
-        layout structure and relpath information from the args
-        (if provided). If no args are provided, just run the base command
-        repo_config() method.
-        """
-        if args is None:
-            return super().repo_config(repo_config, args)
-
-        result_config = copy.deepcopy(repo_config)
-
-        if args.structure:
-            result_config['STRUCTURE'] = args.structure
-
-        if args.relpath:
-            result_config['RELPATH'] = args.relpath
-
-        return result_config
-
-    def __call__(self, client: Client, args: Namespace):
+    def __call__(self, args: Namespace):
         """
         Performs the import
 
-        :param client: the repository configuration
         :param args: the command-line arguments
         """
         if hasattr(args, 'template_file') and args.template_file is not None:
@@ -192,14 +167,14 @@ class Command(BaseCommand):
         job = ImportJob(args.job_id, self.jobs_dir)
         if args.resume:
             self.run(job.resume(
-                repo=self.repo,
+                repo=self.context.repo,
                 limit=args.limit,
                 percentage=args.percentage,
                 validate_only=args.validate_only,
             ))
         else:
             self.run(job.start(
-                repo=self.repo,
+                repo=self.context.repo,
                 import_file=args.import_file,
                 model=args.model,
                 access=args.access,

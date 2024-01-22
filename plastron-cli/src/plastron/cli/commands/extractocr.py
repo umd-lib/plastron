@@ -1,5 +1,5 @@
-import argparse
 import logging
+from argparse import FileType, Namespace
 from datetime import datetime
 
 from lxml import etree
@@ -7,7 +7,6 @@ from lxml import etree
 from plastron.cli import get_uris
 from plastron.repo.utils import context
 from plastron.cli.commands import BaseCommand
-from plastron.client import Client
 from plastron.models.annotations import TextblockOnPage
 from plastron.namespaces import pcdmuse
 from plastron.rdf.ocr import ALTOResource
@@ -42,7 +41,7 @@ def configure_cli(subparsers):
     parser.add_argument(
         '-f', '--file',
         dest='uris_file',
-        type=argparse.FileType(mode='r'),
+        type=FileType(mode='r'),
         help='File containing a list of URIs',
         action='store'
     )
@@ -54,7 +53,7 @@ def configure_cli(subparsers):
 
 
 class Command(BaseCommand):
-    def __call__(self, client: Client, args):
+    def __call__(self, args: Namespace):
         # TODO: create an ExtractOCRJob
 
         fieldnames = ['uri', 'timestamp']
@@ -82,8 +81,8 @@ class Command(BaseCommand):
                 logger.info(f'Ignoring {uri}')
                 continue
 
-            with context(repo=self.repo, use_transactions=args.use_transactions):
-                page_resource = self.repo[uri:PCDMPageResource].read()
+            with context(repo=self.context.repo, use_transactions=args.use_transactions):
+                page_resource = self.context.repo[uri:PCDMPageResource].read()
                 extracted_text_file = page_resource.get_file(rdf_type=pcdmuse.ExtractedText)
                 if extracted_text_file is None:
                     logger.error(f'Resource {page_resource.url} has no OCR file; skipping')

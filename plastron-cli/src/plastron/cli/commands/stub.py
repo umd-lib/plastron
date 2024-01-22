@@ -7,7 +7,7 @@ from typing import Optional
 from rdflib import URIRef
 
 from plastron.cli.commands import BaseCommand
-from plastron.client import Client, ClientError
+from plastron.client import ClientError
 from plastron.files import BinarySource, HTTPFileSource, LocalFileSource
 from plastron.models.umd import Stub
 from plastron.rdf import uri_or_curie
@@ -121,7 +121,7 @@ def write_csv_header(csv_file: csv.DictReader, args: Namespace, csv_writer: csv.
 
 
 class Command(BaseCommand):
-    def __call__(self, client: Client, args: Namespace) -> None:
+    def __call__(self, args: Namespace) -> None:
         csv_file = csv.DictReader(args.source_file)
         if csv_file.fieldnames is None:
             logger.error(f'No fields found in {csv_file}. Exiting.')
@@ -134,8 +134,8 @@ class Command(BaseCommand):
         csv_writer = csv.DictWriter(output_file, fieldnames=csv_file.fieldnames)
 
         write_csv_header(csv_file, args, csv_writer)
-        container_path = args.container_path or self.repo.endpoint.relpath
-        container_resource: ContainerResource = self.repo[container_path:ContainerResource].read()
+        container_path = args.container_path or self.context.repo.endpoint.relpath
+        container_resource: ContainerResource = self.context.repo[container_path:ContainerResource].read()
 
         for _, row in enumerate(csv_file, start=1):
             identifier = row[args.identifier_column]
@@ -152,7 +152,7 @@ class Command(BaseCommand):
             if args.access is not None:
                 item.rdf_type.add(args.access)
 
-            with context(repo=self.repo):
+            with context(repo=self.context.repo):
                 try:
                     access_types = [args.access] if args.access is not None else []
 

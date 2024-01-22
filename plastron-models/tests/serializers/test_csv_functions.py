@@ -4,7 +4,7 @@ from rdflib import Literal, URIRef
 from plastron.namespaces import rdfs, owl, dcterms
 from plastron.rdfmapping.descriptors import DataProperty, ObjectProperty
 from plastron.rdfmapping.embed import EmbeddedObject
-from plastron.rdfmapping.resources import RDFResourceBase
+from plastron.rdfmapping.resources import RDFResource, RDFResourceBase
 from plastron.serializers.csv import join_values, flatten_headers, unflatten, flatten, ensure_text_mode, \
     ensure_binary_mode
 
@@ -20,12 +20,12 @@ def header_map():
     }
 
 
-class Subject(RDFResourceBase):
+class Subject(RDFResource):
     label = DataProperty(rdfs.label)
     same_as = ObjectProperty(owl.sameAs)
 
 
-class Thing(RDFResourceBase):
+class Thing(RDFResource):
     title = DataProperty(dcterms.title)
     subject = ObjectProperty(dcterms.subject, cls=Subject, repeatable=True)
 

@@ -1,4 +1,3 @@
-import dataclasses
 import logging
 import os
 import re
@@ -17,7 +16,7 @@ from rdflib import URIRef
 
 from plastron.client import ClientError
 from plastron.files import BinarySource, ZipFileSource, RemoteFileSource, HTTPFileSource, LocalFileSource
-from plastron.jobs import JobConfigError, JobError, annotate_from_files
+from plastron.jobs import JobConfigError, JobError, annotate_from_files, JobNotFoundError
 from plastron.jobs.imports.spreadsheet import LineReference, MetadataSpreadsheet, InvalidRow, Row
 from plastron.models import get_model_class, ModelClassNotFoundError
 from plastron.namespaces import umdaccess
@@ -76,12 +75,10 @@ class ImportConfig:
 
 
 class ImportJob:
-    def __init__(self, job_id, jobs_dir, ssh_private_key: str = None):
+    def __init__(self, job_id: str, job_dir: Path, ssh_private_key: str = None):
         self.id = job_id
-        # URL-escaped ID that can be used as a path segment on a filesystem or URL
-        self.safe_id = urllib.parse.quote(job_id, safe='')
-        self.dir = Path(jobs_dir) / self.safe_id
-        self.config = ImportConfig(job_id=job_id)
+        self.dir = job_dir
+        self.config = None
         self._model_class = None
 
         # record of items that are successfully loaded
@@ -112,9 +109,9 @@ class ImportJob:
             self._model_class = get_model_class(self.config.model)
         return self._model_class
 
-    def load_config(self) -> ImportConfig:
+    def load_config(self) -> 'ImportJob':
         self.config = ImportConfig.from_file(self.config_filename)
-        return self.config
+        return self
 
     def store_metadata_file(self, input_file: IO):
         with open(self.metadata_filename, mode='w') as file:
@@ -154,47 +151,24 @@ class ImportJob:
     def get_metadata(self) -> MetadataSpreadsheet:
         return MetadataSpreadsheet(metadata_filename=self.metadata_filename, model_class=self.model_class)
 
-    def start(
+    def run(
             self,
             repo: Repository,
-            model: str,
-            access: URIRef = None,
-            member_of: URIRef = None,
-            container: str = None,
-            binaries_location: str = None,
-            extract_text_types: str = None,
-            **kwargs,
+            limit: int = None,
+            percentage: int = None,
+            validate_only: bool = False,
+            import_file: IO = None,
+            publish: bool = False,
     ) -> Generator[Dict[str, Any], None, Dict[str, Any]]:
-        config = {
-            'model': model,
-            'access': access,
-            'member_of': member_of,
-            'container': container,
-            'binaries_location': binaries_location,
-            'extract_text_types': extract_text_types,
-        }
-        # store the relevant config
-        self.config = dataclasses.replace(self.config, **config)
-        # if we are not resuming, make sure the directory exists
-        os.makedirs(self.dir, exist_ok=True)
-        self.config.save(self.config_filename)
-
         run = self.new_run()
-        return run(repo=repo, **kwargs)
-
-    def resume(self, repo: Repository, **kwargs) -> Generator[Dict[str, Any], None, Dict[str, Any]]:
-        if not self.exists:
-            raise RuntimeError(f'Cannot resume job "{self.id}": no such job directory: "{self.dir}"')
-
-        logger.info(f'Resuming saved job {self.id}')
-        try:
-            # load stored config from the previous run of this job
-            self.load_config()
-        except FileNotFoundError:
-            raise RuntimeError(f'Cannot resume job {self.id}: no config.yml found in {self.dir}')
-
-        run = self.new_run()
-        return run(repo=repo, **kwargs)
+        return run(
+            repo=repo,
+            limit=limit,
+            percentage=percentage,
+            validate_only=validate_only,
+            import_file=import_file,
+            publish=publish,
+        )
 
     @property
     def access(self) -> Optional[URIRef]:
@@ -280,11 +254,13 @@ class ImportJob:
 
 
 class ImportRow:
-    def __init__(self, job: ImportJob, repo: Repository, row: Row, validate_only: bool = False):
+    def __init__(self, job: ImportJob, repo: Repository, row: Row, validate_only: bool = False, publish: bool = False):
         self.job = job
         self.row = row
         self.repo = repo
         self.item = row.get_object(repo, read_from_repo=not validate_only)
+        if publish:
+            self.item.rdf_type.add(umdaccess.Published)
 
     def __str__(self):
         return str(self.row.line_reference)
@@ -448,9 +424,10 @@ class ImportRun:
             self,
             repo: Repository,
             limit: int = None,
-            percentage=None,
+            percentage: int = None,
             validate_only: bool = False,
             import_file: IO = None,
+            publish: bool = False,
     ) -> Generator[Dict[str, Any], None, Dict[str, Any]]:
         """Execute this import run. Returns a generator that yields a dictionary of
         current status after each item. The generator also returns a final status
@@ -482,6 +459,8 @@ class ImportRun:
             logger.info(f'Loading {percentage}% of the total items')
         if validate_only:
             logger.info('Validation-only mode, skipping imports')
+        if publish:
+            logger.info('Publishing all imported items')
 
         # if an import file was provided, save that as the new CSV metadata file
         if import_file is not None:
@@ -518,7 +497,7 @@ class ImportRun:
                 continue
 
             logger.debug(f'Row data: {row.data}')
-            import_row = ImportRow(self.job, repo, row, validate_only)
+            import_row = ImportRow(self.job, repo, row, validate_only, publish)
 
             # count the number of files referenced in this row
             count['files'] += len(row.filenames)
@@ -641,3 +620,28 @@ class ImportRun:
         :return:
         """
         self.job.complete(item, line_reference, status)
+
+
+class ImportJobs:
+    def __init__(self, directory: Union[Path, str]):
+        self.dir = Path(directory)
+
+    def create_job(self, job_id: str = None, config: ImportConfig = None) -> ImportJob:
+        if config is None:
+            if job_id is None:
+                raise RuntimeError('Must specify either a job_id or config')
+            config = ImportConfig(job_id=job_id)
+        safe_id = urllib.parse.quote(config.job_id, safe='')
+        job_dir = self.dir / safe_id
+        if job_dir.exists():
+            raise RuntimeError(f'Job directory {job_dir} for job id {config.job_id} already exists')
+        job_dir.mkdir(parents=True, exist_ok=True)
+        config.save(job_dir / 'config.yml')
+        return ImportJob(job_id=config.job_id, job_dir=job_dir).load_config()
+
+    def get_job(self, job_id: str) -> ImportJob:
+        safe_id = urllib.parse.quote(job_id, safe='')
+        job_dir = self.dir / safe_id
+        if not job_dir.exists():
+            raise JobNotFoundError(f'Job directory {job_dir} for job id {job_id} does not exist')
+        return ImportJob(job_id=job_id, job_dir=job_dir).load_config()

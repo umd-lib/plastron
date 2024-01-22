@@ -293,7 +293,7 @@ class ContainerResource(RepositoryResource):
             # To create the resource and metadata at the same time (when the URI is not known),
             # we must use the empty URI for the subject, and serialize as Turtle. Fedora will
             # interpret the empty URI as a placeholder for "this resource".
-            description.graph.change_uri(description.uri, URIRef(''))
+            description.uri = URIRef('')
             resource = self.repo.create(
                 resource_class=resource_class,
                 container_path=self.path,
@@ -303,6 +303,8 @@ class ContainerResource(RepositoryResource):
                 data=description.graph.serialize(format='text/turtle').encode(),
                 **kwargs,
             )
+            # update the description URI the newly created URL
+            description.uri = URIRef(resource.url)
         else:
             resource = self.repo.create(resource_class=resource_class, container_path=self.path, **kwargs)
         return resource

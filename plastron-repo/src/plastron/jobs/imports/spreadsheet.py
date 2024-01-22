@@ -180,7 +180,7 @@ class Row:
         self.number = row_number
         self.data = data
         self.identifier_column = identifier_column
-        self._file_groups = build_file_groups(self.data['FILES'])
+        self._file_groups = build_file_groups(self.data.get('FILES', ''))
 
     def __getitem__(self, item):
         return self.data[item]

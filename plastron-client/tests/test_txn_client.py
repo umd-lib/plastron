@@ -39,6 +39,8 @@ def test_remove_transaction_uri(txn_client, value, expected_uri):
         (URIRef('http://example.com/repo/foo'), URIRef('http://example.com/repo/tx:123456/foo')),
         # do nothing if it is already inserted
         (URIRef('http://example.com/repo/tx:123456/foo'), URIRef('http://example.com/repo/tx:123456/foo')),
+        # do nothing if it is not part of the endpoint (e.g., an external vocabulary value)
+        (URIRef('http://pcdm.org/model#File'), URIRef('http://pcdm.org/model#File')),
         # do nothing if it is not a URIRef
         ('bar', 'bar'),
         (Literal('bar'), Literal('bar')),

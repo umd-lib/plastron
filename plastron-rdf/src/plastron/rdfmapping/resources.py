@@ -63,7 +63,6 @@ class RDFResourceBase:
             self._graph = TrackChangesGraph()
         self.set_properties(**self.default_values)
         self.set_properties(**kwargs)
-        self.apply_changes()
 
     def get_fragment_resource(
             self,

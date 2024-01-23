@@ -6,8 +6,7 @@ from rdflib import Literal, URIRef
 from urlobject import URLObject
 
 from plastron.client import random_slug
-from plastron.files import BinarySource
-from plastron.jobs import FileGroup
+from plastron.files import BinarySource, FileGroup
 from plastron.models import Item
 from plastron.models.annotations import Annotation
 from plastron.models.umd import PCDMObject, PCDMFile, Page, Proxy, LDPContainer
@@ -81,7 +80,6 @@ class PCDMFileBearingResource(ContainerResource):
             self,
             source: BinarySource,
             slug: Optional[str] = None,
-            rdf_types: Optional[Iterable[URIRef]] = None,
     ) -> BinaryResource:
         """Create a single file from the given source as a `pcdm:fileOf` this resource.
         If no slug is provided, one is generated using `random_slug()`."""
@@ -113,7 +111,7 @@ class PCDMFileBearingResource(ContainerResource):
         file.title = title
         file.file_of.add(parent)
         parent.has_file.add(file)
-        file.rdf_type.extend(rdf_types or [])
+        file.rdf_type.extend(source.rdf_types)
 
         file_resource.update()
         self.update()
@@ -243,7 +241,7 @@ class PCDMObjectResource(PCDMFileBearingResource, AggregationResource):
         )
         parent.has_member.add(URIRef(page_resource.url))
         for file_spec in file_group.files:
-            page_resource.create_file(source=file_spec.source, rdf_types=file_spec.source.rdf_types)
+            page_resource.create_file(source=file_spec.source)
         self.update()
         self.member_urls.add(page_resource.url)
         logger.debug(f'Created page: {page_resource.url} {title}')

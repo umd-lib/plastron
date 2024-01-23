@@ -2,10 +2,11 @@ import hashlib
 import io
 import urllib
 import zipfile
+from dataclasses import dataclass, field
 from http import HTTPStatus
 from mimetypes import guess_type
 from os.path import basename, isfile
-from typing import Mapping, Any, Protocol, Union, Set
+from typing import Mapping, Any, Protocol, Union, Set, List
 from urllib.parse import urlsplit
 
 from paramiko import SFTPClient, SSHClient, AutoAddPolicy, SSHException
@@ -397,3 +398,22 @@ class ZipFileSource(BinarySource):
                 return True
         except KeyError:
             return False
+
+
+@dataclass
+class FileSpec:
+    name: str
+    source: BinarySource = None
+
+    def __str__(self):
+        return self.name
+
+
+@dataclass
+class FileGroup:
+    rootname: str
+    files: List[FileSpec] = field(default_factory=list)
+
+    def __str__(self):
+        extensions = list(map(lambda f: str(f).replace(self.rootname, ''), self.files))
+        return f'{self.rootname}{{{",".join(extensions)}}}'

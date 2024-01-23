@@ -1,5 +1,4 @@
-from plastron.files import StringSource
-from plastron.jobs import FileSpec
+from plastron.files import StringSource, FileSpec
 
 OCTET_STREAM_SOURCE = StringSource(content='', mimetype='application/octet-stream')
 HTML_SOURCE = StringSource(content='', mimetype='text/html')

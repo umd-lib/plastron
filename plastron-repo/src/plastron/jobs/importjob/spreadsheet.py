@@ -11,7 +11,8 @@ from uuid import uuid4
 from rdflib import URIRef, Literal
 from rdflib.util import from_n3
 
-from plastron.jobs import JobError, FileSpec, FileGroup
+from plastron.jobs import JobError
+from plastron.files import FileSpec, FileGroup
 from plastron.namespaces import get_manager
 from plastron.rdfmapping.descriptors import Property, DataProperty
 from plastron.rdfmapping.embed import EmbeddedObject

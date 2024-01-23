@@ -3,7 +3,7 @@ import logging
 from argparse import ArgumentTypeError
 from typing import Generator, Any, Dict
 
-from plastron.jobs.imports import ImportJob
+from plastron.jobs.importjob import ImportJob
 from plastron.rdf import uri_or_curie
 from plastron.repo import Repository
 from plastron.stomp.messages import PlastronCommandMessage

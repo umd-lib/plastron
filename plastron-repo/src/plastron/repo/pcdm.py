@@ -83,8 +83,8 @@ class PCDMFileBearingResource(ContainerResource):
             slug: Optional[str] = None,
             rdf_types: Optional[Iterable[URIRef]] = None,
     ) -> BinaryResource:
-        """Create a single file from the given source as a pcdm:fileOf this resource.
-        If no slug is provided, one is generated using random_slug()."""
+        """Create a single file from the given source as a `pcdm:fileOf` this resource.
+        If no slug is provided, one is generated using `random_slug()`."""
         if slug is None:
             slug = random_slug()
 
@@ -243,7 +243,7 @@ class PCDMObjectResource(PCDMFileBearingResource, AggregationResource):
         )
         parent.has_member.add(URIRef(page_resource.url))
         for file_spec in file_group.files:
-            page_resource.create_file(source=file_spec.source)
+            page_resource.create_file(source=file_spec.source, rdf_types=file_spec.source.rdf_types)
         self.update()
         self.member_urls.add(page_resource.url)
         logger.debug(f'Created page: {page_resource.url} {title}')

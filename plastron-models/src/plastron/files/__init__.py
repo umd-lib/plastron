@@ -5,12 +5,15 @@ import zipfile
 from http import HTTPStatus
 from mimetypes import guess_type
 from os.path import basename, isfile
-from typing import Mapping, Any, Protocol, Union
+from typing import Mapping, Any, Protocol, Union, Set
 from urllib.parse import urlsplit
 
 from paramiko import SFTPClient, SSHClient, AutoAddPolicy, SSHException
 from paramiko.config import SSH_PORT
+from rdflib import URIRef
 from requests import Response, Session
+
+from plastron.namespaces import pcdmuse
 
 
 def get_ssh_client(sftp_uri: Union[str, urllib.parse.SplitResult], **kwargs) -> SSHClient:
@@ -94,6 +97,16 @@ class BinarySource:
             for block in stream:
                 sha1.update(block)
         return 'sha1=' + sha1.hexdigest()
+
+    @property
+    def rdf_types(self) -> Set[URIRef]:
+        """Return a set of additional RDF types that describe this source.
+
+        * `pcdmuse:PreservationMasterFile` if it has the `image/tiff` MIME type
+        """
+        if self.mimetype() == 'image/tiff':
+            return {pcdmuse.PreservationMasterFile}
+        return set()
 
 
 class StringSource(BinarySource):

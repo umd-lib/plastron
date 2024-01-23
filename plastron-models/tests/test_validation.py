@@ -12,7 +12,8 @@ from plastron.rdf.rdf import RDFObjectProperty
 from plastron.rdfmapping.descriptors import DataProperty
 from plastron.rdfmapping.resources import RDFResourceBase
 from plastron.validation import ValidationError
-from plastron.validation.rules import is_edtf_formatted, is_handle, is_from_vocabulary
+from plastron.validation.rules import is_edtf_formatted, is_handle, is_from_vocabulary, is_valid_iso639_code, \
+    is_iso_8601_date
 from plastron.validation.vocabularies import get_vocabulary
 
 
@@ -56,9 +57,35 @@ def test_required(values, expected):
         '2020-07-10T22:15:47Z',
         '2020-07-20T22:52:29Z',
         '2020-07-24T22:46:17Z',
+        # the empty string should validate
+        '',
     ])
 def test_is_edtf_formatted(datetime_string):
-    assert is_edtf_formatted(datetime_string) is True
+    assert is_edtf_formatted(datetime_string)
+
+
+@pytest.mark.parametrize(
+    'code', [
+        'en',
+        'eng',
+    ]
+)
+def test_is_valid_iso639_code(code):
+    assert is_valid_iso639_code(code)
+
+
+@pytest.mark.parametrize(
+    ('value', 'expected'),
+    [
+        ('2024-01-23', True),
+        ('2024', False),
+        ('2024-01', False),
+        ('01-23', False),
+        ('2024/01/23', False),
+    ]
+)
+def test_is_iso_8601_date(value, expected):
+    assert is_iso_8601_date(value) == expected
 
 
 @pytest.mark.parametrize(
@@ -70,7 +97,7 @@ def test_is_edtf_formatted(datetime_string):
     ]
 )
 def test_is_handle(handle):
-    assert is_handle(handle) is True
+    assert is_handle(handle)
 
 
 @pytest.mark.parametrize(
@@ -83,7 +110,7 @@ def test_is_handle(handle):
     ]
 )
 def test_not_handle(handle):
-    assert is_handle(handle) is not True
+    assert not is_handle(handle)
 
 
 @pytest.mark.parametrize(

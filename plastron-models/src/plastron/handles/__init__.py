@@ -9,7 +9,7 @@ from requests_jwtauth import HTTPBearerAuth
 from plastron.namespaces import dcterms, umdtype
 from plastron.rdfmapping.descriptors import DataProperty
 from plastron.rdfmapping.resources import RDFResource
-from plastron.validation import is_handle
+from plastron.validation.rules import is_handle
 
 logger = logging.getLogger(__name__)
 

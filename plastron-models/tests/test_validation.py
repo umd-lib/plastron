@@ -1,14 +1,19 @@
+from email.message import Message
 from unittest.mock import Mock, patch
 from urllib.error import HTTPError
 
 import httpretty
 import pytest
 from httpretty import GET
-from rdflib import URIRef
+from rdflib import URIRef, Literal
 
+from plastron.namespaces import rdfs
 from plastron.rdf.rdf import RDFObjectProperty
-from plastron.validation import ValidationError, is_edtf_formatted, is_handle
-from plastron.validation.rules import from_vocabulary, required
+from plastron.rdfmapping.descriptors import DataProperty
+from plastron.rdfmapping.resources import RDFResourceBase
+from plastron.validation import ValidationError
+from plastron.validation.rules import is_edtf_formatted, is_handle, is_from_vocabulary, is_valid_iso639_code, \
+    is_iso_8601_date
 from plastron.validation.vocabularies import get_vocabulary
 
 
@@ -27,17 +32,16 @@ from plastron.validation.vocabularies import get_vocabulary
         # non-string values pass
         ([0], True),
         ([1.0], True),
-        # only need one non-empty string to pass
-        (['foo', ''], True)
+        # any empty string fails
+        (['foo', ''], False),
     ]
 )
 def test_required(values, expected):
-    assert required(values) is expected
+    class SimpleResource(RDFResourceBase):
+        label = DataProperty(rdfs.label, required=True)
 
-
-def test_not_required():
-    # no values but not actually required passes
-    assert required([], False) is True
+    obj = SimpleResource(label=[Literal(str(v)) for v in values])
+    assert obj.is_valid == expected
 
 
 @pytest.mark.parametrize(
@@ -53,9 +57,35 @@ def test_not_required():
         '2020-07-10T22:15:47Z',
         '2020-07-20T22:52:29Z',
         '2020-07-24T22:46:17Z',
+        # the empty string should validate
+        '',
     ])
 def test_is_edtf_formatted(datetime_string):
-    assert is_edtf_formatted(datetime_string) is True
+    assert is_edtf_formatted(datetime_string)
+
+
+@pytest.mark.parametrize(
+    'code', [
+        'en',
+        'eng',
+    ]
+)
+def test_is_valid_iso639_code(code):
+    assert is_valid_iso639_code(code)
+
+
+@pytest.mark.parametrize(
+    ('value', 'expected'),
+    [
+        ('2024-01-23', True),
+        ('2024', False),
+        ('2024-01', False),
+        ('01-23', False),
+        ('2024/01/23', False),
+    ]
+)
+def test_is_iso_8601_date(value, expected):
+    assert is_iso_8601_date(value) == expected
 
 
 @pytest.mark.parametrize(
@@ -67,7 +97,7 @@ def test_is_edtf_formatted(datetime_string):
     ]
 )
 def test_is_handle(handle):
-    assert is_handle(handle) is True
+    assert is_handle(handle)
 
 
 @pytest.mark.parametrize(
@@ -80,7 +110,7 @@ def test_is_handle(handle):
     ]
 )
 def test_not_handle(handle):
-    assert is_handle(handle) is not True
+    assert not is_handle(handle)
 
 
 @pytest.mark.parametrize(
@@ -94,7 +124,8 @@ def test_not_handle(handle):
 def test_from_vocabulary(value, vocab_uri, expected):
     prop = RDFObjectProperty()
     prop.values = [URIRef(value)]
-    assert from_vocabulary(prop, vocab_uri) is expected
+    fn = is_from_vocabulary(vocab_uri)
+    assert fn(URIRef(value)) == expected
 
 
 @patch('plastron.validation.vocabularies.Graph')
@@ -112,7 +143,7 @@ def test_vocabulary_file_not_found(MockGraph):
 @patch('plastron.validation.vocabularies.Graph')
 def test_remote_vocab_error(MockGraph):
     mock_graph = Mock()
-    mock_graph.parse.side_effect = HTTPError('http://example.org/foo/', 503, '', {}, None)
+    mock_graph.parse.side_effect = HTTPError('http://example.org/foo/', 503, '', Message(), None)
     MockGraph.return_value = mock_graph
     # failure to retrieve the vocabulary over HTTP should
     # raise a ValidationError
@@ -146,6 +177,5 @@ def test_remote_vocab_308_redirect(shared_datadir):
         body=(shared_datadir / 'form.json').read_text(),
         content_type='application/ld+json'
     )
-    prop = RDFObjectProperty()
-    prop.values = [URIRef('http://vocab.lib.umd.edu/form#slides_photographs')]
-    assert from_vocabulary(prop, 'http://vocab.lib.umd.edu/form')
+    fn = is_from_vocabulary('http://vocab.lib.umd.edu/form')
+    assert fn(URIRef('http://vocab.lib.umd.edu/form#slides_photographs'))

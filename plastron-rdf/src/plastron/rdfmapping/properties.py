@@ -163,6 +163,9 @@ class RDFDataProperty(RDFProperty):
         # all values must be literals
         if not all(isinstance(v, Literal) for v in self.values):
             return ValidationFailure(self, 'all values must be Literals')
+        # if required, all values must be non-blank
+        if self.required and any(v.strip() == '' for v in self.values):
+            return ValidationFailure(self, 'all values must be non-blank')
         return ValidationSuccess(self)
 
 

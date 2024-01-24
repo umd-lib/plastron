@@ -1,10 +1,10 @@
 from plastron.handles import HandleBearingResource
-from plastron.namespaces import dc, dcterms, edm, rdfs, owl, ldp, fabio, pcdm, iana, ore, ebucore, premis, xsd, umdtype
+from plastron.namespaces import dc, dcterms, edm, rdfs, owl, ldp, fabio, pcdm, iana, ore, ebucore, premis, xsd, \
+    umdtype, umd
 from plastron.rdfmapping.decorators import rdf_type
 from plastron.rdfmapping.descriptors import ObjectProperty, DataProperty
 from plastron.rdfmapping.resources import RDFResource, RDFResourceBase
-from plastron.validation import is_edtf_formatted, is_valid_iso639_code
-from plastron.validation.vocabularies import get_subjects
+from plastron.validation.rules import is_edtf_formatted, is_valid_iso639_code, is_from_vocabulary
 
 
 @rdf_type(pcdm.Object)
@@ -17,16 +17,6 @@ class Stub(RDFResource):
 class LabeledThing(RDFResource):
     label = DataProperty(rdfs.label, required=True)
     same_as = ObjectProperty(owl.sameAs)
-
-
-def is_from_vocabulary(vocab_uri):
-    subjects = get_subjects(vocab_uri)
-
-    def _value_from_vocab(value):
-        return value in subjects
-
-    _value_from_vocab.__doc__ = f'from vocabulary {vocab_uri}'
-    return _value_from_vocab
 
 
 class LDPContainer(RDFResource):
@@ -63,6 +53,7 @@ class PCDMImageFile(PCDMFile):
     width = DataProperty(ebucore.width)
 
 
+@rdf_type(umd.Item)
 class Item(PCDMObject, HandleBearingResource):
     object_type = ObjectProperty(
         dcterms.type,
@@ -95,31 +86,6 @@ class Item(PCDMObject, HandleBearingResource):
     bibliographic_citation = DataProperty(dcterms.bibliographicCitation)
     accession_number = DataProperty(dcterms.identifier, datatype=umdtype.accessionNumber)
 
-    _ORIGINAL_HEADER_MAP = {
-        'object_type': 'Object Type',
-        'identifier': 'Identifier',
-        'rights': 'Rights Statement',
-        'title': 'Title',
-        'format': 'Format',
-        'archival_collection': 'Archival Collection',
-        'date': 'Date',
-        'description': 'Description',
-        'alternate_title': 'Alternate Title',
-        'creator.label': 'Creator',
-        'creator.same_as': 'Creator URI',
-        'contributor.label': 'Contributor',
-        'contributor.same_as': 'Contributor URI',
-        'publisher.label': 'Publisher',
-        'publisher.same_as': 'Publisher URI',
-        'location.label': 'Location',
-        'extent': 'Extent',
-        'subject.label': 'Subject',
-        'language': 'Language',
-        'rights_holder.label': 'Rights Holder',
-        'bibliographic_citation': 'Collection Information',
-        'accession_number': 'Accession Number',
-        'handle': 'Handle',
-    }
     HEADER_MAP = {
         'object_type': 'Object Type',
         'identifier': 'Identifier',

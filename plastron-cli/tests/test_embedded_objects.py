@@ -1,6 +1,6 @@
 import pytest
 
-from plastron.jobs.imports.spreadsheet import MetadataSpreadsheet
+from plastron.jobs.importjob.spreadsheet import MetadataSpreadsheet
 from plastron.models import Item
 from plastron.repo import Repository
 

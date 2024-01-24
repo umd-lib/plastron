@@ -790,39 +790,49 @@ class TransactionClient(Client):
         return str(self.remove_transaction_uri(URIRef(super().get_description_uri(uri=uri, response=response))))
 
     def insert_transaction_uri(self, uri: Any) -> Any:
+        """If `uri` is in this client's `endpoint` but does not contain the current transaction ID,
+        return a modified URI with the transaction ID added to it. Otherwise, return the `uri` argument
+        as-is."""
         if not isinstance(uri, URIRef):
             return uri
         if uri.startswith(self.tx.uri):
             return uri
-        return URIRef(self.tx.uri + self.endpoint.repo_path(uri))
+        if uri in self.endpoint:
+            return URIRef(self.tx.uri + self.endpoint.repo_path(uri))
+        return uri
 
     def remove_transaction_uri(self, uri: Any) -> Any:
+        """If `uri` contains the current transaction ID, return a modified URI with the transaction ID
+        removed. Otherwise, return the `uri` argument as-is."""
         if not isinstance(uri, URIRef):
             return uri
         if uri.startswith(self.tx.uri):
             return URIRef(uri.replace(self.tx.uri, self.endpoint.url))
-        else:
-            return uri
+        return uri
 
     def insert_transaction_uri_for_graph(self, graph: Optional[Graph]) -> Optional[Graph]:
         if graph is None:
             return None
-        new_graph = Graph()
         for s, p, o in graph:
             s_txn = self.insert_transaction_uri(s)
             o_txn = self.insert_transaction_uri(o)
-            new_graph.add((s_txn, p, o_txn))
-        return new_graph
+            # swap the triple if either the subject or object is changed
+            if s != s_txn or o != o_txn:
+                graph.add((s_txn, p, o_txn))
+                graph.remove((s, p, o))
+        return graph
 
     def remove_transaction_uri_for_graph(self, graph: Optional[Graph]) -> Optional[Graph]:
         if graph is None:
             return None
-        new_graph = Graph()
         for s, p, o in graph:
             s_txn = self.remove_transaction_uri(s)
             o_txn = self.remove_transaction_uri(o)
-            new_graph.add((s_txn, p, o_txn))
-        return new_graph
+            # swap the triple if either the subject or object is changed
+            if s != s_txn or o != o_txn:
+                graph.add((s_txn, p, o_txn))
+                graph.remove((s, p, o))
+        return graph
 
     def transaction(self, keep_alive: int = 90):
         """Immediately raises a `TransactionError`, since you cannot nest transactions."""

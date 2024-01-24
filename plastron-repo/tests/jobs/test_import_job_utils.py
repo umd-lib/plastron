@@ -2,8 +2,8 @@ import pytest
 from rdflib import URIRef
 
 from plastron.files import LocalFileSource, RemoteFileSource, ZipFileSource
-from plastron.jobs.imports import ImportJob
-from plastron.jobs.imports.spreadsheet import ColumnSpec, build_fields, build_file_groups, parse_value_string
+from plastron.jobs.importjob import ImportJob
+from plastron.jobs.importjob.spreadsheet import ColumnSpec, build_fields, build_file_groups, parse_value_string
 from plastron.models import Item
 from plastron.namespaces import umdtype
 from plastron.rdfmapping.descriptors import DataProperty

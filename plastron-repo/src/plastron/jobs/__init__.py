@@ -1,10 +1,7 @@
 import logging
-from dataclasses import dataclass, field
-from typing import List
 
 from bs4 import BeautifulSoup
 
-from plastron.files import BinarySource
 from plastron.namespaces import sc
 from plastron.models.annotations import FullTextAnnotation, TextualBody
 
@@ -46,22 +43,3 @@ def annotate_from_files(item, mime_types):
             annotation.props['target'].is_embedded = False
 
             member.annotations.append(annotation)
-
-
-@dataclass
-class FileSpec:
-    name: str
-    source: BinarySource = None
-
-    def __str__(self):
-        return self.name
-
-
-@dataclass
-class FileGroup:
-    rootname: str
-    files: List[FileSpec] = field(default_factory=list)
-
-    def __str__(self):
-        extensions = list(map(lambda f: str(f).replace(self.rootname, ''), self.files))
-        return f'{self.rootname}{{{",".join(extensions)}}}'

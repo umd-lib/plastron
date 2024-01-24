@@ -18,7 +18,7 @@ from rdflib import URIRef
 from plastron.client import ClientError
 from plastron.files import BinarySource, ZipFileSource, RemoteFileSource, HTTPFileSource, LocalFileSource
 from plastron.jobs import JobConfigError, JobError, annotate_from_files
-from plastron.jobs.imports.spreadsheet import LineReference, MetadataSpreadsheet, InvalidRow, Row
+from plastron.jobs.importjob.spreadsheet import LineReference, MetadataSpreadsheet, InvalidRow, Row
 from plastron.models import get_model_class, ModelClassNotFoundError
 from plastron.rdf.pcdm import File, PreservationMasterFile
 from plastron.rdf.rdf import Resource

@@ -6,7 +6,7 @@ from pathlib import Path
 from flask import Flask, url_for
 from werkzeug.exceptions import NotFound
 
-from plastron.jobs.imports import ImportJob
+from plastron.jobs.importjob import ImportJob
 from plastron.jobs import JobError, JobConfigError
 
 logger = logging.getLogger(__name__)

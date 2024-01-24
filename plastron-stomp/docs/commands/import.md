@@ -9,6 +9,7 @@ PlastronArg-model: MODEL
 PlastronArg-limit: LIMIT
 PlastronArg-percent: PERCENTAGE
 PlastronArg-validate-only: {true|false}
+PlastronArg-publish: {true|false}
 PlastronArg-resume: {true|false}
 PlastronArg-access: ACCESS
 PlastronArg-member-of: MEMBER_OF

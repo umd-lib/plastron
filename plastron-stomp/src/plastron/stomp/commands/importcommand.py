@@ -7,7 +7,7 @@ from plastron.jobs.imports import ImportJobs, ImportConfig
 from plastron.rdf import uri_or_curie
 from plastron.repo import Repository
 from plastron.stomp.messages import PlastronCommandMessage
-from plastron.utils import datetimestamp
+from plastron.utils import datetimestamp, strtobool
 
 logger = logging.getLogger(__name__)
 
@@ -38,8 +38,9 @@ def importcommand(
         access_uri = None
     model = message.args.get('model')
     percentage = message.args.get('percent', None)
-    validate_only = message.args.get('validate-only', False)
-    resume = message.args.get('resume', False)
+    validate_only = strtobool(message.args.get('validate-only', 'false'))
+    publish = strtobool(message.args.get('publish', 'false'))
+    resume = strtobool(message.args.get('resume', 'false'))
     import_file = io.StringIO(message.body)
     member_of = message.args.get('member-of')
     binaries_location = message.args.get('binaries-location')
@@ -76,4 +77,5 @@ def importcommand(
         limit=limit,
         percentage=percentage,
         validate_only=validate_only,
+        publish=publish,
     )

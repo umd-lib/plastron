@@ -105,6 +105,9 @@ umdform = Namespace('http://vocab.lib.umd.edu/form#')
 umdtype = Namespace('http://vocab.lib.umd.edu/datatype#')
 """[UMD Datatypes Vocabulary](http://vocab.lib.umd.edu/datatype)"""
 
+umdact = Namespace('http://vocab.lib.umd.edu/activity#')
+"""[UMD Activity Types Vocabulary](http://vocab.lib.umd.edu/activity)"""
+
 webac = Namespace('http://fedora.info/definitions/v4/webac#')
 """[Fedora Commons WebAC Ontology](https://fedora.info/definitions/v4/2015/09/03/webac)"""
 

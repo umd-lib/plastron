@@ -8,6 +8,7 @@ from werkzeug.exceptions import NotFound
 
 from plastron.jobs.imports import ImportJob, ImportJobs
 from plastron.jobs import JobError, JobConfigError, JobNotFoundError
+from plastron.web.activitystream import activitystream
 
 logger = logging.getLogger(__name__)
 
@@ -39,6 +40,7 @@ def create_app():
     app = Flask(__name__)
     jobs_dir = Path(os.environ.get('JOBS_DIR', 'jobs'))
     jobs = ImportJobs(directory=jobs_dir)
+    app.register_blueprint(activitystream)
 
     def get_job(job_id: str):
         return jobs.get_job(urllib.parse.unquote(job_id))

@@ -63,16 +63,26 @@ class Letter(RDFResource):
         'date': 'Date',
         'type': 'Resource Type',
         'rights': 'Rights',
-        'subject.label': 'Subject',
-        'place.label': 'Location',
-        'place.lon': 'Longitude',
-        'place.lat': 'Latitude',
-        'part_of.label': 'Archival Collection',
-        'part_of.same_as': 'Handle/Link',
+        'subject': {
+            'label': 'Subject',
+        },
+        'place': {
+            'label': 'Location',
+            'long': 'Longitude',
+            'lat': 'Latitude',
+        },
+        'part_of': {
+            'label': 'Archival Collection',
+            'same_as': 'Handle/Link',
+        },
         'identifier': 'Identifier',
-        'recipient.label': 'Recipient',
-        'author.label': 'Author',
-        'handle': 'Handle'
+        'recipient': {
+            'label': 'Recipient',
+        },
+        'author': {
+            'label': 'Author',
+        },
+        'handle': 'Handle',
     }
 
 

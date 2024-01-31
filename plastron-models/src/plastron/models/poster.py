@@ -1,9 +1,9 @@
 from rdflib import URIRef
 
 from plastron.models.umd import PCDMObject
-from plastron.namespaces import dcterms, dc, edm, bibo, geo, umd, umdtype
+from plastron.namespaces import dcterms, dc, edm, bibo, geo, umdtype
 from plastron.rdfmapping.decorators import rdf_type
-from plastron.rdfmapping.descriptors import ObjectProperty, DataProperty
+from plastron.rdfmapping.descriptors import ObjectProperty, DataProperty, Property
 from plastron.validation import is_edtf_formatted, is_handle
 
 
@@ -15,7 +15,9 @@ class Poster(PCDMObject):
     part_of = DataProperty(dcterms.isPartOf, required=True)
     # use the full URI since "dc.format" returns the format method of Namespace
     format = DataProperty(URIRef('http://purl.org/dc/elements/1.1/format'), required=True)
-    type = DataProperty(edm.hasType, required=True)
+    # this is a Property since the extant data in fcrepo contains both URIs and literals,
+    # so neither ObjectProperty nor DataProperty would map all values correctly
+    type = Property(edm.hasType, required=True)
     date = DataProperty(dc.date, validate=is_edtf_formatted)
     language = DataProperty(dc.language, required=True)
     description = DataProperty(dcterms.description)
@@ -25,7 +27,7 @@ class Poster(PCDMObject):
     location = DataProperty(dc.coverage)
     longitude = DataProperty(geo.long)
     latitude = DataProperty(geo.lat)
-    subject = DataProperty(dc.subject)
+    subject = ObjectProperty(dc.subject)
     rights = ObjectProperty(dcterms.rights, required=True)
     identifier = DataProperty(dcterms.identifier, required=True)
     handle = DataProperty(dcterms.identifier, validate=is_handle, datatype=umdtype.handle)

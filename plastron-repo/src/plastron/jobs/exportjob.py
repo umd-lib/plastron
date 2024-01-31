@@ -1,11 +1,12 @@
 import logging
 import os
+from pathlib import Path
 import re
 from collections import Counter
 from dataclasses import dataclass
 from datetime import datetime
 from email.utils import parsedate
-from os.path import normpath, relpath, splitext, basename
+from os.path import splitext, basename
 from tempfile import TemporaryDirectory
 from time import mktime
 from typing import Optional, List, Generator, Dict, Any, Iterator
@@ -43,11 +44,12 @@ def format_size(size: int, decimal_places: Optional[int] = None):
 
 
 def compress_bag(bag, dest, root_dirname=''):
+    bag_root = Path(root_dirname)
     with ZipFile(dest, mode='w') as zip_file:
-        for dirpath, dirnames, filenames in os.walk(bag.path):
+        for dirpath, _, filenames in os.walk(bag.path):
             for name in filenames:
-                src_filename = os.path.join(dirpath, name)
-                archived_name = normpath(os.path.join(root_dirname, relpath(dirpath, start=bag.path), name))
+                src_filename = Path(dirpath, name)
+                archived_name = bag_root / src_filename.relative_to(bag.path)
                 zip_file.write(filename=src_filename, arcname=archived_name)
 
 
@@ -71,6 +73,14 @@ class Stopwatch:
         }
 
 
+class FileSize:
+    def __init__(self, size: int) -> None:
+        self._size = size
+
+    def __str__(self) -> str:
+        return ' '.join(str(x) for x in format_size(self._size, decimal_places=2))
+
+
 @dataclass
 class ExportJob:
     repo: Repository
@@ -83,7 +93,10 @@ class ExportJob:
     key: str
 
     def list_binaries_to_export(self, resource: PCDMObjectResource) -> Optional[List[BinaryResource]]:
-        if self.export_binaries and self.binary_types is not None:
+        if not self.export_binaries:
+            return None
+
+        if self.binary_types is not None:
             accepted_types = self.binary_types.split(',')
 
             # filter files by their MIME type
@@ -94,14 +107,10 @@ class ExportJob:
             # all items that evaluate to true
             mime_type_filter = None
 
-        if self.export_binaries:
-            logger.info(f'Gathering binaries for {resource.url}')
-            binaries = list(filter(mime_type_filter, gather_files(resource)))
-            total_size = sum(file_resource.size for file_resource in binaries)
-            size, unit = format_size(total_size, decimal_places=2)
-            logger.info(f'Total size of binaries: {size} {unit}')
-        else:
-            binaries = None
+        logger.info(f'Gathering binaries for {resource.url}')
+        binaries = list(filter(mime_type_filter, gather_files(resource)))
+        total_size = FileSize(sum(file_resource.size for file_resource in binaries))
+        logger.info(f'Total size of binaries: {total_size}')
 
         return binaries
 
@@ -124,6 +133,7 @@ class ExportJob:
 
         # create a bag in a temporary directory to hold exported items
         temp_dir = TemporaryDirectory()
+        logger.debug(f'Assembling export bag in {temp_dir.name}')
         bag = make_bag(temp_dir.name)
 
         export_dir = os.path.join(temp_dir.name, 'data')
@@ -132,32 +142,31 @@ class ExportJob:
             try:
                 logger.info(f'Exporting item {count["exported"] + 1}/{count["total"]}: {uri}')
 
-                # derive an item-level directory name from the URI
-                # currently this is hard-coded to look for a UUID
-                # TODO: expand to other types of unique ids?
-                match = UUID_REGEX.search(uri)
-                if match is None:
-                    raise DataReadError(f'No UUID found in {uri}')
-                item_dir = match[0]
-
                 resource = self.repo[uri:PCDMObjectResource].read()
+                # use a translated version of the repo path as the default item directory name
+                # e.g., "/dc/2023/1/de/84/37/0d/de84370d-f90a-444f-a87f-dd79e0438884" becomes
+                # "dc.2023.1.de.84.37.0d.de84370d-f90a-444f-a87f-dd79e0438884"
+                item_dir = resource.path.lstrip('/').replace('/', '.')
 
                 model_class = detect_resource_class(resource.graph, resource.url, fallback=Item)
                 binaries = self.list_binaries_to_export(resource)
 
                 # write the metadata for this object
                 obj = resource.describe(model=model_class)
+                # use the identifier field from the model as a better item directory name
+                if hasattr(obj, 'identifier'):
+                    item_dir = str(obj.identifier.value or item_dir)
                 serializer.write(obj, files=binaries, binaries_dir=item_dir)
 
                 if binaries is not None:
-                    binaries_dir = os.path.join(export_dir, item_dir)
-                    os.makedirs(binaries_dir, exist_ok=True)
+                    binaries_dir = Path(export_dir, item_dir)
+                    binaries_dir.mkdir(parents=True, exist_ok=True)
                     for file_resource in binaries:
                         accessed = parsedate(file_resource.headers['Date'])
                         modified = parsedate(file_resource.headers['Last-Modified'])
                         file = file_resource.describe(PCDMFile)
 
-                        binary_filename = os.path.join(binaries_dir, str(file.filename))
+                        binary_filename = binaries_dir / str(file.filename)
                         with open(binary_filename, mode='wb') as binary:
                             with file_resource.open() as stream:
                                 for chunk in stream:

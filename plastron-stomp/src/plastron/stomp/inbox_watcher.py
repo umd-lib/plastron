@@ -39,11 +39,11 @@ class InboxWatcher:
 
     def start(self):
         """Start the watcher"""
-        logger.debug(f"Starting InboxWatcher")
+        logger.debug("Starting InboxWatcher")
         self.observer.start()
 
     def stop(self):
         """Stop the watcher"""
-        logger.debug(f"Stopping InboxWatcher")
+        logger.debug("Stopping InboxWatcher")
         self.observer.unschedule_all()
         self.observer.stop()

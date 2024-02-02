@@ -19,6 +19,7 @@ from plastron.files import BinarySource, ZipFileSource, RemoteFileSource, HTTPFi
 from plastron.jobs import JobConfigError, JobError, annotate_from_files, JobNotFoundError
 from plastron.jobs.importjob.spreadsheet import LineReference, MetadataSpreadsheet, InvalidRow, Row
 from plastron.models import get_model_class, ModelClassNotFoundError
+from plastron.namespaces import umdaccess
 from plastron.rdf.pcdm import File, PreservationMasterFile
 from plastron.rdfmapping.resources import RDFResourceBase
 from plastron.rdfmapping.validation import ValidationResultsDict, ValidationResult, ValidationSuccess, ValidationFailure
@@ -262,10 +263,7 @@ class ImportRow:
 
     def validate_item(self) -> ValidationResultsDict:
         """Validate the item for this import row, and check that all files
-        listed are present.
-
-        :returns: ValidationResult
-        """
+        listed are present."""
         try:
             results: ValidationResultsDict = self.item.validate()
         except ValidationError as e:
@@ -278,10 +276,7 @@ class ImportRow:
 
     def validate_files(self, filenames: Iterable[str]) -> ValidationResult:
         """Check that a file exists in the job's binaries location for each
-        file name given.
-
-        :returns: ValidationResult
-        """
+        file name given."""
         missing_files = [
             name for name in filenames
             if not self.job.get_source(self.job.config.binaries_location, name).exists()
@@ -298,12 +293,8 @@ class ImportRow:
             )
 
     def update_repo(self) -> ImportedItemStatus:
-        """
-        Either creates a new item, updates an existing item, or does nothing
-        to an existing item (if there are no changes).
-
-        :returns: ImportedItemStatus
-        """
+        """Either creates a new item, updates an existing item, or does nothing
+        to an existing item (if there are no changes)."""
         if self.item.uri.startswith('urn:uuid:'):
             resource = self.create_resource()
             logger.info(f'Created {resource.url}')
@@ -327,13 +318,14 @@ class ImportRow:
             return ImportedItemStatus.UNCHANGED
 
     def create_resource(self) -> PCDMObjectResource:
+        """Create a new item in the repository."""
+
         # if an item is new, don't construct a SPARQL Update query
         # instead, just create and update normally
-        # create new item in the repo
         logger.debug('Creating a new item')
         # add the access class
         if self.job.access is not None:
-            self.item.rdf_type.append(self.job.access)
+            self.item.rdf_type.add(self.job.access)
         # add the collection membership
         if self.job.member_of is not None:
             self.item.member_of = self.job.member_of
@@ -424,18 +416,35 @@ class ImportRun:
             self._failed_items = ItemLog(self.dir / 'dropped-failed.log.csv', DROPPED_FAILED_FIELDNAMES, 'id')
         return self._failed_items
 
-    def start(
+    def __call__(self, *args, **kwargs):
+        return self.run(*args, **kwargs)
+
+    def run(
             self,
             repo: Repository,
             limit: int = None,
             percentage: int = None,
             validate_only: bool = False,
             import_file: IO = None,
-    ) -> Generator[Any, None, Dict[str, Any]]:
-        """
-        Sets the timestamp for this run, and creates the log directory for it.
+    ) -> Generator[Dict[str, Any], None, Dict[str, Any]]:
+        """Execute this import run. Returns a generator that yields a dictionary of
+        current status after each item. The generator also returns a final status
+        dictionary after the run has completed. This value can be captured using
+        a delegating generator and Python's `yield from` syntax:
 
-        :return:
+        ```python
+        import_run = ImportRun(job)
+        result = None
+
+        # this is the delegated generator function
+        def generator(repo):
+            result = yield from import_run.run(repo)
+
+        for status in generator(repo):
+            print(status['count'], 'items completed')
+
+        print('job status', result['type'])
+        ```
         """
         if self.dir is not None:
             raise RuntimeError('Run completed, cannot start again')
@@ -599,7 +608,7 @@ class ImportRun:
 
     def complete(self, item, line_reference, status):
         """
-        Delegates to the `plastron.jobs.ImportJob.complete()` method.
+        Delegates to the `ImportJob.complete()` method.
 
         :param item:
         :param line_reference:

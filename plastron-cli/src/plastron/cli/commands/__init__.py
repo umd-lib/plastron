@@ -14,7 +14,7 @@ class BaseCommand:
         name = self.__module__.split('.')[-1]
         if name == 'importcommand':
             name = 'import'
-        return self.context.config.get('COMMANDS').get(name.upper(), {})
+        return self.context.config.get('COMMANDS', {}).get(name.upper(), {})
 
     def _run(self, command: Generator):
         # delegating generator; each progress step is passed to the calling

@@ -1,26 +1,20 @@
 from importlib import import_module
-from typing import Optional, Generator
+from typing import Generator, Dict, Any
 
-from plastron.repo import Repository
+from plastron.cli.context import PlastronContext
 
 
 class BaseCommand:
-    def __init__(self, config=None):
-        if config is None:
-            config = {}
-        self.config = config
-        self.repo: Optional[Repository] = None
+    def __init__(self, context: PlastronContext = None):
+        self.context = context
         self.result = None
 
-    def repo_config(self, repo_config, args=None):
-        """
-        Enable default repository config dictionary to be overridden by the
-        command before actually creating the repository.
-
-        The default implementation of this method simply returns the provided
-        repo_config dictionary without change
-        """
-        return repo_config
+    @property
+    def config(self) -> Dict[str, Any]:
+        name = self.__module__.split('.')[-1]
+        if name == 'importcommand':
+            name = 'import'
+        return self.context.config.get('COMMANDS', {}).get(name.upper(), {})
 
     def _run(self, command: Generator):
         # delegating generator; each progress step is passed to the calling

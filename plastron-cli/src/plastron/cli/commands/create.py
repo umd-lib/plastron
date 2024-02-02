@@ -5,7 +5,6 @@ from typing import List, Tuple, Union
 
 from rdflib import Graph, Literal, URIRef
 
-from plastron.client import Client
 from plastron.cli.commands import BaseCommand
 from plastron.namespaces import dcterms, get_manager, pcdm, rdf
 from plastron.rdf import parse_data_property, parse_object_property, uri_or_curie
@@ -83,9 +82,7 @@ def configure_cli(subparsers):
 
 
 class Command(BaseCommand):
-    def __call__(self, client: Client, args: Namespace):
-        self.client = client
-
+    def __call__(self, args: Namespace):
         properties: List[Tuple[URIRef, Union[Literal, URIRef]]] = [
             *(parse_data_property(p, o) for p, o in args.data_properties),
             *(parse_object_property(p, o) for p, o in args.object_properties)
@@ -103,6 +100,6 @@ class Command(BaseCommand):
             graph.add((URIRef(''), p, o))
 
         if args.path is not None:
-            self.client.create_at_path(Path(args.path), graph)
+            self.context.client.create_at_path(Path(args.path), graph)
         elif args.container is not None:
-            self.client.create_in_container(Path(args.container), graph)
+            self.context.client.create_in_container(Path(args.container), graph)

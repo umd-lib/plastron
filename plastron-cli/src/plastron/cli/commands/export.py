@@ -3,7 +3,6 @@ from argparse import Namespace
 
 from plastron.cli.commands import BaseCommand
 from plastron.jobs.exportjob import ExportJob
-from plastron.repo import Repository
 from plastron.serializers import SERIALIZER_CLASSES
 
 logger = logging.getLogger(__name__)
@@ -56,14 +55,9 @@ def configure_cli(subparsers):
 
 
 class Command(BaseCommand):
-    def __init__(self, config=None):
-        super().__init__(config=config)
-        self.ssh_private_key = self.config.get('SSH_PRIVATE_KEY')
-        self.result = None
-
-    def __call__(self, repo: Repository, args: Namespace):
+    def __call__(self, args: Namespace):
         export_job = ExportJob(
-            repo=self.repo,
+            repo=self.context.repo,
             export_binaries=args.export_binaries,
             binary_types=args.binary_types,
             uris=args.uris,

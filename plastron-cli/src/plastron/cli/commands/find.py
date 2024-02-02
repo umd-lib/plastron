@@ -5,7 +5,6 @@ from typing import List, Tuple, Union, Iterator, Callable, Iterable
 from rdflib import URIRef, Literal
 
 from plastron.cli.commands import BaseCommand
-from plastron.client import Client
 from plastron.namespaces import get_manager, rdf
 from plastron.rdf import parse_predicate_list, parse_data_property, parse_object_property, uri_or_curie
 from plastron.repo import RepositoryResource
@@ -84,7 +83,7 @@ def configure_cli(subparsers):
 
 
 class Command(BaseCommand):
-    def __call__(self, client: Client, args: Namespace):
+    def __call__(self, args: Namespace):
         self.properties: List[Tuple[URIRef, Union[Literal, URIRef]]] = [
             *(parse_data_property(p, o) for p, o in args.data_properties),
             *(parse_object_property(p, o) for p, o in args.object_properties)
@@ -109,7 +108,7 @@ class Command(BaseCommand):
         traverse = parse_predicate_list(args.recursive) if args.recursive else []
         for uri in args.uris:
             for resource in find(
-                start_resource=self.repo[uri],
+                start_resource=self.context.repo[uri],
                 matcher=self.match,
                 traverse=traverse,
                 properties=self.properties,

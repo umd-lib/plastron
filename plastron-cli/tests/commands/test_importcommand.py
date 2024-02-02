@@ -7,7 +7,7 @@ import pytest
 
 from plastron.cli.commands.importcommand import Command
 from plastron.client import Client, Endpoint
-from plastron.jobs import JobConfigError
+from plastron.jobs import JobConfigError, JobNotFoundError
 
 
 @pytest.fixture
@@ -22,78 +22,81 @@ def test_cannot_resume_without_job_id(client):
     args = argparse.Namespace(resume=True, job_id=None)
 
     with pytest.raises(RuntimeError) as excinfo:
-        for _ in command(client, args):
+        for _ in command(args):
             pass
 
     assert "Resuming a job requires a job id" in str(excinfo.value)
 
 
-def test_cannot_resume_without_job_directory(client):
+def test_cannot_resume_without_job_directory(plastron_context):
     # Verifies that the import command throws RuntimeError when resuming a
     # job and the directory associated with job id is not found
     jobs_dir = '/nonexistent_directory'
-    config = {'JOBS_DIR': jobs_dir}
-    command = Command(config)
+    plastron_context.config.update({'COMMANDS': {'IMPORT': {'JOBS_DIR': jobs_dir}}})
     args = create_args('test_job_id')
     args.resume = True
+    plastron_context.args = args
+    command = Command(context=plastron_context)
 
-    with pytest.raises(RuntimeError) as excinfo:
-        for _ in command(client, args):
+    with pytest.raises(JobNotFoundError) as excinfo:
+        for _ in command(args):
             pass
 
-    assert "no such job directory" in str(excinfo.value)
+    assert "does not exist" in str(excinfo.value)
 
 
-def test_cannot_resume_without_config_file(client):
+def test_cannot_resume_without_config_file(plastron_context):
     # Verifies that the import command throws ConfigMissingError when resuming a
     # job and a config file is not found
     job_id = 'test_id'
     args = create_args(job_id)
     args.resume = True
+    plastron_context.args = args
 
     with tempfile.TemporaryDirectory() as tmpdirname:
-        config = {'JOBS_DIR': tmpdirname}
+        plastron_context.config.update({'COMMANDS': {'IMPORT': {'JOBS_DIR': tmpdirname}}})
 
         # Make subdirectory in tmpdirname for job
         job_dir = os.path.join(tmpdirname, job_id)
         os.mkdir(job_dir)
 
-        command = Command(config)
+        command = Command(context=plastron_context)
 
         with pytest.raises(JobConfigError) as excinfo:
-            for _ in command(client, args):
+            for _ in command(args):
                 pass
 
         assert "config.yml is missing" in str(excinfo.value)
 
 
-def test_model_is_required_unless_resuming(client):
+def test_model_is_required_unless_resuming(plastron_context):
     # Verifies that the import command throws RuntimeError if model
     # is not provided when not resuming
     job_id = 'test_id'
     args = create_args(job_id)
     args.model = None
-    config = {}
+    plastron_context.args = args
 
-    command = Command(config)
+    command = Command(context=plastron_context)
     with pytest.raises(RuntimeError) as excinfo:
-        for _ in command(client, args):
+        for _ in command(args):
             pass
 
     assert "A model is required unless resuming an existing job" in str(excinfo.value)
 
 
-def test_import_file_is_required_unless_resuming(datadir, client):
+def test_import_file_is_required_unless_resuming(datadir, plastron_context):
     # Verifies that the import command throws RuntimeError if an import_file
     # is not provided when not resuming
     job_id = 'test_id'
     args = create_args(job_id)
     args.import_file = None
-    config = {'JOBS_DIR': datadir}
+    plastron_context.args = args
+    plastron_context.config.update({'COMMANDS': {'IMPORT': {'JOBS_DIR': datadir}}})
 
-    command = Command(config)
+    command = Command(context=plastron_context)
     with pytest.raises(RuntimeError) as excinfo:
-        for _ in command(client, args):
+        for _ in command(args):
             pass
 
     assert "An import file is required unless resuming an existing job" in str(excinfo.value)
@@ -110,7 +113,9 @@ def create_args(job_id):
     :return: a configured argparse.Namespace object
     """
     return argparse.Namespace(
-        resume=False, job_id=job_id,
+        job_id=job_id,
+        delegated_user=None,
+        resume=False,
         model='Item',
         access=None,
         member_of="test",

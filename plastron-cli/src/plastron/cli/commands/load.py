@@ -2,7 +2,7 @@ import logging.config
 import os
 import re
 import yaml
-from argparse import ArgumentTypeError
+from argparse import ArgumentTypeError, Namespace
 from datetime import datetime
 from importlib import import_module
 from time import sleep
@@ -83,7 +83,7 @@ def configure_cli(subparsers):
 
 class Command(BaseCommand):
 
-    def __call__(self, client: Client, args):
+    def __call__(self, args: Namespace):
         # Load batch configuration
         try:
             batch_config = BatchConfig(args.batch)
@@ -97,7 +97,7 @@ class Command(BaseCommand):
         if not os.path.isdir(batch_config.log_dir):
             os.makedirs(batch_config.log_dir)
 
-        client.load_binaries = args.load_binaries
+        self.context.client.load_binaries = args.load_binaries
 
         # Define the data_handler function for the data being loaded
         logger.info("Initializing data handler")
@@ -111,14 +111,14 @@ class Command(BaseCommand):
             args.create_annotations = False
 
         try:
-            batch = handler.Batch(client, batch_config)
+            batch = handler.Batch(self.context.client, batch_config)
         except (ConfigError, DataReadError) as e:
             logger.error(e.message)
             logger.error('Failed to initialize batch')
             raise RuntimeError(e.message)
 
         if not args.dry_run:
-            client.test_connection()
+            self.context.client.test_connection()
 
             # read the log of completed items
             fieldnames = ['number', 'timestamp', 'title', 'path', 'uri']
@@ -169,7 +169,7 @@ class Command(BaseCommand):
                 try:
                     logger.info(f"Loading item {n + 1}")
                     is_loaded = load_item(
-                        client, item, args, extra=batch_config.extra
+                        self.context.client, item, args, extra=batch_config.extra
                     )
                 except ClientError:
                     logger.error(
@@ -177,7 +177,7 @@ class Command(BaseCommand):
                     )
                     raise RuntimeError()
                 except DataReadError as e:
-                    logger.error(f"Skipping item {n + 1}: {e.message}")
+                    logger.error(f"Skipping item {n + 1}: {e}")
 
                 row = {'number': n + 1,
                        'path': item.path,

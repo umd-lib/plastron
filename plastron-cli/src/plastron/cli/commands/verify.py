@@ -21,17 +21,14 @@ def configure_cli(subparsers):
 
 
 class Command(BaseCommand):
-    def __call__(self, fcrepo, args: Namespace):
-        if not self.solr:
-            raise RuntimeError('A URL for the Solr connection was not provided in the configuration file')
-
+    def __call__(self, args: Namespace):
         invalid_items = []
         try:
             with open(args.log) as csvfile:
                 reader = csv.DictReader(csvfile)
 
                 for item in reader:
-                    query = self.solr.search(f'id:\"{item["uri"]}\"')
+                    query = self.context.solr.search(f'id:\"{item["uri"]}\"')
 
                     if len(query) == 0:
                         invalid_items.append(item["uri"])

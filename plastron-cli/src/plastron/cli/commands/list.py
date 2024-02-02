@@ -1,7 +1,6 @@
 import logging
 from argparse import Namespace
 
-from plastron.cli import Client
 from plastron.cli.commands import BaseCommand
 from plastron.models.umd import PCDMFile
 from plastron.namespaces import ldp
@@ -29,11 +28,11 @@ def configure_cli(subparsers):
 
 
 class Command(BaseCommand):
-    def __call__(self, client: Client, args: Namespace):
+    def __call__(self, args: Namespace):
         self.long = args.long
 
         for uri in args.uris:
-            resource = self.repo[uri].read()
+            resource = self.context.repo[uri].read()
 
             if resource.is_binary:
                 print(uri)

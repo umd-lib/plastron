@@ -1,12 +1,10 @@
-import copy
 import csv
 import logging
 from argparse import FileType, ArgumentTypeError, Namespace
 from typing import TextIO
 
 from plastron.cli.commands import BaseCommand
-from plastron.client import Client
-from plastron.jobs.importjob import ImportJob
+from plastron.jobs.importjob import ImportConfig, ImportJobs
 from plastron.models import get_model_class, ModelClassNotFoundError
 from plastron.rdf import uri_or_curie
 from plastron.utils import datetimestamp
@@ -138,37 +136,14 @@ def configure_cli(subparsers):
 
 
 class Command(BaseCommand):
-    def __init__(self, config=None):
-        super().__init__(config=config)
-        self.result = None
-        self.ssh_private_key = self.config.get('SSH_PRIVATE_KEY')
-        self.jobs_dir = self.config.get('JOBS_DIR', 'jobs')
+    @property
+    def jobs_dir(self):
+        return self.config.get('JOBS_DIR', 'jobs')
 
-    def repo_config(self, repo_config, args=None):
-        """
-        Returns a deep copy of the provided repo_config, updated with
-        layout structure and relpath information from the args
-        (if provided). If no args are provided, just run the base command
-        repo_config() method.
-        """
-        if args is None:
-            return super().repo_config(repo_config, args)
-
-        result_config = copy.deepcopy(repo_config)
-
-        if args.structure:
-            result_config['STRUCTURE'] = args.structure
-
-        if args.relpath:
-            result_config['RELPATH'] = args.relpath
-
-        return result_config
-
-    def __call__(self, client: Client, args: Namespace):
+    def __call__(self, args: Namespace):
         """
         Performs the import
 
-        :param client: the repository configuration
         :param args: the command-line arguments
         """
         if hasattr(args, 'template_file') and args.template_file is not None:
@@ -189,27 +164,29 @@ class Command(BaseCommand):
             # TODO: generate a more unique id? add in user and hostname?
             args.job_id = f"import-{datetimestamp()}"
 
-        job = ImportJob(args.job_id, self.jobs_dir)
+        jobs = ImportJobs(self.jobs_dir)
         if args.resume:
-            self.run(job.resume(
-                repo=self.repo,
-                limit=args.limit,
-                percentage=args.percentage,
-                validate_only=args.validate_only,
-            ))
+            logger.info(f'Resuming saved job {args.job_id}')
+            job = jobs.get_job(args.job_id)
         else:
-            self.run(job.start(
-                repo=self.repo,
-                import_file=args.import_file,
+            logger.info(f'Creating new job {args.job_id}')
+            job = jobs.create_job(config=ImportConfig(
+                job_id=args.job_id,
                 model=args.model,
                 access=args.access,
                 member_of=args.member_of,
                 container=args.container,
                 binaries_location=args.binaries_location,
-                limit=args.limit,
-                percentage=args.percentage,
-                validate_only=args.validate_only,
             ))
+
+        logger.debug(f'Running job {job.id}')
+        self.run(job.run(
+            repo=self.context.repo,
+            import_file=args.import_file,
+            limit=args.limit,
+            percentage=args.percentage,
+            validate_only=args.validate_only,
+        ))
 
         for key, value in self.result['count'].items():
             logger.info(f"{key.title().replace('_', ' ')}: {value}")

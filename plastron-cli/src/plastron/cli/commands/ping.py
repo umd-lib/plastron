@@ -12,8 +12,8 @@ def configure_cli(subparsers):
 
 
 class Command(BaseCommand):
-    def __call__(self, fcrepo, args):
+    def __call__(self, *args, **kwargs):
         try:
-            fcrepo.test_connection()
+            self.context.client.test_connection()
         except ConnectionError as e:
             raise RuntimeError(str(e)) from e

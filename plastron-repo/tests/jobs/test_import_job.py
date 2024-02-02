@@ -1,19 +1,32 @@
-from plastron.jobs.importjob import ImportJob
+from pathlib import Path
+
+import pytest
+
+from plastron.jobs.importjob import ImportJobs
 
 
-def test_safe_job_id():
-    job = ImportJob('foo', '/tmp')
-    assert job.id == 'foo'
-    assert job.safe_id == 'foo'
+@pytest.fixture
+def jobs_dir(datadir) -> Path:
+    return datadir
 
 
-def test_job_id_with_slashes():
-    job = ImportJob('foo/bar', '/tmp')
-    assert job.id == 'foo/bar'
-    assert job.safe_id == 'foo%2Fbar'
+@pytest.fixture
+def jobs(jobs_dir) -> ImportJobs:
+    return ImportJobs(jobs_dir)
 
 
-def test_uri_as_job_id():
-    job = ImportJob('http://localhost:3000/import-jobs/17', '/tmp')
-    assert job.id == 'http://localhost:3000/import-jobs/17'
-    assert job.safe_id == 'http%3A%2F%2Flocalhost%3A3000%2Fimport-jobs%2F17'
+@pytest.mark.parametrize(
+    ('job_id', 'safe_id'),
+    [
+        # basic
+        ('foo', 'foo'),
+        # with slashes
+        ('foo/bar', 'foo%2Fbar'),
+        # URI as job ID
+        ('http://localhost:3000/import-jobs/17', 'http%3A%2F%2Flocalhost%3A3000%2Fimport-jobs%2F17'),
+    ]
+)
+def test_safe_job_id(jobs, job_id, safe_id):
+    job = jobs.create_job(job_id=job_id)
+    assert job.id == job_id
+    assert job.dir == jobs.dir / safe_id

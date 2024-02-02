@@ -17,11 +17,9 @@ from rdflib import URIRef
 from plastron.client import ClientError
 from plastron.files import BinarySource, ZipFileSource, RemoteFileSource, HTTPFileSource, LocalFileSource
 from plastron.jobs import JobConfigError, JobError, annotate_from_files, JobNotFoundError
-from plastron.jobs.importjob.spreadsheet import LineReference, MetadataSpreadsheet, InvalidRow, Row
+from plastron.jobs.importjob.spreadsheet import MetadataSpreadsheet, InvalidRow, Row
 from plastron.models import get_model_class, ModelClassNotFoundError
-from plastron.namespaces import umdaccess
 from plastron.rdf.pcdm import File, PreservationMasterFile
-from plastron.rdfmapping.resources import RDFResourceBase
 from plastron.rdfmapping.validation import ValidationResultsDict, ValidationResult, ValidationSuccess, ValidationFailure
 from plastron.repo import Repository, RepositoryError, ContainerResource
 from plastron.repo.pcdm import PCDMObjectResource
@@ -118,13 +116,13 @@ class ImportJob:
             copyfileobj(input_file, file)
             logger.debug(f"Copied input file {getattr(input_file, 'name', '<>')} to {file.name}")
 
-    def complete(self, item: RDFResourceBase, line_reference: LineReference, status: ImportedItemStatus):
+    def complete(self, row, status: ImportedItemStatus):
         # write to the completed item log
         self.completed_log.append({
-            'id': getattr(item, 'identifier', str(line_reference)),
+            'id': row.identifier,
             'timestamp': datetimestamp(digits_only=False),
-            'title': getattr(item, 'title', ''),
-            'uri': getattr(item, 'uri', ''),
+            'title': getattr(row.item, 'title', ''),
+            'uri': getattr(row.item, 'uri', ''),
             'status': status.value
         })
 
@@ -260,6 +258,10 @@ class ImportRow:
 
     def __str__(self):
         return str(self.row.line_reference)
+
+    @property
+    def identifier(self):
+        return self.row.identifier
 
     def validate_item(self) -> ValidationResultsDict:
         """Validate the item for this import row, and check that all files
@@ -486,6 +488,8 @@ class ImportRun:
             skipped_items=0,
         )
         logger.info(f'Found {count["initially_completed_items"]} completed items')
+        if count['initially_completed_items'] > 0:
+            logger.debug(f'Completed item identifiers: {self.job.completed_log._item_keys}')
 
         for row in metadata.rows(limit=limit, percentage=percentage, completed=self.job.completed_log):
             if isinstance(row, InvalidRow):
@@ -521,7 +525,7 @@ class ImportRun:
 
             try:
                 status = import_row.update_repo()
-                self.complete(import_row.item, row.line_reference, status)
+                self.complete(import_row, status)
                 if status == ImportedItemStatus.CREATED:
                     count['created_items'] += 1
                 elif status == ImportedItemStatus.MODIFIED:
@@ -606,16 +610,11 @@ class ImportRun:
             'reason': reason
         })
 
-    def complete(self, item, line_reference, status):
+    def complete(self, row: ImportRow, status: ImportedItemStatus):
         """
         Delegates to the `ImportJob.complete()` method.
-
-        :param item:
-        :param line_reference:
-        :param status:
-        :return:
         """
-        self.job.complete(item, line_reference, status)
+        self.job.complete(row, status)
 
 
 class ImportJobs:

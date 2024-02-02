@@ -21,7 +21,6 @@ from plastron.rdfmapping.resources import RDFResourceBase, RDFResourceType
 from plastron.repo import DataReadError, Repository, RepositoryResource
 from plastron.serializers import CSVSerializer
 from plastron.serializers.csv import flatten_headers, unflatten, not_empty, split_escaped, build_lookup_index
-from plastron.utils import strtobool
 
 nsm = get_manager()
 logger = logging.getLogger(__name__)

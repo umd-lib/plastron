@@ -1,37 +1,43 @@
 import json
 import logging
-from flask import Blueprint, request, jsonify, Response
+from flask import Blueprint, Response, current_app, jsonify, request
 from rdflib import Graph, Namespace
 from typing import List
 from uuid import uuid4
 
-from plastron.cli.commands.publish import Command as PublishCommand
-from plastron.cli.commands.unpublish import Command as UnpublishCommand
-from plastron.namespaces import get_manager, rdf, umdact
+from plastron.cli.commands.publish import publish
+from plastron.cli.commands.unpublish import unpublish
+from plastron.namespaces import rdf, umdact
 
 logger = logging.getLogger(__name__)
 
-activitystream = Blueprint('activities', __name__, template_folder='templates')
+activitystream_bp = Blueprint('activitystream', __name__, template_folder='templates')
 
 activitystreams = Namespace('https://www.w3.org/ns/activitystreams#')
 
-@activitystream.route('/inbox', methods=['POST'])
+
+@activitystream_bp.route('/inbox', methods=['POST'])
 def new_activity():
     try:
         activity = Activity(from_json=request.get_json())
-        args = {
-            'uris': activity.objects,
-            'force_hidden': activity.force_hidden,
-            'force_visible': False
-        }
-        if activity.publish:
-            PublishCommand(args)
-        elif activity.unpublish:
-            UnpublishCommand(args)
+        ctx = current_app.config['CONTEXT']
+        cmd = get_command(activity)
+        cmd(ctx, uris=activity.objects, force_hidden=activity.force_hidden, force_visible=False)
         return Response(status=201)
-    except Exception as e:
+    except ValidationError as e:
         logger.error(f'Exception: {e}')
         return jsonify({'error': str(e)}), 400
+    except Exception as e:
+        logger.error(f'Exception: {e}')
+        return jsonify({'error': str(e)}), 500
+
+def get_command(activity):
+    if activity.publish:
+        return publish
+    elif activity.unpublish:
+        return unpublish
+    else:
+        raise ValidationError(f'Invalid JSON-LD provided: unsupported activity type.')
 
 class Activity:
     def __init__(self, from_json: str):
@@ -45,7 +51,7 @@ class Activity:
 
         for s, p, o in g:
             if activitystreams.object == p:
-                self._objects.append(o)
+                self._objects.append(str(o))
             elif rdf.type == p:
                 if o == umdact.Publish:
                     self._publish = True

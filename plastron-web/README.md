@@ -7,14 +7,14 @@ HTTP server for synchronous remote operations
 As a Flask application: 
 
 ```bash
-flask --app plastron.web:create_app run
+flask --app plastron.web:create_app("/path/to/docker-plastron.yml") run
 ```
 
 To enable debugging, for hot code reloading, set `FLASK_DEBUG=1` either on 
 the command line or in a `.env` file:
 
 ```bash
-FLASK_DEBUG=1 flask --app plastron.web:create_app run
+FLASK_DEBUG=1 flask --app plastron.web:create_app("/path/to/docker-plastron.yml") run
 ```
 
 Using the console script entrypoint, which runs the application with the 
@@ -54,6 +54,10 @@ docker swarm init
 # build the image
 docker build -t docker.lib.umd.edu/plastrond-http:latest \
     -f plastron-web/Dockerfile .
+
+# Copy the docker-plastron-template.yml and edit the configuration
+cp docker-plastron.template.yml docker-plastron.yml
+vim docker-plastron.yml
 
 # deploy the stack to run the HTTP webapp
 docker stack deploy -c plastron-web/compose.yml plastrond

@@ -12,7 +12,13 @@ from plastron.web import create_app
     help='Address and port to listen on. Default is "0.0.0.0:5000".',
     metavar='[ADDRESS]:PORT',
 )
-def run(listen):
+@click.option(
+    '-c', '--config-file',
+    type=click.Path(exists=True),
+    help='Configuration file',
+    required=True,
+)
+def run(listen: bool, config_file: str):
     load_dotenv()
-    app = create_app()
+    app = create_app(config_file)
     serve(app, listen=listen)

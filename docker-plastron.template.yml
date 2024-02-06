@@ -19,3 +19,9 @@ COMMANDS:
   IMPORT:
     SSH_PRIVATE_KEY: /etc/plastron/auth/archelon_id
     JOBS_DIR: /var/opt/plastron/jobs
+PUBLICATION_WORKFLOW:
+  HANDLE_ENDPOINT: http://docker.for.mac.localhost:3000/api/v1
+  HANDLE_JWT_TOKEN: <Replace with value from running `bundle exec rails 'jwt:create_token[publication_workflow]'>
+  HANDLE_PREFIX: 1903.1
+  HANDLE_REPO: fcrepo
+  PUBLIC_URL_PATTERN: http://digital-local/{uuid}

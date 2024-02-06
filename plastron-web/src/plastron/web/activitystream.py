@@ -7,14 +7,11 @@ from uuid import uuid4
 
 from plastron.cli.commands.publish import publish
 from plastron.cli.commands.unpublish import unpublish
-from plastron.namespaces import rdf, umdact
+from plastron.namespaces import activitystreams, rdf, umdact
 
 logger = logging.getLogger(__name__)
 
 activitystream_bp = Blueprint('activitystream', __name__, template_folder='templates')
-
-activitystreams = Namespace('https://www.w3.org/ns/activitystreams#')
-
 
 @activitystream_bp.route('/inbox', methods=['POST'])
 def new_activity():

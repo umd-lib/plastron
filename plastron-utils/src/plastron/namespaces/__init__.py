@@ -9,6 +9,9 @@ from rdflib.namespace import NamespaceManager
 acl = Namespace('http://www.w3.org/ns/auth/acl#')
 """[Web Access Controls (WebAC)](https://solidproject.org/TR/wac)"""
 
+activitystreams = Namespace('https://www.w3.org/ns/activitystreams#')
+"""[Activity Streams 2.0](https://www.w3.org/TR/activitystreams-core/)"""
+
 bibo = Namespace('http://purl.org/ontology/bibo/')
 """[Bibliographic Ontology](https://www.dublincore.org/specifications/bibo/bibo/)"""
 

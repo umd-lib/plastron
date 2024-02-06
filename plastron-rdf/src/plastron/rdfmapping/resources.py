@@ -1,6 +1,6 @@
 from collections import defaultdict
 from copy import deepcopy, copy
-from typing import List, Optional, Union, Any, Type, TypeVar
+from typing import Dict, List, Optional, Union, Any, Type, TypeVar
 from uuid import uuid4
 
 from rdflib import Graph, URIRef
@@ -61,8 +61,8 @@ class RDFResourceBase:
                 copy_triples(graph, self._graph.original)
         else:
             self._graph = TrackChangesGraph()
-        self.set_properties(**self.default_values)
-        self.set_properties(**kwargs)
+        self.add_properties(**self.default_values)
+        self.add_properties(**kwargs)
 
     def get_fragment_resource(
             self,
@@ -83,18 +83,29 @@ class RDFResourceBase:
         fragment = object_class(uri=uri, graph=self._graph)
         return fragment
 
-    def set_properties(self, **kwargs):
-        for name, value in kwargs.items():
+    def _update_properties(self, properties: Dict[str, Any], clear_existing=False):
+        for name, value in properties.items():
             if name not in self.rdf_property_names:
                 raise ValueError(f'Unknown property name: {name}')
+
+            prop = getattr(self, name)
+            if clear_existing:
+                prop.clear()
             if is_iterable(value):
                 # value is iterable, add each value separately
-                prop = getattr(self, name)
                 for v in value:
                     prop.add(v)
             else:
                 # this is non-iterable, set a single value
-                setattr(self, name, value)
+                prop.add(value)
+
+    def set_properties(self, **kwargs):
+        """Set the properties on this object. Clears any existing properties."""
+        self._update_properties(properties=kwargs, clear_existing=True)
+
+    def add_properties(self, **kwargs):
+        """Add the given properties to this object. Does *not* clear existing properties."""
+        self._update_properties(properties=kwargs, clear_existing=False)
 
     @property
     def graph(self) -> TrackChangesGraph:

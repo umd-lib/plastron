@@ -221,7 +221,8 @@ class Row:
         # to their correct positional locations
         row_index = build_lookup_index(self.index_string)
         params = unflatten(self.data, self.spreadsheet.model_class, self.spreadsheet.model_class.HEADER_MAP, row_index)
-        item: RDFResourceType = self.spreadsheet.model_class(uri=self.uri, graph=resource.graph, **params)
+        item: RDFResourceType = self.spreadsheet.model_class(uri=self.uri, graph=resource.graph)
+        item.set_properties(**params)
 
         return item
 

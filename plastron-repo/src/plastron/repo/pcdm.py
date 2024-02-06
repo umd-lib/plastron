@@ -237,7 +237,7 @@ class PCDMObjectResource(PCDMFileBearingResource, AggregationResource):
         page_resource = self.members_container.create_child(
             resource_class=PCDMPageResource,
             slug=slug,
-            description=Page(title=title, number=number, member_of=parent),
+            description=Page(title=title, number=Literal(number), member_of=parent),
         )
         parent.has_member.add(URIRef(page_resource.url))
         for file_spec in file_group.files:

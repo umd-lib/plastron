@@ -41,7 +41,7 @@ def create_app(config_file: str):
     app = Flask(__name__)
     with open(config_file, "r") as stream:
         config = envsubst(yaml.safe_load(stream))
-        app.config['CONTEXT'] = Namespace(obj=PlastronContext(config=config, args=Namespace(delegated_user='plastron-web')))
+        app.config['CONTEXT'] = Namespace(obj=PlastronContext(config=config, args=Namespace(delegated_user=None)))
     jobs_dir = Path(os.environ.get('JOBS_DIR', 'jobs'))
     jobs = ImportJobs(directory=jobs_dir)
     app.register_blueprint(activitystream_bp)

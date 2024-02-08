@@ -1,9 +1,10 @@
 import json
 import logging
-from flask import Blueprint, Response, current_app, jsonify, request
-from rdflib import Graph, Namespace
 from typing import List
 from uuid import uuid4
+
+from flask import Blueprint, Response, current_app, jsonify, request
+from rdflib import Graph
 
 from plastron.cli.commands.publish import publish
 from plastron.cli.commands.unpublish import unpublish
@@ -12,6 +13,7 @@ from plastron.namespaces import activitystreams, rdf, umdact
 logger = logging.getLogger(__name__)
 
 activitystream_bp = Blueprint('activitystream', __name__, template_folder='templates')
+
 
 @activitystream_bp.route('/inbox', methods=['POST'])
 def new_activity():
@@ -28,6 +30,7 @@ def new_activity():
         logger.error(f'Exception: {e}')
         return jsonify({'error': str(e)}), 500
 
+
 def get_command(activity):
     if activity.publish:
         return publish
@@ -35,6 +38,7 @@ def get_command(activity):
         return unpublish
     else:
         raise ValidationError(f'Invalid JSON-LD provided: unsupported activity type.')
+
 
 class Activity:
     def __init__(self, from_json: str):
@@ -59,7 +63,7 @@ class Activity:
                     self._force_hidden = True
                 else:
                     raise ValidationError(f'Invalid Activity type: {str(o)}')
-        if (not self.publish and not self.unpublish):
+        if not self.publish and not self.unpublish:
             raise ValidationError(f'Invalid JSON-LD provided: Type not specified.')
         if not self.objects:
             raise ValidationError(f'Invalid JSON-LD provided: Object(s) not specified.')
@@ -82,6 +86,7 @@ class Activity:
     @property
     def objects(self) -> List[str]:
         return self._objects
+
 
 class ValidationError(Exception):
     pass

@@ -15,6 +15,7 @@ from plastron.utils import envsubst
 
 logger = logging.getLogger(__name__)
 
+
 def job_url(job_id):
     return url_for('show_job', _external=True, job_id=job_id)
 
@@ -36,6 +37,7 @@ def latest_dropped_items(job: ImportJob):
         'failed': items(latest_run.failed_items),
         'invalid': items(latest_run.invalid_items)
     }
+
 
 def create_app(config_file: str):
     app = Flask(__name__)

@@ -1,6 +1,5 @@
-import pytest
-
 import os
+
 
 def config_file_path(request):
     test_dir = os.path.dirname(request.module.__file__)

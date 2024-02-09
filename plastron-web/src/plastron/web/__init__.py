@@ -15,6 +15,7 @@ from plastron.utils import envsubst
 
 logger = logging.getLogger(__name__)
 
+
 def job_url(job_id):
     return url_for('show_job', _external=True, job_id=job_id)
 
@@ -37,11 +38,12 @@ def latest_dropped_items(job: ImportJob):
         'invalid': items(latest_run.invalid_items)
     }
 
+
 def create_app(config_file: str):
     app = Flask(__name__)
     with open(config_file, "r") as stream:
         config = envsubst(yaml.safe_load(stream))
-        app.config['CONTEXT'] = Namespace(obj=PlastronContext(config=config, args=Namespace(delegated_user='plastron-web')))
+        app.config['CONTEXT'] = Namespace(obj=PlastronContext(config=config, args=Namespace(delegated_user=None)))
     jobs_dir = Path(os.environ.get('JOBS_DIR', 'jobs'))
     jobs = ImportJobs(directory=jobs_dir)
     app.register_blueprint(activitystream_bp)

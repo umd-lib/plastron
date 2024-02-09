@@ -22,3 +22,7 @@ def run(listen: bool, config_file: str):
     load_dotenv()
     app = create_app(config_file)
     serve(app, listen=listen)
+
+
+if __name__ == "__main__":
+    run()

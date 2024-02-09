@@ -1,13 +1,17 @@
 import logging
 import os
+import yaml
 import urllib.parse
 from pathlib import Path
-
+from argparse import Namespace
 from flask import Flask, url_for
 from werkzeug.exceptions import NotFound
 
+from plastron.cli.context import PlastronContext
 from plastron.jobs.imports import ImportJob, ImportJobs
 from plastron.jobs import JobError, JobConfigError, JobNotFoundError
+from plastron.web.activitystream import activitystream_bp
+from plastron.utils import envsubst
 
 logger = logging.getLogger(__name__)
 
@@ -35,10 +39,14 @@ def latest_dropped_items(job: ImportJob):
     }
 
 
-def create_app():
+def create_app(config_file: str):
     app = Flask(__name__)
+    with open(config_file, "r") as stream:
+        config = envsubst(yaml.safe_load(stream))
+        app.config['CONTEXT'] = Namespace(obj=PlastronContext(config=config, args=Namespace(delegated_user=None)))
     jobs_dir = Path(os.environ.get('JOBS_DIR', 'jobs'))
     jobs = ImportJobs(directory=jobs_dir)
+    app.register_blueprint(activitystream_bp)
 
     def get_job(job_id: str):
         return jobs.get_job(urllib.parse.unquote(job_id))

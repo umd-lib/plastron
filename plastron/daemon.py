@@ -14,7 +14,7 @@ from plastron import version
 from plastron.logging import DEFAULT_LOGGING_OPTIONS
 from plastron.stomp import Broker
 from plastron.stomp.listeners import CommandListener
-from plastron.util import envsubst
+from plastron.util import envsubst, check_python_version
 from plastron.web import create_app
 
 logger = logging.getLogger(__name__)
@@ -33,6 +33,7 @@ class STOMPDaemon(Thread):
         self.command_listener = CommandListener(self)
 
     def run(self):
+        check_python_version()
         # setup listeners
         self.broker.set_listener('command', self.command_listener)
 
@@ -56,6 +57,7 @@ class HTTPDaemon(Thread):
         self.port = int(server_config.get('PORT', 5000))
 
     def run(self):
+        check_python_version()
         app = create_app({'JOBS_DIR': Path(self.jobs_dir)})
         logger.info(f'HTTP server listening on {self.host}:{self.port}')
         waitress.serve(app, host=self.host, port=self.port)

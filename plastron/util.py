@@ -1,6 +1,7 @@
 import csv
 import logging
 import os
+import platform
 import re
 import shutil
 import sys
@@ -308,3 +309,14 @@ class ItemLog:
 
 class ItemLogError(Exception):
     pass
+
+
+def check_python_version():
+    # check Python version
+    major, minor, patch = (int(v) for v in platform.python_version_tuple())
+    if minor < 8:
+        logger.warning(
+            f'You appear to be running Python {platform.python_version()}. '
+            'Upgrading to Python 3.8+ is STRONGLY recommended.'
+        )
+

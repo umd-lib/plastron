@@ -22,7 +22,7 @@ def new_activity():
         ctx = current_app.config['CONTEXT']
         cmd = get_command(activity)
         cmd(ctx, uris=activity.objects, force_hidden=activity.force_hidden, force_visible=False)
-        return Response(status=201)
+        return {}, 201
     except ValidationError as e:
         logger.error(f'Exception: {e}')
         return jsonify({'error': str(e)}), 400

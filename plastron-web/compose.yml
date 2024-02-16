@@ -1,6 +1,6 @@
 version: "3.7"
 services:
-  http:
+  plastrond-http:
     image: docker.lib.umd.edu/plastrond-http
     configs:
       - source: plastron-config

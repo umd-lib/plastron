@@ -12,8 +12,8 @@ from uuid import uuid4
 from rdflib import URIRef, Literal
 from rdflib.util import from_n3
 
-from plastron.jobs import JobError
 from plastron.files import FileSpec, FileGroup
+from plastron.jobs import JobError
 from plastron.namespaces import get_manager
 from plastron.rdfmapping.descriptors import Property, DataProperty
 from plastron.rdfmapping.embed import EmbeddedObject
@@ -72,7 +72,7 @@ def build_fields(fieldnames, model_class) -> Dict[str, List[ColumnSpec]]:
             fields[attrs].append(ColumnSpec(
                 attrs=attrs,
                 header=header,
-                prop=get_final_prop(model_class, attrs),
+                prop=get_final_prop(model_class, attrs.split('.')),
                 lang_code=lang_code,
                 datatype=None,
             ))
@@ -96,7 +96,7 @@ def build_fields(fieldnames, model_class) -> Dict[str, List[ColumnSpec]]:
             fields[attrs].append(ColumnSpec(
                 attrs=attrs,
                 header=header,
-                prop=get_final_prop(model_class, attrs),
+                prop=get_final_prop(model_class, attrs.split('.')),
                 lang_code=None,
                 datatype=datatype_uri,
             ))
@@ -121,7 +121,7 @@ def build_fields(fieldnames, model_class) -> Dict[str, List[ColumnSpec]]:
     return fields
 
 
-def get_final_prop(model_class, attrs):
+def get_final_prop(model_class: Type[RDFResourceType], attrs: List[str]) -> str:
     next_attr_name = attrs.pop(0)
     next_attr = getattr(model_class, next_attr_name)
     if not attrs:

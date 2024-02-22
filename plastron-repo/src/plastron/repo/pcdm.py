@@ -94,16 +94,17 @@ class PCDMFileBearingResource(ContainerResource):
         title = basename(source.filename)
         logger.info(f'Creating file {source.filename} ({source.mimetype()}) for {parent} as "{title}"')
         # first create the binary with its data
+        headers = {
+            'Content-Type': source.mimetype() or 'application/octet-stream',
+            'Digest': source.digest(),
+            'Content-Disposition': f'attachment; filename="{source.filename}"',
+        }
         with source.open() as stream:
             file_resource = self.files_container.create_child(
                 resource_class=BinaryResource,
                 slug=slug,
                 data=stream,
-                headers={
-                    'Content-Type': source.mimetype() or 'application/octet-stream',
-                    'Digest': source.digest(),
-                    'Content-Disposition': f'attachment; filename="{source.filename}"',
-                },
+                headers=headers,
             )
 
         # then add its metadata description

@@ -472,7 +472,7 @@ class ImportRun:
             raise RuntimeError(str(e)) from e
 
         if metadata.has_binaries and self.job.config.binaries_location is None:
-            raise RuntimeError('Must specify --binaries-location if the metadata has a FILES column')
+            raise RuntimeError('Must specify --binaries-location if the metadata has a FILES and/or ITEM_FILES column')
 
         count = Counter(
             total_items=metadata.total,

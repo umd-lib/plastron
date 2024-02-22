@@ -308,7 +308,7 @@ class MetadataSpreadsheet:
 
     @property
     def has_binaries(self) -> bool:
-        return 'FILES' in self.fieldnames
+        return 'FILES' in self.fieldnames or 'ITEM_FILES' in self.fieldnames
 
     @property
     def fieldnames(self):

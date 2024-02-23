@@ -1,3 +1,4 @@
+import dataclasses
 import logging
 import os
 import re
@@ -111,6 +112,11 @@ class ImportJob:
         self.config = ImportConfig.from_file(self.config_filename)
         return self
 
+    def update_config(self, job_config_args: Dict[str, Any]) -> 'ImportJob':
+        """Update the config with values from `job_config_args` that are not `None`."""
+        self.config = dataclasses.replace(self.config, **{k: v for k, v in job_config_args.items() if v is not None})
+        return self
+
     def store_metadata_file(self, input_file: IO):
         with open(self.metadata_filename, mode='w') as file:
             copyfileobj(input_file, file)
@@ -169,7 +175,7 @@ class ImportJob:
     @property
     def access(self) -> Optional[URIRef]:
         if self.config.access is not None:
-            return URIRef[self.config.access]
+            return URIRef(self.config.access)
         else:
             return None
 
@@ -324,19 +330,22 @@ class ImportRow:
 
         # if an item is new, don't construct a SPARQL Update query
         # instead, just create and update normally
-        logger.debug('Creating a new item')
+        logger.debug(f'Creating a new item for "{self.row.line_reference}"')
         # add the access class
+        logger.debug(f'Access class: {self.job.access}')
         if self.job.access is not None:
             self.item.rdf_type.add(self.job.access)
         # add the collection membership
+        logger.debug(f'Member of: {self.job.member_of}')
         if self.job.member_of is not None:
             self.item.member_of = self.job.member_of
 
         if self.job.extract_text_types is not None:
             annotate_from_files(self.item, self.job.extract_text_types)
 
+        logger.debug(f"Creating resources in container: {self.job.config.container}")
+        logger.debug(f'Repo: {self.repo}')
         container: ContainerResource = self.repo[self.job.config.container:ContainerResource]
-        logger.debug(f"Creating resources in container: {container.path}")
 
         try:
             with self.repo.transaction():

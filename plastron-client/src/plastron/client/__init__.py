@@ -8,10 +8,10 @@ from contextlib import contextmanager
 from enum import Enum
 from http import HTTPStatus
 from pathlib import Path
-from typing import Any, Optional, List, Callable, NamedTuple
+from typing import Any, Optional, List, Callable, NamedTuple, Union
 
 import requests
-from rdflib import Graph, URIRef
+from rdflib import Graph, URIRef, Literal
 from requests import Response, Session
 from requests.auth import AuthBase
 from requests.exceptions import ConnectionError

@@ -1,14 +1,10 @@
-from io import StringIO
 from argparse import Namespace
 from unittest.mock import MagicMock
 
-import pytest
 
 from plastron.cli import PlastronContext
 from plastron.client import Client
 from plastron.cli.commands.update import Command
-from plastron.models import Letter, Item
-from plastron.repo import Repository
 from pytest import raises
 
 

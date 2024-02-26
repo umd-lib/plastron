@@ -5,7 +5,8 @@ from unittest.mock import MagicMock
 import pytest
 
 from plastron.cli.commands.publish import get_publication_status
-from plastron.jobs.imports import ImportJobs, ImportConfig
+from plastron.jobs import JobConfigError
+from plastron.jobs.importjob import ImportJobs, ImportConfig
 from plastron.repo import Repository, RepositoryResource
 
 
@@ -36,6 +37,18 @@ def test_safe_job_id(jobs, job_id, safe_id):
     assert job.dir == jobs.dir / safe_id
 
 
+@pytest.mark.parametrize(
+    ('job_id', 'expected_message'),
+    [
+        ('no-config', 'is missing'),
+        ('empty-config', 'is empty'),
+    ]
+)
+def test_job_config_errors(jobs, job_id, expected_message):
+    with pytest.raises(JobConfigError) as exc_info:
+        jobs.get_job(job_id)
+
+    assert expected_message in str(exc_info.value)
 class MockContainer:
     obj = None
     _resource_class = None

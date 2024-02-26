@@ -102,7 +102,7 @@ def test_publish_handle_service_error(caplog):
 
 
 def test_publish_new_handle_update_handle_in_repo():
-    obj = Item(handle='hdl:1903.1/987')
+    obj = Item(handle=Literal('hdl:1903.1/987'))
     publish(Namespace(obj=get_mock_context(obj)), uris=['http://fcrepo-local:8080/fcrepo/rest/foo'])
 
     assert umdaccess.Published in obj.rdf_type.values
@@ -111,7 +111,7 @@ def test_publish_new_handle_update_handle_in_repo():
 
 
 def test_publish_existing_handle_update_handle_in_repo():
-    obj = Item(handle='hdl:1903.1/987')
+    obj = Item(handle=Literal('hdl:1903.1/987'))
     handle = Handle(
         prefix='1903.1',
         suffix='123',

@@ -22,13 +22,14 @@ def test_handle_attributes(handle):
 
 
 def test_handle_bearing_resource():
-    obj = HandleBearingResource(handle='hdl:1903.1/123')
+    obj = HandleBearingResource(handle=Literal('hdl:1903.1/123', datatype=umdtype.handle))
+    obj.apply_changes()
     assert obj.is_valid
     assert obj.handle.value == Literal('hdl:1903.1/123', datatype=umdtype.handle)
 
 
 def test_invalid_handle_bearing_resource():
-    obj = HandleBearingResource(handle='not-a-handle')
+    obj = HandleBearingResource(handle=Literal('not-a-handle', datatype=umdtype.handle))
     assert not obj.is_valid
     assert obj.validate()['handle'].message == 'is not a handle URI'
 

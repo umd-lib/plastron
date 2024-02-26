@@ -12,7 +12,8 @@ from uuid import uuid4
 from rdflib import URIRef, Literal
 from rdflib.util import from_n3
 
-from plastron.jobs import JobError, FileSpec, FileGroup
+from plastron.files import FileSpec, FileGroup
+from plastron.jobs import JobError
 from plastron.namespaces import get_manager
 from plastron.rdfmapping.descriptors import Property, DataProperty
 from plastron.rdfmapping.embed import EmbeddedObject
@@ -72,7 +73,7 @@ def build_fields(fieldnames, model_class) -> Dict[str, List[ColumnSpec]]:
             fields[attrs].append(ColumnSpec(
                 attrs=attrs,
                 header=header,
-                prop=get_final_prop(model_class, attrs),
+                prop=get_final_prop(model_class, attrs.split('.')),
                 lang_code=lang_code,
                 datatype=None,
             ))
@@ -96,7 +97,7 @@ def build_fields(fieldnames, model_class) -> Dict[str, List[ColumnSpec]]:
             fields[attrs].append(ColumnSpec(
                 attrs=attrs,
                 header=header,
-                prop=get_final_prop(model_class, attrs),
+                prop=get_final_prop(model_class, attrs.split('.')),
                 lang_code=None,
                 datatype=datatype_uri,
             ))
@@ -121,7 +122,7 @@ def build_fields(fieldnames, model_class) -> Dict[str, List[ColumnSpec]]:
     return fields
 
 
-def get_final_prop(model_class, attrs):
+def get_final_prop(model_class: Type[RDFResourceType], attrs: List[str]) -> str:
     next_attr_name = attrs.pop(0)
     next_attr = getattr(model_class, next_attr_name)
     if not attrs:
@@ -221,7 +222,8 @@ class Row:
         # to their correct positional locations
         row_index = build_lookup_index(self.index_string)
         params = unflatten(self.data, self.spreadsheet.model_class, self.spreadsheet.model_class.HEADER_MAP, row_index)
-        item: RDFResourceType = self.spreadsheet.model_class(uri=self.uri, graph=resource.graph, **params)
+        item: RDFResourceType = self.spreadsheet.model_class(uri=self.uri, graph=resource.graph)
+        item.set_properties(**params)
 
         return item
 
@@ -315,7 +317,7 @@ class MetadataSpreadsheet:
 
     @property
     def has_binaries(self) -> bool:
-        return 'FILES' in self.fieldnames
+        return 'FILES' in self.fieldnames or 'ITEM_FILES' in self.fieldnames
 
     @property
     def fieldnames(self):

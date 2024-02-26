@@ -6,8 +6,7 @@ from rdflib import Literal, URIRef
 from urlobject import URLObject
 
 from plastron.client import random_slug
-from plastron.files import BinarySource
-from plastron.jobs import FileGroup
+from plastron.files import BinarySource, FileGroup
 from plastron.models import Item
 from plastron.models.annotations import Annotation
 from plastron.models.umd import PCDMObject, PCDMFile, Page, Proxy, LDPContainer
@@ -81,10 +80,9 @@ class PCDMFileBearingResource(ContainerResource):
             self,
             source: BinarySource,
             slug: Optional[str] = None,
-            rdf_types: Optional[Iterable[URIRef]] = None,
     ) -> BinaryResource:
-        """Create a single file from the given source as a pcdm:fileOf this resource.
-        If no slug is provided, one is generated using random_slug()."""
+        """Create a single file from the given source as a `pcdm:fileOf` this resource.
+        If no slug is provided, one is generated using `random_slug()`."""
         if slug is None:
             slug = random_slug()
 
@@ -96,16 +94,17 @@ class PCDMFileBearingResource(ContainerResource):
         title = basename(source.filename)
         logger.info(f'Creating file {source.filename} ({source.mimetype()}) for {parent} as "{title}"')
         # first create the binary with its data
+        headers = {
+            'Content-Type': source.mimetype() or 'application/octet-stream',
+            'Digest': source.digest(),
+            'Content-Disposition': f'attachment; filename="{source.filename}"',
+        }
         with source.open() as stream:
             file_resource = self.files_container.create_child(
                 resource_class=BinaryResource,
                 slug=slug,
                 data=stream,
-                headers={
-                    'Content-Type': source.mimetype() or 'application/octet-stream',
-                    'Digest': source.digest(),
-                    'Content-Disposition': f'attachment; filename="{source.filename}"',
-                },
+                headers=headers,
             )
 
         # then add its metadata description
@@ -113,7 +112,7 @@ class PCDMFileBearingResource(ContainerResource):
         file.title = title
         file.file_of.add(parent)
         parent.has_file.add(file)
-        file.rdf_type.extend(rdf_types or [])
+        file.rdf_type.extend(source.rdf_types)
 
         file_resource.update()
         self.update()
@@ -239,7 +238,7 @@ class PCDMObjectResource(PCDMFileBearingResource, AggregationResource):
         page_resource = self.members_container.create_child(
             resource_class=PCDMPageResource,
             slug=slug,
-            description=Page(title=title, number=number, member_of=parent),
+            description=Page(title=title, number=Literal(number), member_of=parent),
         )
         parent.has_member.add(URIRef(page_resource.url))
         for file_spec in file_group.files:

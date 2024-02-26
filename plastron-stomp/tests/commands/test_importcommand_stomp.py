@@ -1,9 +1,8 @@
 from unittest.mock import MagicMock, patch, ANY
 
 import pytest
-from pytest import raises
 
-from plastron.jobs.imports import ImportJobs
+from plastron.jobs.importjob import ImportJobs
 from plastron.repo import Repository
 from plastron.stomp.commands.importcommand import importcommand
 from plastron.stomp.messages import PlastronCommandMessage

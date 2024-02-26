@@ -6,8 +6,10 @@ from uuid import uuid4
 from zipfile import ZipFile
 
 import httpretty
+import pytest
 
-from plastron.files import HTTPFileSource, LocalFileSource, RemoteFileSource, ZipFileSource
+from plastron.files import HTTPFileSource, LocalFileSource, RemoteFileSource, ZipFileSource, StringSource
+from plastron.namespaces import pcdmuse
 
 
 def test_local_file():
@@ -108,3 +110,14 @@ def test_zip_file_source_exists_closes_remote_file_source_when_file_does_not_exi
     assert not zip_file_source.exists()
     remote_file_source_mock.open.assert_called()
     remote_file_source_mock.close.assert_called()
+
+
+@pytest.mark.parametrize(
+    ('source', 'expected_rdf_types'),
+    [
+        (StringSource('', mimetype='image/tiff'), {pcdmuse.PreservationMasterFile}),
+        (StringSource('', mimetype='text/plain'), set()),
+    ]
+)
+def test_rdf_types(source, expected_rdf_types):
+    assert source.rdf_types == expected_rdf_types

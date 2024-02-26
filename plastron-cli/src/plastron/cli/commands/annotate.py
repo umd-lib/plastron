@@ -6,7 +6,6 @@ from rdflib import URIRef
 from plastron.cli import get_uris
 from plastron.repo.utils import context
 from plastron.cli.commands import BaseCommand
-from plastron.client import Client
 from plastron.models.annotations import FullTextAnnotation, TextualBody
 from plastron.namespaces import sc
 from plastron.rdfmapping.embed import embedded

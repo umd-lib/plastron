@@ -8,7 +8,7 @@ from flask import Flask, url_for
 from werkzeug.exceptions import NotFound
 
 from plastron.cli.context import PlastronContext
-from plastron.jobs.imports import ImportJob, ImportJobs
+from plastron.jobs.importjob import ImportJob, ImportJobs
 from plastron.jobs import JobError, JobConfigError, JobNotFoundError
 from plastron.web.activitystream import activitystream_bp
 from plastron.utils import envsubst

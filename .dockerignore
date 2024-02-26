@@ -1,20 +1,21 @@
-.dockerignore
-.DS_Store
-.git*
-.idea
-*.egg-info
-*.key
-*.pem
-.*_cache
+**/.dockerignore
+**/.DS_Store
+**/.git*
+**/*.egg-info
+**/*.key
+**/*.pem
+**/.*_cache
+**/build
+**/dist
+**/Dockerfile
+**/__pycache__
+**/tests
+**/.tox
 
-Dockerfile
 docker-compose.yml
 docker-plastron.yml
 
-.mypy_cache/
-.pytest_cache/
-.tox/
-build/
+.idea
 config/
 data/
 dist/
@@ -22,9 +23,7 @@ exports/
 jobs/
 logs/
 msg/
-plastron.egg-info/
 site/
-tests/
 
 # SSH Keys
 archelon_id

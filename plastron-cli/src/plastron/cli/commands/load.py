@@ -7,7 +7,7 @@ from datetime import datetime
 from importlib import import_module
 from time import sleep
 
-from plastron.client import Client, TransactionClient, ClientError
+from plastron.client import Client, ClientError
 from plastron.cli.commands import BaseCommand
 from plastron.repo import DataReadError
 from plastron.cli import ConfigError

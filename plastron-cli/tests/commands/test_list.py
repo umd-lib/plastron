@@ -16,8 +16,8 @@ def test_list_command(capsys, datadir, plastron_context, simulate_repo):
     cmd(args)
     captured = capsys.readouterr()
     assert len(captured.out.splitlines()) == 2
-    assert f'http://localhost:9999/container/1\n' in captured.out
-    assert f'http://localhost:9999/container/2\n' in captured.out
+    assert 'http://localhost:9999/container/1\n' in captured.out
+    assert 'http://localhost:9999/container/2\n' in captured.out
 
 
 @httpretty.activate
@@ -30,5 +30,5 @@ def test_list_long_command(capsys, datadir, plastron_context, simulate_repo):
     cmd(args)
     captured = capsys.readouterr()
     assert len(captured.out.splitlines()) == 2
-    assert f'http://localhost:9999/container/1 Foobar\n' in captured.out
-    assert f'http://localhost:9999/container/2 Moonpig\n' in captured.out
+    assert 'http://localhost:9999/container/1 Foobar\n' in captured.out
+    assert 'http://localhost:9999/container/2 Moonpig\n' in captured.out

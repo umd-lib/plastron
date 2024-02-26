@@ -1,3 +1,4 @@
+import dataclasses
 import logging
 import os
 import re
@@ -17,11 +18,10 @@ from rdflib import URIRef
 from plastron.client import ClientError
 from plastron.files import BinarySource, ZipFileSource, RemoteFileSource, HTTPFileSource, LocalFileSource
 from plastron.jobs import JobConfigError, JobError, annotate_from_files, JobNotFoundError
-from plastron.jobs.imports.spreadsheet import LineReference, MetadataSpreadsheet, InvalidRow, Row
+from plastron.jobs.importjob.spreadsheet import LineReference, MetadataSpreadsheet, InvalidRow, Row
 from plastron.models import get_model_class, ModelClassNotFoundError
 from plastron.namespaces import umdaccess
 from plastron.rdf.pcdm import File, PreservationMasterFile
-from plastron.rdfmapping.resources import RDFResourceBase
 from plastron.rdfmapping.validation import ValidationResultsDict, ValidationResult, ValidationSuccess, ValidationFailure
 from plastron.repo import Repository, RepositoryError, ContainerResource
 from plastron.repo.pcdm import PCDMObjectResource
@@ -113,18 +113,23 @@ class ImportJob:
         self.config = ImportConfig.from_file(self.config_filename)
         return self
 
+    def update_config(self, job_config_args: Dict[str, Any]) -> 'ImportJob':
+        """Update the config with values from `job_config_args` that are not `None`."""
+        self.config = dataclasses.replace(self.config, **{k: v for k, v in job_config_args.items() if v is not None})
+        return self
+
     def store_metadata_file(self, input_file: IO):
         with open(self.metadata_filename, mode='w') as file:
             copyfileobj(input_file, file)
             logger.debug(f"Copied input file {getattr(input_file, 'name', '<>')} to {file.name}")
 
-    def complete(self, item: RDFResourceBase, line_reference: LineReference, status: ImportedItemStatus):
+    def complete(self, row, status: ImportedItemStatus):
         # write to the completed item log
         self.completed_log.append({
-            'id': getattr(item, 'identifier', str(line_reference)),
+            'id': row.identifier,
             'timestamp': datetimestamp(digits_only=False),
-            'title': getattr(item, 'title', ''),
-            'uri': getattr(item, 'uri', ''),
+            'title': getattr(row.item, 'title', ''),
+            'uri': getattr(row.item, 'uri', ''),
             'status': status.value
         })
 
@@ -173,7 +178,7 @@ class ImportJob:
     @property
     def access(self) -> Optional[URIRef]:
         if self.config.access is not None:
-            return URIRef[self.config.access]
+            return URIRef(self.config.access)
         else:
             return None
 
@@ -265,6 +270,10 @@ class ImportRow:
     def __str__(self):
         return str(self.row.line_reference)
 
+    @property
+    def identifier(self):
+        return self.row.identifier
+
     def validate_item(self) -> ValidationResultsDict:
         """Validate the item for this import row, and check that all files
         listed are present."""
@@ -326,11 +335,13 @@ class ImportRow:
 
         # if an item is new, don't construct a SPARQL Update query
         # instead, just create and update normally
-        logger.debug('Creating a new item')
+        logger.debug(f'Creating a new item for "{self.row.line_reference}"')
         # add the access class
+        logger.debug(f'Access class: {self.job.access}')
         if self.job.access is not None:
             self.item.rdf_type.add(self.job.access)
         # add the collection membership
+        logger.debug(f'Member of: {self.job.member_of}')
         if self.job.member_of is not None:
             self.item.member_of = self.job.member_of
         # set publication status
@@ -343,8 +354,9 @@ class ImportRow:
         if self.job.extract_text_types is not None:
             annotate_from_files(self.item, self.job.extract_text_types)
 
+        logger.debug(f"Creating resources in container: {self.job.config.container}")
+        logger.debug(f'Repo: {self.repo}')
         container: ContainerResource = self.repo[self.job.config.container:ContainerResource]
-        logger.debug(f"Creating resources in container: {container.path}")
 
         try:
             with self.repo.transaction():
@@ -372,6 +384,15 @@ class ImportRow:
             raise JobError(self.job, f'Creating item failed: {e}', e.response.text) from e
         else:
             return resource
+
+
+def get_loggable_uri(item):
+    uri = getattr(item, 'uri', '')
+    if uri.startswith('urn:uuid:'):
+        # if the URI is a placeholder urn:uuid:, omit it from the log since
+        # it has no meaning outside this particular running import job
+        return ''
+    return uri
 
 
 class ImportRun:
@@ -474,7 +495,7 @@ class ImportRun:
             raise RuntimeError(str(e)) from e
 
         if metadata.has_binaries and self.job.config.binaries_location is None:
-            raise RuntimeError('Must specify --binaries-location if the metadata has a FILES column')
+            raise RuntimeError('Must specify --binaries-location if the metadata has a FILES and/or ITEM_FILES column')
 
         count = Counter(
             total_items=metadata.total,
@@ -490,6 +511,8 @@ class ImportRun:
             skipped_items=0,
         )
         logger.info(f'Found {count["initially_completed_items"]} completed items')
+        if count['initially_completed_items'] > 0:
+            logger.debug(f'Completed item identifiers: {self.job.completed_log._item_keys}')
 
         for row in metadata.rows(limit=limit, percentage=percentage, completed=self.job.completed_log):
             if isinstance(row, InvalidRow):
@@ -525,7 +548,7 @@ class ImportRun:
 
             try:
                 status = import_row.update_repo()
-                self.complete(import_row.item, row.line_reference, status)
+                self.complete(import_row, status)
                 if status == ImportedItemStatus.CREATED:
                     count['created_items'] += 1
                 elif status == ImportedItemStatus.MODIFIED:
@@ -586,7 +609,7 @@ class ImportRun:
             'id': getattr(item, 'identifier', line_reference),
             'timestamp': datetimestamp(digits_only=False),
             'title': getattr(item, 'title', ''),
-            'uri': getattr(item, 'uri', ''),
+            'uri': get_loggable_uri(item),
             'reason': reason
         })
 
@@ -606,20 +629,15 @@ class ImportRun:
             'id': getattr(item, 'identifier', line_reference),
             'timestamp': datetimestamp(digits_only=False),
             'title': getattr(item, 'title', ''),
-            'uri': getattr(item, 'uri', ''),
+            'uri': get_loggable_uri(item),
             'reason': reason
         })
 
-    def complete(self, item, line_reference, status):
+    def complete(self, row: ImportRow, status: ImportedItemStatus):
         """
         Delegates to the `ImportJob.complete()` method.
-
-        :param item:
-        :param line_reference:
-        :param status:
-        :return:
         """
-        self.job.complete(item, line_reference, status)
+        self.job.complete(row, status)
 
 
 class ImportJobs:

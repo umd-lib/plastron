@@ -1,0 +1,21 @@
+[project]
+name = "plastron-models"
+version = "4.0.0"
+requires-python = ">= 3.8"
+dependencies = [
+    "edtf_validate",
+    "iso639",
+    "lxml==4.9.2",
+    "requests",
+    "paramiko",
+    "pillow",
+    # rdflib 6.0.0 fixed the 308 HTTP redirect bug
+    "rdflib >= 6.0.0",
+]
+
+[project.optional-dependencies]
+test = [
+    "freezegun",
+    "pytest",
+    "pytest-cov",
+]

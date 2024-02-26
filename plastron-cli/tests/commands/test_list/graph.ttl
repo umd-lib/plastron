@@ -1,0 +1,11 @@
+@base <http://localhost:9999/> .
+
+@prefix dcterms: <http://purl.org/dc/terms/> .
+@prefix ldp: <http://www.w3.org/ns/ldp#> .
+@prefix pcdm: <http://pcdm.org/models#> .
+
+<container> ldp:contains <container/1>, <container/2> .
+
+<container/1> a pcdm:Object; dcterms:title "Foobar" .
+
+<container/2> dcterms:title "Moonpig" .

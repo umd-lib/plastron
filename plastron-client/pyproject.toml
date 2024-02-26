@@ -1,0 +1,17 @@
+[project]
+name = "plastron-client"
+version = "4.0.0"
+requires-python = ">= 3.8"
+dependencies = [
+    "rdflib",
+    "requests",
+    "requests-jwtauth",
+    "urlobject",
+]
+
+[project.optional-dependencies]
+test = [
+    "freezegun",
+    "pytest",
+    "pytest-cov",
+]

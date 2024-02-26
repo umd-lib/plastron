@@ -1,25 +1,28 @@
-.dockerignore
-.DS_Store
-.git*
-.idea
-*.egg-info
-*.key
-*.pem
-.*_cache
+**/.dockerignore
+**/.DS_Store
+**/.git*
+**/*.egg-info
+**/*.key
+**/*.pem
+**/.*_cache
+**/build
+**/dist
+**/Dockerfile
+**/__pycache__
+**/tests
+**/.tox
 
 docker-compose.yml
 docker-plastron.yml
 
-.mypy_cache/
-.pytest_cache/
-.tox/
+.idea
+config/
 data/
 dist/
 exports/
 jobs/
 logs/
 msg/
-plastron.egg-info/
 site/
 
 # SSH Keys

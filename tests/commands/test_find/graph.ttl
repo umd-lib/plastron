@@ -1,6 +1,0 @@
-@prefix dcterms: <http://purl.org/dc/terms/> .
-@prefix pcdm: <http://pcdm.org/models#> .
-
-<http://example.com/test_find/1> a pcdm:Object; dcterms:title "Foobar" .
-
-<http://example.com/test_find/2> dcterms:title "Moonpig" .

@@ -1,0 +1,14 @@
+[project]
+name = "plastron-rdf"
+version = "4.0.0"
+requires-python = ">= 3.8"
+dependencies = [
+    "rdflib",
+]
+
+[project.optional-dependencies]
+test = [
+    "freezegun",
+    "pytest",
+    "pytest-cov",
+]

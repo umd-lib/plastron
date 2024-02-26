@@ -1,0 +1,20 @@
+[project]
+name = "plastron-repo"
+version = "4.0.0"
+requires-python = ">= 3.8"
+dependencies = [
+    "bagit",
+    "beautifulsoup4",
+    "paramiko",
+    "PyYAML",
+    "rdflib",
+    "requests",
+    "URLObject",
+]
+
+[project.optional-dependencies]
+test = [
+    "freezegun",
+    "pytest",
+    "pytest-cov",
+]

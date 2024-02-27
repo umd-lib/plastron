@@ -6,7 +6,7 @@ import pytest
 from httpretty import httpretty
 from rdflib import Graph
 
-from plastron.cli import PlastronContext
+from plastron.context import PlastronContext
 from plastron.client import Endpoint, Client
 from plastron.client.auth import get_authenticator
 from plastron.repo import Repository

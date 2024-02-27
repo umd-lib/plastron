@@ -1,5 +1,7 @@
+import dataclasses
 import re
 from argparse import Namespace
+from contextlib import contextmanager
 from dataclasses import dataclass
 from importlib.metadata import version
 from typing import Dict, Any, Optional
@@ -11,6 +13,15 @@ from plastron.client.auth import get_authenticator
 from plastron.handles import HandleServiceClient
 from plastron.repo import Repository
 from plastron.stomp.broker import Broker, ServerTuple
+
+UUID_REGEX = re.compile(r'([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})', re.IGNORECASE)
+
+
+def get_uuid_from_uri(uri: str) -> Optional[str]:
+    if m := UUID_REGEX.search(uri):
+        return m[1]
+    else:
+        return None
 
 
 @dataclass
@@ -67,6 +78,11 @@ class PlastronContext:
             self._repo = Repository(client=self.client)
         return self._repo
 
+    @contextmanager
+    def repo_configuration(self, delegated_user: str = None, ua_string: str = None) -> 'PlastronContext':
+        args = Namespace(**{**self.args.__dict__, 'delegated_user': delegated_user, 'ua_string': ua_string})
+        return dataclasses.replace(self, args=args)
+
     @property
     def broker(self) -> Broker:
         if self._broker is None:
@@ -121,13 +137,3 @@ class PlastronContext:
             raise RuntimeError(f'Cannot create public URL; unable to find UUID in {repo_uri}')
 
         return public_url_pattern.format(uuid=uuid.lower())
-
-
-UUID_REGEX = re.compile(r'([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})', re.IGNORECASE)
-
-
-def get_uuid_from_uri(uri: str) -> Optional[str]:
-    if m := UUID_REGEX.search(uri):
-        return m[1]
-    else:
-        return None

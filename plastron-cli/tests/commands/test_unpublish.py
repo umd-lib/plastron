@@ -2,21 +2,27 @@ from argparse import Namespace
 from unittest.mock import MagicMock
 
 from plastron.cli.commands.unpublish import Command, unpublish
-from plastron.cli.context import PlastronContext
+from plastron.context import PlastronContext
+from plastron.client import Endpoint, Client, TypedText
 from plastron.models.umd import Item
 from plastron.namespaces import umdaccess
-from plastron.repo import Repository, RepositoryError, RepositoryResource
+from plastron.repo import Repository, RepositoryError
+from plastron.repo.publish import PublishableResource
 
 
 def get_mock_context(obj):
-    mock_resource = MagicMock(spec=RepositoryResource)
-    mock_resource.read.return_value = mock_resource
-    mock_resource.describe.return_value = obj
-    mock_resource.update = lambda: obj.apply_changes()
-    mock_repo = MagicMock(spec=Repository)
-    mock_repo.__getitem__.return_value = mock_resource
-
-    return MagicMock(spec=PlastronContext, repo=mock_repo)
+    endpoint = Endpoint('http://fcrepo-local:8080/fcrepo/rest')
+    mock_client = MagicMock(spec=Client, endpoint=endpoint)
+    mock_client.get_description.return_value = TypedText('application/n-triples', '')
+    mock_repo = MagicMock(spec=Repository, client=mock_client, endpoint=endpoint)
+    resource = PublishableResource(repo=mock_repo, path='/foo')
+    resource.describe = lambda _: obj
+    mock_repo.__getitem__.return_value = resource
+    return MagicMock(
+        spec=PlastronContext,
+        repo=mock_repo,
+        get_public_url=lambda uri: uri.replace('fcrepo-local:8080/fcrepo/rest', 'digital-local')
+    )
 
 
 def test_unpublish():

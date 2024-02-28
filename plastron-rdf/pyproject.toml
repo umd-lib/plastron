@@ -1,6 +1,6 @@
 [project]
 name = "plastron-rdf"
-version = "4.0.0"
+version = "4.1.0-dev1"
 requires-python = ">= 3.8"
 dependencies = [
     "rdflib",

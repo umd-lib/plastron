@@ -7,7 +7,6 @@
 # where <VERSION> is the Docker image version to create.
 
 FROM python:3.8.18-slim
-RUN apt-get update && apt-get install -y git
 
 RUN mkdir -p /opt/plastron
 COPY plastron-client /opt/plastron/plastron-client
@@ -27,7 +26,6 @@ RUN pip install \
     './plastron-models' \
     './plastron-repo' \
     './plastron-web' \
-    './plastron-cli' \
     './plastron-stomp'
 
 ENV PYTHONUNBUFFERED=1

@@ -80,8 +80,11 @@ class PlastronContext:
 
     @contextmanager
     def repo_configuration(self, delegated_user: str = None, ua_string: str = None) -> 'PlastronContext':
-        args = Namespace(**{**self.args.__dict__, 'delegated_user': delegated_user, 'ua_string': ua_string})
-        return dataclasses.replace(self, args=args)
+        if self.args is not None:
+            args = Namespace(**{**self.args.__dict__, 'delegated_user': delegated_user, 'ua_string': ua_string})
+        else:
+            args = Namespace(delegated_user=delegated_user, ua_string=ua_string)
+        yield dataclasses.replace(self, args=args)
 
     @property
     def broker(self) -> Broker:

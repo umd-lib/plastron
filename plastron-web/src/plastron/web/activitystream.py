@@ -3,12 +3,11 @@ import logging
 from typing import List
 from uuid import uuid4
 
-from flask import Blueprint, Response, current_app, jsonify, request
+from flask import Blueprint, current_app, jsonify, request
 from rdflib import Graph
 
-from plastron.cli.commands.publish import publish
-from plastron.cli.commands.unpublish import unpublish
 from plastron.namespaces import activitystreams, rdf, umdact
+from plastron.repo.publish import PublishableResource
 
 logger = logging.getLogger(__name__)
 
@@ -20,8 +19,20 @@ def new_activity():
     try:
         activity = Activity(from_json=request.get_json())
         ctx = current_app.config['CONTEXT']
-        cmd = get_command(activity)
-        cmd(ctx, uris=activity.objects, force_hidden=activity.force_hidden, force_visible=False)
+        for uri in activity.objects:
+            resource: PublishableResource = ctx.repo[uri:PublishableResource].read()
+            if activity.publish:
+                resource.publish(
+                    handle_client=ctx.handle_client,
+                    public_url=ctx.get_public_url(uri),
+                    force_hidden=activity.force_hidden,
+                    force_visible=False,
+                )
+            elif activity.unpublish:
+                resource.unpublish(
+                    force_hidden=activity.force_hidden,
+                    force_visible=False,
+                )
         return {}, 201
     except ValidationError as e:
         logger.error(f'Exception: {e}')
@@ -29,15 +40,6 @@ def new_activity():
     except Exception as e:
         logger.error(f'Exception: {e}')
         return jsonify({'error': str(e)}), 500
-
-
-def get_command(activity):
-    if activity.publish:
-        return publish
-    elif activity.unpublish:
-        return unpublish
-    else:
-        raise ValidationError(f'Invalid JSON-LD provided: unsupported activity type.')
 
 
 class Activity:

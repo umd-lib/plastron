@@ -4,9 +4,9 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from plastron.cli.commands.publish import get_publication_status
-from plastron.jobs import JobConfigError
-from plastron.jobs.importjob import ImportJobs, ImportConfig
+from plastron.repo.publish import get_publication_status
+from plastron.jobs import JobConfigError, Jobs
+from plastron.jobs.importjob import ImportConfig, ImportJob
 from plastron.repo import Repository, RepositoryResource
 
 
@@ -16,8 +16,8 @@ def jobs_dir(datadir) -> Path:
 
 
 @pytest.fixture
-def jobs(jobs_dir) -> ImportJobs:
-    return ImportJobs(jobs_dir)
+def jobs(jobs_dir) -> Jobs:
+    return Jobs(jobs_dir)
 
 
 @pytest.mark.parametrize(
@@ -32,7 +32,7 @@ def jobs(jobs_dir) -> ImportJobs:
     ]
 )
 def test_safe_job_id(jobs, job_id, safe_id):
-    job = jobs.create_job(job_id=job_id)
+    job = jobs.create_job(ImportJob, job_id=job_id)
     assert job.id == job_id
     assert job.dir == jobs.dir / safe_id
 
@@ -46,9 +46,11 @@ def test_safe_job_id(jobs, job_id, safe_id):
 )
 def test_job_config_errors(jobs, job_id, expected_message):
     with pytest.raises(JobConfigError) as exc_info:
-        jobs.get_job(job_id)
+        jobs.get_job(ImportJob, job_id)
 
     assert expected_message in str(exc_info.value)
+
+
 class MockContainer:
     obj = None
     _resource_class = None
@@ -82,7 +84,7 @@ def test_import_job_create_resource(import_file, jobs):
         'UnpublishedHidden',
         'Published',
     ]
-    import_job = jobs.create_job(config=ImportConfig(job_id='123', model='Item'))
+    import_job = jobs.create_job(ImportJob, config=ImportConfig(job_id='123', model='Item'))
     for i, stats in enumerate(import_job.run(repo=mock_repo, import_file=import_file.open())):
         assert mock_container.obj is not None
         assert get_publication_status(mock_container.obj) == expected_publication_statuses[i]
@@ -105,7 +107,7 @@ def test_import_job_create_resource_publish_all(import_file, jobs):
         'PublishedHidden',
         'Published',
     ]
-    import_job = jobs.create_job(config=ImportConfig(job_id='123', model='Item'))
+    import_job = jobs.create_job(ImportJob, config=ImportConfig(job_id='123', model='Item'))
     for i, stats in enumerate(import_job.run(repo=mock_repo, publish=True, import_file=import_file.open())):
         assert mock_container.obj is not None
         assert get_publication_status(mock_container.obj) == expected_publication_statuses[i]

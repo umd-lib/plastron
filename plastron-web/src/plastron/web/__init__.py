@@ -7,9 +7,9 @@ from argparse import Namespace
 from flask import Flask, url_for
 from werkzeug.exceptions import NotFound
 
-from plastron.cli.context import PlastronContext
-from plastron.jobs.importjob import ImportJob, ImportJobs
-from plastron.jobs import JobError, JobConfigError, JobNotFoundError
+from plastron.context import PlastronContext
+from plastron.jobs.importjob import ImportJob
+from plastron.jobs import JobError, JobConfigError, JobNotFoundError, Jobs
 from plastron.web.activitystream import activitystream_bp
 from plastron.utils import envsubst
 
@@ -45,11 +45,11 @@ def create_app(config_file: str):
         config = envsubst(yaml.safe_load(stream))
         app.config['CONTEXT'] = Namespace(obj=PlastronContext(config=config, args=Namespace(delegated_user=None)))
     jobs_dir = Path(os.environ.get('JOBS_DIR', 'jobs'))
-    jobs = ImportJobs(directory=jobs_dir)
+    jobs = Jobs(directory=jobs_dir)
     app.register_blueprint(activitystream_bp)
 
     def get_job(job_id: str):
-        return jobs.get_job(urllib.parse.unquote(job_id))
+        return jobs.get_job(ImportJob, urllib.parse.unquote(job_id))
 
     @app.route('/jobs')
     def list_jobs():

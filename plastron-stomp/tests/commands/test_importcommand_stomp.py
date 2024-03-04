@@ -2,7 +2,8 @@ from unittest.mock import MagicMock, patch, ANY
 
 import pytest
 
-from plastron.jobs.importjob import ImportJobs
+from plastron.context import PlastronContext
+from plastron.jobs import Jobs
 from plastron.repo import Repository
 from plastron.stomp.commands.importcommand import importcommand
 from plastron.stomp.messages import PlastronCommandMessage
@@ -12,9 +13,11 @@ from plastron.stomp.messages import PlastronCommandMessage
 def message_body():
     return '{"uris": ["test"], "sparql_update": "" }'
 
+
 @pytest.fixture
 def mock_repo():
     return MagicMock(spec=Repository)
+
 
 @pytest.mark.parametrize(
     ('headers', 'expected_args'),
@@ -61,17 +64,22 @@ def mock_repo():
         ),
     ],
 )
-@patch.object(ImportJobs, "create_job") # Mock the create_job method in ImportJobs class
+@patch.object(Jobs, "create_job")
 def test_publish(create_job, headers, expected_args):
     # Mock the job object and its run method
     mock_job = MagicMock()
-    mock_job.run.return_value = {}  # Return value can be adjusted based on your needs
+    mock_job.run.return_value = {}
     create_job.return_value = mock_job
 
     message = PlastronCommandMessage(headers=headers, body=message_body)
+    mock_context = MagicMock(
+        spec=PlastronContext,
+        repo=mock_repo,
+        config={'COMMANDS': {'IMPORT': {'JOBS_DIR': 'some_jobs_dir'}}}
+    )
 
     # Call the importcommand function with the mock repo, config, and message
-    result = importcommand(mock_repo, {'JOBS_DIR': 'some_jobs_dir'}, message)
+    importcommand(mock_context, message)
 
     # Assert that the job.run method was called with correct value for publish
     mock_job.run.assert_called_with(**expected_args)

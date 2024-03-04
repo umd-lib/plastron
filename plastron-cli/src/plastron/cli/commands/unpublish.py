@@ -4,7 +4,7 @@ from typing import Iterable
 from plastron.cli import get_uris
 
 from plastron.cli.commands import BaseCommand
-from plastron.cli.commands.publish import get_publication_status
+from plastron.repo.publish import get_publication_status, PublishableResource
 from plastron.namespaces import umdaccess
 from plastron.rdfmapping.resources import RDFResource
 from plastron.repo import RepositoryResource, RepositoryError
@@ -52,21 +52,11 @@ def unpublish(ctx, uris: Iterable[str], force_hidden: bool = False, force_visibl
     for uri in uris:
         # get the resource and check for an existing handle and current publication status
         try:
-            resource: RepositoryResource = ctx.obj.repo[uri].read()
+            resource: PublishableResource = ctx.obj.repo[uri:PublishableResource].read()
         except RepositoryError as e:
             logger.error(f'Unable to retrieve {uri}: {e}')
             continue
 
-        obj = resource.describe(RDFResource)
+        resource.unpublish(force_hidden=force_hidden, force_visible=force_visible)
 
-        # remove the Published (and optionally, add or remove the Hidden) access classes
-        obj.rdf_type.remove(umdaccess.Published)
-        if force_hidden:
-            obj.rdf_type.add(umdaccess.Hidden)
-        elif force_visible:
-            obj.rdf_type.remove(umdaccess.Hidden)
-
-        # save changes
-        resource.update()
-
-        logger.info(f'Publication status of {uri} is {get_publication_status(obj)}')
+        logger.info(f'Publication status of {uri} is {resource.publication_status}')

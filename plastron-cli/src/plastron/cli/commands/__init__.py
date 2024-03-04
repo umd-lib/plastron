@@ -1,7 +1,7 @@
 from importlib import import_module
 from typing import Generator, Dict, Any
 
-from plastron.cli.context import PlastronContext
+from plastron.context import PlastronContext
 
 
 class BaseCommand:

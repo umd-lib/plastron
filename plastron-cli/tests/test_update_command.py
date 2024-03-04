@@ -1,8 +1,7 @@
 from argparse import Namespace
 from unittest.mock import MagicMock
 
-
-from plastron.cli import PlastronContext
+from plastron.context import PlastronContext
 from plastron.client import Client
 from plastron.cli.commands.update import Command
 from pytest import raises

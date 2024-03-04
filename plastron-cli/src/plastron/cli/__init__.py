@@ -14,7 +14,7 @@ from typing import Iterable
 import yaml
 
 from plastron.cli import commands
-from plastron.cli.context import PlastronContext
+from plastron.context import PlastronContext
 from plastron.utils import DEFAULT_LOGGING_OPTIONS, envsubst
 
 logger = logging.getLogger(__name__)

@@ -1,17 +1,24 @@
+import json
+from unittest.mock import MagicMock, ANY
+
 import pytest
 
-import json
-from conftest import config_file_path
-from unittest.mock import MagicMock, patch, ANY
-
+from plastron.context import PlastronContext
+from plastron.handles import Handle, HandleServiceClient
+from plastron.repo import Repository
+from plastron.repo.publish import PublishableResource
 from plastron.web import create_app
 
 
 # from plastron.web.activitystream
 
 @pytest.fixture
-def app_client(request):
-    app = create_app(config_file_path(request))
+def app(config_file_path, request):
+    return create_app(config_file_path(request))
+
+
+@pytest.fixture
+def app_client(app):
     return app.test_client()
 
 
@@ -41,69 +48,88 @@ def request_headers():
     }
 
 
+@pytest.fixture
+def mock_resource():
+    mock_resource = MagicMock(spec=PublishableResource)
+    mock_resource.read.return_value = mock_resource
+    mock_handle = MagicMock(spec=Handle)
+    mock_resource.publish.return_value = mock_handle
+    return mock_resource
+
+
+@pytest.fixture
+def mock_context(mock_resource):
+    mock_repo = MagicMock(spec=Repository)
+    mock_repo.__getitem__.return_value = mock_resource
+    mock_context = MagicMock(spec=PlastronContext, repo=mock_repo, handle_client=MagicMock(spec=HandleServiceClient))
+    mock_context.get_public_url.return_value = 'http://digital-local/foo'
+    return mock_context
+
+
 @pytest.mark.parametrize(
     ('input_json', 'expected_args'),
     [
         (
-                # json input
-                {
-                    "@context": [
-                        "https://www.w3.org/ns/activitystreams",
-                        {
-                            "umdact": "http://vocab.lib.umd.edu/activity#",
-                            "Publish": "umdact:Publish",
-                            "PublishHidden": "umdact:PublishHidden",
-                            "Unpublish": "umdact:Unpublish"
-                        }
-                    ],
-                    "type": "Publish",
-                    "object": ["http://fcrepo-local:8080/fcrepo/rest/test/obj"]
-                },
-                # expected args
-                {
-                    'uris': ["http://fcrepo-local:8080/fcrepo/rest/test/obj"],
-                    'force_hidden': False,
-                    'force_visible': False
-                },
+            # json input
+            {
+                "@context": [
+                    "https://www.w3.org/ns/activitystreams",
+                    {
+                        "umdact": "http://vocab.lib.umd.edu/activity#",
+                        "Publish": "umdact:Publish",
+                        "PublishHidden": "umdact:PublishHidden",
+                        "Unpublish": "umdact:Unpublish"
+                    }
+                ],
+                "type": "Publish",
+                "object": ["http://fcrepo-local:8080/fcrepo/rest/test/obj"]
+            },
+            # expected args
+            {
+                'force_hidden': False,
+                'force_visible': False
+            },
         ),
         (
-                # json input
-                {
-                    "@context": [
-                        "https://www.w3.org/ns/activitystreams",
-                        {
-                            "umdact": "http://vocab.lib.umd.edu/activity#",
-                            "Publish": "umdact:Publish",
-                            "PublishHidden": "umdact:PublishHidden",
-                            "Unpublish": "umdact:Unpublish"
-                        }
-                    ],
-                    "type": "PublishHidden",
-                    "object": ["http://fcrepo-local:8080/fcrepo/rest/test/obj"]
-                },
-                # expected args
-                {
-                    'uris': ["http://fcrepo-local:8080/fcrepo/rest/test/obj"],
-                    'force_hidden': True,
-                    'force_visible': False
-                },
+            # json input
+            {
+                "@context": [
+                    "https://www.w3.org/ns/activitystreams",
+                    {
+                        "umdact": "http://vocab.lib.umd.edu/activity#",
+                        "Publish": "umdact:Publish",
+                        "PublishHidden": "umdact:PublishHidden",
+                        "Unpublish": "umdact:Unpublish"
+                    }
+                ],
+                "type": "PublishHidden",
+                "object": ["http://fcrepo-local:8080/fcrepo/rest/test/obj"]
+            },
+            # expected args
+            {
+                'force_hidden': True,
+                'force_visible': False
+            },
         ),
     ],
 )
-@patch("plastron.web.activitystream.get_command")
-def test_new_activity_publish(get_command_mock, app_client, post_data, request_headers, input_json, expected_args):
-    mock_command = MagicMock()
-    get_command_mock.return_value = mock_command
+def test_new_activity_publish(
+        app,
+        app_client,
+        mock_context,
+        mock_resource,
+        post_data,
+        request_headers,
+        input_json,
+        expected_args,
+):
+    app.config['CONTEXT'] = mock_context
 
     url = '/inbox'
     response = app_client.post(url, data=json.dumps(input_json), headers=request_headers)
     assert response.status_code == 201
 
-    get_command_mock.assert_called()
-    activity_obj = get_command_mock.call_args[0][0]
-    assert activity_obj.publish is True
-    assert activity_obj.unpublish is False
-    mock_command.assert_called_once_with(ANY, **expected_args)
+    mock_resource.publish.assert_called_once_with(handle_client=ANY, public_url=ANY, **expected_args)
 
 
 @pytest.mark.parametrize(
@@ -126,27 +152,29 @@ def test_new_activity_publish(get_command_mock, app_client, post_data, request_h
             },
             # expected args
             {
-                'uris': ["http://fcrepo-local:8080/fcrepo/rest/test/obj"],
                 'force_hidden': False,
                 'force_visible': False
             },
         )
     ],
 )
-@patch("plastron.web.activitystream.get_command")
-def test_new_activity_unpublish(get_command_mock, app_client, post_data, request_headers, input_json, expected_args):
-    mock_command = MagicMock()
-    get_command_mock.return_value = mock_command
+def test_new_activity_unpublish(
+        app,
+        app_client,
+        mock_context,
+        mock_resource,
+        post_data,
+        request_headers,
+        input_json,
+        expected_args,
+):
+    app.config['CONTEXT'] = mock_context
 
     url = '/inbox'
     response = app_client.post(url, data=json.dumps(input_json), headers=request_headers)
     assert response.status_code == 201
 
-    get_command_mock.assert_called_once()
-    activity_obj = get_command_mock.call_args[0][0]
-    assert activity_obj.publish is False
-    assert activity_obj.unpublish is True
-    mock_command.assert_called_once_with(ANY, **expected_args)
+    mock_resource.unpublish.assert_called_once_with(**expected_args)
 
 
 @pytest.mark.parametrize(
@@ -194,13 +222,7 @@ def test_new_activity_unpublish(get_command_mock, app_client, post_data, request
         }
     ],
 )
-@patch("plastron.web.activitystream.get_command")
-def test_new_activity_invalid_input(get_command_mock, app_client, post_data, request_headers, input_json):
-    mock_command = MagicMock()
-    get_command_mock.return_value = mock_command
-
+def test_new_activity_invalid_input(app_client, post_data, request_headers, input_json):
     url = '/inbox'
     response = app_client.post(url, data=json.dumps(input_json), headers=request_headers)
     assert response.status_code == 400
-
-    get_command_mock.assert_not_called()

@@ -94,7 +94,7 @@ PUBLICATION_WORKFLOW:
     test-export.tar/tagmanifest-sha256.txt
     test-export.tar/tagmanifest-sha512.txt
     test-export.tar/manifest-sha256.txt
-    test-export.tar/data/metadata.ttl
+    test-export.tar/data/Item_metadata.csv
     test-export.tar/data/{SOME UUID}/labor-087802-0001.tif
     ```
 

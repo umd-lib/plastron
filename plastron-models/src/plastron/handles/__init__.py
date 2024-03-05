@@ -1,6 +1,7 @@
 import dataclasses
 import logging
 from dataclasses import dataclass
+from http import HTTPStatus
 from typing import Optional
 
 import requests
@@ -45,6 +46,8 @@ class HandleServiceClient:
             },
             auth=self.auth,
         )
+        if response.status_code == HTTPStatus.NOT_FOUND:
+            return None
         if not response.ok:
             raise HandleServerError(str(response))
         result = response.json()
@@ -100,6 +103,6 @@ class HandleServerError(Exception):
 
 class HandleBearingResource(RDFResource):
     """This class be used by itself for instances where the handle field is the only
-    one need, or it can be used as a mix-in to other full models to give them a handle
+    one needed, or it can be used as a mix-in to other full models to give them a handle
     field."""
     handle = DataProperty(dcterms.identifier, datatype=umdtype.handle, validate=is_handle)

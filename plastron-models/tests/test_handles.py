@@ -51,6 +51,16 @@ def test_get_handle_error(handle_client):
 
 
 @httpretty.activate
+def test_get_handle_not_found(handle_client):
+    httpretty.register_uri(
+        httpretty.GET,
+        uri='http://handle-local:3000/handles/exists',
+        status=HTTPStatus.NOT_FOUND,
+    )
+    assert handle_client.get_handle('http://example.com/foobar') is None
+
+
+@httpretty.activate
 def test_get_handle_does_not_exist(handle_client):
     httpretty.register_uri(
         httpretty.GET,

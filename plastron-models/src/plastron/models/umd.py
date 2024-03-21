@@ -72,6 +72,11 @@ class Item(PCDMObject, HandleBearingResource):
         dcterms.isPartOf,
         validate=is_from_vocabulary('http://vocab.lib.umd.edu/collection#'),
     )
+    presentation_set = ObjectProperty(
+        ore.isAggregatedBy,
+        repeatable=True,
+        validate=is_from_vocabulary('http://vocab.lib.umd.edu/set#'),
+    )
     date = DataProperty(dc.date, validate=is_edtf_formatted)
     description = DataProperty(dcterms.description)
     alternate_title = DataProperty(dcterms.alternative, repeatable=True)
@@ -93,6 +98,7 @@ class Item(PCDMObject, HandleBearingResource):
         'title': 'Title',
         'format': 'Format',
         'archival_collection': 'Archival Collection',
+        'presentation_set': 'Presentation Set',
         'date': 'Date',
         'description': 'Description',
         'alternate_title': 'Alternate Title',

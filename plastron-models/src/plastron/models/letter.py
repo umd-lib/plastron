@@ -3,8 +3,8 @@ from rdflib import Namespace
 from plastron.rdfmapping.decorators import rdf_type
 from plastron.rdfmapping.descriptors import ObjectProperty, DataProperty
 from plastron.rdfmapping.resources import RDFResource
-from plastron.validation.rules import is_edtf_formatted, is_handle
-from plastron.namespaces import bibo, dc, dcmitype, dcterms, edm, geo, rel, skos, owl, umd
+from plastron.validation.rules import is_edtf_formatted, is_handle, is_from_vocabulary
+from plastron.namespaces import bibo, dc, dcmitype, dcterms, edm, geo, rel, skos, ore, owl, umd
 
 umdtype = Namespace('http://vocab.lib.umd.edu/datatype#')
 
@@ -52,6 +52,11 @@ class Letter(RDFResource):
     extent = DataProperty(dcterms.extent, required=True)
     rights_holder = DataProperty(dcterms.rightsHolder, required=True)
     handle = DataProperty(dcterms.identifier, datatype=umdtype.handle, validate=is_handle)
+    presentation_set = ObjectProperty(
+        ore.isAggregatedBy,
+        repeatable=True,
+        validate=is_from_vocabulary('http://vocab.lib.umd.edu/set#'),
+    )
 
     HEADER_MAP = {
         'title': 'Title',
@@ -83,6 +88,7 @@ class Letter(RDFResource):
             'label': 'Author',
         },
         'handle': 'Handle',
+        'presentation_set': 'Presentation Set',
     }
 
 

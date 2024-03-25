@@ -1,23 +1,16 @@
-import re
-
 from lxml.etree import parse, XMLSyntaxError
 
 from plastron.models.annotations import TextblockOnPage
 from plastron.models.umd import PCDMObject, PCDMFile
-from plastron.namespaces import bibo, carriers, dc, dcterms, fabio, ndnp, pcdmuse, umdtype, pcdm
+from plastron.namespaces import bibo, carriers, dc, dcterms, fabio, ndnp, pcdmuse, umdtype, pcdm, umd
 from plastron.rdf.ocr import ALTOResource
 from plastron.rdfmapping.decorators import rdf_type
 from plastron.rdfmapping.descriptors import DataProperty, ObjectProperty
 from plastron.repo import DataReadError
-from plastron.validation import is_handle
+from plastron.validation.rules import is_handle, is_iso_8601_date
 
 
-def is_iso_8601_date(value: str) -> bool:
-    """an ISO 8601 date string (YYYY-MM-DD)"""
-    return bool(re.match(r'^\d\d\d\d-\d\d-\d\d$', value))
-
-
-@rdf_type(bibo.Issue)
+@rdf_type(bibo.Issue, umd.Newspaper)
 class Issue(PCDMObject):
     """Newspaper issue"""
     title = DataProperty(dcterms.title, required=True)

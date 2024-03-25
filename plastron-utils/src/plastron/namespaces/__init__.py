@@ -9,6 +9,9 @@ from rdflib.namespace import NamespaceManager
 acl = Namespace('http://www.w3.org/ns/auth/acl#')
 """[Web Access Controls (WebAC)](https://solidproject.org/TR/wac)"""
 
+activitystreams = Namespace('https://www.w3.org/ns/activitystreams#')
+"""[Activity Streams 2.0](https://www.w3.org/TR/activitystreams-core/)"""
+
 bibo = Namespace('http://purl.org/ontology/bibo/')
 """[Bibliographic Ontology](https://www.dublincore.org/specifications/bibo/bibo/)"""
 
@@ -93,6 +96,9 @@ sc = Namespace('http://www.shared-canvas.org/ns/')
 skos = Namespace('http://www.w3.org/2004/02/skos/core#')
 """[Simple Knowledge Organization System (SKOS)](https://www.w3.org/TR/skos-reference/)"""
 
+umd = Namespace('http://vocab.lib.umd.edu/model#')
+"""[UMD Content Models Vocabulary](http://vocab.lib.umd.edu/model)"""
+
 umdaccess = Namespace('http://vocab.lib.umd.edu/access#')
 """[UMD Access Classes Vocabulary](http://vocab.lib.umd.edu/access)"""
 
@@ -101,6 +107,9 @@ umdform = Namespace('http://vocab.lib.umd.edu/form#')
 
 umdtype = Namespace('http://vocab.lib.umd.edu/datatype#')
 """[UMD Datatypes Vocabulary](http://vocab.lib.umd.edu/datatype)"""
+
+umdact = Namespace('http://vocab.lib.umd.edu/activity#')
+"""[UMD Activity Types Vocabulary](http://vocab.lib.umd.edu/activity)"""
 
 webac = Namespace('http://fedora.info/definitions/v4/webac#')
 """[Fedora Commons WebAC Ontology](https://fedora.info/definitions/v4/2015/09/03/webac)"""

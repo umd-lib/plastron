@@ -11,7 +11,7 @@ def test_import(datadir, stomp_client):
         'PlastronJobId': f'test-import-{datetimestamp()}',
         'PlastronCommand': 'import',
         'PlastronArg-model': 'Item',
-        'PlastronArg-container': '/',
+        'PlastronArg-relpath': '/',
         'PlastronArg-binaries-location': str(datadir / 'import-files'),
         'PlastronArg-limit': '1',
     }

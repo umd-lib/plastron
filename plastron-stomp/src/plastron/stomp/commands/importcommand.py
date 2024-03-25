@@ -5,11 +5,12 @@ from typing import Generator, Any, Dict, Optional
 
 from rdflib import URIRef
 
-from plastron.jobs.importjob import ImportJobs, ImportConfig
+from plastron.context import PlastronContext
+from plastron.jobs import Jobs
+from plastron.jobs.importjob import ImportConfig, ImportJob
 from plastron.rdf import uri_or_curie
-from plastron.repo import Repository
 from plastron.stomp.messages import PlastronCommandMessage
-from plastron.utils import datetimestamp
+from plastron.utils import datetimestamp, strtobool
 
 logger = logging.getLogger(__name__)
 
@@ -24,15 +25,13 @@ def get_access_uri(access) -> Optional[URIRef]:
 
 
 def importcommand(
-    repo: Repository,
-    config: Dict[str, Any],
-    message: PlastronCommandMessage,
-) -> Generator[Any, None, Dict[str, Any]]:
+        context: PlastronContext,
+        message: PlastronCommandMessage,
+) -> Generator[Dict[str, Any], None, Dict[str, Any]]:
     """
     Performs the import
 
-    :param repo: the repository configuration
-    :param config:
+    :param context
     :param message:
     """
     job_id = message.job_id
@@ -43,8 +42,9 @@ def importcommand(
         limit = int(limit)
     message.body = message.body.encode('utf-8').decode('utf-8-sig')
     percentage = message.args.get('percent', None)
-    validate_only = message.args.get('validate-only', False)
-    resume = message.args.get('resume', False)
+    validate_only = strtobool(message.args.get('validate-only', 'false'))
+    publish = strtobool(message.args.get('publish', 'false'))
+    resume = strtobool(message.args.get('resume', 'false'))
     import_file = io.StringIO(message.body)
 
     # options that are saved to the config
@@ -64,19 +64,21 @@ def importcommand(
         # TODO: generate a more unique id? add in user and hostname?
         job_id = f"import-{datetimestamp()}"
 
-    jobs = ImportJobs(directory=config.get('JOBS_DIR', 'jobs'))
+    config = context.config.get('COMMANDS', {}).get('IMPORT', {})
+    jobs = Jobs(directory=config.get('JOBS_DIR', 'jobs'))
     if resume:
-        job = jobs.get_job(job_id=job_id)
+        job = jobs.get_job(ImportJob, job_id=job_id)
         # update the config with any changes in this request
         job.update_config(job_config_args)
         job.ssh_private_key = config.get('SSH_PRIVATE_KEY', None)
     else:
-        job = jobs.create_job(config=ImportConfig(**job_config_args))
+        job = jobs.create_job(ImportJob, config=ImportConfig(**job_config_args))
 
     return job.run(
-        repo=repo,
+        repo=context.repo,
         import_file=import_file,
         limit=limit,
         percentage=percentage,
         validate_only=validate_only,
+        publish=publish,
     )

@@ -4,7 +4,8 @@ from argparse import FileType, ArgumentTypeError, Namespace
 from typing import TextIO
 
 from plastron.cli.commands import BaseCommand
-from plastron.jobs.importjob import ImportConfig, ImportJobs
+from plastron.jobs.importjob import ImportConfig, ImportJob
+from plastron.jobs import Jobs
 from plastron.models import get_model_class, ModelClassNotFoundError
 from plastron.rdf import uri_or_curie
 from plastron.utils import datetimestamp
@@ -127,6 +128,11 @@ def configure_cli(subparsers):
         action='store'
     )
     parser.add_argument(
+        '--publish',
+        help='automatically publish all items in this import',
+        action='store_true',
+    )
+    parser.add_argument(
         'import_file', nargs='?',
         help='name of the file to import from',
         type=FileType('r', encoding='utf-8-sig'),
@@ -164,20 +170,23 @@ class Command(BaseCommand):
             # TODO: generate a more unique id? add in user and hostname?
             args.job_id = f"import-{datetimestamp()}"
 
-        jobs = ImportJobs(self.jobs_dir)
+        jobs = Jobs(self.jobs_dir)
         if args.resume:
             logger.info(f'Resuming saved job {args.job_id}')
-            job = jobs.get_job(args.job_id)
+            job = jobs.get_job(ImportJob, args.job_id)
         else:
             logger.info(f'Creating new job {args.job_id}')
-            job = jobs.create_job(config=ImportConfig(
-                job_id=args.job_id,
-                model=args.model,
-                access=args.access,
-                member_of=args.member_of,
-                container=args.container,
-                binaries_location=args.binaries_location,
-            ))
+            job = jobs.create_job(
+                job_class=ImportJob,
+                config=ImportConfig(
+                    job_id=args.job_id,
+                    model=args.model,
+                    access=args.access,
+                    member_of=args.member_of,
+                    container=args.container,
+                    binaries_location=args.binaries_location,
+                ),
+            )
 
         logger.debug(f'Running job {job.id}')
         self.run(job.run(
@@ -186,6 +195,7 @@ class Command(BaseCommand):
             limit=args.limit,
             percentage=args.percentage,
             validate_only=args.validate_only,
+            publish=args.publish,
         ))
 
         for key, value in self.result['count'].items():

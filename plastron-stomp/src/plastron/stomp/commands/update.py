@@ -2,6 +2,7 @@ import json
 import logging
 from typing import Generator, Any, Dict
 
+from plastron.context import PlastronContext
 from plastron.jobs.updatejob import UpdateJob
 from plastron.models import get_model_class
 from plastron.rdf import parse_predicate_list
@@ -40,8 +41,7 @@ def parse_message(message: PlastronCommandMessage) -> Dict[str, Any]:
 
 
 def update(
-        repo: Repository,
-        _config: Dict[str, Any],
+        context: PlastronContext,
         message: PlastronCommandMessage,
 ) -> Generator[Dict[str, str], None, Dict[str, Any]]:
-    return UpdateJob(repo=repo, **parse_message(message)).run()
+    return UpdateJob(repo=context.repo, **parse_message(message)).run()

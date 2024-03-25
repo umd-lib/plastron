@@ -1,5 +1,7 @@
+import dataclasses
 import re
 from argparse import Namespace
+from contextlib import contextmanager
 from dataclasses import dataclass
 from importlib.metadata import version
 from typing import Dict, Any, Optional
@@ -8,8 +10,18 @@ import pysolr
 
 from plastron.client import Endpoint, Client, RepositoryStructure
 from plastron.client.auth import get_authenticator
+from plastron.handles import HandleServiceClient
 from plastron.repo import Repository
 from plastron.stomp.broker import Broker, ServerTuple
+
+UUID_REGEX = re.compile(r'([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})', re.IGNORECASE)
+
+
+def get_uuid_from_uri(uri: str) -> Optional[str]:
+    if m := UUID_REGEX.search(uri):
+        return m[1]
+    else:
+        return None
 
 
 @dataclass
@@ -21,6 +33,7 @@ class PlastronContext:
     _client: Client = None
     _broker: Broker = None
     _solr: pysolr.Solr = None
+    _handle_client: HandleServiceClient = None
 
     @property
     def version(self):
@@ -65,6 +78,14 @@ class PlastronContext:
             self._repo = Repository(client=self.client)
         return self._repo
 
+    @contextmanager
+    def repo_configuration(self, delegated_user: str = None, ua_string: str = None) -> 'PlastronContext':
+        if self.args is not None:
+            args = Namespace(**{**self.args.__dict__, 'delegated_user': delegated_user, 'ua_string': ua_string})
+        else:
+            args = Namespace(delegated_user=delegated_user, ua_string=ua_string)
+        yield dataclasses.replace(self, args=args)
+
     @property
     def broker(self) -> Broker:
         if self._broker is None:
@@ -91,6 +112,23 @@ class PlastronContext:
 
         return self._solr
 
+    @property
+    def handle_client(self) -> HandleServiceClient:
+        if self._handle_client is None:
+            # try to instantiate a handle client
+            config = self.config.get('PUBLICATION_WORKFLOW', {})
+            try:
+                self._handle_client = HandleServiceClient(
+                    endpoint_url=config['HANDLE_ENDPOINT'],
+                    jwt_token=config['HANDLE_JWT_TOKEN'],
+                    default_prefix=config['HANDLE_PREFIX'],
+                    default_repo=config['HANDLE_REPO'],
+                )
+            except KeyError as e:
+                raise RuntimeError(f"Missing configuration key {e} in section 'PUBLICATION_WORKFLOW'")
+
+        return self._handle_client
+
     def get_public_url(self, repo_uri: str) -> str:
         try:
             public_url_pattern = self.config.get('PUBLICATION_WORKFLOW', {})['PUBLIC_URL_PATTERN']
@@ -102,13 +140,3 @@ class PlastronContext:
             raise RuntimeError(f'Cannot create public URL; unable to find UUID in {repo_uri}')
 
         return public_url_pattern.format(uuid=uuid.lower())
-
-
-UUID_REGEX = re.compile(r'([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})', re.IGNORECASE)
-
-
-def get_uuid_from_uri(uri: str) -> Optional[str]:
-    if m := UUID_REGEX.search(uri):
-        return m[1]
-    else:
-        return None

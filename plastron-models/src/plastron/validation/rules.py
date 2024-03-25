@@ -1,41 +1,39 @@
 import re
-from typing import Callable
+
+from edtf_validate.valid_edtf import is_valid as is_valid_edtf
+from iso639 import is_valid639_1, is_valid639_2
 
 from plastron.validation.vocabularies import get_subjects
 
 
-def non_empty(values):
-    return [v for v in values if len(str(v).strip()) > 0]
+def is_edtf_formatted(value):
+    """an EDTF-formatted date"""
+    # Allow blank values
+    if str(value).strip() == "":
+        return True
+    return is_valid_edtf(str(value))
 
 
-def required(prop, is_required=True):
-    return len(non_empty(prop)) > 0 if is_required else True
+def is_valid_iso639_code(value):
+    """a valid ISO-639 language code"""
+    return is_valid639_1(value) or is_valid639_2(value)
 
 
-def min_values(prop, length):
-    return len(prop) >= length
+def is_handle(value: str) -> bool:
+    """a handle URI"""
+    return bool(re.match('hdl:[^/]+/.*', value))
 
 
-def max_values(prop, length):
-    return len(prop) <= length
+def is_iso_8601_date(value: str) -> bool:
+    """an ISO 8601 date string (YYYY-MM-DD)"""
+    return bool(re.match(r'^\d\d\d\d-\d\d-\d\d$', value))
 
 
-def exactly(prop, length):
-    return len(prop) == length
+def is_from_vocabulary(vocab_uri):
+    subjects = get_subjects(vocab_uri)
 
+    def _value_from_vocab(value):
+        return value in subjects
 
-def allowed_values(prop, values):
-    # is the set of property values a subset of the set of possible values?
-    return set(prop.values) <= set(values)
-
-
-def from_vocabulary(prop, vocab_uri):
-    return allowed_values(prop, get_subjects(vocab_uri))
-
-
-def value_pattern(prop, pattern):
-    return not any(True for v in prop.values if not re.search(pattern, v))
-
-
-def function(prop, func: Callable):
-    return not any(True for v in prop.values if not func(v))
+    _value_from_vocab.__doc__ = f'from vocabulary {vocab_uri}'
+    return _value_from_vocab

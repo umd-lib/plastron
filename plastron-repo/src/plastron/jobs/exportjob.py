@@ -19,6 +19,7 @@ from requests import ConnectionError
 
 from plastron.client import ClientError
 from plastron.files import get_ssh_client
+from plastron.jobs import Job
 from plastron.models import Item
 from plastron.models.umd import PCDMFile
 from plastron.repo import DataReadError, Repository, BinaryResource
@@ -82,7 +83,7 @@ class FileSize:
 
 
 @dataclass
-class ExportJob:
+class ExportJob(Job):
     repo: Repository
     export_format: str
     export_binaries: bool

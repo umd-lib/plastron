@@ -15,9 +15,8 @@ from typing import Iterable
 import yaml
 
 from plastron.cli import commands
-
-from plastron.cli.context import PlastronContext
-from plastron.utils import envsubst, check_python_version, DEFAULT_LOGGING_OPTIONS
+from plastron.context import PlastronContext
+from plastron.utils import DEFAULT_LOGGING_OPTIONS, envsubst
 
 logger = logging.getLogger(__name__)
 now = datetime.utcnow().strftime('%Y%m%d%H%M%S')

@@ -1,9 +1,10 @@
-from plastron.namespaces import dc, dcterms, edm, rdfs, owl, ldp, fabio, pcdm, iana, ore, ebucore, premis, xsd, umdtype
+from plastron.handles import HandleBearingResource
+from plastron.namespaces import dc, dcterms, edm, rdfs, owl, ldp, fabio, pcdm, iana, ore, ebucore, premis, xsd, \
+    umdtype, umd
 from plastron.rdfmapping.decorators import rdf_type
 from plastron.rdfmapping.descriptors import ObjectProperty, DataProperty
 from plastron.rdfmapping.resources import RDFResource, RDFResourceBase
-from plastron.validation import is_edtf_formatted, is_valid_iso639_code, is_handle
-from plastron.validation.vocabularies import get_subjects
+from plastron.validation.rules import is_edtf_formatted, is_valid_iso639_code, is_from_vocabulary
 
 
 @rdf_type(pcdm.Object)
@@ -18,23 +19,13 @@ class LabeledThing(RDFResource):
     same_as = ObjectProperty(owl.sameAs)
 
 
-def is_from_vocabulary(vocab_uri):
-    subjects = get_subjects(vocab_uri)
-
-    def _value_from_vocab(value):
-        return value in subjects
-
-    _value_from_vocab.__doc__ = f'from vocabulary {vocab_uri}'
-    return _value_from_vocab
-
-
 class LDPContainer(RDFResource):
     contains = ObjectProperty(ldp.contains, repeatable=True)
 
 
 class AggregationMixin(RDFResourceBase):
-    first = ObjectProperty(iana.first, required=True, cls='Proxy')
-    last = ObjectProperty(iana.last, required=True, cls='Proxy')
+    first = ObjectProperty(iana.first, cls='Proxy')
+    last = ObjectProperty(iana.last, cls='Proxy')
 
 
 @rdf_type(pcdm.Object)
@@ -62,7 +53,8 @@ class PCDMImageFile(PCDMFile):
     width = DataProperty(ebucore.width)
 
 
-class Item(PCDMObject):
+@rdf_type(umd.Item)
+class Item(PCDMObject, HandleBearingResource):
     object_type = ObjectProperty(
         dcterms.type,
         required=True,
@@ -93,33 +85,7 @@ class Item(PCDMObject):
     rights_holder = ObjectProperty(dcterms.rightsHolder, repeatable=True, embed=True, cls=LabeledThing)
     bibliographic_citation = DataProperty(dcterms.bibliographicCitation)
     accession_number = DataProperty(dcterms.identifier, datatype=umdtype.accessionNumber)
-    handle = DataProperty(dcterms.identifier, datatype=umdtype.handle, validate=is_handle)
 
-    _ORIGINAL_HEADER_MAP = {
-        'object_type': 'Object Type',
-        'identifier': 'Identifier',
-        'rights': 'Rights Statement',
-        'title': 'Title',
-        'format': 'Format',
-        'archival_collection': 'Archival Collection',
-        'date': 'Date',
-        'description': 'Description',
-        'alternate_title': 'Alternate Title',
-        'creator.label': 'Creator',
-        'creator.same_as': 'Creator URI',
-        'contributor.label': 'Contributor',
-        'contributor.same_as': 'Contributor URI',
-        'publisher.label': 'Publisher',
-        'publisher.same_as': 'Publisher URI',
-        'location.label': 'Location',
-        'extent': 'Extent',
-        'subject.label': 'Subject',
-        'language': 'Language',
-        'rights_holder.label': 'Rights Holder',
-        'bibliographic_citation': 'Collection Information',
-        'accession_number': 'Accession Number',
-        'handle': 'Handle',
-    }
     HEADER_MAP = {
         'object_type': 'Object Type',
         'identifier': 'Identifier',

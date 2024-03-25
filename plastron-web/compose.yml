@@ -1,7 +1,10 @@
 version: "3.7"
 services:
-  http:
+  plastrond-http:
     image: docker.lib.umd.edu/plastrond-http
+    configs:
+      - source: plastron-config
+        target: /etc/plastron-config.yml
     volumes:
       - plastrond-jobs:/var/opt/plastron/jobs
     environment:
@@ -11,6 +14,9 @@ services:
 volumes:
   plastrond-jobs:
   plastrond-messages:
+configs:
+  plastron-config:
+    file: ../docker-plastron.yml
 networks:
   default:
     external: true

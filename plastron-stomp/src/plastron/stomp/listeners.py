@@ -6,9 +6,8 @@ from typing import Dict, Any, Callable, Generator, Iterator
 
 from stomp.listener import ConnectionListener
 
-from plastron.client import RepositoryStructure
-from plastron.repo import Repository
-from plastron.stomp.broker import Broker, Destination
+from plastron.context import PlastronContext
+from plastron.stomp.broker import Destination
 from plastron.stomp.commands import get_command_module, get_module_name
 from plastron.stomp.handlers import AsynchronousResponseHandler, SynchronousResponseHandler
 from plastron.stomp.inbox_watcher import InboxWatcher
@@ -19,23 +18,14 @@ version = importlib.metadata.version('plastron-stomp')
 
 
 class CommandListener(ConnectionListener):
-    def __init__(
-            self,
-            broker: Broker,
-            repo_config: Dict[str, Any],
-            command_config: Dict[str, Any] = None,
-            after_connected: Callable = None,
-            after_disconnected: Callable = None,
-    ):
-        self.broker = broker
-        self.repo_config = repo_config
+    def __init__(self, context: PlastronContext, after_connected: Callable = None, after_disconnected: Callable = None):
+        self.context = context
+        self.broker = context.broker
         self.inbox = MessageBox(os.path.join(self.broker.message_store_dir, 'inbox'), PlastronCommandMessage)
         self.outbox = MessageBox(os.path.join(self.broker.message_store_dir, 'outbox'), PlastronMessage)
         self.executor = ThreadPoolExecutor(thread_name_prefix=__name__)
-        self.public_uri_template = self.broker.public_uri_template
         self.inbox_watcher = None
-        self.command_config = command_config or {}
-        self.processor = MessageProcessor(self.command_config, self.repo_config)
+        self.processor = MessageProcessor(context)
         self.after_connected = after_connected
         self.after_disconnected = after_disconnected
 
@@ -99,7 +89,12 @@ class CommandListener(ConnectionListener):
             self.after_disconnected()
 
 
-def get_command(command_name: str) -> Callable[..., Generator[Dict, None, Dict]]:
+# type alias for command functions that take a context and a message, and return a generator that yields
+# status updates in the form of dictionaries, and returns a final state, also as a dictionary
+STOMPCommandFunction = Callable[[PlastronContext, PlastronMessage], Generator[Dict[str, Any], None, Dict[str, Any]]]
+
+
+def get_command(command_name: str) -> STOMPCommandFunction:
     module_name = get_module_name(command_name)
     module = get_command_module(command_name)
     command = getattr(module, module_name, None)
@@ -109,41 +104,33 @@ def get_command(command_name: str) -> Callable[..., Generator[Dict, None, Dict]]
 
 
 class MessageProcessor:
-    def __init__(self, command_config, repo_config):
-        self.command_config = command_config
-        self.repo_config = repo_config
+    def __init__(self, context: PlastronContext):
+        self.context = context
         # cache for command instances
         self.commands = {}
         self.result = None
-
-    def configure_repo(self, message: PlastronCommandMessage) -> Repository:
-        repo = Repository.from_config(self.repo_config)
-        repo.ua_string = f'plastron/{version}',
-        repo.delegated_user = message.args.get('on-behalf-of'),
-        if 'structure' in message.args:
-            repo.client.structure = RepositoryStructure[message.args['structure'].upper()]
-        if 'relpath' in message.args:
-            repo.endpoint.relpath = message.args['relpath']
-        if repo.client.delegated_user is not None:
-            logger.info(f'Running repository operations on behalf of {repo.client.delegated_user}')
-        return repo
 
     def __call__(self, message: PlastronCommandMessage, progress_topic: Destination):
         if message.job_id is None:
             raise RuntimeError('Expecting a PlastronJobId header')
 
         logger.info(f'Received message to initiate job {message.job_id}')
-        repo = self.configure_repo(message)
 
         # determine which command to load to process the message
         command = get_command(message.command)
-        # get the configuration options for this command
-        config = self.command_config.get(message.command.upper(), {})
+
+        delegated_user = message.args.get('on-behalf-of')
+        if delegated_user is not None:
+            logger.info(f'Running repository operations on behalf of {delegated_user}')
 
         # run the command, and send a progress message over STOMP every time it yields
         # the _run() delegating generator captures the final status in self.result
-        for status in self._run(command(repo, config, message)):
-            progress_topic.send(PlastronMessage(job_id=message.job_id, body=status))
+        with self.context.repo_configuration(
+            delegated_user=delegated_user,
+            ua_string=f'plastron/{version}',
+        ) as run_context:
+            for status in self._run(command(run_context, message)):
+                progress_topic.send(PlastronMessage(job_id=message.job_id, body=status))
 
         logger.info(f'Job {message.job_id} complete')
 

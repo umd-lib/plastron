@@ -21,6 +21,7 @@ from plastron.rdfmapping.resources import RDFResourceBase, RDFResourceType
 from plastron.repo import DataReadError, Repository, RepositoryResource
 from plastron.serializers import CSVSerializer
 from plastron.serializers.csv import flatten_headers, unflatten, not_empty, split_escaped, build_lookup_index
+from plastron.utils import strtobool
 
 nsm = get_manager()
 logger = logging.getLogger(__name__)
@@ -261,6 +262,14 @@ class Row:
     @property
     def index_string(self):
         return self.data.get('INDEX')
+
+    @property
+    def publish(self) -> bool:
+        return bool(strtobool(self.data.get('PUBLISH', 'False') or 'False'))
+
+    @property
+    def hidden(self) -> bool:
+        return bool(strtobool(self.data.get('HIDDEN', 'False') or 'False'))
 
 
 class MetadataSpreadsheet:

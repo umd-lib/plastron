@@ -21,7 +21,7 @@ from plastron.client import ClientError
 from plastron.files import get_ssh_client
 from plastron.jobs import Job
 from plastron.models import Item
-from plastron.models.umd import PCDMFile
+from plastron.models.pcdm import PCDMFile
 from plastron.repo import DataReadError, Repository, BinaryResource
 from plastron.repo.pcdm import PCDMObjectResource, AggregationResource, PCDMFileBearingResource
 from plastron.serializers import SERIALIZER_CLASSES, detect_resource_class

@@ -4,7 +4,7 @@ from argparse import Namespace
 from PIL import Image
 
 from plastron.cli.commands import BaseCommand
-from plastron.models.umd import PCDMImageFile
+from plastron.models.pcdm import PCDMImageFile
 from plastron.repo import BinaryResource
 from plastron.repo.utils import context
 

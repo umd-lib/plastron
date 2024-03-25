@@ -2,7 +2,7 @@ import logging
 from argparse import Namespace
 
 from plastron.cli.commands import BaseCommand
-from plastron.models.umd import PCDMFile
+from plastron.models.pcdm import PCDMFile
 from plastron.namespaces import ldp
 
 logger = logging.getLogger(__name__)

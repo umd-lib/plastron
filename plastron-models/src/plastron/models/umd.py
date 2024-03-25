@@ -1,9 +1,9 @@
 from plastron.handles import HandleBearingResource
-from plastron.namespaces import dc, dcterms, edm, rdfs, owl, ldp, fabio, pcdm, iana, ore, ebucore, premis, xsd, \
-    umdtype, umd
+from plastron.models.pcdm import PCDMObject
+from plastron.namespaces import dc, dcterms, edm, rdfs, owl, fabio, pcdm, ore, umdtype, umd
 from plastron.rdfmapping.decorators import rdf_type
 from plastron.rdfmapping.descriptors import ObjectProperty, DataProperty
-from plastron.rdfmapping.resources import RDFResource, RDFResourceBase
+from plastron.rdfmapping.resources import RDFResource
 from plastron.validation.rules import is_edtf_formatted, is_valid_iso639_code, is_from_vocabulary
 
 
@@ -17,40 +17,6 @@ class Stub(RDFResource):
 class LabeledThing(RDFResource):
     label = DataProperty(rdfs.label, required=True)
     same_as = ObjectProperty(owl.sameAs)
-
-
-class LDPContainer(RDFResource):
-    contains = ObjectProperty(ldp.contains, repeatable=True)
-
-
-class AggregationMixin(RDFResourceBase):
-    first = ObjectProperty(iana.first, cls='Proxy')
-    last = ObjectProperty(iana.last, cls='Proxy')
-
-
-@rdf_type(pcdm.Object)
-class PCDMObject(RDFResource, AggregationMixin):
-    title = DataProperty(dcterms.title)
-    has_member = ObjectProperty(pcdm.hasMember, repeatable=True, cls='PCDMObject')
-    member_of = ObjectProperty(pcdm.memberOf, repeatable=True, cls='PCDMObject')
-    has_file = ObjectProperty(pcdm.hasFile, repeatable=True, cls='PCDMFile')
-
-
-@rdf_type(pcdm.File)
-class PCDMFile(RDFResource):
-    title = DataProperty(dcterms.title)
-    file_of = ObjectProperty(pcdm.fileOf, repeatable=True, cls=PCDMObject)
-    mime_type = DataProperty(ebucore.hasMimeType)
-    filename = DataProperty(ebucore.filename)
-    size = DataProperty(premis.hasSize, datatype=xsd.long)
-
-    def __str__(self):
-        return str(self.title or self.uri)
-
-
-class PCDMImageFile(PCDMFile):
-    height = DataProperty(ebucore.height)
-    width = DataProperty(ebucore.width)
 
 
 @rdf_type(umd.Item)
@@ -141,12 +107,3 @@ class Page(PCDMObject):
 
     def __str__(self):
         return str(self.title or self.uri)
-
-
-@rdf_type(ore.Proxy)
-class Proxy(RDFResource):
-    title = DataProperty(dcterms.title)
-    prev = ObjectProperty(iana.prev, cls='Proxy')
-    next = ObjectProperty(iana.next, cls='Proxy')
-    proxy_for = ObjectProperty(ore.proxyFor, cls=RDFResourceBase)
-    proxy_in = ObjectProperty(ore.proxyIn, cls=RDFResourceBase)

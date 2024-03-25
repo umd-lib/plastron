@@ -16,7 +16,7 @@ import yaml
 
 from plastron.cli import commands
 from plastron.context import PlastronContext
-from plastron.utils import DEFAULT_LOGGING_OPTIONS, envsubst
+from plastron.utils import DEFAULT_LOGGING_OPTIONS, envsubst, check_python_version
 
 logger = logging.getLogger(__name__)
 now = datetime.utcnow().strftime('%Y%m%d%H%M%S')

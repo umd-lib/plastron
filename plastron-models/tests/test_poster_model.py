@@ -1,13 +1,15 @@
-from plastron.models.poster import Poster
-from plastron.namespaces import ore
-from rdflib import Graph, Literal, URIRef
+from rdflib import Literal
 
-import pytest
+from plastron.models.poster import Poster
 
 base_uri = 'http://example.com/xyz'
 
 
-@pytest.mark.skip('Test cannot be run because Poster validation does not currently work')
+def test_poster_invalid_with_no_fields():
+    poster = Poster()
+    assert not poster.is_valid
+
+
 def test_poster_valid_with_only_required_fields():
     poster = Poster()
 

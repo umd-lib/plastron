@@ -5,7 +5,7 @@ from uuid import uuid4
 
 from rdflib import Graph, URIRef
 
-from plastron.rdfmapping.descriptors import ObjectProperty, Property, DataProperty
+from plastron.rdfmapping.descriptors import ObjectProperty, Property, DataProperty, OBJECT_CLASSES
 from plastron.rdfmapping.graph import TrackChangesGraph, copy_triples
 from plastron.rdfmapping.properties import RDFProperty
 from plastron.rdfmapping.validation import ValidationResultsDict
@@ -48,6 +48,8 @@ class RDFResourceBase:
             # run after the __init_subclass__ method
             cls.default_values.update(deepcopy(base_class.default_values))
             cls.validators.extend(deepcopy(base_class.validators))
+        # build the lookup table of class name to class
+        OBJECT_CLASSES[cls.__name__] = cls
 
     def __init__(self, uri: Union[URIRef, str] = None, graph: Graph = None, **kwargs):
         if uri is not None:

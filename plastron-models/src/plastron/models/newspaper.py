@@ -1,7 +1,7 @@
 from lxml.etree import parse, XMLSyntaxError
 
 from plastron.models.annotations import TextblockOnPage
-from plastron.models.umd import PCDMObject, PCDMFile
+from plastron.models.pcdm import PCDMObject, PCDMFile
 from plastron.namespaces import bibo, carriers, dc, dcterms, fabio, ndnp, ore, pcdmuse, umdtype, pcdm, umd
 from plastron.rdf.ocr import ALTOResource
 from plastron.rdfmapping.decorators import rdf_type

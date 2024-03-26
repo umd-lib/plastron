@@ -11,7 +11,7 @@ from urllib.parse import urlparse
 from rdflib import URIRef, Literal
 from urlobject import URLObject
 
-from plastron.models.umd import PCDMFile
+from plastron.models.pcdm import PCDMFile
 from plastron.namespaces import fedora
 from plastron.rdfmapping.descriptors import ObjectProperty
 from plastron.rdfmapping.embed import EmbeddedObject

@@ -1,6 +1,6 @@
 from rdflib import URIRef
 
-from plastron.models.umd import PCDMObject
+from plastron.models.pcdm import PCDMObject
 from plastron.namespaces import dcterms, dc, edm, bibo, geo, ore, umd, umdtype
 from plastron.rdfmapping.decorators import rdf_type
 from plastron.rdfmapping.descriptors import ObjectProperty, DataProperty, Property

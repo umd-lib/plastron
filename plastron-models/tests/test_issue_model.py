@@ -1,13 +1,13 @@
 from plastron.models.newspaper import Issue
-from plastron.namespaces import ore
-from rdflib import Graph, URIRef
-
-import pytest
 
 base_uri = 'http://example.com/xyz'
 
 
-@pytest.mark.skip('Test cannot be run because Issue validation does not currently work')
+def test_issue_invalid_with_no_fields():
+    issue = Issue()
+    assert not issue.is_valid
+
+
 def test_issue_valid_with_only_required_fields():
     issue = Issue()
 

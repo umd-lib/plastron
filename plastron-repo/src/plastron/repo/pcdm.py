@@ -9,7 +9,10 @@ from plastron.client import random_slug
 from plastron.files import BinarySource, FileGroup
 from plastron.models import Item
 from plastron.models.annotations import Annotation
-from plastron.models.umd import PCDMObject, PCDMFile, Page, Proxy, LDPContainer
+from plastron.models.ore import Proxy
+from plastron.models.umd import Page
+from plastron.models.ldp import LDPContainer
+from plastron.models.pcdm import PCDMObject, PCDMFile
 from plastron.namespaces import umdform
 from plastron.rdfmapping.resources import RDFResourceBase
 from plastron.repo import ContainerResource, Repository, BinaryResource

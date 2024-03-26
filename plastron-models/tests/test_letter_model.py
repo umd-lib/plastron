@@ -1,8 +1,11 @@
 from plastron.models.letter import Letter
-from plastron.namespaces import ore
-from rdflib import Graph, URIRef
 
 base_uri = 'http://example.com/xyz'
+
+
+def test_letter_invalid_with_no_fields():
+    letter = Letter()
+    assert not letter.is_valid
 
 
 def test_letter_valid_with_only_required_fields():
@@ -20,4 +23,5 @@ def test_letter_valid_with_only_required_fields():
     letter.rights_holder = 'Test Rights Holder'
     letter.type = 'http://purl.org/dc/dcmitype/Text'
     letter.extent = '1 page'
+
     assert letter.is_valid

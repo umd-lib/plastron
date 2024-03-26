@@ -20,6 +20,3 @@ def test_no_binaries(datadir):
 def test_has_binaries(filename, datadir):
     metadata = MetadataSpreadsheet(datadir / filename, Item)
     assert metadata.has_binaries
-
-
-

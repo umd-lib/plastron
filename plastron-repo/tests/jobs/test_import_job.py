@@ -111,3 +111,38 @@ def test_import_job_create_resource_publish_all(import_file, jobs):
     for i, stats in enumerate(import_job.run(repo=mock_repo, publish=True, import_file=import_file.open())):
         assert mock_container.obj is not None
         assert get_publication_status(mock_container.obj) == expected_publication_statuses[i]
+
+
+def test_config_read_none_string_as_none(jobs):
+    # ensure that when reading improperly serialized config files,
+    # the string "None" gets treated as the value None
+    job = jobs.get_job(job_class=ImportJob, job_id='bad_access')
+    assert job.access is None
+
+
+def test_config_read_null_as_none(jobs):
+    # ensure that when reading the config file, "null" is converted
+    # to the value None
+    job = jobs.get_job(job_class=ImportJob, job_id='null_access')
+    assert job.access is None
+
+
+def test_config_read_empty_as_none(jobs):
+    # ensure that when reading the config file, an empty value
+    # is converted to the value None
+    job = jobs.get_job(job_class=ImportJob, job_id='empty_access')
+    assert job.access is None
+
+
+def test_config_write_none_as_null(jobs):
+    # ensure that when writing the config file, values of None
+    # are serialized as a YAML null; see https://yaml.org/type/null.html
+    # for details on YAML's treatment of null values
+    job = jobs.create_job(
+        job_class=ImportJob,
+        job_id='fixed_saved',
+        config=ImportConfig(job_id='fixed_saved', access=None),
+    )
+    contents = job.config_filename.read_text()
+    assert 'access: None\n' not in contents
+    assert 'access: null\n' in contents

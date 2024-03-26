@@ -5,7 +5,8 @@ import logging
 import logging.config
 import os
 import sys
-from argparse import ArgumentParser, FileType, Namespace
+from argparse import ArgumentParser, FileType
+from argparse import Namespace
 from datetime import datetime
 from importlib import import_module
 from pkgutil import iter_modules
@@ -15,7 +16,7 @@ import yaml
 
 from plastron.cli import commands
 from plastron.context import PlastronContext
-from plastron.utils import DEFAULT_LOGGING_OPTIONS, envsubst
+from plastron.utils import DEFAULT_LOGGING_OPTIONS, envsubst, check_python_version
 
 logger = logging.getLogger(__name__)
 now = datetime.utcnow().strftime('%Y%m%d%H%M%S')
@@ -142,6 +143,8 @@ def main():
 
     # configure logging
     logging.config.dictConfig(logging_options)
+
+    check_python_version()
 
     # get the selected subcommand
     command_module = command_modules[args.cmd_name]

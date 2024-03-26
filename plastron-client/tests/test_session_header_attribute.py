@@ -37,4 +37,3 @@ def test_get_session_header():
     foo = Foo()
     foo.x_test_header = 'ABC'
     assert foo.x_test_header == 'ABC'
-

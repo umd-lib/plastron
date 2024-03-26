@@ -2,6 +2,7 @@ import collections.abc
 import csv
 import logging
 import os
+import platform
 import re
 from abc import ABC
 from datetime import datetime
@@ -111,6 +112,16 @@ def envsubst(value: Union[str, list, dict], env: Mapping[str, str] = None) -> Un
         return {k: envsubst(v, env) for k, v in value.items()}
     else:
         return value
+
+
+def check_python_version():
+    # check Python version
+    major, minor, patch = (int(v) for v in platform.python_version_tuple())
+    if minor < 8:
+        logger.warning(
+            f'You appear to be running Python {platform.python_version()}. '
+            'Upgrading to Python 3.8+ is STRONGLY recommended.'
+        )
 
 
 def strtobool(val: str) -> int:

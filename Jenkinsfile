@@ -102,7 +102,15 @@ pipeline {
           . venv/bin/activate
           pip install --force-reinstall 'setuptools<58.0.0'
 
-          pip install -e .[test]
+          pip install \
+              -e './plastron-utils[test]' \
+              -e './plastron-client[test]' \
+              -e './plastron-rdf[test]' \
+              -e './plastron-models[test]' \
+              -e './plastron-repo[test]' \
+              -e './plastron-web[test]' \
+              -e './plastron-stomp[test]' \
+              -e './plastron-cli[test]'
         '''
       }
     }
@@ -141,7 +149,9 @@ pipeline {
       post {
         always {
           // Collect pycodestyle reports
-          recordIssues(tools: [pyLint(reportEncoding: 'UTF-8', name: 'pycodestyle')], unstableTotalAll: 1)
+          recordIssues(tools: [pyLint(reportEncoding: 'UTF-8', name: 'pycodestyle')],
+                       qualityGates: [[threshold: 1, type: 'TOTAL', criticality: 'UNSTABLE']]
+          )
         }
       }
     }

@@ -97,9 +97,8 @@ pipeline {
     stage('build') {
       steps {
         sh '''
-          python -m pip install virtualenv
-          virtualenv venv
-          . venv/bin/activate
+          python -m venv .venv
+          . .venv/bin/activate
 
           pip install \
               -e './plastron-utils[test]' \
@@ -117,7 +116,7 @@ pipeline {
     stage('test') {
       steps {
         sh '''
-          . venv/bin/activate
+          . .venv/bin/activate
 
           pytest -v --junitxml=reports/results.xml -o junit_family=xunit1
         '''
@@ -132,7 +131,7 @@ pipeline {
     stage('static-analysis') {
       steps {
         sh '''
-          . venv/bin/activate
+          . .venv/bin/activate
 
           # Install pycodestyle
           pip install pycodestyle

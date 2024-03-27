@@ -142,7 +142,7 @@ pipeline {
           # post-build action
           #
           # Using "|| true" so that build will be considered successful, even if there are violations.
-          pycodestyle --format pylint plastron || true
+          pycodestyle --format pylint . || true
         '''
       }
       post {

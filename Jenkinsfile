@@ -120,7 +120,7 @@ pipeline {
         sh '''
           . .venv/bin/activate
 
-          pytest -v --junitxml=reports/results.xml -o junit_family=xunit1
+          pytest -v --junitxml=reports/results.xml
         '''
       }
       post {

@@ -36,7 +36,7 @@ def split_escaped(string: str, separator: str = '|') -> List[str]:
     >>> split_escaped('foo\|bar|alpha')
     ['foo|bar', 'alpha']
     ```
-    """
+    """  # noqa: W605
     if string is None or string == '':
         return []
     # uses a negative look-behind to only split on separator characters

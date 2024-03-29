@@ -60,6 +60,8 @@ pipeline {
            |
            |Check console output at $BUILD_URL to view the results.
            |
+           |There were ${TEST_COUNTS,var="fail"} failed tests.
+           |
            |There are ${ANALYSIS_ISSUES_COUNT} static analysis issues in this build.
            |
            |There were ${TEST_COUNTS,var="skip"} skipped tests.'''.stripMargin()
@@ -97,12 +99,18 @@ pipeline {
     stage('build') {
       steps {
         sh '''
-          python -m pip install virtualenv
-          virtualenv venv
-          . venv/bin/activate
-          pip install --force-reinstall 'setuptools<58.0.0'
+          python -m venv .venv
+          . .venv/bin/activate
 
-          pip install -e .[test]
+          pip install \
+              -e './plastron-utils[test]' \
+              -e './plastron-client[test]' \
+              -e './plastron-rdf[test]' \
+              -e './plastron-models[test]' \
+              -e './plastron-repo[test]' \
+              -e './plastron-web[test]' \
+              -e './plastron-stomp[test]' \
+              -e './plastron-cli[test]'
         '''
       }
     }
@@ -110,9 +118,9 @@ pipeline {
     stage('test') {
       steps {
         sh '''
-          . venv/bin/activate
+          . .venv/bin/activate
 
-          pytest -v --junitxml=reports/results.xml -o junit_family=xunit1
+          pytest -v --junitxml=reports/results.xml
         '''
       }
       post {
@@ -125,7 +133,7 @@ pipeline {
     stage('static-analysis') {
       steps {
         sh '''
-          . venv/bin/activate
+          . .venv/bin/activate
 
           # Install pycodestyle
           pip install pycodestyle
@@ -135,13 +143,15 @@ pipeline {
           # post-build action
           #
           # Using "|| true" so that build will be considered successful, even if there are violations.
-          pycodestyle --format pylint plastron || true
+          pycodestyle --format pylint . || true
         '''
       }
       post {
         always {
           // Collect pycodestyle reports
-          recordIssues(tools: [pyLint(reportEncoding: 'UTF-8', name: 'pycodestyle')], unstableTotalAll: 1)
+          recordIssues(tools: [pyLint(reportEncoding: 'UTF-8', name: 'pycodestyle')],
+                       qualityGates: [[threshold: 1, type: 'TOTAL', criticality: 'UNSTABLE']]
+          )
         }
       }
     }

@@ -156,25 +156,27 @@ class Command(BaseCommand):
             write_model_template(args.model, args.template_file)
             return
 
-        if not args.resume:
+        jobs = Jobs(self.jobs_dir)
+        if args.resume:
+            if args.job_id is None:
+                raise RuntimeError('Resuming a job requires a job id')
+
+            logger.info(f'Resuming saved job {args.job_id}')
+            job = jobs.get_job(ImportJob, args.job_id)
+        else:
             if args.import_file is None:
                 raise RuntimeError('An import file is required unless resuming an existing job')
 
             if args.model is None:
                 raise RuntimeError('A model is required unless resuming an existing job')
 
-        if args.resume and args.job_id is None:
-            raise RuntimeError('Resuming a job requires a job id')
+            if args.container is None:
+                raise RuntimeError('A container is required unless resuming an existing job')
 
-        if args.job_id is None:
-            # TODO: generate a more unique id? add in user and hostname?
-            args.job_id = f"import-{datetimestamp()}"
+            if args.job_id is None:
+                # TODO: generate a more unique id? add in user and hostname?
+                args.job_id = f"import-{datetimestamp()}"
 
-        jobs = Jobs(self.jobs_dir)
-        if args.resume:
-            logger.info(f'Resuming saved job {args.job_id}')
-            job = jobs.get_job(ImportJob, args.job_id)
-        else:
             logger.info(f'Creating new job {args.job_id}')
             job = jobs.create_job(
                 job_class=ImportJob,

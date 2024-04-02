@@ -1,0 +1,30 @@
+@startuml
+start
+if (Handle in metadata?) then (yes)
+    :Look up handle on server
+    by metadata handle value;
+    if (Server handle exists?) then (yes)
+        :Compare server handle target URL
+        with fcrepo object public URL;
+        if (URLs match?) then (yes)
+        else (no)
+            :Set server handle target URL
+            to fcrepo object public URL;
+        endif
+    else (no)
+        :Halt publication;
+        :Send error message;
+        end
+    endif
+else (no)
+    :Look up handle on server
+    by fcrepo object URL;
+    if (Server handle exists?) then (yes)
+    else (no)
+        :Mint new handle;
+    endif
+    :Set metadata handle
+    to server handle;
+endif
+stop
+@enduml

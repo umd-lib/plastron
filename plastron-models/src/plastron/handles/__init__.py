@@ -1,8 +1,7 @@
 import dataclasses
 import logging
 from dataclasses import dataclass
-from http import HTTPStatus
-from typing import Optional
+from typing import Optional, Dict, Any
 
 import requests
 from requests_jwtauth import HTTPBearerAuth
@@ -37,29 +36,58 @@ class HandleServiceClient:
         self.default_prefix = default_prefix
         self.default_repo = default_repo
 
-    def get_handle(self, repo_uri: str, repo: str = None) -> Optional[Handle]:
-        response = requests.get(
-            f'{self.endpoint_url}/handles/exists',
-            params={
-                'repo': repo or self.default_repo,
-                'repo_id': repo_uri,
-            },
-            auth=self.auth,
-        )
-        if response.status_code == HTTPStatus.NOT_FOUND:
-            return None
+    def _send_request(self, path: str, params: Dict[str, str]) -> Dict[str, Any]:
+        url = self.endpoint_url + path
+        response = requests.get(url=url, params=params, auth=self.auth)
         if not response.ok:
             raise HandleServerError(str(response))
         result = response.json()
         logger.debug(result)
-        if result['exists']:
-            return Handle(
-                prefix=result['prefix'],
-                suffix=result['suffix'],
-                url=result['url'],
-            )
-        else:
+        return result
+
+    def get_handle(self, handle: str, repo: str = None) -> Optional[Handle]:
+        if handle.startswith('hdl:'):
+            handle = handle[4:]
+        try:
+            prefix, suffix = handle.split('/', 1)
+        except ValueError as e:
+            raise HandleError(
+                'Handle must be a string in the form "{prefix}/{suffix}" or "hdl:{prefix}/{suffix}'
+            ) from e
+
+        result = self._send_request(
+            path='/handles/info',
+            params={
+                'repo': repo or self.default_repo,
+                'prefix': prefix,
+                'suffix': suffix,
+            },
+        )
+        if not result['exists']:
             return None
+
+        return Handle(
+            prefix=prefix,
+            suffix=suffix,
+            url=result['url']
+        )
+
+    def find_handle(self, repo_uri: str, repo: str = None) -> Optional[Handle]:
+        result = self._send_request(
+            path='/handles/exists',
+            params={
+                'repo': repo or self.default_repo,
+                'repo_id': repo_uri,
+            },
+        )
+        if not result['exists']:
+            return None
+
+        return Handle(
+            prefix=result['prefix'],
+            suffix=result['suffix'],
+            url=result['url'],
+        )
 
     def create_handle(self, repo_uri: str, url: str, prefix: str = None, repo: str = None) -> Handle:
         request = {
@@ -97,7 +125,11 @@ class HandleServiceClient:
         return updated_handle
 
 
-class HandleServerError(Exception):
+class HandleError(Exception):
+    pass
+
+
+class HandleServerError(HandleError):
     pass
 
 
@@ -106,3 +138,8 @@ class HandleBearingResource(RDFResource):
     one needed, or it can be used as a mix-in to other full models to give them a handle
     field."""
     handle = DataProperty(dcterms.identifier, datatype=umdtype.handle, validate=is_handle)
+
+    @property
+    def has_handle(self) -> bool:
+        """Convenience property for whether this object has a valid handle."""
+        return bool(len(self.handle) > 0 and self.handle.is_valid)

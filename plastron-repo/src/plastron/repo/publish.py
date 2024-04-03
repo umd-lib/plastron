@@ -1,6 +1,6 @@
 import logging
 
-from plastron.handles import HandleBearingResource, Handle, HandleServiceClient
+from plastron.handles import HandleBearingResource, Handle, HandleServiceClient, HandleServerError
 from plastron.namespaces import umdaccess
 from plastron.rdfmapping.resources import RDFResource
 from plastron.repo import RepositoryResource, RepositoryError
@@ -34,37 +34,41 @@ class PublishableResource(RepositoryResource):
             force_visible: bool = False,
     ) -> Handle:
         obj = self.describe(HandleBearingResource)
-        if obj.handle.is_valid:
+
+        # find or create handle
+        if obj.has_handle:
             logger.debug(f'Handle in the repository: {obj.handle.value}')
 
-        handle = handle_client.get_handle(repo_uri=self.url)
-        if handle is not None:
-            logger.debug(f'Handle service returns handle: {handle.hdl_uri}')
-
-        if handle is None:
-            # create a new handle
-            logger.debug(f'Minting new handle for {self.url}')
-            handle = handle_client.create_handle(
-                repo_uri=self.url,
-                url=public_url,
-            )
+            # check the handle service to see if there is a registered handle
+            # if so, check the URL and update it to the fcrepo url if need be
+            handle = handle_client.get_handle(str(obj.handle.value))
             if handle is None:
-                # if the handle is still not created, something *really* went wrong
-                logger.error(f'Unable to find or create handle for {self.url}')
+                logger.error(f'Unable to find expected handle {obj.handle.value} for {self.url} on the handle server')
                 raise RepositoryError(f'Unable to publish {self}')
 
-            obj.handle = handle.hdl_uri
-        else:
+            logger.debug(f'Handle service returns handle: {handle.hdl_uri}')
+
             # check target URL, and update if needed
             if handle.url != public_url:
                 logger.warning(f'Current target URL ({handle.url}) does not match the expected URL ({public_url})')
                 handle = handle_client.update_handle(handle, url=public_url)
+        else:
+            handle = handle_client.find_handle(repo_uri=self.url)
+            if handle is None:
+                # create a new handle
+                logger.debug(f'Minting new handle for {self.url}')
+                try:
+                    handle = handle_client.create_handle(
+                        repo_uri=self.url,
+                        url=public_url,
+                    )
+                except HandleServerError as e:
+                    # if the handle is still not created, something *really* went wrong
+                    logger.error(f'Unable to find or create handle for {self.url}: {e}')
+                    raise RepositoryError(f'Unable to publish {self}') from e
 
-            # check to ensure that the handle matches
-            if obj.handle.is_valid:
-                if handle.hdl_uri != str(obj.handle.value):
-                    logger.warning('Handle values differ; updating the repository to match the handle service')
-                    obj.handle = handle.hdl_uri
+            # set the object's handle
+            obj.handle = handle.hdl_uri
 
         # add the Published (and optionally, add or remove the Hidden) access classes
         obj.rdf_type.add(umdaccess.Published)

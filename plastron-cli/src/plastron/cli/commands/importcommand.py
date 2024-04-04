@@ -192,7 +192,7 @@ class Command(BaseCommand):
 
         logger.debug(f'Running job {job.id}')
         self.run(job.run(
-            repo=self.context.repo,
+            context=self.context,
             import_file=args.import_file,
             limit=args.limit,
             percentage=args.percentage,

@@ -75,7 +75,7 @@ def importcommand(
         job = jobs.create_job(ImportJob, config=ImportConfig(**job_config_args))
 
     return job.run(
-        repo=context.repo,
+        context=context,
         import_file=import_file,
         limit=limit,
         percentage=percentage,

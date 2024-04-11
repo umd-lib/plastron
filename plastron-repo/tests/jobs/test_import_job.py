@@ -150,7 +150,7 @@ def test_config_write_none_as_null(jobs):
 
 def test_import_job_validation_fails_for_job_with_files_column_and_file_missing(jobs, datadir):
     """
-    Verifies the import validation fails when
+    Verifies that import validation fails when
     - The CSV file contains an "ITEM_FILES" column that contains non-empty values
     - A "binaries_location" parameter is provided
     - The file is not found
@@ -186,7 +186,7 @@ def test_import_job_raises_runtime_error_job_with_files_and_no_binaries_location
 
 def test_import_job_validation_succeeds_for_job_with_files_column_and_file_exists(jobs, datadir, tmpdir):
     """
-    Verifies the import validation fails when
+    Verifies that import validation succeeds when
     - The CSV file contains an "ITEM_FILES" column that contains non-empty values
     - A "binaries_location" parameter is provided
     - The indicated file is found
@@ -199,6 +199,24 @@ def test_import_job_validation_succeeds_for_job_with_files_column_and_file_exist
     mock_repo = MagicMock(spec=Repository)
 
     import_job = jobs.create_job(ImportJob, config=ImportConfig(job_id='456', model='Item', binaries_location=str(binaries_location)))
+    with pytest.raises(StopIteration) as exc_info:
+      next(import_job.run(repo=mock_repo, validate_only=True, import_file=import_file.open()))
+
+    return_value = exc_info.value.value
+    assert return_value['type'] == 'validate_success'
+
+
+def test_import_job_validation_passes_for_job_with_files_column_and_no_files_specified(jobs, datadir):
+    """
+    Verifies that import validation succeed when
+    - The CSV file contains an "ITEM_FILES" column that is empty for ALL rows
+    - A "binaries_location" parameter is not provided
+    """
+    import_file = datadir / 'item_with_empty_item_files_column.csv'
+    binaries_location = 'test_binaries_location'
+    mock_repo = MagicMock(spec=Repository)
+
+    import_job = jobs.create_job(ImportJob, config=ImportConfig(job_id='456', model='Item'))
     with pytest.raises(StopIteration) as exc_info:
       next(import_job.run(repo=mock_repo, validate_only=True, import_file=import_file.open()))
 

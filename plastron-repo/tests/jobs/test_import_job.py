@@ -146,3 +146,61 @@ def test_config_write_none_as_null(jobs):
     contents = job.config_filename.read_text()
     assert 'access: None\n' not in contents
     assert 'access: null\n' in contents
+
+
+def test_import_job_validation_fails_for_job_with_files_column_and_file_missing(jobs, datadir):
+    """
+    Verifies the import validation fails when
+    - The CSV file contains an "ITEM_FILES" column that contains non-empty values
+    - A "binaries_location" parameter is provided
+    - The file is not found
+    """
+    import_file = datadir / 'item_with_file_in_item_files_column.csv'
+    binaries_location = 'test_binaries_location'
+    mock_repo = MagicMock(spec=Repository)
+
+    import_job = jobs.create_job(ImportJob, config=ImportConfig(job_id='456', model='Item', binaries_location=binaries_location))
+    with pytest.raises(StopIteration) as exc_info:
+      next(import_job.run(repo=mock_repo, validate_only=True, import_file=import_file.open()))
+
+    return_value = exc_info.value.value
+    assert return_value['type'] == 'validate_failed'
+
+
+def test_import_job_raises_runtime_error_job_with_files_and_no_binaries_location(jobs, datadir):
+    """
+    Verifies that the import job raises a RuntimeError when:
+    - The CSV file contains a "FILES" or "ITEM_FILES" column that contains non-empty values
+    - A "binaries_location" parameter is NOT provided
+    """
+    import_file = datadir / 'item_with_file_in_item_files_column.csv'
+    mock_repo = MagicMock(spec=Repository)
+
+    import_job = jobs.create_job(ImportJob, config=ImportConfig(job_id='456', model='Item'))
+    with pytest.raises(RuntimeError) as exc_info:
+      next(import_job.run(repo=mock_repo, validate_only=True, import_file=import_file.open()))
+
+    expected_message = 'Must specify --binaries-location if the metadata has a FILES and/or ITEM_FILES column'
+    assert expected_message == str(exc_info.value)
+
+
+def test_import_job_validation_succeeds_for_job_with_files_column_and_file_exists(jobs, datadir, tmpdir):
+    """
+    Verifies the import validation fails when
+    - The CSV file contains an "ITEM_FILES" column that contains non-empty values
+    - A "binaries_location" parameter is provided
+    - The indicated file is found
+    """
+    import_file = datadir / 'item_with_file_in_item_files_column.csv'
+    binaries_location = tmpdir.mkdir('test_binary_location')
+    temp_binary_file = binaries_location / 'test_file.tif'
+    temp_binary_file.write('Test file')
+
+    mock_repo = MagicMock(spec=Repository)
+
+    import_job = jobs.create_job(ImportJob, config=ImportConfig(job_id='456', model='Item', binaries_location=str(binaries_location)))
+    with pytest.raises(StopIteration) as exc_info:
+      next(import_job.run(repo=mock_repo, validate_only=True, import_file=import_file.open()))
+
+    return_value = exc_info.value.value
+    assert return_value['type'] == 'validate_success'

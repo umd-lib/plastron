@@ -1,7 +1,8 @@
 import dataclasses
 import logging
 from dataclasses import dataclass
-from typing import Optional, Dict, Any
+from http import HTTPStatus
+from typing import Optional, List
 
 import requests
 from requests_jwtauth import HTTPBearerAuth
@@ -14,11 +15,27 @@ from plastron.validation.rules import is_handle
 logger = logging.getLogger(__name__)
 
 
+def parse_handle_string(handle: str) -> List[str]:
+    if handle.startswith('hdl:'):
+        handle = handle[4:]
+    try:
+        return handle.split('/', 1)
+    except ValueError as e:
+        raise HandleError(
+            'Handle must be a string in the form "{prefix}/{suffix}" or "hdl:{prefix}/{suffix}'
+        ) from e
+
+
 @dataclass
 class Handle:
     prefix: str
     suffix: str
-    url: str
+    url: str = None
+
+    @classmethod
+    def parse(cls, handle_string: str) -> 'Handle':
+        prefix, suffix = parse_handle_string(handle_string)
+        return cls(prefix=prefix, suffix=suffix)
 
     def __str__(self):
         return '/'.join((self.prefix, self.suffix))
@@ -28,6 +45,10 @@ class Handle:
         """The handle in `hdl:{prefix}/{suffix}` form"""
         return f'hdl:{self}'
 
+    @property
+    def has_url(self):
+        return self.url is not None
+
 
 class HandleServiceClient:
     def __init__(self, endpoint_url: str, jwt_token: str, default_prefix: str = None, default_repo: str = None):
@@ -36,50 +57,39 @@ class HandleServiceClient:
         self.default_prefix = default_prefix
         self.default_repo = default_repo
 
-    def _send_request(self, path: str, params: Dict[str, str]) -> Dict[str, Any]:
+    def resolve(self, handle: Handle) -> Optional[Handle]:
+        """Attempt to resolve the given handle. If successful, returns a new `Handle`
+        object with the `url` field populated. If the handle is not found, returns
+        `None`. For any other error response, raises a `HandleServerError`."""
+        path = f'/handles/{handle.prefix}/{handle.suffix}'
         url = self.endpoint_url + path
-        response = requests.get(url=url, params=params, auth=self.auth)
-        if not response.ok:
-            raise HandleServerError(str(response))
-        result = response.json()
-        logger.debug(result)
-        return result
-
-    def get_handle(self, handle: str, repo: str = None) -> Optional[Handle]:
-        if handle.startswith('hdl:'):
-            handle = handle[4:]
-        try:
-            prefix, suffix = handle.split('/', 1)
-        except ValueError as e:
-            raise HandleError(
-                'Handle must be a string in the form "{prefix}/{suffix}" or "hdl:{prefix}/{suffix}'
-            ) from e
-
-        result = self._send_request(
-            path='/handles/info',
-            params={
-                'repo': repo or self.default_repo,
-                'prefix': prefix,
-                'suffix': suffix,
-            },
-        )
-        if not result['exists']:
+        response = requests.get(url=url, auth=self.auth)
+        if response.status_code == HTTPStatus.NOT_FOUND:
             return None
-
+        elif not response.ok:
+            raise HandleServerError(str(response))
         return Handle(
-            prefix=prefix,
-            suffix=suffix,
-            url=result['url']
+            prefix=handle.prefix,
+            suffix=handle.suffix,
+            url=response.json().get('url', None),
         )
 
     def find_handle(self, repo_uri: str, repo: str = None) -> Optional[Handle]:
-        result = self._send_request(
-            path='/handles/exists',
+        url = self.endpoint_url + '/handles/exists'
+        response = requests.get(
+            url=url,
+            auth=self.auth,
             params={
                 'repo': repo or self.default_repo,
                 'repo_id': repo_uri,
             },
         )
+        if not response.ok:
+            raise HandleServerError(str(response))
+
+        result = response.json()
+        logger.debug(result)
+
         if not result['exists']:
             return None
 
@@ -131,6 +141,12 @@ class HandleError(Exception):
 
 class HandleServerError(HandleError):
     pass
+
+
+class HandleNotFoundError(HandleServerError):
+    def __init__(self, handle, *args):
+        super().__init__(*args)
+        self.handle = handle
 
 
 class HandleBearingResource(RDFResource):

@@ -28,9 +28,10 @@ def test_get_publication_status(obj, expected_status):
 
 # TODO: this should go into a common library
 class MockHandleClient:
-    def __init__(self, get_handle_lookup=None, find_handle_lookup=None):
+    def __init__(self, get_handle_lookup=None, find_handle_lookup=None, resolver=None):
         self.get_handle_lookup = get_handle_lookup or {}
         self.find_handle_lookup = find_handle_lookup or {}
+        self.resolver = resolver or {}
 
     FIND_HANDLE_LOOKUP = {
         # this fcrepo resource has a handle and its target
@@ -48,6 +49,9 @@ class MockHandleClient:
             url='http://fedora2-local/bar',
         ),
     }
+
+    def resolve(self, handle: Handle) -> Optional[Handle]:
+        return self.resolver.get(handle.hdl_uri, None)
 
     def get_handle(self, handle: str, _repo: str = None) -> Optional[Handle]:
         return self.get_handle_lookup.get(handle, None)
@@ -116,7 +120,7 @@ def mock_repo(endpoint):
     ]
 )
 def test_existing_handle(mock_repo, fcrepo_path, existing_handle, expected_suffix, expected_url):
-    mock_client = MockHandleClient(get_handle_lookup={existing_handle.hdl_uri: existing_handle})
+    mock_client = MockHandleClient(resolver={existing_handle.hdl_uri: existing_handle})
     resource = PublishableResource(
         repo=mock_repo(path=fcrepo_path, handle=existing_handle.hdl_uri),
         path=fcrepo_path

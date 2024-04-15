@@ -41,17 +41,18 @@ class PublishableResource(RepositoryResource):
 
             # check the handle service to see if there is a registered handle
             # if so, check the URL and update it to the fcrepo url if need be
-            handle = handle_client.get_handle(str(obj.handle.value))
+            handle = handle_client.resolve(Handle.parse(obj.handle.value))
             if handle is None:
                 logger.error(f'Unable to find expected handle {obj.handle.value} for {self.url} on the handle server')
                 raise RepositoryError(f'Unable to publish {self}')
 
-            logger.debug(f'Handle service returns handle: {handle.hdl_uri}')
+            logger.debug(f'Handle service resolves {handle.hdl_uri} to {handle.url}')
 
             # check target URL, and update if needed
             if handle.url != public_url:
                 logger.warning(f'Current target URL ({handle.url}) does not match the expected URL ({public_url})')
                 handle = handle_client.update_handle(handle, url=public_url)
+                logger.info(f'Updated {handle.hdl_uri} target URL to {public_url}')
         else:
             handle = handle_client.find_handle(repo_uri=self.url)
             if handle is None:

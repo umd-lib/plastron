@@ -42,9 +42,9 @@ def importcommand(
         limit = int(limit)
     message.body = message.body.encode('utf-8').decode('utf-8-sig')
     percentage = message.args.get('percent', None)
-    validate_only = strtobool(message.args.get('validate-only', 'false'))
-    publish = strtobool(message.args.get('publish', 'false'))
-    resume = strtobool(message.args.get('resume', 'false'))
+    validate_only = bool(strtobool(message.args.get('validate-only', 'false')))
+    publish = bool(strtobool(message.args.get('publish', 'false')))
+    resume = bool(strtobool(message.args.get('resume', 'false')))
     import_file = io.StringIO(message.body)
 
     # options that are saved to the config

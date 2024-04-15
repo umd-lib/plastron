@@ -155,9 +155,6 @@ class ImportRun:
         except JobError as e:
             raise RuntimeError(str(e)) from e
 
-        if metadata.has_binaries and self.job.config.binaries_location is None:
-            raise RuntimeError('Must specify --binaries-location if the metadata has a FILES and/or ITEM_FILES column')
-
         count = Counter(
             total_items=metadata.total,
             rows=0,
@@ -465,6 +462,13 @@ class ImportRow:
             results: ValidationResultsDict = self.item.validate()
         except ValidationError as e:
             raise RuntimeError(f'Unable to run validation: {e}') from e
+
+        # binaries_location is only required if there is a value in the
+        # "FILES" or "ITEM_FILES" column.
+        # This is to enable CSVs originally generated from an Archelon
+        # export job to be used as an import CSV file
+        if (self.row.has_files or self.row.has_item_files) and not self.job.config.binaries_location:
+            raise RuntimeError('Must specify --binaries-location if the metadata has a FILES and/or ITEM_FILES column')
 
         results['FILES'] = self.validate_files(self.row.filenames)
         results['ITEM_FILES'] = self.validate_files(self.row.item_filenames)

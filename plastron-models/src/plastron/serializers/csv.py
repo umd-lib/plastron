@@ -279,7 +279,12 @@ def unflatten(
                 if isinstance(descriptor, ObjectProperty):
                     params[attr].extend(URIRef(v) for v in values)
                 else:
-                    params[attr].extend(Literal(v, lang=column_header.language) for v in values)
+                    if descriptor.datatype is not None:
+                        if column_header.language is not None:
+                            raise RuntimeError('Cannot apply a language tag to a column with a defined datatype')
+                        params[attr].extend(Literal(v, datatype=descriptor.datatype) for v in values)
+                    else:
+                        params[attr].extend(Literal(v, lang=column_header.language) for v in values)
     return params
 
 

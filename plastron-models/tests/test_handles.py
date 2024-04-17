@@ -47,17 +47,7 @@ def test_get_handle_error(handle_client):
         status=HTTPStatus.BAD_REQUEST,
     )
     with pytest.raises(HandleServerError):
-        handle_client.get_handle('http://example.com/foobar')
-
-
-@httpretty.activate
-def test_get_handle_not_found(handle_client):
-    httpretty.register_uri(
-        httpretty.GET,
-        uri='http://handle-local:3000/handles/exists',
-        status=HTTPStatus.NOT_FOUND,
-    )
-    assert handle_client.get_handle('http://example.com/foobar') is None
+        handle_client.find_handle('http://example.com/foobar')
 
 
 @httpretty.activate
@@ -67,7 +57,7 @@ def test_get_handle_does_not_exist(handle_client):
         uri='http://handle-local:3000/handles/exists',
         body=json.dumps({'exists': False})
     )
-    assert handle_client.get_handle('http://example.com/foobar') is None
+    assert handle_client.find_handle('http://example.com/foobar') is None
 
 
 @httpretty.activate
@@ -77,7 +67,7 @@ def test_get_handle_exists(handle_client):
         uri='http://handle-local:3000/handles/exists',
         body=json.dumps({'exists': True, 'prefix': '1903.1', 'suffix': '123', 'url': 'http://example.com/foobar'})
     )
-    handle = handle_client.get_handle('http://example.com/foobar')
+    handle = handle_client.find_handle('http://example.com/foobar')
     assert handle.prefix == '1903.1'
     assert handle.suffix == '123'
     assert handle.url == 'http://example.com/foobar'

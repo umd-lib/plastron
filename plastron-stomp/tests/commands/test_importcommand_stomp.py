@@ -34,7 +34,7 @@ def mock_repo():
             },
             # expected args
             {
-                'repo': mock_repo,
+                'context': ANY,
                 'import_file': ANY,
                 'limit': None,
                 'percentage': None,
@@ -54,7 +54,7 @@ def mock_repo():
             },
             # expected args
             {
-                'repo': mock_repo,
+                'context': ANY,
                 'import_file': ANY,
                 'limit': None,
                 'percentage': None,

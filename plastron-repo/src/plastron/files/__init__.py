@@ -412,6 +412,7 @@ class FileSpec:
 @dataclass
 class FileGroup:
     rootname: str
+    label: str = None
     files: List[FileSpec] = field(default_factory=list)
 
     def __str__(self):

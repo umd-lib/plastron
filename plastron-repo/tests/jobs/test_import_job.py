@@ -4,10 +4,12 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from plastron.repo.publish import get_publication_status
+from plastron.context import PlastronContext
 from plastron.jobs import JobConfigError, Jobs
-from plastron.jobs.importjob import ImportConfig, ImportJob
-from plastron.repo import Repository, RepositoryResource
+from plastron.jobs.importjob import ImportConfig, ImportJob, PublishableObjectResource
+from plastron.namespaces import umdaccess
+from plastron.repo import Repository
+from plastron.repo.publish import get_publication_status
 
 
 @pytest.fixture
@@ -59,7 +61,9 @@ class MockContainer:
     def create_child(self, resource_class, description):
         self.obj = description
         self._resource_class = resource_class
-        return MagicMock(spec=RepositoryResource, url='/foo/bar')
+        mock_resource = MagicMock(spec=PublishableObjectResource, url='/foo/bar')
+        mock_resource.publish = lambda *args, **kwargs: self.obj.rdf_type.add(umdaccess.Published)
+        return mock_resource
 
 
 @pytest.fixture
@@ -72,6 +76,7 @@ def test_import_job_create_resource(import_file, jobs):
     mock_repo = MagicMock(spec=Repository)
     mock_repo.transaction.return_value = nullcontext()
     mock_repo.__getitem__.return_value = mock_container
+    mock_context = MagicMock(spec=PlastronContext, repo=mock_repo)
 
     expected_publication_statuses = [
         'Unpublished',
@@ -85,7 +90,7 @@ def test_import_job_create_resource(import_file, jobs):
         'Published',
     ]
     import_job = jobs.create_job(ImportJob, config=ImportConfig(job_id='123', model='Item'))
-    for i, stats in enumerate(import_job.run(repo=mock_repo, import_file=import_file.open())):
+    for i, stats in enumerate(import_job.run(context=mock_context, import_file=import_file.open())):
         assert mock_container.obj is not None
         assert get_publication_status(mock_container.obj) == expected_publication_statuses[i]
 
@@ -95,6 +100,7 @@ def test_import_job_create_resource_publish_all(import_file, jobs):
     mock_repo = MagicMock(spec=Repository)
     mock_repo.transaction.return_value = nullcontext()
     mock_repo.__getitem__.return_value = mock_container
+    mock_context = MagicMock(spec=PlastronContext, repo=mock_repo)
 
     expected_publication_statuses = [
         'Published',
@@ -108,7 +114,7 @@ def test_import_job_create_resource_publish_all(import_file, jobs):
         'Published',
     ]
     import_job = jobs.create_job(ImportJob, config=ImportConfig(job_id='123', model='Item'))
-    for i, stats in enumerate(import_job.run(repo=mock_repo, publish=True, import_file=import_file.open())):
+    for i, stats in enumerate(import_job.run(context=mock_context, publish=True, import_file=import_file.open())):
         assert mock_container.obj is not None
         assert get_publication_status(mock_container.obj) == expected_publication_statuses[i]
 

@@ -13,7 +13,9 @@ from bs4 import BeautifulSoup
 from rdflib import URIRef
 
 from plastron.client import ClientError
+from plastron.context import PlastronContext
 from plastron.files import BinarySource, ZipFileSource, RemoteFileSource, HTTPFileSource, LocalFileSource
+from plastron.handles import Handle
 from plastron.jobs import JobError, JobConfig, Job
 from plastron.jobs.importjob.spreadsheet import LineReference, MetadataSpreadsheet, InvalidRow, Row
 from plastron.models import get_model_class, ModelClassNotFoundError
@@ -21,8 +23,9 @@ from plastron.models.annotations import FullTextAnnotation, TextualBody
 from plastron.namespaces import umdaccess, sc
 from plastron.rdf.pcdm import File, PreservationMasterFile
 from plastron.rdfmapping.validation import ValidationResultsDict, ValidationResult, ValidationSuccess, ValidationFailure
-from plastron.repo import Repository, RepositoryError, ContainerResource
+from plastron.repo import RepositoryError, ContainerResource
 from plastron.repo.pcdm import PCDMObjectResource
+from plastron.repo.publish import PublishableResource
 from plastron.utils import datetimestamp, ItemLog
 from plastron.validation import ValidationError
 
@@ -104,7 +107,7 @@ class ImportRun:
 
     def run(
             self,
-            repo: Repository,
+            context: PlastronContext,
             limit: int = None,
             percentage: int = None,
             validate_only: bool = False,
@@ -178,7 +181,7 @@ class ImportRun:
                 continue
 
             logger.debug(f'Row data: {row.data}')
-            import_row = ImportRow(self.job, repo, row, validate_only, publish)
+            import_row = ImportRow(self.job, context, row, validate_only, publish)
 
             # count the number of files referenced in this row
             count['files'] += len(row.filenames)
@@ -339,7 +342,7 @@ class ImportJob(Job):
 
     def run(
             self,
-            repo: Repository,
+            context: PlastronContext,
             limit: int = None,
             percentage: int = None,
             validate_only: bool = False,
@@ -348,7 +351,7 @@ class ImportJob(Job):
     ) -> Generator[Dict[str, Any], None, Dict[str, Any]]:
         run = self.new_run()
         return run(
-            repo=repo,
+            context=context,
             limit=limit,
             percentage=percentage,
             validate_only=validate_only,
@@ -376,9 +379,6 @@ class ImportJob(Job):
             return self.config.extract_text_types.split(',')
         else:
             return []
-
-    def get_import_row(self, repo: Repository, row: Row):
-        return ImportRow(self, repo, row)
 
     def get_source(self, base_location: str, path: str) -> BinarySource:
         """
@@ -439,14 +439,27 @@ class ImportJob(Job):
         return file_class.from_source(title=basename(filename), source=source)
 
 
+class PublishableObjectResource(PCDMObjectResource, PublishableResource):
+    pass
+
+
 class ImportRow:
-    def __init__(self, job: ImportJob, repo: Repository, row: Row, validate_only: bool = False, publish: bool = False):
+    def __init__(
+            self,
+            job: ImportJob,
+            context: PlastronContext,
+            row: Row,
+            validate_only: bool = False,
+            publish: bool = None,
+    ):
         self.job = job
         self.row = row
-        self.repo = repo
-        self.item = row.get_object(repo, read_from_repo=not validate_only)
-        if publish:
-            self.item.rdf_type.add(umdaccess.Published)
+        self.context = context
+        self.item = row.get_object(context.repo, read_from_repo=not validate_only)
+        if publish is not None:
+            self._publish = publish
+        else:
+            self._publish = row.publish
 
     def __str__(self):
         return str(self.row.line_reference)
@@ -505,9 +518,12 @@ class ImportRow:
             # construct the SPARQL Update query if there are any deletions or insertions
             # then do a PATCH update of an existing item
             try:
-                resource = self.repo[self.item.uri:PCDMObjectResource].read()
+                resource: PublishableObjectResource = self.context.repo[self.item.uri:PublishableObjectResource].read()
                 resource.attach_description(self.item)
                 resource.update()
+                # publish this resource, if requested
+                if self._publish:
+                    self.publish(resource)
             except RepositoryError as e:
                 raise JobError(f'Updating item failed: {e}') from e
 
@@ -518,7 +534,13 @@ class ImportRow:
             logger.info(f'No changes found for "{self.item}" ({self.item.uri}); skipping')
             return ImportedItemStatus.UNCHANGED
 
-    def create_resource(self) -> PCDMObjectResource:
+    def publish(self, resource: PublishableObjectResource) -> Handle:
+        return resource.publish(
+            handle_client=self.context.handle_client,
+            public_url=self.context.get_public_url(resource.url),
+        )
+
+    def create_resource(self) -> PublishableObjectResource:
         """Create a new item in the repository."""
 
         # if an item is new, don't construct a SPARQL Update query
@@ -543,15 +565,15 @@ class ImportRow:
             annotate_from_files(self.item, self.job.extract_text_types)
 
         logger.debug(f"Creating resources in container: {self.job.config.container}")
-        logger.debug(f'Repo: {self.repo}')
-        container: ContainerResource = self.repo[self.job.config.container:ContainerResource]
+        logger.debug(f'Repo: {self.context.repo}')
+        container: ContainerResource = self.context.repo[self.job.config.container:ContainerResource]
 
         try:
-            with self.repo.transaction():
+            with self.context.repo.transaction():
                 # create the main resource
                 logger.debug(f'Creating main resource for "{self.item}"')
                 resource = container.create_child(
-                    resource_class=PCDMObjectResource,
+                    resource_class=PublishableObjectResource,
                     description=self.item,
                 )
                 # add pages and files to those pages
@@ -567,6 +589,10 @@ class ImportRow:
                     for filename in self.row.item_filenames:
                         source = self.job.get_source(self.job.config.binaries_location, filename)
                         resource.create_file(source=source)
+
+                # publish this resource, if requested
+                if self._publish:
+                    self.publish(resource)
 
         except ClientError as e:
             raise JobError(self.job, f'Creating item failed: {e}', e.response.text) from e

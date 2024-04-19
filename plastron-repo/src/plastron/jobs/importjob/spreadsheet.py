@@ -4,6 +4,7 @@ import re
 from collections import defaultdict, OrderedDict
 from collections.abc import Sized, Container
 from dataclasses import dataclass
+from itertools import chain
 from os.path import splitext, basename
 from pathlib import Path
 from typing import Optional, Dict, List, Tuple, Union, Mapping, Type, Iterator, NamedTuple, Protocol
@@ -210,6 +211,7 @@ class Row:
         self.data = data
         self.identifier_column = identifier_column
         self._file_groups = build_file_groups(self.data.get('FILES', ''))
+        self._filenames = list(chain(*[group.filenames for group in self._file_groups.values()]))
 
     def __getitem__(self, item):
         return self.data[item]
@@ -271,7 +273,7 @@ class Row:
 
     @property
     def filenames(self):
-        return self.data['FILES'].strip().split(';') if self.has_files else []
+        return self._filenames
 
     @property
     def file_groups(self):

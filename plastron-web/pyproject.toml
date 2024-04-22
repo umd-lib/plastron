@@ -1,6 +1,6 @@
 [project]
 name = "plastron-web"
-version = "4.2.0-dev"
+version = "4.2.0-dev1"
 requires-python = ">= 3.8"
 dependencies = [
     "click",

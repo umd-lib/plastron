@@ -236,24 +236,23 @@ class PCDMObjectResource(PCDMFileBearingResource, AggregationResource):
             self.repo.create(resource_class=ContainerResource, url=self.members_container.url)
 
         parent = self.describe(PCDMObject)
-        title = get_new_member_title(parent, file_group.rootname, number)
-        logger.info(f'Creating page {number} for {parent} as "{title}"')
+        logger.info(f'Creating page {number} as "{file_group.label}"')
         page_resource = self.members_container.create_child(
             resource_class=PCDMPageResource,
             slug=slug,
-            description=Page(title=title, number=Literal(number), member_of=parent),
+            description=Page(title=Literal(file_group.label), number=Literal(number), member_of=parent),
         )
         parent.has_member.add(URIRef(page_resource.url))
         for file_spec in file_group.files:
             page_resource.create_file(source=file_spec.source)
         self.update()
         self.member_urls.add(page_resource.url)
-        logger.debug(f'Created page: {page_resource.url} {title}')
+        logger.debug(f'Created page {number}: {page_resource.url} "{file_group.label}"')
         return page_resource
 
     def create_page_sequence(self, file_groups: Dict[str, FileGroup]):
         def create_pages() -> Iterator[PCDMObject]:
-            for n, (rootname, file_group) in enumerate(file_groups.items(), 1):
+            for n, file_group in enumerate(file_groups.values(), 1):
                 page_resource = self.create_page(number=n, file_group=file_group)
                 yield page_resource.read().describe(Page)
 

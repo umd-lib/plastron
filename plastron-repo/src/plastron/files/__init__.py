@@ -412,8 +412,13 @@ class FileSpec:
 @dataclass
 class FileGroup:
     rootname: str
+    label: str = None
     files: List[FileSpec] = field(default_factory=list)
 
     def __str__(self):
         extensions = list(map(lambda f: str(f).replace(self.rootname, ''), self.files))
         return f'{self.rootname}{{{",".join(extensions)}}}'
+
+    @property
+    def filenames(self) -> List[str]:
+        return [file.name for file in self.files]

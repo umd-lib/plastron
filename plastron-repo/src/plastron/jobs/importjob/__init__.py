@@ -17,7 +17,7 @@ from plastron.context import PlastronContext
 from plastron.files import BinarySource, ZipFileSource, RemoteFileSource, HTTPFileSource, LocalFileSource
 from plastron.handles import Handle
 from plastron.jobs import JobError, JobConfig, Job
-from plastron.jobs.importjob.spreadsheet import LineReference, MetadataSpreadsheet, InvalidRow, Row
+from plastron.jobs.importjob.spreadsheet import LineReference, MetadataSpreadsheet, InvalidRow, Row, MetadataError
 from plastron.models import get_model_class, ModelClassNotFoundError
 from plastron.models.annotations import FullTextAnnotation, TextualBody
 from plastron.namespaces import umdaccess, sc
@@ -338,7 +338,10 @@ class ImportJob(Job):
         })
 
     def get_metadata(self) -> MetadataSpreadsheet:
-        return MetadataSpreadsheet(metadata_filename=self.metadata_filename, model_class=self.model_class)
+        try:
+            return MetadataSpreadsheet(metadata_filename=self.metadata_filename, model_class=self.model_class)
+        except MetadataError as e:
+            raise JobError(job=self) from e
 
     def run(
             self,

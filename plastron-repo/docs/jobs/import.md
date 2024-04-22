@@ -142,3 +142,46 @@ imported during the first run of the job.
 
 If you specify a percentage that would generate a subset larger than the number
 of remaining items, Plastron will import all the remaining items.
+
+## Metadata Spreadsheet
+
+### `FILES` column format
+
+In the metadata spreadsheet CSV file, the `FILES` column (if present) 
+specifies both the binary files that should be included with the object, 
+and also their ordering into a sequence of member objects of the main object.
+
+* The `FILES` column of an import spreadsheet may have zero or more 
+  relpaths (relative paths), separated by semicolons (e.g., 
+  `ex-99/ex-99-0001.tif;ex-99/ex-99-0001.jpg;ex-99/ex-99-0002.tif;ex-99/ex-99-0002.jpg`)
+* A relpath is a relative path to an individual file (e.g., 
+  `ex-99/ex-99-0001.tif`)
+* The filename is the right-most segment of the relpath (e.g., 
+  `ex-99-0001.tif`)
+* The basename is the filename, excluding the file extension and its period 
+  separator (e.g., `ex-99-0001`)
+* All relpaths that share a basename are considered to be part of a single 
+  file group
+* Each file group corresponds to one member object
+* Each relpath within a file group will be used to create a `pcdm:File` 
+  object for that file group's member object
+* The member objects will be added to a sequence in the order in which 
+  their basename first occurs in the `FILES` field
+
+By default, the member objects have titles of the form "Page 1" to "Page 
+N". You may also specify custom labels in the relpath list to get custom 
+titles on the member objects.
+
+* A relpath may have an initial string followed by a colon; this is a label 
+  for the page for files in its file group (e.g.,
+  `Front Cover:ex-99/ex-99-0001.tif`)
+* If using a label, only one relpath in a file group is required to have that 
+  label
+* If more than one relpath from a single file group has a label, those labels 
+  must match; mismatched labels will cause the validation of the item to fail
+* If at least one relpath has a label, then each file group must have at 
+  least one relpath with a label; otherwise this will cause validation of 
+  the item to fail
+* If no relpaths have labels, the default behavior of assigning the labels 
+  "Page 1" through "Page N" based on the document order of the relpaths 
+  will be used

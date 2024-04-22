@@ -4,6 +4,7 @@ import re
 from collections import defaultdict, OrderedDict
 from collections.abc import Sized, Container
 from dataclasses import dataclass
+from itertools import chain
 from os.path import splitext, basename
 from pathlib import Path
 from typing import Optional, Dict, List, Tuple, Union, Mapping, Type, Iterator, NamedTuple, Protocol
@@ -13,7 +14,6 @@ from rdflib import URIRef, Literal
 from rdflib.util import from_n3
 
 from plastron.files import FileSpec, FileGroup
-from plastron.jobs import JobError
 from plastron.namespaces import get_manager
 from plastron.rdfmapping.descriptors import Property, DataProperty
 from plastron.rdfmapping.embed import EmbeddedObject
@@ -36,7 +36,7 @@ class ColumnSpec:
     datatype: Optional[URIRef] = None
 
 
-class MetadataError(JobError):
+class MetadataError(Exception):
     pass
 
 
@@ -135,11 +135,34 @@ def build_file_groups(filenames_string: str) -> Dict[str, FileGroup]:
     if filenames_string.strip() == '':
         return file_groups
     for filename in filenames_string.split(';'):
+        if ':' in filename:
+            label, filename = filename.split(':', 1)
+        else:
+            label = None
         root, ext = splitext(basename(filename))
         if root not in file_groups:
-            file_groups[root] = FileGroup(rootname=root)
+            file_groups[root] = FileGroup(rootname=root, label=label)
+        file_group = file_groups[root]
+        if label is not None:
+            if file_group.label is not None:
+                if file_group.label != label:
+                    raise MetadataError(f'Multiple files with rootname "{root}" have differing labels')
+            else:
+                file_group.label = label
+
         file_groups[root].files.append(FileSpec(name=filename))
-    logger.debug(f'Found {len(file_groups.keys())} unique file basename(s)')
+
+    labels = [g.label for g in file_groups.values()]
+    if any(label is not None for label in labels) and not all(label is not None for label in labels):
+        raise MetadataError('If any file group has a label, all file groups must have a label')
+    elif all(label is None for label in labels):
+        # no explicit labels, default to "Page 1" to "Page N"
+        logger.info('No explicit page labels given, using default "Page 1" to "Page N"')
+        for i, group in enumerate(file_groups.values(), 1):
+            group.label = f'Page {i}'
+            labels[i - 1] = group.label
+    logger.debug(f'Found {len(file_groups)} unique file basename(s)')
+    logger.debug(f'File group labels: {labels}')
     return file_groups
 
 
@@ -188,6 +211,7 @@ class Row:
         self.data = data
         self.identifier_column = identifier_column
         self._file_groups = build_file_groups(self.data.get('FILES', ''))
+        self._filenames = list(chain(*[group.filenames for group in self._file_groups.values()]))
 
     def __getitem__(self, item):
         return self.data[item]
@@ -249,7 +273,7 @@ class Row:
 
     @property
     def filenames(self):
-        return self.data['FILES'].strip().split(';') if self.has_files else []
+        return self._filenames
 
     @property
     def file_groups(self):

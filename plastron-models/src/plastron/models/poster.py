@@ -4,7 +4,8 @@ from plastron.models.pcdm import PCDMObject
 from plastron.namespaces import bibo, dcterms, dc, edm, geo, ore, schema, umd, umdtype
 from plastron.rdfmapping.decorators import rdf_type
 from plastron.rdfmapping.descriptors import ObjectProperty, DataProperty, Property
-from plastron.validation.rules import is_edtf_formatted, is_handle, is_from_vocabulary
+from plastron.validation.rules import is_edtf_formatted, is_handle
+from plastron.validation.vocabularies import Vocabulary
 
 
 @rdf_type(bibo.Image, umd.Poster)
@@ -31,7 +32,7 @@ class Poster(PCDMObject):
     rights = ObjectProperty(dcterms.rights, required=True)
     terms_of_use = ObjectProperty(
         dcterms.license,
-        validate=is_from_vocabulary('http://vocab.lib.umd.edu/termsOfUse#')
+        values_from=Vocabulary('http://vocab.lib.umd.edu/termsOfUse#'),
     )
     copyright_notice = DataProperty(schema.copyrightNotice)
     identifier = DataProperty(dcterms.identifier, required=True)
@@ -40,7 +41,7 @@ class Poster(PCDMObject):
     presentation_set = ObjectProperty(
         ore.isAggregatedBy,
         repeatable=True,
-        validate=is_from_vocabulary('http://vocab.lib.umd.edu/set#'),
+        values_from=Vocabulary('http://vocab.lib.umd.edu/set#'),
     )
 
     HEADER_MAP = {

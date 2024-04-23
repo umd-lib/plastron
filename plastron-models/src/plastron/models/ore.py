@@ -7,12 +7,12 @@ from plastron.rdfmapping.resources import RDFResource, RDFResourceBase
 @rdf_type(ore.Proxy)
 class Proxy(RDFResource):
     title = DataProperty(dcterms.title)
-    prev = ObjectProperty(iana.prev, cls='Proxy')
+    prev = ObjectProperty(iana.prev)
     next = ObjectProperty(iana.next, cls='Proxy')
-    proxy_for = ObjectProperty(ore.proxyFor, cls=RDFResourceBase)
-    proxy_in = ObjectProperty(ore.proxyIn, cls=RDFResourceBase)
+    proxy_for = ObjectProperty(ore.proxyFor)
+    proxy_in = ObjectProperty(ore.proxyIn)
 
 
 class AggregationMixin(RDFResourceBase):
     first = ObjectProperty(iana.first, cls=Proxy)
-    last = ObjectProperty(iana.last, cls=Proxy)
+    last = ObjectProperty(iana.last)

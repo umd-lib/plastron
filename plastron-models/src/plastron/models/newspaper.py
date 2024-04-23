@@ -6,7 +6,8 @@ from plastron.namespaces import bibo, carriers, dc, dcterms, fabio, ndnp, ore, p
 from plastron.rdf.ocr import ALTOResource
 from plastron.rdfmapping.decorators import rdf_type
 from plastron.rdfmapping.descriptors import DataProperty, ObjectProperty
-from plastron.validation.rules import is_handle, is_iso_8601_date, is_from_vocabulary
+from plastron.validation.rules import is_handle, is_iso_8601_date
+from plastron.validation.vocabularies import Vocabulary
 
 
 @rdf_type(bibo.Issue, umd.Newspaper)
@@ -21,12 +22,12 @@ class Issue(PCDMObject):
     presentation_set = ObjectProperty(
         ore.isAggregatedBy,
         repeatable=True,
-        validate=is_from_vocabulary('http://vocab.lib.umd.edu/set#'),
+        values_from=Vocabulary('http://vocab.lib.umd.edu/set#'),
     )
     copyright_notice = DataProperty(schema.copyrightNotice)
     terms_of_use = ObjectProperty(
         dcterms.license,
-        validate=is_from_vocabulary('http://vocab.lib.umd.edu/termsOfUse#')
+        values_from=Vocabulary('http://vocab.lib.umd.edu/termsOfUse#')
     )
 
     HEADER_MAP = {

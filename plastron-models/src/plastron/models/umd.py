@@ -1,10 +1,12 @@
 from plastron.handles import HandleBearingResource
+from plastron.models.authorities import Agent, Subject, Place, VocabularyTerm
 from plastron.models.pcdm import PCDMObject
-from plastron.namespaces import dc, dcterms, edm, rdfs, owl, fabio, pcdm, ore, schema, umdtype, umd
+from plastron.namespaces import dc, dcterms, edm, fabio, pcdm, ore, schema, umdtype, umd
 from plastron.rdfmapping.decorators import rdf_type
 from plastron.rdfmapping.descriptors import ObjectProperty, DataProperty
 from plastron.rdfmapping.resources import RDFResource
-from plastron.validation.rules import is_edtf_formatted, is_valid_iso639_code, is_from_vocabulary
+from plastron.validation.rules import is_edtf_formatted, is_valid_iso639_code
+from plastron.validation.vocabularies import Vocabulary
 
 
 @rdf_type(pcdm.Object)
@@ -14,49 +16,59 @@ class Stub(RDFResource):
     member_of = ObjectProperty(pcdm.memberOf)
 
 
-class LabeledThing(RDFResource):
-    label = DataProperty(rdfs.label, required=True)
-    same_as = ObjectProperty(owl.sameAs)
+@rdf_type(pcdm.Collection)
+class AdminSet(RDFResource):
+    title = DataProperty(dcterms.title, required=True)
 
 
 @rdf_type(umd.Item)
 class Item(PCDMObject, HandleBearingResource):
+    member_of = ObjectProperty(pcdm.memberOf, cls=AdminSet)
     object_type = ObjectProperty(
         dcterms.type,
         required=True,
-        validate=is_from_vocabulary('http://purl.org/dc/dcmitype/'),
+        values_from=Vocabulary('http://purl.org/dc/dcmitype/'),
+        cls=VocabularyTerm,
     )
     identifier = DataProperty(dcterms.identifier, required=True, repeatable=True)
     rights = ObjectProperty(
         dcterms.rights,
         required=True,
-        validate=is_from_vocabulary('http://vocab.lib.umd.edu/rightsStatement#'),
+        values_from=Vocabulary('http://vocab.lib.umd.edu/rightsStatement#'),
+        cls=VocabularyTerm,
     )
     title = DataProperty(dcterms.title, required=True)
-    format = ObjectProperty(edm.hasType, validate=is_from_vocabulary('http://vocab.lib.umd.edu/form#'))
+    format = ObjectProperty(
+        edm.hasType,
+        values_from=Vocabulary('http://vocab.lib.umd.edu/form#'),
+        cls=VocabularyTerm,
+    )
     archival_collection = ObjectProperty(
         dcterms.isPartOf,
-        validate=is_from_vocabulary('http://vocab.lib.umd.edu/collection#'),
+        values_from=Vocabulary('http://vocab.lib.umd.edu/collection#'),
+        cls=VocabularyTerm,
     )
     presentation_set = ObjectProperty(
         ore.isAggregatedBy,
         repeatable=True,
-        validate=is_from_vocabulary('http://vocab.lib.umd.edu/set#'),
+        values_from=Vocabulary('http://vocab.lib.umd.edu/set#'),
+        cls=VocabularyTerm,
     )
     date = DataProperty(dc.date, validate=is_edtf_formatted)
     description = DataProperty(dcterms.description)
     alternate_title = DataProperty(dcterms.alternative, repeatable=True)
-    creator = ObjectProperty(dcterms.creator, repeatable=True, embed=True, cls=LabeledThing)
-    contributor = ObjectProperty(dcterms.contributor, repeatable=True, embed=True, cls=LabeledThing)
-    publisher = ObjectProperty(dcterms.publisher, repeatable=True, embed=True, cls=LabeledThing)
-    location = ObjectProperty(dcterms.spatial, repeatable=True, embed=True, cls=LabeledThing)
+    creator = ObjectProperty(dcterms.creator, repeatable=True, embed=True, cls=Agent)
+    contributor = ObjectProperty(dcterms.contributor, repeatable=True, embed=True, cls=Agent)
+    publisher = ObjectProperty(dcterms.publisher, repeatable=True, embed=True, cls=Agent)
+    location = ObjectProperty(dcterms.spatial, repeatable=True, embed=True, cls=Place)
     extent = DataProperty(dcterms.extent, repeatable=True)
-    subject = ObjectProperty(dcterms.subject, repeatable=True, embed=True, cls=LabeledThing)
+    subject = ObjectProperty(dcterms.subject, repeatable=True, embed=True, cls=Subject)
     language = DataProperty(dc.language, repeatable=True, validate=is_valid_iso639_code)
-    rights_holder = ObjectProperty(dcterms.rightsHolder, repeatable=True, embed=True, cls=LabeledThing)
+    rights_holder = ObjectProperty(dcterms.rightsHolder, repeatable=True, embed=True, cls=Agent)
     terms_of_use = ObjectProperty(
         dcterms.license,
-        validate=is_from_vocabulary('http://vocab.lib.umd.edu/termsOfUse#')
+        values_from=Vocabulary('http://vocab.lib.umd.edu/termsOfUse#'),
+        cls=VocabularyTerm,
     )
     copyright_notice = DataProperty(schema.copyrightNotice)
     bibliographic_citation = DataProperty(dcterms.bibliographicCitation)

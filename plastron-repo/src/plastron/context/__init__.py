@@ -4,6 +4,7 @@ from argparse import Namespace
 from contextlib import contextmanager
 from dataclasses import dataclass
 from importlib.metadata import version
+from string import Formatter
 from typing import Dict, Any, Optional
 
 import pysolr
@@ -11,7 +12,8 @@ import pysolr
 from plastron.client import Endpoint, Client, RepositoryStructure
 from plastron.client.auth import get_authenticator
 from plastron.handles import HandleServiceClient
-from plastron.repo import Repository
+from plastron.models.fedora import FedoraResource
+from plastron.repo import Repository, RepositoryResource, RepositoryError
 from plastron.stomp.broker import Broker, ServerTuple
 
 UUID_REGEX = re.compile(r'([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})', re.IGNORECASE)
@@ -129,14 +131,42 @@ class PlastronContext:
 
         return self._handle_client
 
-    def get_public_url(self, repo_uri: str) -> str:
+    def get_public_url(self, resource: RepositoryResource) -> str:
+        """Given a `RepositoryResource`, use the configuration value `PUBLICATION_WORKFLOW.PUBLIC_URL_PATTERN`
+        to generate a URL. The pattern may use the Python formatting string syntax to insert
+        resource-specific values into the string. Available fields are:
+
+        * `path`: the full repository path to the resource
+        * `container_path`: the repository path to the resource's parent container
+        * `relpath`: same as `container_path`, but omits the leading "/"
+        * `uuid`: the UUID portion of the resource's path
+
+        If one of these fields is requested by the pattern, but the context is unable to get a value
+        for that field, raises a `RuntimeError`. If there is not a public URL pattern config value,
+        raises a `RuntimeError`."""
         try:
             public_url_pattern = self.config.get('PUBLICATION_WORKFLOW', {})['PUBLIC_URL_PATTERN']
         except KeyError as e:
             raise RuntimeError(f"Missing configuration key {e} in section 'PUBLICATION_WORKFLOW'")
 
-        uuid = get_uuid_from_uri(repo_uri)
-        if uuid is None:
-            raise RuntimeError(f'Cannot create public URL; unable to find UUID in {repo_uri}')
+        formatter = Formatter()
+        field_names = {name for _, name, *_ in formatter.parse(public_url_pattern) if name != ''}
+        data = {}
 
-        return public_url_pattern.format(uuid=uuid.lower())
+        if 'path' in field_names:
+            data['path'] = self.endpoint.repo_path(resource.url)
+
+        if 'container_path' in field_names or 'relpath' in field_names:
+            try:
+                data['container_path'] = self.endpoint.repo_path(resource.describe(FedoraResource).parent.value)
+                data['relpath'] = data['container_path'].lstrip('/')
+            except RepositoryError as e:
+                raise RuntimeError(f'Unable to retrieve container path for {resource.url}') from e
+
+        if 'uuid' in field_names:
+            uuid = get_uuid_from_uri(resource.url)
+            if uuid is None:
+                raise RuntimeError(f'Cannot create public URL; unable to find UUID in {resource.url}')
+            data['uuid'] = uuid.lower()
+
+        return public_url_pattern.format(**data)

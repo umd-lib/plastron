@@ -24,7 +24,7 @@ def new_activity():
             if activity.publish:
                 resource.publish(
                     handle_client=ctx.handle_client,
-                    public_url=ctx.get_public_url(uri),
+                    public_url=ctx.get_public_url(resource),
                     force_hidden=activity.force_hidden,
                     force_visible=False,
                 )

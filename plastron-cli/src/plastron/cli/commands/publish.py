@@ -58,7 +58,7 @@ def publish(ctx, uris: Iterable[str], force_hidden: bool = False, force_visible:
         try:
             handle = resource.publish(
                 handle_client=ctx.obj.handle_client,
-                public_url=ctx.obj.get_public_url(uri),
+                public_url=ctx.obj.get_public_url(resource),
                 force_hidden=force_hidden,
                 force_visible=force_visible,
             )

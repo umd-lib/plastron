@@ -533,7 +533,7 @@ class ImportRow:
     def publish(self, resource: PublishableObjectResource) -> Handle:
         return resource.publish(
             handle_client=self.context.handle_client,
-            public_url=self.context.get_public_url(resource.url),
+            public_url=self.context.get_public_url(resource),
         )
 
     def create_resource(self) -> PublishableObjectResource:

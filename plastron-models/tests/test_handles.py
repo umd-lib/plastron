@@ -4,13 +4,13 @@ import httpretty
 import pytest
 from rdflib import Literal
 
-from plastron.handles import Handle, HandleBearingResource, HandleServerError, HandleServiceClient
+from plastron.handles import HandleBearingResource, HandleServerError, HandleServiceClient, HandleInfo
 from plastron.namespaces import umdtype
 
 
 @pytest.fixture
 def handle():
-    return Handle(prefix='1903.1', suffix='123', url='http://example.com/foobar')
+    return HandleInfo(exists=True, prefix='1903.1', suffix='123', url='http://example.com/foobar')
 
 
 def test_handle_attributes(handle):
@@ -57,7 +57,7 @@ def test_get_handle_does_not_exist(handle_client):
         uri='http://handle-local:3000/handles/exists',
         body=json.dumps({'exists': False})
     )
-    assert handle_client.find_handle('http://example.com/foobar') is None
+    assert not handle_client.find_handle('http://example.com/foobar').exists
 
 
 @httpretty.activate
@@ -82,7 +82,7 @@ def test_create_handle_success(handle_client):
             {'suffix': '123', 'request': {'url': 'http://example.com/foobar', 'prefix': '1903.1'}}
         )
     )
-    handle = handle_client.create_handle(repo_uri='http://localhost/fcrepo/foobar', url='http://example.com/foobar')
+    handle = handle_client.create_handle(repo_id='http://localhost/fcrepo/foobar', url='http://example.com/foobar')
     assert handle.prefix == '1903.1'
     assert handle.suffix == '123'
     assert handle.url == 'http://example.com/foobar'
@@ -96,7 +96,7 @@ def test_create_handle_error(handle_client):
         status=HTTPStatus.BAD_REQUEST,
     )
     with pytest.raises(HandleServerError):
-        handle_client.create_handle(repo_uri='http://localhost/fcrepo/foobar', url='http://example.com/foobar')
+        handle_client.create_handle(repo_id='http://localhost/fcrepo/foobar', url='http://example.com/foobar')
 
 
 @httpretty.activate
@@ -104,8 +104,11 @@ def test_update_handle(handle, handle_client):
     httpretty.register_uri(
         httpretty.PATCH,
         uri='http://handle-local:3000/handles/1903.1/123',
+        body=json.dumps(
+            {'suffix': '123', 'request': {'url': 'http://example.com/foobar', 'prefix': '1903.1'}}
+        )
     )
-    updated_handle = handle_client.update_handle(handle=handle, url='http://example.com/new-url')
+    updated_handle = handle_client.update_handle(handle_info=handle, url='http://example.com/new-url')
     assert updated_handle.url == 'http://example.com/new-url'
 
 
@@ -117,4 +120,4 @@ def test_update_handle_error(handle, handle_client):
         status=HTTPStatus.BAD_REQUEST,
     )
     with pytest.raises(HandleServerError):
-        handle_client.update_handle(handle=handle, url='http://example.com/new-url')
+        handle_client.update_handle(handle_info=handle, url='http://example.com/new-url')

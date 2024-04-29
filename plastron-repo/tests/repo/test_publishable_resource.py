@@ -1,12 +1,11 @@
 import dataclasses
 from random import randint
-from typing import Optional
 from unittest.mock import MagicMock
 
 import pytest
 
 from plastron.client import Endpoint, Client, TypedText
-from plastron.handles import Handle, HandleServerError
+from plastron.handles import HandleInfo, HandleServerError
 from plastron.namespaces import umdaccess
 from plastron.rdfmapping.resources import RDFResource
 from plastron.repo import Repository, RepositoryError
@@ -28,45 +27,64 @@ def test_get_publication_status(obj, expected_status):
 
 # TODO: this should go into a common library
 class MockHandleClient:
-    def __init__(self, get_handle_lookup=None, find_handle_lookup=None, resolver=None):
-        self.get_handle_lookup = get_handle_lookup or {}
-        self.find_handle_lookup = find_handle_lookup or {}
-        self.resolver = resolver or {}
+    default_repo = 'fcrepo'
 
+    GET_HANDLE_LOOKUP = {
+        # existing handle with fcrepo target URL
+        '1903.1/123': HandleInfo(
+            exists=True,
+            prefix='1903.1',
+            suffix='123',
+            url='http://digital-local/foo',
+        ),
+        # existing handle with fedora2 target URL
+        # if publishing the resource with this handle,
+        # should call the handle server to update the
+        # target URL
+        '1903.1/456': HandleInfo(
+            exists=True,
+            prefix='1903.1',
+            suffix='456',
+            url='http://fedora2-local/bar',
+        ),
+        # there is no handle with this prefix/suffix pair
+        '1903.1/789': HandleInfo(
+            exists=False,
+        ),
+    }
     FIND_HANDLE_LOOKUP = {
         # this fcrepo resource has a handle and its target
         # URL points to the correct public URL
-        'http://fcrepo-local:8080/fcrepo/rest/foo': Handle(
+        'http://fcrepo-local:8080/fcrepo/rest/foo': HandleInfo(
+            exists=True,
             prefix='1903.1',
             suffix='123',
             url='http://digital-local/foo',
         ),
         # this fcrepo resource has a handle and its target
         # URL needs to be updated to the correct public URL
-        'http://fcrepo-local:8080/fcrepo/rest/bar': Handle(
+        'http://fcrepo-local:8080/fcrepo/rest/bar': HandleInfo(
+            exists=True,
             prefix='1903.1',
             suffix='456',
             url='http://fedora2-local/bar',
         ),
     }
 
-    def resolve(self, handle: Handle) -> Optional[Handle]:
-        return self.resolver.get(handle.hdl_uri, None)
+    def get_info(self, prefix: str, suffix: str) -> HandleInfo:
+        return self.GET_HANDLE_LOOKUP.get(f'{prefix}/{suffix}', HandleInfo(exists=False))
 
-    def get_handle(self, handle: str, _repo: str = None) -> Optional[Handle]:
-        return self.get_handle_lookup.get(handle, None)
-
-    def find_handle(self, repo_uri: str, _repo: str = None) -> Optional[Handle]:
-        return self.find_handle_lookup.get(repo_uri, None)
+    def find_handle(self, repo_id: str, _repo: str = None) -> HandleInfo:
+        return self.FIND_HANDLE_LOOKUP.get(repo_id, HandleInfo(exists=False))
 
     @staticmethod
-    def create_handle(repo_uri: str, url: str, prefix: str = '1903.1', _repo: str = None) -> Handle:
-        if repo_uri.endswith('NO_HANDLE'):
-            raise HandleServerError()
-        return Handle(prefix=prefix, suffix=str(randint(1000, 10000)), url=url)
+    def create_handle(repo_id: str, url: str, prefix: str = None, _repo: str = None) -> HandleInfo:
+        if repo_id.endswith('NO_HANDLE'):
+            raise HandleServerError('no handle')
+        return HandleInfo(exists=True, prefix=prefix, suffix=str(randint(1000, 10000)), url=url)
 
     @staticmethod
-    def update_handle(handle: Handle, **fields) -> Handle:
+    def update_handle(handle: HandleInfo, **fields) -> HandleInfo:
         return dataclasses.replace(handle, **fields)
 
 
@@ -105,7 +123,7 @@ def mock_repo(endpoint):
         # existing handle with fcrepo target URL
         (
             '/foo',
-            Handle(prefix='1903.1', suffix='123', url='http://digital-local/foo'),
+            HandleInfo(exists=True, prefix='1903.1', suffix='123', url='http://digital-local/foo'),
             '123',
             'http://digital-local/foo',
         ),
@@ -113,14 +131,14 @@ def mock_repo(endpoint):
         # should call the handle server to update the target URL
         (
             '/bar',
-            Handle(prefix='1903.1', suffix='456', url='http://fedora2-local/bar'),
+            HandleInfo(exists=True, prefix='1903.1', suffix='456', url='http://fedora2-local/bar'),
             '456',
             'http://digital-local/bar',
         ),
     ]
 )
 def test_existing_handle(mock_repo, fcrepo_path, existing_handle, expected_suffix, expected_url):
-    mock_client = MockHandleClient(resolver={existing_handle.hdl_uri: existing_handle})
+    mock_client = MockHandleClient()  # resolver={existing_handle.hdl_uri: existing_handle})
     resource = PublishableResource(
         repo=mock_repo(path=fcrepo_path, handle=existing_handle.hdl_uri),
         path=fcrepo_path
@@ -133,7 +151,7 @@ def test_existing_handle(mock_repo, fcrepo_path, existing_handle, expected_suffi
 def test_missing_handle(mock_repo):
     # resource metadata has a handle value, but that handle is not found in the handle service
     # should raise a RepositoryError
-    mock_handle_client = MockHandleClient(get_handle_lookup={'hdl:1903.1/789': None})
+    mock_handle_client = MockHandleClient()
     resource = PublishableResource(
         repo=mock_repo(path='/abc', handle='hdl:1903.1/789'),
         path='/abc',

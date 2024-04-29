@@ -57,7 +57,8 @@ class PublishableResource(RepositoryResource):
 
             if handle_info.repo != handle_client.default_repo:
                 logger.warning(
-                    f'Current repo ({handle_info.repo}) does not match the expected value "{handle_client.default_repo}'
+                    f'Current repo ({handle_info.repo}) does not match '
+                    f'the expected value "{handle_client.default_repo}"'
                 )
                 updates['repo'] = handle_client.default_repo
 

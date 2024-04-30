@@ -4,7 +4,7 @@ from unittest.mock import MagicMock, ANY
 import pytest
 
 from plastron.context import PlastronContext
-from plastron.handles import Handle, HandleServiceClient
+from plastron.handles import HandleServiceClient, HandleInfo
 from plastron.repo import Repository
 from plastron.repo.publish import PublishableResource
 from plastron.web import create_app
@@ -52,7 +52,7 @@ def request_headers():
 def mock_resource():
     mock_resource = MagicMock(spec=PublishableResource)
     mock_resource.read.return_value = mock_resource
-    mock_handle = MagicMock(spec=Handle)
+    mock_handle = MagicMock(spec=HandleInfo)
     mock_resource.publish.return_value = mock_handle
     return mock_resource
 

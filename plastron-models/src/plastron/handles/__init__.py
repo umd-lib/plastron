@@ -1,10 +1,9 @@
 import dataclasses
 import logging
 from dataclasses import dataclass
-from http import HTTPStatus
-from typing import Optional, List
+from typing import List, Dict, Any
 
-import requests
+from requests import Session
 from requests_jwtauth import HTTPBearerAuth
 
 from plastron.namespaces import dcterms, umdtype
@@ -26,113 +25,97 @@ def parse_handle_string(handle: str) -> List[str]:
         ) from e
 
 
-@dataclass
-class Handle:
-    prefix: str
-    suffix: str
-    url: str = None
+def parse_result(result: Dict[str, Any]) -> Dict[str, Any]:
+    logger.debug(f'Raw result: {result}')
+    if 'request' in result:
+        request = result['request']
+        del result['request']
+        result.update(request)
+    return result
 
-    @classmethod
-    def parse(cls, handle_string: str) -> 'Handle':
-        prefix, suffix = parse_handle_string(handle_string)
-        return cls(prefix=prefix, suffix=suffix)
+
+@dataclass
+class HandleInfo:
+    exists: bool
+    handle_url: str = None
+    prefix: str = None
+    suffix: str = None
+    url: str = None
+    repo: str = None
+    repo_id: str = None
 
     def __str__(self):
-        return '/'.join((self.prefix, self.suffix))
+        """The handle in `{prefix}/{suffix}` form"""
+        return f'{self.prefix}/{self.suffix}'
 
     @property
     def hdl_uri(self):
         """The handle in `hdl:{prefix}/{suffix}` form"""
         return f'hdl:{self}'
 
-    @property
-    def has_url(self):
-        return self.url is not None
-
 
 class HandleServiceClient:
     def __init__(self, endpoint_url: str, jwt_token: str, default_prefix: str = None, default_repo: str = None):
         self.endpoint_url = endpoint_url
-        self.auth = HTTPBearerAuth(jwt_token)
         self.default_prefix = default_prefix
         self.default_repo = default_repo
+        self.session = Session()
+        self.session.auth = HTTPBearerAuth(jwt_token)
 
-    def resolve(self, handle: Handle) -> Optional[Handle]:
-        """Attempt to resolve the given handle. If successful, returns a new `Handle`
-        object with the `url` field populated. If the handle is not found, returns
-        `None`. For any other error response, raises a `HandleServerError`."""
-        path = f'/handles/{handle.prefix}/{handle.suffix}'
-        url = self.endpoint_url + path
-        response = requests.get(url=url, auth=self.auth)
-        if response.status_code == HTTPStatus.NOT_FOUND:
-            return None
-        elif not response.ok:
-            raise HandleServerError(str(response))
-        return Handle(
-            prefix=handle.prefix,
-            suffix=handle.suffix,
-            url=response.json().get('url', None),
-        )
-
-    def find_handle(self, repo_uri: str, repo: str = None) -> Optional[Handle]:
-        url = self.endpoint_url + '/handles/exists'
-        response = requests.get(
+    def get_info(self, prefix: str, suffix: str):
+        url = self.endpoint_url + '/handles/info'
+        response = self.session.get(
             url=url,
-            auth=self.auth,
             params={
-                'repo': repo or self.default_repo,
-                'repo_id': repo_uri,
+                'prefix': prefix,
+                'suffix': suffix,
             },
         )
         if not response.ok:
             raise HandleServerError(str(response))
 
-        result = response.json()
-        logger.debug(result)
+        return HandleInfo(**parse_result(response.json()))
 
-        if not result['exists']:
-            return None
-
-        return Handle(
-            prefix=result['prefix'],
-            suffix=result['suffix'],
-            url=result['url'],
+    def find_handle(self, repo_id: str, repo: str = None) -> HandleInfo:
+        url = self.endpoint_url + '/handles/exists'
+        response = self.session.get(
+            url=url,
+            params={
+                'repo': repo or self.default_repo,
+                'repo_id': repo_id,
+            },
         )
+        if not response.ok:
+            raise HandleServerError(str(response))
 
-    def create_handle(self, repo_uri: str, url: str, prefix: str = None, repo: str = None) -> Handle:
+        return HandleInfo(**parse_result(response.json()))
+
+    def create_handle(self, repo_id: str, url: str, prefix: str = None, repo: str = None) -> HandleInfo:
         request = {
             'prefix': prefix or self.default_prefix,
             'repo': repo or self.default_repo,
-            'repo_id': repo_uri,
+            'repo_id': repo_id,
             'url': url,
         }
-        response = requests.post(
+        response = self.session.post(
             f'{self.endpoint_url}/handles',
             json=request,
-            auth=self.auth,
         )
         if not response.ok:
             raise HandleServerError(str(response))
-        result = response.json()
-        logger.debug(result)
-        return Handle(
-            prefix=result['request']['prefix'],
-            suffix=result['suffix'],
-            url=result['request']['url'],
-        )
 
-    def update_handle(self, handle: Handle, **fields) -> Handle:
-        updated_handle = dataclasses.replace(handle, **fields)
-        response = requests.patch(
-            f'{self.endpoint_url}/handles/{handle.prefix}/{handle.suffix}',
-            json=dataclasses.asdict(updated_handle),
-            auth=self.auth,
+        return HandleInfo(exists=True, **parse_result(response.json()))
+
+    def update_handle(self, handle_info: HandleInfo, **fields) -> HandleInfo:
+        updated_handle_info = dataclasses.replace(handle_info, **fields)
+        response = self.session.patch(
+            f'{self.endpoint_url}/handles/{handle_info.prefix}/{handle_info.suffix}',
+            json=dataclasses.asdict(updated_handle_info),
         )
         if not response.ok:
             raise HandleServerError(str(response))
-        result = response.json()
-        logger.debug(result)
-        return updated_handle
+
+        return updated_handle_info
 
 
 class HandleError(Exception):

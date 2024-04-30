@@ -15,7 +15,7 @@ from rdflib import URIRef
 from plastron.client import ClientError
 from plastron.context import PlastronContext
 from plastron.files import BinarySource, ZipFileSource, RemoteFileSource, HTTPFileSource, LocalFileSource
-from plastron.handles import Handle
+from plastron.handles import HandleInfo
 from plastron.jobs import JobError, JobConfig, Job
 from plastron.jobs.importjob.spreadsheet import LineReference, MetadataSpreadsheet, InvalidRow, Row
 from plastron.models import get_model_class, ModelClassNotFoundError
@@ -530,10 +530,10 @@ class ImportRow:
             logger.info(f'No changes found for "{self.item}" ({self.item.uri}); skipping')
             return ImportedItemStatus.UNCHANGED
 
-    def publish(self, resource: PublishableObjectResource) -> Handle:
+    def publish(self, resource: PublishableObjectResource) -> HandleInfo:
         return resource.publish(
             handle_client=self.context.handle_client,
-            public_url=self.context.get_public_url(resource.url),
+            public_url=self.context.get_public_url(resource),
         )
 
     def create_resource(self) -> PublishableObjectResource:

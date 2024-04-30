@@ -4,7 +4,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from plastron.context import PlastronContext
-from plastron.handles import Handle
+from plastron.handles import HandleInfo
 from plastron.jobs.publicationjob import PublicationJob, PublicationAction
 from plastron.repo import Repository, RepositoryError
 from plastron.repo.publish import PublishableResource
@@ -39,7 +39,7 @@ class JobRunner:
 def test_publication_job(action, with_errors, expected_status, expected_done, expected_errors):
     mock_resource = MagicMock(spec=PublishableResource)
     mock_resource.read.return_value = mock_resource
-    mock_handle = MagicMock(spec=Handle)
+    mock_handle = MagicMock(spec=HandleInfo)
     if action == PublicationAction.PUBLISH:
         if with_errors:
             mock_resource.publish.side_effect = [mock_handle, RepositoryError]

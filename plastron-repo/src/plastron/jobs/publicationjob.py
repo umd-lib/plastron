@@ -46,7 +46,7 @@ class PublicationJob(Job):
                 if self.action == PublicationAction.PUBLISH:
                     handle = resource.publish(
                         handle_client=self.context.handle_client,
-                        public_url=self.context.get_public_url(uri),
+                        public_url=self.context.get_public_url(resource),
                         force_hidden=self.force_hidden,
                         force_visible=self.force_visible,
                     )

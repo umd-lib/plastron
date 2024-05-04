@@ -178,6 +178,7 @@ class ImportRun:
         for row in metadata.rows(limit=limit, percentage=percentage, completed=self.job.completed_log):
             if isinstance(row, InvalidRow):
                 self.drop_invalid(item=None, line_reference=row.line_reference, reason=row.reason)
+                count['invalid_items'] += 1
                 continue
 
             logger.debug(f'Row data: {row.data}')
@@ -284,7 +285,7 @@ class ImportRun:
         :return:
         """
         logger.warning(
-            f'Dropping invalid {line_reference} from import job "{self.job}" run {self.timestamp}: {reason}'
+            f'Dropping invalid row {line_reference} from import job "{self.job}" run {self.timestamp}: {reason}'
         )
         self.invalid_items.append({
             'id': getattr(item, 'identifier', line_reference),

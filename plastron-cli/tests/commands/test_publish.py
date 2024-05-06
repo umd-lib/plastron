@@ -48,7 +48,7 @@ class MockHandleClient:
         ),
         # there is no handle with this prefix/suffix pair
         '1903.1/789': HandleInfo(
-           exists=False,
+            exists=False,
         ),
     }
     FIND_HANDLE_LOOKUP = {

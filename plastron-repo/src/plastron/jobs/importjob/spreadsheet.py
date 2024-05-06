@@ -1,7 +1,7 @@
 import csv
 import logging
 import re
-from collections import defaultdict, OrderedDict
+from collections import defaultdict
 from collections.abc import Sized, Container
 from dataclasses import dataclass
 from itertools import chain
@@ -122,7 +122,7 @@ def build_fields(fieldnames, model_class) -> Dict[str, List[ColumnSpec]]:
     return fields
 
 
-def get_final_prop(model_class: Type[RDFResourceType], attrs: List[str]) -> str:
+def get_final_prop(model_class: Type[RDFResourceType], attrs: List[str]) -> Property:
     next_attr_name = attrs.pop(0)
     next_attr = getattr(model_class, next_attr_name)
     if not attrs:
@@ -131,7 +131,44 @@ def get_final_prop(model_class: Type[RDFResourceType], attrs: List[str]) -> str:
 
 
 def build_file_groups(filenames_string: str) -> Dict[str, FileGroup]:
-    file_groups = OrderedDict()
+    """Parses a string containing zero or more file paths with optional
+    labels into a dictionary whose values are `FileGroup` objects, and
+    whose keys are the file basenames from those `FileGroup` objects.
+
+    ```pycon
+    >>> build_file_groups('')
+    {}
+    >>> build_file_groups('foo.jpg')
+    {'foo': FileGroup(rootname='foo', label='Page 1', files=[FileSpec(name='foo.jpg', source=None)])}
+    >>> build_file_groups('foo.jpg;foo.png')
+    {'foo': FileGroup(rootname='foo', label='Page 1', files=[
+        FileSpec(name='foo.jpg', source=None),
+        FileSpec(name='foo.png', source=None)
+    ])}
+    >>> build_file_groups('foo.jpg;bar.jpg')
+    {
+        'foo': FileGroup(rootname='foo', label='Page 1', files=[FileSpec(name='foo.jpg', source=None)]),
+        'bar': FileGroup(rootname='bar', label='Page 2', files=[FileSpec(name='bar.jpg', source=None)])
+    }
+    >>> build_file_groups('Front:foo.jpg;Back:bar.jpg')
+    {
+        'foo': FileGroup(rootname='foo', label='Front', files=[FileSpec(name='foo.jpg', source=None)]),
+        'bar': FileGroup(rootname='bar', label='Back', files=[FileSpec(name='bar.jpg', source=None)])
+    }
+    ```
+
+    If one file group has a label, then all file groups must have a
+    label, otherwise this function raises a `MetadataError`.
+
+    If using labels, only one file path in each group is required
+    to have a label. Labelling the other file paths in that group is
+    redundant. However, if those labels differ, this function raises
+    a `MetadataError`.
+
+    If no labels are given, defaults to using "Page 1" to "Page N"
+    as the labels."""
+
+    file_groups: Dict[str, FileGroup] = {}
     if filenames_string.strip() == '':
         return file_groups
     for filename in filenames_string.split(';'):
@@ -355,6 +392,15 @@ class MetadataSpreadsheet:
         """Whether the given line is part of the subset of lines to load."""
         return self.subset_to_load is None or line[self.identifier_column] in self.subset_to_load
 
+    def _handle_invalid_row(self, line_reference: LineReference, reason: str) -> InvalidRow:
+        self.errors += 1
+        self.validation_reports.append({
+            'line': line_reference,
+            'is_valid': False,
+            'error': f'Line {line_reference}: {reason}'
+        })
+        return InvalidRow(line_reference=line_reference, reason=reason)
+
     def rows(
             self,
             limit: int = None,
@@ -408,16 +454,14 @@ class MetadataSpreadsheet:
             self.row_count += 1
 
             if any(v is None for v in line.values()):
-                self.errors += 1
-                self.validation_reports.append({
-                    'line': line_reference,
-                    'is_valid': False,
-                    'error': f'Line {line_reference} has the wrong number of columns'
-                })
-                yield InvalidRow(line_reference=line_reference, reason='Wrong number of columns')
+                yield self._handle_invalid_row(line_reference=line_reference, reason='Wrong number of columns')
                 continue
 
-            row = Row(self, line_reference, row_number, line, self.identifier_column)
+            try:
+                row = Row(self, line_reference, row_number, line, self.identifier_column)
+            except MetadataError as e:
+                yield self._handle_invalid_row(line_reference=line_reference, reason=str(e))
+                continue
 
             if row.identifier in completed:
                 logger.info(f'Already loaded "{row.identifier}" from {line_reference}, skipping')

@@ -1,6 +1,7 @@
 from unittest.mock import MagicMock
 
 import pytest
+from plastron.jobs.importjob.spreadsheet import InvalidRow
 from rdflib import Literal
 
 from plastron.jobs.importjob import MetadataSpreadsheet
@@ -41,3 +42,18 @@ def test_cannot_mix_language_and_datatype(datadir):
     row = next(metadata.rows())
     with pytest.raises(RuntimeError):
         row.get_object(repo)
+
+
+@pytest.mark.parametrize(
+    ('filename', 'expected_reason'),
+    [
+        ('missing_some_file_groups.csv', 'If any file group has a label, all file groups must have a label'),
+        ('inconsistent_file_groups.csv', 'Multiple files with rootname "ntl-010543-0001" have differing labels')
+    ]
+)
+def test_file_group_errors(filename, expected_reason, datadir):
+    metadata = MetadataSpreadsheet(datadir / filename, Item)
+    row = next(metadata.rows())
+    assert isinstance(row, InvalidRow)
+    assert row.reason == expected_reason
+    assert metadata.errors == 1

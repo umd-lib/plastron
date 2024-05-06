@@ -57,7 +57,7 @@ def configure_cli(subparsers):
 class Command(BaseCommand):
     def __call__(self, args: Namespace):
         export_job = ExportJob(
-            repo=self.context.repo,
+            context=self.context,
             export_binaries=args.export_binaries,
             binary_types=args.binary_types,
             uris=args.uris,

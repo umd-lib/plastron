@@ -151,6 +151,9 @@ class RDFResourceBase:
             results['_' + test.__name__] = test(self)
         return results
 
+    def redescribe(self, model: Type['RDFResourceType']) -> 'RDFResourceType':
+        return model(uri=self.uri, graph=self.graph)
+
 
 class RDFResource(RDFResourceBase):
     rdf_type = ObjectProperty(URIRef('http://www.w3.org/1999/02/22-rdf-syntax-ns#type'), repeatable=True)

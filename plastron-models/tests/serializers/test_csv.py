@@ -21,15 +21,15 @@ from plastron.serializers import CSVSerializer
             {'PUBLISH': 'False', 'HIDDEN': 'False', 'Presentation Set': 'http://vocab.lib.umd.edu/set#test'},
         ),
         (
-                Item(rdf_type=umdaccess.Published, presentation_set=URIRef('http://vocab.lib.umd.edu/set#test')),
-                {'PUBLISH': 'True', 'HIDDEN': 'False', 'Presentation Set': 'http://vocab.lib.umd.edu/set#test'},
+            Item(rdf_type=umdaccess.Published, presentation_set=URIRef('http://vocab.lib.umd.edu/set#test')),
+            {'PUBLISH': 'True', 'HIDDEN': 'False', 'Presentation Set': 'http://vocab.lib.umd.edu/set#test'},
         ),
         (
-                Item(
-                    rdf_type=[umdaccess.Published, umdaccess.Hidden],
-                    presentation_set=URIRef('http://vocab.lib.umd.edu/set#test'),
-                ),
-                {'PUBLISH': 'True', 'HIDDEN': 'True', 'Presentation Set': 'http://vocab.lib.umd.edu/set#test'},
+            Item(
+                rdf_type=[umdaccess.Published, umdaccess.Hidden],
+                presentation_set=URIRef('http://vocab.lib.umd.edu/set#test'),
+            ),
+            {'PUBLISH': 'True', 'HIDDEN': 'True', 'Presentation Set': 'http://vocab.lib.umd.edu/set#test'},
         ),
     ]
 )

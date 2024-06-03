@@ -7,6 +7,8 @@ from rdflib import URIRef, Literal
 from plastron.rdfmapping.embed import EmbeddedObject
 from plastron.rdfmapping.properties import RDFDataProperty, RDFObjectProperty, RDFProperty
 
+OBJECT_CLASSES = {}
+
 
 class Property:
     def __init__(
@@ -65,8 +67,7 @@ class ObjectProperty(Property):
         if instance is None:
             return self
         if isinstance(self.object_class, str):
-            module = import_module(instance.__module__)
-            self.object_class = getattr(module, self.object_class)
+            self.object_class = OBJECT_CLASSES[self.object_class]
         return RDFObjectProperty(
             **self._get_property_kwargs(instance),
             object_class=self.object_class,

@@ -1,0 +1,2 @@
+Object Type,Identifier,Rights Statement,Title,Format,Archival Collection,Presentation Set,Date,Description,Creator,Creator URI,Contributor URI,Publisher,Publisher URI,Extent,Subject,Rights Holder,Collection Information,Handle,URI,CREATED,MODIFIED,INDEX,ITEM_FILES,HIDDEN
+http://purl.org/dc/dcmitype/Image,test-item-with-empty_item-files-column,http://vocab.lib.umd.edu/rightsStatement#InC-NC,"Test Item with empty ITEM_FILES column",,,,,,,,,,,,,,,,,,,,"test_file.tif",

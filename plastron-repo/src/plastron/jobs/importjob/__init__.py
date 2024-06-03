@@ -17,7 +17,7 @@ from plastron.context import PlastronContext
 from plastron.files import BinarySource, ZipFileSource, RemoteFileSource, HTTPFileSource, LocalFileSource
 from plastron.handles import HandleInfo
 from plastron.jobs import JobError, JobConfig, Job
-from plastron.jobs.importjob.spreadsheet import LineReference, MetadataSpreadsheet, InvalidRow, Row
+from plastron.jobs.importjob.spreadsheet import LineReference, MetadataSpreadsheet, InvalidRow, Row, MetadataError
 from plastron.models import get_model_class, ModelClassNotFoundError
 from plastron.models.annotations import FullTextAnnotation, TextualBody
 from plastron.namespaces import umdaccess, sc
@@ -158,9 +158,6 @@ class ImportRun:
         except JobError as e:
             raise RuntimeError(str(e)) from e
 
-        if metadata.has_binaries and self.job.config.binaries_location is None:
-            raise RuntimeError('Must specify --binaries-location if the metadata has a FILES and/or ITEM_FILES column')
-
         count = Counter(
             total_items=metadata.total,
             rows=0,
@@ -181,6 +178,7 @@ class ImportRun:
         for row in metadata.rows(limit=limit, percentage=percentage, completed=self.job.completed_log):
             if isinstance(row, InvalidRow):
                 self.drop_invalid(item=None, line_reference=row.line_reference, reason=row.reason)
+                count['invalid_items'] += 1
                 continue
 
             logger.debug(f'Row data: {row.data}')
@@ -287,7 +285,7 @@ class ImportRun:
         :return:
         """
         logger.warning(
-            f'Dropping invalid {line_reference} from import job "{self.job}" run {self.timestamp}: {reason}'
+            f'Dropping invalid row {line_reference} from import job "{self.job}" run {self.timestamp}: {reason}'
         )
         self.invalid_items.append({
             'id': getattr(item, 'identifier', line_reference),
@@ -341,7 +339,10 @@ class ImportJob(Job):
         })
 
     def get_metadata(self) -> MetadataSpreadsheet:
-        return MetadataSpreadsheet(metadata_filename=self.metadata_filename, model_class=self.model_class)
+        try:
+            return MetadataSpreadsheet(metadata_filename=self.metadata_filename, model_class=self.model_class)
+        except MetadataError as e:
+            raise JobError(job=self) from e
 
     def run(
             self,
@@ -478,6 +479,13 @@ class ImportRow:
             results: ValidationResultsDict = self.item.validate()
         except ValidationError as e:
             raise RuntimeError(f'Unable to run validation: {e}') from e
+
+        # binaries_location is only required if there is a value in the
+        # "FILES" or "ITEM_FILES" column.
+        # This is to enable CSVs originally generated from an Archelon
+        # export job to be used as an import CSV file
+        if (self.row.has_files or self.row.has_item_files) and not self.job.config.binaries_location:
+            raise RuntimeError('Must specify --binaries-location if the metadata has a FILES and/or ITEM_FILES column')
 
         results['FILES'] = self.validate_files(self.row.filenames)
         results['ITEM_FILES'] = self.validate_files(self.row.item_filenames)

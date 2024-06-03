@@ -1,13 +1,13 @@
 from lxml.etree import parse, XMLSyntaxError
 
 from plastron.models.annotations import TextblockOnPage
-from plastron.models.umd import PCDMObject, PCDMFile
-from plastron.namespaces import bibo, carriers, dc, dcterms, fabio, ndnp, pcdmuse, umdtype, pcdm, umd
+from plastron.models.pcdm import PCDMObject, PCDMFile
+from plastron.namespaces import bibo, carriers, dc, dcterms, fabio, ndnp, ore, pcdmuse, umdtype, pcdm, umd
 from plastron.rdf.ocr import ALTOResource
 from plastron.rdfmapping.decorators import rdf_type
 from plastron.rdfmapping.descriptors import DataProperty, ObjectProperty
 from plastron.repo import DataReadError
-from plastron.validation.rules import is_handle, is_iso_8601_date
+from plastron.validation.rules import is_handle, is_iso_8601_date, is_from_vocabulary
 
 
 @rdf_type(bibo.Issue, umd.Newspaper)
@@ -19,6 +19,11 @@ class Issue(PCDMObject):
     issue = DataProperty(bibo.issue, required=True)
     edition = DataProperty(bibo.edition, required=True)
     handle = DataProperty(dcterms.identifier, datatype=umdtype.handle, validate=is_handle)
+    presentation_set = ObjectProperty(
+        ore.isAggregatedBy,
+        repeatable=True,
+        validate=is_from_vocabulary('http://vocab.lib.umd.edu/set#'),
+    )
 
     HEADER_MAP = {
         'title': 'Title',
@@ -26,7 +31,8 @@ class Issue(PCDMObject):
         'volume': 'Volume',
         'issue': 'Issue',
         'edition': 'Edition',
-        'handle': 'Handle'
+        'handle': 'Handle',
+        'presentation_set': 'Presentation Set',
     }
 
 

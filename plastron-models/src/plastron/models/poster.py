@@ -1,10 +1,10 @@
 from rdflib import URIRef
 
-from plastron.models.umd import PCDMObject
-from plastron.namespaces import dcterms, dc, edm, bibo, geo, umd, umdtype
+from plastron.models.pcdm import PCDMObject
+from plastron.namespaces import dcterms, dc, edm, bibo, geo, ore, umd, umdtype
 from plastron.rdfmapping.decorators import rdf_type
 from plastron.rdfmapping.descriptors import ObjectProperty, DataProperty, Property
-from plastron.validation.rules import is_edtf_formatted, is_handle
+from plastron.validation.rules import is_edtf_formatted, is_handle, is_from_vocabulary
 
 
 @rdf_type(bibo.Image, umd.Poster)
@@ -32,6 +32,11 @@ class Poster(PCDMObject):
     identifier = DataProperty(dcterms.identifier, required=True)
     handle = DataProperty(dcterms.identifier, validate=is_handle, datatype=umdtype.handle)
     place = ObjectProperty(dcterms.spatial)
+    presentation_set = ObjectProperty(
+        ore.isAggregatedBy,
+        repeatable=True,
+        validate=is_from_vocabulary('http://vocab.lib.umd.edu/set#'),
+    )
 
     HEADER_MAP = {
         'title': 'Title',
@@ -52,5 +57,6 @@ class Poster(PCDMObject):
         'subject': 'Subject',
         'rights': 'Rights',
         'identifier': 'Identifier',
-        'handle': 'Handle'
+        'handle': 'Handle',
+        'presentation_set': 'Presentation Set',
     }

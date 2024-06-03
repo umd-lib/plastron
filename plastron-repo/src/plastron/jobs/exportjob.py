@@ -1,12 +1,12 @@
 import logging
 import os
-from pathlib import Path
 import re
 from collections import Counter
 from dataclasses import dataclass
 from datetime import datetime
 from email.utils import parsedate
 from os.path import splitext, basename
+from pathlib import Path
 from tempfile import TemporaryDirectory
 from time import mktime
 from typing import Optional, List, Generator, Dict, Any, Iterator
@@ -18,11 +18,12 @@ from paramiko import SFTPClient, SSHException
 from requests import ConnectionError
 
 from plastron.client import ClientError
+from plastron.context import PlastronContext
 from plastron.files import get_ssh_client
 from plastron.jobs import Job
 from plastron.models import Item
-from plastron.models.umd import PCDMFile
-from plastron.repo import DataReadError, Repository, BinaryResource
+from plastron.models.pcdm import PCDMFile
+from plastron.repo import DataReadError, BinaryResource
 from plastron.repo.pcdm import PCDMObjectResource, AggregationResource, PCDMFileBearingResource
 from plastron.serializers import SERIALIZER_CLASSES, detect_resource_class
 from plastron.serializers.csv import EmptyItemListError
@@ -84,7 +85,7 @@ class FileSize:
 
 @dataclass
 class ExportJob(Job):
-    repo: Repository
+    context: PlastronContext
     export_format: str
     export_binaries: bool
     binary_types: str
@@ -138,12 +139,12 @@ class ExportJob(Job):
         bag = make_bag(temp_dir.name)
 
         export_dir = os.path.join(temp_dir.name, 'data')
-        serializer = serializer_class(directory=export_dir, public_uri_template=self.uri_template)
+        serializer = serializer_class(directory=export_dir)
         for uri in self.uris:
             try:
                 logger.info(f'Exporting item {count["exported"] + 1}/{count["total"]}: {uri}')
 
-                resource = self.repo[uri:PCDMObjectResource].read()
+                resource = self.context.repo[uri:PCDMObjectResource].read()
                 # use a translated version of the repo path as the default item directory name
                 # e.g., "/dc/2023/1/de/84/37/0d/de84370d-f90a-444f-a87f-dd79e0438884" becomes
                 # "dc.2023.1.de.84.37.0d.de84370d-f90a-444f-a87f-dd79e0438884"
@@ -157,7 +158,12 @@ class ExportJob(Job):
                 # use the identifier field from the model as a better item directory name
                 if hasattr(obj, 'identifier'):
                     item_dir = str(obj.identifier.value or item_dir)
-                serializer.write(obj, files=binaries, binaries_dir=item_dir)
+                serializer.write(
+                    obj,
+                    files=binaries,
+                    binaries_dir=item_dir,
+                    public_url=self.context.get_public_url(resource),
+                )
 
                 if binaries is not None:
                     binaries_dir = Path(export_dir, item_dir)

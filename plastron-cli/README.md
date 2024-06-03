@@ -432,7 +432,7 @@ import logging
 from argparse import Namespace
 
 from plastron.cli.commands import BaseCommand
-from plastron.models.umd import PCDMFile
+from plastron.models.pcdm import PCDMFile
 from plastron.namespaces import ldp
 
 logger = logging.getLogger(__name__)
@@ -468,7 +468,8 @@ class Command(BaseCommand):
                 print(uri)
                 continue
 
-            for child_resource in resource.walk(min_depth=1, max_depth=1, traverse=[ldp.contains]):
+            for child_resource in resource.walk(min_depth=1, max_depth=1,
+                                                traverse=[ldp.contains]):
                 if self.long:
                     description = child_resource.describe(PCDMFile)
                     title = str(description.title)

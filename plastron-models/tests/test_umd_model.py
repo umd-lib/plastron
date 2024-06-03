@@ -1,8 +1,7 @@
-from rdflib import Graph, Literal, Namespace, URIRef
-
 from plastron.models.umd import Item
-from plastron.namespaces import umdform
+from plastron.namespaces import dcterms, umdform, umdtype, ore
 from plastron.repo.pcdm import get_new_member_title
+from rdflib import Graph, Literal, URIRef
 
 rdf = (
     '@prefix dcterms: <http://purl.org/dc/terms/> .'
@@ -16,8 +15,6 @@ item = Item(
     graph=Graph().parse(data=rdf, format='turtle', publicID=base_uri),
     uri=base_uri
 )
-dcterms = Namespace('http://purl.org/dc/terms/')
-umdtype = Namespace('http://vocab.lib.umd.edu/datatype#')
 
 
 def test_identifier_distinct_from_accession_number():
@@ -45,3 +42,14 @@ def test_get_new_member_pool_report():
 
     attachment_title = get_new_member_title(pool_report, 'foo', 2)
     assert str(attachment_title) == 'Attachment 1'
+
+
+def test_item_valid_with_only_required_fields():
+    item = Item()
+
+    # Only provide required fields
+    item.identifier = 'test_item'
+    item.object_type = 'http://purl.org/dc/dcmitype/Text'
+    item.rights = 'http://vocab.lib.umd.edu/rightsStatement#InC-EDU'
+    item.title = 'Test Item'
+    assert item.is_valid

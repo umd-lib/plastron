@@ -15,7 +15,7 @@ def export(
 ) -> Generator[Dict[str, Any], None, Dict[str, Any]]:
     ssh_key = context.config.get('COMMANDS', {}).get('EXPORT', {}).get('SSH_PRIVATE_KEY', None)
     export_job = ExportJob(
-        repo=context.repo,
+        context=context,
         export_binaries=bool(strtobool(message.args.get('export-binaries', 'false'))),
         binary_types=message.args.get('binary-types'),
         uris=message.body.strip().split('\n'),

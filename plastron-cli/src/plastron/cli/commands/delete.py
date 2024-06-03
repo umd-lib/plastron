@@ -6,7 +6,7 @@ from plastron.cli import get_uris
 from plastron.repo.utils import context
 from plastron.cli.commands import BaseCommand
 from plastron.client import ClientError
-from plastron.models.umd import PCDMObject
+from plastron.models.pcdm import PCDMObject
 from plastron.rdf import parse_predicate_list
 from plastron.repo import RepositoryError
 from plastron.utils import ItemLog

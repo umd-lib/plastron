@@ -6,17 +6,17 @@ from contextlib import contextmanager
 from itertools import zip_longest
 from pathlib import Path
 from typing import List, Union, Dict, Type, NamedTuple, Mapping, Iterable
-from urllib.parse import urlparse
 
 from rdflib import URIRef, Literal
 from urlobject import URLObject
 
-from plastron.models.umd import PCDMFile
-from plastron.namespaces import fedora
+from plastron.models.fedora import FedoraResource
+from plastron.models.pcdm import PCDMFile
+from plastron.namespaces import umdaccess
 from plastron.rdfmapping.descriptors import ObjectProperty
 from plastron.rdfmapping.embed import EmbeddedObject
 from plastron.rdfmapping.properties import RDFObjectProperty, RDFDataProperty
-from plastron.rdfmapping.resources import RDFResourceBase
+from plastron.rdfmapping.resources import RDFResourceBase, RDFResource
 from plastron.repo import BinaryResource
 
 
@@ -36,7 +36,7 @@ def split_escaped(string: str, separator: str = '|') -> List[str]:
     >>> split_escaped('foo\|bar|alpha')
     ['foo|bar', 'alpha']
     ```
-    """
+    """  # noqa: W605
     if string is None or string == '':
         return []
     # uses a negative look-behind to only split on separator characters
@@ -342,8 +342,8 @@ class CSVSerializer:
         'URI', 'PUBLIC URI', 'CREATED', 'MODIFIED', 'INDEX', 'FILES', 'ITEM_FILES', 'PUBLISH', 'HIDDEN'
     ]
 
-    def __init__(self, directory: Union[str, Path] = None, public_uri_template: str = None):
-        self.directory = Path(directory) or Path.cwd()
+    def __init__(self, directory: Union[str, Path] = None):
+        self.directory = Path(directory) if directory is not None else Path.cwd()
         """Destination directory for the CSV file(s)"""
 
         self.rows_by_content_model = {}
@@ -351,7 +351,6 @@ class CSVSerializer:
 
         self.content_type = 'text/csv'
         self.file_extension = '.csv'
-        self.public_uri_template = public_uri_template
 
     def __enter__(self):
         self.rows = []
@@ -360,7 +359,13 @@ class CSVSerializer:
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.finish()
 
-    def write(self, resource: RDFResourceBase, files: Iterable[BinaryResource] = None, binaries_dir=''):
+    def write(
+            self,
+            resource: RDFResource,
+            files: Iterable[BinaryResource] = None,
+            binaries_dir: str = '',
+            public_url: str = None,
+    ) -> Dict[str, str]:
         """
         Serializes the given resource as a CSV row using the `flatten()` function. The resulting row is
         added to an internal accumulator. The CSV file or files themselves are not actually written until
@@ -375,21 +380,24 @@ class CSVSerializer:
                 'rows': []
             }
 
-        graph = resource.graph
         row = {k: join_values(v) for k, v in flatten(resource, resource_class.HEADER_MAP).items()}
         row['URI'] = str(resource.uri)
         if files is not None:
             row['FILES'] = ';'.join(
                 os.path.join(binaries_dir, file.describe(PCDMFile).filename.value) for file in files)
-        row['CREATED'] = str(graph.value(resource.uri, fedora.created))
-        row['MODIFIED'] = str(graph.value(resource.uri, fedora.lastModified))
-        if self.public_uri_template is not None:
-            # TODO: more generic transform function than hardwired to look for a uuid
-            uri = urlparse(resource.uri)
-            uuid = os.path.basename(uri.path)
-            row['PUBLIC URI'] = self.public_uri_template.format(uuid=uuid)
+        fedora_resource = resource.redescribe(FedoraResource)
+        row['CREATED'] = str(fedora_resource.created.value)
+        row['MODIFIED'] = str(fedora_resource.last_modified.value)
+        if public_url is not None:
+            row['PUBLIC URI'] = public_url
+
+        # set publication and visibility state
+        row['PUBLISH'] = str(umdaccess.Published in resource.rdf_type.values)
+        row['HIDDEN'] = str(umdaccess.Hidden in resource.rdf_type.values)
 
         self.rows_by_content_model[resource_class]['rows'].append(row)
+
+        return row
 
     LANGUAGE_NAMES = {
         'ja': 'Japanese',

@@ -17,7 +17,7 @@ importlib-metadata==4.6.1
 iso639==0.1.4
 isodate==0.6.0
 itsdangerous==2.0.1
-Jinja2==3.0.1
+Jinja2==3.1.4
 jwcrypto==0.9.1
 lxml==4.9.2
 MarkupSafe==2.0.1

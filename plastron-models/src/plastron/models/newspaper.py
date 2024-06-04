@@ -2,7 +2,7 @@ from lxml.etree import parse, XMLSyntaxError
 
 from plastron.models.annotations import TextblockOnPage
 from plastron.models.pcdm import PCDMObject, PCDMFile
-from plastron.namespaces import bibo, carriers, dc, dcterms, fabio, ndnp, ore, pcdmuse, umdtype, pcdm, umd
+from plastron.namespaces import bibo, carriers, dc, dcterms, fabio, ndnp, ore, pcdm, pcdmuse, schema, umdtype, umd
 from plastron.rdf.ocr import ALTOResource
 from plastron.rdfmapping.decorators import rdf_type
 from plastron.rdfmapping.descriptors import DataProperty, ObjectProperty
@@ -24,6 +24,7 @@ class Issue(PCDMObject):
         repeatable=True,
         validate=is_from_vocabulary('http://vocab.lib.umd.edu/set#'),
     )
+    copyright_notice = DataProperty(schema.copyrightNotice)
 
     HEADER_MAP = {
         'title': 'Title',
@@ -33,6 +34,7 @@ class Issue(PCDMObject):
         'edition': 'Edition',
         'handle': 'Handle',
         'presentation_set': 'Presentation Set',
+        'copyright_notice': 'Copyright Notice',
     }
 
 

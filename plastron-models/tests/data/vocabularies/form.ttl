@@ -1,0 +1,222 @@
+@prefix dc: <http://purl.org/dc/elements/1.1/> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+
+<http://vocab.lib.umd.edu/form#architectural_drawings> rdfs:label "Architectural drawings (visual works)";
+  dc:identifier "architectural_drawings";
+  owl:sameAs <http://vocab.getty.edu/page/aat/300034787> .
+
+<http://vocab.lib.umd.edu/form#art> rdfs:label "Art";
+  dc:identifier "art";
+  owl:sameAs <http://id.loc.gov/authorities/genreForms/gf2017027218> .
+
+<http://vocab.lib.umd.edu/form#books> rdfs:label "Books";
+  dc:identifier "books";
+  owl:sameAs <http://vocab.getty.edu/page/aat/300028051> .
+
+<http://vocab.lib.umd.edu/form#broadsides_notices> rdfs:label "Broadsides (notices)";
+  dc:identifier "broadsides_notices";
+  owl:sameAs <http://vocab.getty.edu/page/aat/300026739> .
+
+<http://vocab.lib.umd.edu/form#business_correspondence> rdfs:label "Business correspondence";
+  dc:identifier "business_correspondence";
+  owl:sameAs <http://id.loc.gov/authorities/genreForms/gf2014026054> .
+
+<http://vocab.lib.umd.edu/form#catalogs> rdfs:label "Catalogs";
+  dc:identifier "catalogs";
+  owl:sameAs <http://id.loc.gov/authorities/genreForms/gf2014026057> .
+
+<http://vocab.lib.umd.edu/form#certificates> rdfs:label "Certificates";
+  dc:identifier "certificates";
+  owl:sameAs <http://vocab.getty.edu/page/aat/300026841> .
+
+<http://vocab.lib.umd.edu/form#chapbooks> rdfs:label "Chapbooks";
+  dc:identifier "chapbooks";
+  owl:sameAs <http://vocab.getty.edu/page/aat/300152367> .
+
+<http://vocab.lib.umd.edu/form#conference_papers> rdfs:label "Conference papers and proceedings";
+  dc:identifier "conference_papers";
+  owl:sameAs <http://id.loc.gov/authorities/genreForms/gf2014026068> .
+
+<http://vocab.lib.umd.edu/form#diaries> rdfs:label "Diaries";
+  dc:identifier "diaries";
+  owl:sameAs <http://id.loc.gov/authorities/genreForms/gf2014026085> .
+
+<http://vocab.lib.umd.edu/form#drama> rdfs:label "Drama";
+  dc:identifier "drama";
+  owl:sameAs <http://id.loc.gov/authorities/genreForms/gf2014026297> .
+
+<http://vocab.lib.umd.edu/form#drawings> rdfs:label "Drawings";
+  dc:identifier "drawings";
+  owl:sameAs <http://id.loc.gov/authorities/genreForms/gf2017027231> .
+
+<http://vocab.lib.umd.edu/form#ephemera> rdfs:label "Ephemera";
+  dc:identifier "ephemera";
+  owl:sameAs <http://id.loc.gov/authorities/genreForms/gf2014026093> .
+
+<http://vocab.lib.umd.edu/form#essays> rdfs:label "Essays";
+  dc:identifier "essays";
+  owl:sameAs <http://id.loc.gov/authorities/genreForms/gf2014026094> .
+
+<http://vocab.lib.umd.edu/form#exhibition_catalogs> rdfs:label "Exhibition catalogs";
+  dc:identifier "exhibition_catalogs";
+  owl:sameAs <http://id.loc.gov/authorities/genreForms/gf2014026098> .
+
+<http://vocab.lib.umd.edu/form#fanzines> rdfs:label "Fanzines";
+  dc:identifier "fanzines";
+  owl:sameAs <http://vocab.getty.edu/page/aat/300252980> .
+
+<http://vocab.lib.umd.edu/form#fliers_ephemera> rdfs:label "Fliers (ephemera)";
+  dc:identifier "fliers_ephemera";
+  owl:sameAs <http://id.loc.gov/authorities/genreForms/gf2017026133> .
+
+<http://vocab.lib.umd.edu/form#greeting_cards> rdfs:label "Greeting cards";
+  dc:identifier "greeting_cards";
+  owl:sameAs <http://vocab.getty.edu/page/aat/300026778> .
+
+<http://vocab.lib.umd.edu/form#illustrated_works> rdfs:label "Illustrated works";
+  dc:identifier "illustrated_works";
+  owl:sameAs <http://id.loc.gov/authorities/genreForms/gf2014026111> .
+
+<http://vocab.lib.umd.edu/form#invitations> rdfs:label "Invitations";
+  dc:identifier "invitations";
+  owl:sameAs <http://vocab.getty.edu/page/aat/300027083> .
+
+<http://vocab.lib.umd.edu/form#manuscripts> rdfs:label "Manuscripts (documents)";
+  dc:identifier "manuscripts";
+  owl:sameAs <http://vocab.getty.edu/page/aat/300028569> .
+
+<http://vocab.lib.umd.edu/form#manuscripts_publication> rdfs:label "Manuscripts for publication";
+  dc:identifier "manuscripts_publication";
+  owl:sameAs <http://vocab.getty.edu/page/aat/300028579> .
+
+<http://vocab.lib.umd.edu/form#maps> rdfs:label "Maps";
+  dc:identifier "maps";
+  owl:sameAs <http://id.loc.gov/authorities/genreForms/gf2011026387> .
+
+<http://vocab.lib.umd.edu/form#negatives> rdfs:label "Negatives (photographs)";
+  dc:identifier "negatives";
+  owl:sameAs <http://id.loc.gov/authorities/genreForms/gf2019026026> .
+
+<http://vocab.lib.umd.edu/form#newsletters> rdfs:label "Newsletters";
+  dc:identifier "newsletters";
+  owl:sameAs <http://id.loc.gov/authorities/genreForms/gf2014026131> .
+
+<http://vocab.lib.umd.edu/form#newspaper_clippings> rdfs:label "Newspaper clippings";
+  dc:identifier "newspaper_clippings";
+  owl:sameAs <http://vocab.getty.edu/page/aat/300429554> .
+
+<http://vocab.lib.umd.edu/form#newspapers> rdfs:label "Newspapers";
+  dc:identifier "newspapers";
+  owl:sameAs <http://id.loc.gov/authorities/genreForms/gf2014026132> .
+
+<http://vocab.lib.umd.edu/form#nonfiction_films> rdfs:label "Nonfiction films";
+  dc:identifier "nonfiction_films";
+  owl:sameAs <http://id.loc.gov/authorities/genreForms/gf2011026423> .
+
+<http://vocab.lib.umd.edu/form#paintings> rdfs:label "Paintings (visual works)";
+  dc:identifier "paintings";
+  owl:sameAs <http://vocab.getty.edu/page/aat/300033618> .
+
+<http://vocab.lib.umd.edu/form#pamphlets> rdfs:label "Pamphlets";
+  dc:identifier "pamphlets";
+  owl:sameAs <http://vocab.getty.edu/page/aat/300220572> .
+
+<http://vocab.lib.umd.edu/form#periodicals> rdfs:label "Periodicals";
+  dc:identifier "periodicals";
+  owl:sameAs <http://id.loc.gov/authorities/genreForms/gf2014026139> .
+
+<http://vocab.lib.umd.edu/form#personal_correspondence> rdfs:label "Personal correspondence";
+  dc:identifier "personal_correspondence";
+  owl:sameAs <http://id.loc.gov/authorities/genreForms/gf2014026141> .
+
+<http://vocab.lib.umd.edu/form#photograph_albums> rdfs:label "Photograph albums";
+  dc:identifier "photograph_albums";
+  owl:sameAs <http://vocab.getty.edu/page/aat/300026695> .
+
+<http://vocab.lib.umd.edu/form#photographs> rdfs:label "Photographs";
+  dc:identifier "photographs";
+  owl:sameAs <http://id.loc.gov/authorities/genreForms/gf2017027249> .
+
+<http://vocab.lib.umd.edu/form#poetry> rdfs:label "Poetry";
+  dc:identifier "poetry";
+  owl:sameAs <http://id.loc.gov/authorities/genreForms/gf2014026481> .
+
+<http://vocab.lib.umd.edu/form#pool_reports> rdfs:label "Pool reports";
+  dc:identifier "pool_reports" .
+
+<http://vocab.lib.umd.edu/form#postcards> rdfs:label "Postcards";
+  dc:identifier "postcards";
+  owl:sameAs <http://id.loc.gov/authorities/genreForms/gf2014026151> .
+
+<http://vocab.lib.umd.edu/form#posters> rdfs:label "Posters";
+  dc:identifier "posters";
+  owl:sameAs <http://id.loc.gov/authorities/genreForms/gf2014026152> .
+
+<http://vocab.lib.umd.edu/form#press_releases> rdfs:label "Press releases";
+  dc:identifier "press_releases";
+  owl:sameAs <http://id.loc.gov/authorities/genreForms/gf2014026153> .
+
+<http://vocab.lib.umd.edu/form#prints> rdfs:label "Prints (visual works)";
+  dc:identifier "prints";
+  owl:sameAs <http://vocab.getty.edu/page/aat/300041273> .
+
+<http://vocab.lib.umd.edu/form#programs> rdfs:label "Programs (publications)";
+  dc:identifier "programs";
+  owl:sameAs <http://id.loc.gov/authorities/genreForms/gf2014026156> .
+
+<http://vocab.lib.umd.edu/form#property_records> rdfs:label "Property records";
+  dc:identifier "property_records";
+  owl:sameAs <http://vocab.getty.edu/page/aat/300027243> .
+
+<http://vocab.lib.umd.edu/form#records> rdfs:label "Records (documents)";
+  dc:identifier "records";
+  owl:sameAs <http://id.loc.gov/authorities/genreForms/gf2014026163> .
+
+<http://vocab.lib.umd.edu/form#reports> rdfs:label "Reports";
+  dc:identifier "reports";
+  owl:sameAs <http://vocab.getty.edu/page/aat/300027267> .
+
+<http://vocab.lib.umd.edu/form#research_notes> rdfs:label "Research notes";
+  dc:identifier "research_notes";
+  owl:sameAs <http://vocab.getty.edu/page/aat/300265639> .
+
+<http://vocab.lib.umd.edu/form#rosters> rdfs:label "Rosters";
+  dc:identifier "rosters";
+  owl:sameAs <http://vocab.getty.edu/page/aat/300027178> .
+
+<http://vocab.lib.umd.edu/form#scores> rdfs:label "Scores";
+  dc:identifier "scores";
+  owl:sameAs <http://id.loc.gov/authorities/genreForms/gf2014027077> .
+
+<http://vocab.lib.umd.edu/form#scrapbooks> rdfs:label "Scrapbooks";
+  dc:identifier "scrapbooks";
+  owl:sameAs <http://id.loc.gov/authorities/genreForms/gf2014026173> .
+
+<http://vocab.lib.umd.edu/form#sculpture> rdfs:label "Sculpture (visual works)";
+  dc:identifier "sculpture";
+  owl:sameAs <http://vocab.getty.edu/page/aat/300047090> .
+
+<http://vocab.lib.umd.edu/form#sheet_music> rdfs:label "Sheet music";
+  dc:identifier "sheet_music";
+  owl:sameAs <http://vocab.getty.edu/page/aat/300026430> .
+
+<http://vocab.lib.umd.edu/form#slides_photographs> rdfs:label "Slides (photographs)";
+  dc:identifier "slides_photographs";
+  owl:sameAs <http://vocab.getty.edu/page/aat/300128371> .
+
+<http://vocab.lib.umd.edu/form#speeches> rdfs:label "Speeches";
+  dc:identifier "speeches";
+  owl:sameAs <http://id.loc.gov/authorities/genreForms/gf2011026363> .
+
+<http://vocab.lib.umd.edu/form#spoken_word> rdfs:label "Spoken word poetry";
+  dc:identifier "spoken_word";
+  owl:sameAs <http://id.loc.gov/authorities/genreForms/gf2014026552> .
+
+<http://vocab.lib.umd.edu/form#transcripts> rdfs:label "Transcripts";
+  dc:identifier "transcripts";
+  owl:sameAs <http://vocab.getty.edu/page/aat/300027388> .
+
+<http://vocab.lib.umd.edu/form#yearbooks> rdfs:label "School yearbooks";
+  dc:identifier "yearbooks";
+  owl:sameAs <http://id.loc.gov/authorities/genreForms/gf2014026172> .

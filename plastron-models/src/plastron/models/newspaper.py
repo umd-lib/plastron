@@ -25,6 +25,10 @@ class Issue(PCDMObject):
         validate=is_from_vocabulary('http://vocab.lib.umd.edu/set#'),
     )
     copyright_notice = DataProperty(schema.copyrightNotice)
+    terms_of_use = ObjectProperty(
+        dcterms.license,
+        validate=is_from_vocabulary('http://vocab.lib.umd.edu/termsOfUse#')
+    )
 
     HEADER_MAP = {
         'title': 'Title',
@@ -35,6 +39,7 @@ class Issue(PCDMObject):
         'handle': 'Handle',
         'presentation_set': 'Presentation Set',
         'copyright_notice': 'Copyright Notice',
+        'terms_of_use': 'Terms of Use',
     }
 
 

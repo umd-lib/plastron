@@ -29,6 +29,10 @@ class Poster(PCDMObject):
     latitude = DataProperty(geo.lat)
     subject = ObjectProperty(dc.subject)
     rights = ObjectProperty(dcterms.rights, required=True)
+    terms_of_use = ObjectProperty(
+        dcterms.license,
+        validate=is_from_vocabulary('http://vocab.lib.umd.edu/termsOfUse#')
+    )
     copyright_notice = DataProperty(schema.copyrightNotice)
     identifier = DataProperty(dcterms.identifier, required=True)
     handle = DataProperty(dcterms.identifier, validate=is_handle, datatype=umdtype.handle)
@@ -57,6 +61,7 @@ class Poster(PCDMObject):
         'latitude': 'Latitude',
         'subject': 'Subject',
         'rights': 'Rights',
+        'terms_of_use': 'Terms of Use',
         'copyright_notice': 'Copyright Notice',
         'identifier': 'Identifier',
         'handle': 'Handle',

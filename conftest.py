@@ -23,5 +23,6 @@ def pytest_configure(config):
         'http://vocab.lib.umd.edu/collection#': 'collection.ttl',
         'http://vocab.lib.umd.edu/form#': 'form.ttl',
         'http://vocab.lib.umd.edu/rightsStatement#': 'rightsStatement.ttl',
-        'http://vocab.lib.umd.edu/set#': 'set.ttl'
+        'http://vocab.lib.umd.edu/set#': 'set.ttl',
+        'http://vocab.lib.umd.edu/termsOfUse#': 'termsOfUse.ttl'
     }

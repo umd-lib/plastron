@@ -52,6 +52,10 @@ class Letter(RDFResource):
     bibliographic_citation = DataProperty(dcterms.bibliographicCitation, required=True)
     extent = DataProperty(dcterms.extent, required=True)
     rights_holder = DataProperty(dcterms.rightsHolder, required=True)
+    terms_of_use = ObjectProperty(
+        dcterms.license,
+        validate=is_from_vocabulary('http://vocab.lib.umd.edu/termsOfUse#')
+    )
     handle = DataProperty(dcterms.identifier, datatype=umdtype.handle, validate=is_handle)
     presentation_set = ObjectProperty(
         ore.isAggregatedBy,
@@ -69,6 +73,7 @@ class Letter(RDFResource):
         'date': 'Date',
         'type': 'Resource Type',
         'rights': 'Rights',
+        'terms_of_use': 'Terms of Use',
         'copyright_notice': 'Copyright Notice',
         'subject': {
             'label': 'Subject',

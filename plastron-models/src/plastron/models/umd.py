@@ -54,6 +54,10 @@ class Item(PCDMObject, HandleBearingResource):
     subject = ObjectProperty(dcterms.subject, repeatable=True, embed=True, cls=LabeledThing)
     language = DataProperty(dc.language, repeatable=True, validate=is_valid_iso639_code)
     rights_holder = ObjectProperty(dcterms.rightsHolder, repeatable=True, embed=True, cls=LabeledThing)
+    terms_of_use = ObjectProperty(
+        dcterms.license,
+        validate=is_from_vocabulary('http://vocab.lib.umd.edu/termsOfUse#')
+    )
     copyright_notice = DataProperty(schema.copyrightNotice)
     bibliographic_citation = DataProperty(dcterms.bibliographicCitation)
     accession_number = DataProperty(dcterms.identifier, datatype=umdtype.accessionNumber)
@@ -92,6 +96,7 @@ class Item(PCDMObject, HandleBearingResource):
         'rights_holder': {
             'label': 'Rights Holder',
         },
+        'terms_of_use': 'Terms of Use',
         'copyright_notice': 'Copyright Notice',
         'bibliographic_citation': 'Collection Information',
         'accession_number': 'Accession Number',

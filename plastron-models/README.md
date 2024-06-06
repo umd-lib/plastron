@@ -56,9 +56,10 @@ One method that was found to work was to add a
 `pytest_configure` method. It is necessary to have the `conftest.py` in the
 root directory, so that it will always be used when running pytests in any of
 the Plastron modules (as those tests may use one of the content models with a
-vocabulary). This method runs as soon as pytest starts, and before any modules
-are loaded, providing an opportunity to set the “VOCABULARIES_DIR” and
-“VOCABULARIES” variables to values that are suitable for testing.
+vocabulary). The `pytest_configure` method runs as soon as pytest starts, and
+before any modules are loaded, providing an opportunity to set the
+“VOCABULARIES_DIR” and “VOCABULARIES” variables to values that are suitable for
+testing.
 
 Any vocabularies needed for the tests should be added as follows:
 

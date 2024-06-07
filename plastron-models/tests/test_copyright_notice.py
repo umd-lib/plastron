@@ -24,7 +24,7 @@ def test_copyright_notice_can_be_set_on_model(model_class):
     model = model_class(uri=base_uri)
     model.copyright_notice = Literal(copyright_notice)
 
-    expected = (URIRef(base_uri), URIRef('http://schema.org/copyrightNotice'), Literal(copyright_notice))
+    expected = (URIRef(base_uri), URIRef('https://schema.org/copyrightNotice'), Literal(copyright_notice))
     assert expected in model.graph
 
 

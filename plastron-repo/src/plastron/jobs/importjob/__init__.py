@@ -462,8 +462,6 @@ class ImportRow:
         self.item = row.get_object(context.repo, read_from_repo=not validate_only)
         if publish is not None:
             self._publish = publish
-        else:
-            self._publish = row.publish
 
     def __str__(self):
         return str(self.row.line_reference)
@@ -558,12 +556,6 @@ class ImportRow:
         logger.debug(f'Member of: {self.job.member_of}')
         if self.job.member_of is not None:
             self.item.member_of = self.job.member_of
-        # set publication status
-        if self.row.publish:
-            self.item.rdf_type.add(umdaccess.Published)
-        # set visibility
-        if self.row.hidden:
-            self.item.rdf_type.add(umdaccess.Hidden)
 
         if self.job.extract_text_types is not None:
             annotate_from_files(self.item, self.job.extract_text_types)

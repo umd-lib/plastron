@@ -2,14 +2,14 @@
 
 ## CLI Usage
 
-```
-$ plastron import -h
+```zsh
+$ plastron import --help
 usage: plastron import [-h] [-m MODEL] [-l LIMIT] [-% PERCENTAGE]
                        [--validate-only] [--make-template FILENAME]
                        [--access URI|CURIE] [--member-of URI]
                        [--binaries-location LOCATION] [--container PATH]
                        [--job-id JOB_ID] [--resume]
-                       [--extract-text-from MIME_TYPES]
+                       [--extract-text-from MIME_TYPES] [--publish]
                        [import_file]
 
 Import data to the repository
@@ -24,41 +24,36 @@ optional arguments:
   -l LIMIT, --limit LIMIT
                         limit the number of rows to read from the import file
   -% PERCENTAGE, --percent PERCENTAGE
-                        select an evenly spaced subset of items to import; the
-                        size of this set will be as close as possible to the
-                        specified percentage of the total items
+                        select an evenly spaced subset of items to import; the size of this set will be as close as possible to the specified percentage
+                        of the total items
   --validate-only       only validate, do not do the actual import
   --make-template FILENAME
                         create a CSV template for the given model
   --access URI|CURIE    URI or CURIE of the access class to apply to new items
   --member-of URI       URI of the object that new items are PCDM members of
   --binaries-location LOCATION
-                        where to find binaries; either a path to a directory,
-                        a "zip:<path to zipfile>" URI, an SFTP URI in the form
-                        "sftp://<user>@<host>/<path to dir>", or a URI in the
-                        form "zip+sftp://<user>@<host>/<path to zipfile>"
-  --container PATH      parent container for new items; defaults to the
-                        RELPATH in the repo configuration file
-  --job-id JOB_ID       unique identifier for this job; defaults to
-                        "import-{timestamp}"
-  --resume              resume a job that has been started; requires --job-id
-                        {id} to be present
+                        where to find binaries; either a path to a directory, a "zip:<path to zipfile>" URI, an SFTP URI in the form
+                        "sftp://<user>@<host>/<path to dir>", or a URI in the form "zip+sftp://<user>@<host>/<path to zipfile>"
+  --container PATH      parent container for new items; defaults to the RELPATH in the repo configuration file
+  --job-id JOB_ID       unique identifier for this job; defaults to "import-{timestamp}"
+  --resume              resume a job that has been started; requires --job-id {id} to be present
   --extract-text-from MIME_TYPES, -x MIME_TYPES
-                        extract text from binaries of the given MIME types,
-                        and add as annotations
+                        extract text from binaries of the given MIME types, and add as annotations
+  --publish             automatically publish all items in this import
 ```
 
 ## Daemon Usage
 
 STOMP message headers:
 
-```
+```text
 PlastronCommand: import
 PlastronJobId: JOB_ID
 PlastronArg-model: MODEL
 PlastronArg-limit: LIMIT
 PlastronArg-percent: PERCENTAGE
 PlastronArg-validate-only: {true|false}
+PlastronArg-publish: {true|false}
 PlastronArg-resume: {true|false}
 PlastronArg-access: ACCESS
 PlastronArg-member-of: MEMBER_OF
@@ -152,7 +147,7 @@ plastron -c repo.yml import \
 
 Plastron will create the following structure in the `JOBS_DIR`:
 
-```
+```text
 {JOBS_DIR}
     +- import-foo-1           # job ID
         +- completed.log.csv  # completed item log
@@ -162,7 +157,7 @@ Plastron will create the following structure in the `JOBS_DIR`:
 
 Resume that job later:
 
-```bash
+```zsh
 plastron -c repo.yml import \
     --job-id import-foo-1 \
     --resume
@@ -181,7 +176,7 @@ select new subsets of items that have not yet been imported.
 
 For example, start a job that has 50 items total, but only load 10% at first:
 
-```bash
+```zsh
 plastron -c repo.yml import \
     --model Item \
     --binaries-location /path/to/binaries \
@@ -196,7 +191,7 @@ uncompleted items as possible.
 
 If you resume the job with the `--percent 10` option again:
 
-```bash
+```zsh
 plastron -c repo.yml import \
     --job-id percentile-job \
     --resume \

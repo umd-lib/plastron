@@ -16,6 +16,7 @@ dependencies = [
 [project.optional-dependencies]
 test = [
     "freezegun",
+    "httpretty",
     "pytest",
     "pytest-cov",
 ]

@@ -1,5 +1,4 @@
 import logging
-from functools import lru_cache
 from os.path import abspath, dirname
 from pathlib import Path
 from typing import Set
@@ -45,7 +44,6 @@ def get_vocabulary(vocab_uri: str) -> Graph:
     return graph
 
 
-@lru_cache()
 def get_subjects(vocab_uri: str) -> Set[Node]:
     subjects = set(get_vocabulary(vocab_uri).subjects())
     return subjects

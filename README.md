@@ -99,7 +99,7 @@ Source: [Wikipedia](https://en.wikipedia.org/wiki/Turtle_shell#Plastron)
 
 ## License
 
-See the [LICENSE](plastron-utils/LICENSE.md) file for license rights and
+See the [LICENSE](LICENSE.md) file for license rights and
 limitations (Apache 2.0).
 
 [development mode]: https://packaging.python.org/tutorials/installing-packages/#installing-from-vcs

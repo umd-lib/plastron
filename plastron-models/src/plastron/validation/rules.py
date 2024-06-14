@@ -30,10 +30,8 @@ def is_iso_8601_date(value: str) -> bool:
 
 
 def is_from_vocabulary(vocab_uri):
-    subjects = get_subjects(vocab_uri)
-
     def _value_from_vocab(value):
-        return value in subjects
+        return value in get_subjects(vocab_uri)
 
     _value_from_vocab.__doc__ = f'from vocabulary {vocab_uri}'
     return _value_from_vocab

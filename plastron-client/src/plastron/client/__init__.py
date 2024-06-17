@@ -436,7 +436,12 @@ class Client:
         keyword arguments are passed to the underlying `session.request()`
         method."""
         logger.debug(f'{method} {url}')
-        response = self.session.request(method, url, **kwargs)
+        try:
+            response = self.session.request(method, url, **kwargs)
+        except ConnectionError as e:
+            message = ' '.join(str(arg) for arg in e.args)
+            logger.error(message)
+            raise RuntimeError(f'Connection error: {message}') from e
         logger.debug(f'{response.status_code} {response.reason}')
         return response
 

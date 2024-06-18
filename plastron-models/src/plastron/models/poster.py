@@ -27,7 +27,7 @@ class Poster(PCDMObject):
     location = DataProperty(dc.coverage)
     longitude = DataProperty(geo.long)
     latitude = DataProperty(geo.lat)
-    subject = ObjectProperty(dc.subject)
+    subject = DataProperty(dc.subject, repeatable=True)
     rights = ObjectProperty(dcterms.rights, required=True)
     terms_of_use = ObjectProperty(
         dcterms.license,

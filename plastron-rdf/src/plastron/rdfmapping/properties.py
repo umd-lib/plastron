@@ -132,9 +132,14 @@ class RDFDataProperty(RDFProperty):
         self.datatype: URIRef = datatype
         """The datatype of this property"""
 
+    def add(self, value):
+        if not isinstance(value, Literal):
+            raise TypeError(f'Cannot add a non-Literal value {value} to data property {self.attr_name}')
+        super().add(value)
+
     @property
     def values(self) -> Iterator[Literal]:
-        return filter(lambda v: v.datatype == self.datatype, super().values)
+        return filter(lambda v: isinstance(v, Literal) and v.datatype == self.datatype, super().values)
 
     @property
     def languages(self) -> Iterator[str]:

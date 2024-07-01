@@ -1,0 +1,35 @@
+@prefix dc: <http://purl.org/dc/elements/1.1/> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+
+<http://vocab.lib.umd.edu/rightsStatement#CNE> rdfs:label "Copyright Not Evaluated";
+  dc:identifier "CNE";
+  owl:sameAs <http://rightsstatements.org/vocab/CNE/1.0/> .
+
+<http://vocab.lib.umd.edu/rightsStatement#InC> rdfs:label "In Copyright";
+  dc:identifier "InC";
+  owl:sameAs <http://rightsstatements.org/vocab/InC/1.0/> .
+
+<http://vocab.lib.umd.edu/rightsStatement#InC-EDU> rdfs:label "In Copyright - Educational Use Permitted";
+  dc:identifier "InC-EDU";
+  owl:sameAs <http://rightsstatements.org/vocab/InC-EDU/1.0/> .
+
+<http://vocab.lib.umd.edu/rightsStatement#InC-NC> rdfs:label "In Copyright - Non-Commercial Use Permitted";
+  dc:identifier "InC-NC";
+  owl:sameAs <http://rightsstatements.org/vocab/InC-NC/1.0/> .
+
+<http://vocab.lib.umd.edu/rightsStatement#InC-RUU> rdfs:label "In Copyright - Rights-Holder(s) Unlocatable or Unidentifiable";
+  dc:identifier "InC-RUU";
+  owl:sameAs <http://rightsstatements.org/vocab/InC-RUU/1.0/> .
+
+<http://vocab.lib.umd.edu/rightsStatement#NKC> rdfs:label "No Known Copyright";
+  dc:identifier "NKC";
+  owl:sameAs <http://rightsstatements.org/vocab/NKC/1.0/> .
+
+<http://vocab.lib.umd.edu/rightsStatement#NoC-US> rdfs:label "No Copyright - United States";
+  dc:identifier "NoC-US";
+  owl:sameAs <http://rightsstatements.org/vocab/NoC-US/1.0/> .
+
+<http://vocab.lib.umd.edu/rightsStatement#UND> rdfs:label "Copyright Undetermined";
+  dc:identifier "UND";
+  owl:sameAs <http://rightsstatements.org/vocab/UND/1.0/> .

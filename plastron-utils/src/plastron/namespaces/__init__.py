@@ -93,6 +93,9 @@ rel = Namespace('http://id.loc.gov/vocabulary/relators/')
 sc = Namespace('http://www.shared-canvas.org/ns/')
 """[Shared Canvas Data Model](https://iiif.io/api/model/shared-canvas/1.0/)"""
 
+schema = Namespace('https://schema.org/')
+"""[Schema.org](https://schema.org/)"""
+
 skos = Namespace('http://www.w3.org/2004/02/skos/core#')
 """[Simple Knowledge Organization System (SKOS)](https://www.w3.org/TR/skos-reference/)"""
 

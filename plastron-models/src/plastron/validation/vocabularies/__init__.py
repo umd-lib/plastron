@@ -1,5 +1,4 @@
 import logging
-from functools import lru_cache
 from os.path import abspath, dirname
 from pathlib import Path
 from typing import Set
@@ -12,10 +11,14 @@ from plastron.validation import ValidationError
 
 logger = logging.getLogger(__name__)
 
-VOCABULARIES_DIR = Path(dirname(abspath(__file__)))
-VOCABULARIES = {
-    'http://purl.org/dc/dcmitype/': 'dcmitype.ttl',
-}
+# Enable VOCABULARIES_DIR and VOCABULARIES to be overridden for tests
+if 'VOCABULARIES_DIR' not in globals():
+    VOCABULARIES_DIR = Path(dirname(abspath(__file__)))
+
+if 'VOCABULARIES' not in globals():
+    VOCABULARIES = {
+        'http://purl.org/dc/dcmitype/': 'dcmitype.ttl',
+    }
 
 
 def get_vocabulary(vocab_uri: str) -> Graph:
@@ -41,7 +44,6 @@ def get_vocabulary(vocab_uri: str) -> Graph:
     return graph
 
 
-@lru_cache()
 def get_subjects(vocab_uri: str) -> Set[Node]:
     subjects = set(get_vocabulary(vocab_uri).subjects())
     return subjects

@@ -1,7 +1,7 @@
 from rdflib import URIRef
 
 from plastron.models.pcdm import PCDMObject
-from plastron.namespaces import dcterms, dc, edm, bibo, geo, ore, umd, umdtype
+from plastron.namespaces import bibo, dcterms, dc, edm, geo, ore, schema, umd, umdtype
 from plastron.rdfmapping.decorators import rdf_type
 from plastron.rdfmapping.descriptors import ObjectProperty, DataProperty, Property
 from plastron.validation.rules import is_edtf_formatted, is_handle, is_from_vocabulary
@@ -27,8 +27,13 @@ class Poster(PCDMObject):
     location = DataProperty(dc.coverage)
     longitude = DataProperty(geo.long)
     latitude = DataProperty(geo.lat)
-    subject = ObjectProperty(dc.subject)
+    subject = DataProperty(dc.subject, repeatable=True)
     rights = ObjectProperty(dcterms.rights, required=True)
+    terms_of_use = ObjectProperty(
+        dcterms.license,
+        validate=is_from_vocabulary('http://vocab.lib.umd.edu/termsOfUse#')
+    )
+    copyright_notice = DataProperty(schema.copyrightNotice)
     identifier = DataProperty(dcterms.identifier, required=True)
     handle = DataProperty(dcterms.identifier, validate=is_handle, datatype=umdtype.handle)
     place = ObjectProperty(dcterms.spatial)
@@ -56,6 +61,8 @@ class Poster(PCDMObject):
         'latitude': 'Latitude',
         'subject': 'Subject',
         'rights': 'Rights',
+        'terms_of_use': 'Terms of Use',
+        'copyright_notice': 'Copyright Notice',
         'identifier': 'Identifier',
         'handle': 'Handle',
         'presentation_set': 'Presentation Set',

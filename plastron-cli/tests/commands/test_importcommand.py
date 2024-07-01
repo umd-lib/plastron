@@ -1,7 +1,8 @@
 import argparse
 import os
 import tempfile
-from io import StringIO
+from csv import DictReader
+from io import BytesIO, StringIO
 from uuid import uuid4
 
 import pytest
@@ -103,6 +104,72 @@ def test_container_is_required_unless_resuming(datadir, plastron_context):
             pass
 
     assert "A container is required unless resuming an existing job" in str(excinfo.value)
+
+
+@pytest.mark.parametrize(
+    ('model_name', 'expected_header_fields'),
+    [
+        (
+            'Item',
+            [
+                'Object Type', 'Identifier', 'Rights Statement', 'Title',
+                'Format', 'Archival Collection', 'Presentation Set', 'Date',
+                'Description', 'Alternate Title', 'Creator', 'Creator URI',
+                'Contributor', 'Contributor URI', 'Publisher', 'Publisher URI',
+                'Location', 'Extent', 'Subject', 'Language', 'Rights Holder',
+                'Terms of Use', 'Copyright Notice', 'Collection Information',
+                'Accession Number', 'Handle', 'FILES', 'ITEM_FILES'
+            ]
+        ),
+        (
+            'Letter',
+            [
+                'Title', 'Rights Holder', 'Extent', 'Bibliographic Citation',
+                'Description', 'Language', 'Date', 'Resource Type', 'Rights',
+                'Terms of Use', 'Copyright Notice', 'Subject', 'Location',
+                'Longitude', 'Latitude', 'Archival Collection', 'Handle/Link',
+                'Identifier', 'Recipient', 'Author', 'Handle',
+                'Presentation Set', 'FILES', 'ITEM_FILES'
+            ]
+        ),
+        (
+            'Poster',
+            [
+                'Title', 'Alternate Title', 'Publisher', 'Collection',
+                'Format', 'Resource Type', 'Date', 'Language', 'Description',
+                'Extent', 'Issue', 'Identifier/Call Number', 'Location',
+                'Longitude', 'Latitude', 'Subject', 'Rights', 'Terms of Use',
+                'Copyright Notice', 'Identifier', 'Handle', 'Presentation Set',
+                'FILES', 'ITEM_FILES'
+            ]
+        ),
+        (
+            'Issue',
+            [
+                'Title', 'Date', 'Volume', 'Issue', 'Edition', 'Handle',
+                'Presentation Set', 'Copyright Notice', 'Terms of Use',
+                'FILES', 'ITEM_FILES'
+            ]
+        ),
+
+    ]
+)
+def test_make_template(plastron_context, model_name, expected_header_fields):
+    template_file = tempfile.NamedTemporaryFile(delete=False)
+    with open(template_file.name, 'w') as template_file:
+        args = create_args(model=model_name, template_file=template_file)
+        plastron_context.args = args
+        command = Command(context=plastron_context)
+        command(args)
+
+    with open(template_file.name, 'r') as template_file:
+        template_file.seek(0)
+
+        csv_reader = DictReader(template_file)
+        header_fields = csv_reader.fieldnames
+        os.unlink(template_file.name)
+
+        assert header_fields == expected_header_fields
 
 
 def create_args(**kwargs):

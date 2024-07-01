@@ -78,21 +78,12 @@ def test_import_job_create_resource(import_file, jobs):
     mock_repo.__getitem__.return_value = mock_container
     mock_context = MagicMock(spec=PlastronContext, repo=mock_repo)
 
-    expected_publication_statuses = [
-        'Unpublished',
-        'Published',
-        'UnpublishedHidden',
-        'PublishedHidden',
-        'Unpublished',
-        'Unpublished',
-        'Unpublished',
-        'UnpublishedHidden',
-        'Published',
-    ]
     import_job = jobs.create_job(ImportJob, config=ImportConfig(job_id='123', model='Item'))
     for i, stats in enumerate(import_job.run(context=mock_context, import_file=import_file.open())):
         assert mock_container.obj is not None
-        assert get_publication_status(mock_container.obj) == expected_publication_statuses[i]
+        # PUBLISH and HIDDEN columns should be ignored, all items
+        # should be unpublished
+        assert get_publication_status(mock_container.obj) == 'Unpublished'
 
 
 def test_import_job_create_resource_publish_all(import_file, jobs):
@@ -102,21 +93,11 @@ def test_import_job_create_resource_publish_all(import_file, jobs):
     mock_repo.__getitem__.return_value = mock_container
     mock_context = MagicMock(spec=PlastronContext, repo=mock_repo)
 
-    expected_publication_statuses = [
-        'Published',
-        'Published',
-        'PublishedHidden',
-        'PublishedHidden',
-        'Published',
-        'Published',
-        'Published',
-        'PublishedHidden',
-        'Published',
-    ]
     import_job = jobs.create_job(ImportJob, config=ImportConfig(job_id='123', model='Item'))
     for i, stats in enumerate(import_job.run(context=mock_context, publish=True, import_file=import_file.open())):
         assert mock_container.obj is not None
-        assert get_publication_status(mock_container.obj) == expected_publication_statuses[i]
+        # HIDDEN column should be ignored, all items should be published
+        assert get_publication_status(mock_container.obj) == 'Published'
 
 
 def test_config_read_none_string_as_none(jobs):

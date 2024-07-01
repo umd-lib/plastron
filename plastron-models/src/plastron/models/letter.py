@@ -4,7 +4,7 @@ from plastron.rdfmapping.decorators import rdf_type
 from plastron.rdfmapping.descriptors import ObjectProperty, DataProperty
 from plastron.rdfmapping.resources import RDFResource
 from plastron.validation.rules import is_edtf_formatted, is_handle, is_from_vocabulary
-from plastron.namespaces import bibo, dc, dcmitype, dcterms, edm, geo, rel, skos, ore, owl, umd
+from plastron.namespaces import bibo, dc, dcmitype, dcterms, edm, geo, ore, owl, rel, schema, skos, umd
 
 umdtype = Namespace('http://vocab.lib.umd.edu/datatype#')
 
@@ -43,6 +43,7 @@ class Letter(RDFResource):
     place = ObjectProperty(dcterms.spatial, repeatable=True, embed=True, cls=Place)
     subject = ObjectProperty(dcterms.subject, repeatable=True, embed=True, cls=Concept)
     rights = ObjectProperty(dcterms.rights, required=True)
+    copyright_notice = DataProperty(schema.copyrightNotice)
     identifier = DataProperty(dcterms.identifier, required=True)
     type = DataProperty(edm.hasType, required=True)
     date = DataProperty(dc.date, validate=is_edtf_formatted)
@@ -51,6 +52,10 @@ class Letter(RDFResource):
     bibliographic_citation = DataProperty(dcterms.bibliographicCitation, required=True)
     extent = DataProperty(dcterms.extent, required=True)
     rights_holder = DataProperty(dcterms.rightsHolder, required=True)
+    terms_of_use = ObjectProperty(
+        dcterms.license,
+        validate=is_from_vocabulary('http://vocab.lib.umd.edu/termsOfUse#')
+    )
     handle = DataProperty(dcterms.identifier, datatype=umdtype.handle, validate=is_handle)
     presentation_set = ObjectProperty(
         ore.isAggregatedBy,
@@ -68,6 +73,8 @@ class Letter(RDFResource):
         'date': 'Date',
         'type': 'Resource Type',
         'rights': 'Rights',
+        'terms_of_use': 'Terms of Use',
+        'copyright_notice': 'Copyright Notice',
         'subject': {
             'label': 'Subject',
         },

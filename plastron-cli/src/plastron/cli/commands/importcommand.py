@@ -31,7 +31,26 @@ def write_model_template(model_name: str, template_file: TextIO):
 
     logger.info(f'Writing template for the {model_class.__name__} model to {template_file.name}')
     writer = csv.writer(template_file)
-    writer.writerow(list(model_class.HEADER_MAP.values()) + ['FILES', 'ITEM_FILES'])
+    writer.writerow(parse_model_header_map(model_class) + ['FILES', 'ITEM_FILES'])
+
+
+def parse_model_header_map(model_class):
+    """
+    Returns a list of fields to use as column headers for the CSV template file
+    derived from the HEADER_MAP of the given model class.
+    """
+    header_fields = []
+
+    for header in model_class.HEADER_MAP.values():
+        if isinstance(header, dict):
+            # Every value in a header map dictionary is assumed to be a field
+            # name that should be used by the CSV file.
+            for value in header.values():
+                header_fields.append(value)
+        else:
+            header_fields.append(header)
+
+    return header_fields
 
 
 def configure_cli(subparsers):

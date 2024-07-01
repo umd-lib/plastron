@@ -1,8 +1,11 @@
 import re
+from http.client import RemoteDisconnected
+from unittest.mock import MagicMock
 
 import pytest
 import requests
 from requests import Session, Request
+from requests.exceptions import ConnectionError
 from requests_jwtauth import HTTPBearerAuth
 
 from plastron.client import Endpoint, Client, random_slug, ResourceURI, RepositoryStructure, \
@@ -354,3 +357,13 @@ def test_forwarded_headers(url, external_url, forwarded_host, forwarded_protocol
     client = Client(endpoint=endpoint)
     assert client.forwarded_host == forwarded_host
     assert client.forwarded_protocol == forwarded_protocol
+
+
+def test_client_connection_error(client, monkeypatch):
+    error = RemoteDisconnected('Remote end closed connection without response')
+    mock_session = MagicMock(spec=Session)
+    mock_session.request.side_effect = ConnectionError('Connection aborted.', error)
+    monkeypatch.setattr(client, 'session', mock_session)
+    with pytest.raises(RuntimeError) as e:
+        client.get(client.endpoint.url)
+    assert str(e.value) == 'Connection error: Connection aborted. Remote end closed connection without response'

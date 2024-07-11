@@ -4,20 +4,9 @@ from rdflib import Literal, URIRef
 from plastron.namespaces import rdfs, owl, dcterms
 from plastron.rdfmapping.descriptors import DataProperty, ObjectProperty
 from plastron.rdfmapping.embed import EmbeddedObject
-from plastron.rdfmapping.resources import RDFResource, RDFResourceBase
+from plastron.rdfmapping.resources import RDFResource
 from plastron.serializers.csv import join_values, flatten_headers, unflatten, flatten, ensure_text_mode, \
-    ensure_binary_mode
-
-
-@pytest.fixture
-def header_map():
-    return {
-        'title': 'Title',
-        'subject': {
-            'label': 'Subject',
-            'same_as': 'Subject URI',
-        },
-    }
+    ensure_binary_mode, ColumnHeader
 
 
 class Subject(RDFResource):
@@ -58,6 +47,16 @@ def test_flatten_headers(header_map):
     assert flatten_headers(header_map) == flat_headers
 
 
+def test_flatten_multiple_languages(multilingual_item, header_map):
+    expected_values = {
+        ColumnHeader(label='Title'): [Literal('The Trial')],
+        ColumnHeader(label='Title', language='de'): [Literal('Der Prozeß', lang='de')],
+    }
+    columns = flatten(multilingual_item, header_map)
+    for key, value in expected_values.items():
+        assert columns[key] == value
+
+
 def test_unflatten(header_map):
     row = {
         'Title': 'Foo',
@@ -82,10 +81,11 @@ def test_unflatten_flatten(header_map):
         'Subject URI': 'http://example.com/term/phil',
     }
     obj = Thing(**unflatten(row_data=row, header_map=header_map, resource_class=Thing))
-    output_row = {k: join_values(v) for k, v in flatten(obj, header_map).items()}
+    columns = flatten(obj, header_map)
+    output_row = {k: join_values(v) for k, v in columns.items()}
 
     for key in row.keys():
-        assert output_row[key] == row[key]
+        assert output_row[ColumnHeader(label=key)] == row[key]
 
 
 def test_unflatten_multiple_embed(header_map):

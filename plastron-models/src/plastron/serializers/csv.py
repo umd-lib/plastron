@@ -1,11 +1,11 @@
 import csv
 import os
 import re
-from collections import defaultdict
+from collections import defaultdict, UserDict
 from contextlib import contextmanager
 from itertools import zip_longest
 from pathlib import Path
-from typing import List, Union, Dict, Type, NamedTuple, Mapping, Iterable
+from typing import List, Union, Dict, Type, NamedTuple, Mapping, Iterable, TextIO
 
 from rdflib import URIRef, Literal
 from urlobject import URLObject
@@ -135,36 +135,6 @@ def flatten_headers(header_map: Dict[str, Union[str, dict]], prefix='') -> Dict[
     return headers
 
 
-def flatten(description: RDFResourceBase, header_map: Dict[str, Union[str, dict]]) -> Dict[str, List[str]]:
-    """Convert an RDF description to a dictionary with string header keys and list values.
-    RDF attributes of the description object are mapped to the header keys by the `header_map`."""
-    columns = defaultdict(list)
-    for attr, header in header_map.items():
-        if isinstance(header, dict):
-            # treat this as an embedded ObjectProperty
-            base_prop = getattr(description, attr)
-            assert isinstance(base_prop, RDFObjectProperty), f'"{attr}" must be an object property'
-            for n, obj in enumerate(base_prop.objects):
-                # add this embedded object to the index for this row
-                columns['INDEX'].append([f'{attr}[{n}]=#{URLObject(obj.uri).fragment}'])
-                for key, values in flatten(obj, header).items():
-                    columns[key].append(values)
-        else:
-            if description is not None:
-                prop = getattr(description, attr)
-                if isinstance(prop, RDFDataProperty):
-                    # handle language tags on literals
-                    languages = set(v.language for v in prop.values)
-                    language_headers = {lang: header + (f' [{lang}]' if lang else '') for lang in languages}
-                    for tag, tagged_header in language_headers.items():
-                        columns[tagged_header] = [v for v in prop.values if v.language == tag]
-                else:
-                    columns[header] = list(prop.values)
-            else:
-                columns[header] = []
-    return columns
-
-
 class ColumnHeader(NamedTuple):
     """A column header with an optional language."""
     label: str
@@ -189,6 +159,46 @@ class ColumnHeader(NamedTuple):
 
     def __str__(self):
         return f'{self.label} [{self.language}]' if self.language is not None else self.label
+
+
+class ColumnDict(UserDict):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.index = []
+
+
+def flatten(
+    description: RDFResourceBase,
+    header_map: Dict[str, Union[str, dict]],
+) -> ColumnDict:
+    """Convert an RDF description to a dictionary with `ColumnHeader` keys and list values, and a
+    lookup index list for embedded objects. RDF attributes of the description object are mapped to
+    the header keys by the `header_map`."""
+    columns = ColumnDict()
+    for attr, header in header_map.items():
+        if isinstance(header, dict):
+            # treat this as an embedded ObjectProperty
+            base_prop = getattr(description, attr)
+            assert isinstance(base_prop, RDFObjectProperty), f'"{attr}" must be an object property'
+            for n, obj in enumerate(base_prop.objects):
+                # add this embedded object to the index for this row
+                columns.index.append([f'{attr}[{n}]=#{URLObject(obj.uri).fragment}'])
+                embedded_columns = flatten(obj, header)
+                columns.update(embedded_columns)
+        else:
+            if description is not None:
+                prop = getattr(description, attr)
+                if isinstance(prop, RDFDataProperty):
+                    # handle language tags on literals
+                    for language in set(v.language for v in prop.values):
+                        columns[ColumnHeader(label=header, language=language)] = [
+                            v for v in prop.values if v.language == language
+                        ]
+                else:
+                    columns[ColumnHeader(label=header)] = list(prop.values)
+            else:
+                columns[ColumnHeader(label=header)] = []
+    return columns
 
 
 def get_column_headers(headers: Iterable[str], base_header: str) -> List[ColumnHeader]:
@@ -312,27 +322,38 @@ def ensure_binary_mode(file):
         yield file
 
 
-def write_csv_file(row_info, file):
-    # sort and add the new headers that have language names or datatypes
-    for header, new_headers in row_info['extra_headers'].items():
-        header_index = row_info['headers'].index(header)
-        for i, new_header in enumerate(sorted(new_headers), start=1):
-            row_info['headers'].insert(header_index + i, new_header)
+class Sheet:
+    def __init__(self, model: Type[RDFResourceBase]):
+        self.model_class = model
+        self.headers = list(flatten_headers(self.header_map).keys()) + CSVSerializer.SYSTEM_HEADERS
+        self.extra_headers = defaultdict(set)
+        self.rows = []
 
-    # strip out headers that aren't used in any row
-    for header in row_info['headers']:
-        has_column_values = any([True for row in row_info['rows'] if header in row])
-        if not has_column_values:
-            row_info['headers'].remove(header)
+    @property
+    def header_map(self):
+        return self.model_class.HEADER_MAP
 
-    # write the CSV file;
-    # file must be opened in text mode, otherwise csv complains
-    # about wanting str and not bytes
-    with ensure_text_mode(file) as csv_file:
-        csv_writer = csv.DictWriter(csv_file, row_info['headers'], extrasaction='ignore')
-        csv_writer.writeheader()
-        for row in row_info['rows']:
-            csv_writer.writerow(row)
+    def write_csv_file(self, file: TextIO):
+        # sort and add the new headers that have language names or datatypes
+        for header, new_headers in self.extra_headers.items():
+            header_index = self.headers.index(header)
+            for i, new_header in enumerate(sorted(new_headers), start=1):
+                self.headers.insert(header_index + i, new_header)
+
+        # strip out headers that aren't used in any row
+        for header in self.headers:
+            has_column_values = any([True for row in self.rows if header in row])
+            if not has_column_values:
+                self.headers.remove(header)
+
+        # write the CSV file;
+        # file must be opened in text mode, otherwise csv complains
+        # about wanting str and not bytes
+        with ensure_text_mode(file) as csv_file:
+            csv_writer = csv.DictWriter(csv_file, self.headers, extrasaction='ignore')
+            csv_writer.writeheader()
+            for row in self.rows:
+                csv_writer.writerow(row)
 
 
 class CSVSerializer:
@@ -346,7 +367,7 @@ class CSVSerializer:
         self.directory = Path(directory) if directory is not None else Path.cwd()
         """Destination directory for the CSV file(s)"""
 
-        self.rows_by_content_model = {}
+        self.sheets = {}
         """Internal accumulator of row data"""
 
         self.content_type = 'text/csv'
@@ -372,16 +393,19 @@ class CSVSerializer:
         the `finish()` method is called.
         """
         resource_class = type(resource)
-        if resource_class not in self.rows_by_content_model:
-            self.rows_by_content_model[resource_class] = {
-                'header_map': resource_class.HEADER_MAP,
-                'headers': list(flatten_headers(resource_class.HEADER_MAP).keys()) + self.SYSTEM_HEADERS,
-                'extra_headers': defaultdict(set),
-                'rows': []
-            }
 
-        row = {k: join_values(v) for k, v in flatten(resource, resource_class.HEADER_MAP).items()}
+        if resource_class not in self.sheets:
+            self.sheets[resource_class] = Sheet(model=resource_class)
+        sheet = self.sheets[resource_class]
+
+        columns = flatten(resource, resource_class.HEADER_MAP)
+        for header in columns.keys():
+            if header.language is not None:
+                sheet.extra_headers[header.label].add(str(header))
+
+        row = {str(k): join_values(v) for k, v in columns.items()}
         row['URI'] = str(resource.uri)
+        row['INDEX'] = join_values(columns.index)
         if files is not None:
             row['FILES'] = ';'.join(
                 os.path.join(binaries_dir, file.describe(PCDMFile).filename.value) for file in files)
@@ -395,7 +419,7 @@ class CSVSerializer:
         row['PUBLISH'] = str(umdaccess.Published in resource.rdf_type.values)
         row['HIDDEN'] = str(umdaccess.Hidden in resource.rdf_type.values)
 
-        self.rows_by_content_model[resource_class]['rows'].append(row)
+        sheet.rows.append(row)
 
         return row
 
@@ -418,14 +442,14 @@ class CSVSerializer:
 
         Raises an `EmptyItemListError` if there are no items to export.
         """
-        if len(self.rows_by_content_model) == 0:
+        if len(self.sheets) == 0:
             raise EmptyItemListError()
 
-        for resource_class, row_info in self.rows_by_content_model.items():
+        for resource_class, sheet in self.sheets.items():
             metadata_filename = resource_class.__name__ + '_metadata.csv'
             with (self.directory / metadata_filename).open(mode='w') as metadata_file:
                 # write a CSV file for this model
-                write_csv_file(row_info, metadata_file)
+                sheet.write_csv_file(metadata_file)
 
 
 class EmptyItemListError(Exception):

@@ -38,3 +38,11 @@ def test_write(resource, expected_values):
     row = serializer.write(resource=resource)
     for key, expected_value in expected_values.items():
         assert row[key] == expected_value
+
+
+def test_serialize_multiple_languages(multilingual_item, header_map):
+    serializer = CSVSerializer()
+    row = serializer.write(multilingual_item)
+    expected_values = {'Title': 'The Trial', 'Title [de]': 'Der Prozeß'}
+    for key, value in expected_values.items():
+        assert row[key] == value

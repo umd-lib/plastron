@@ -2,7 +2,7 @@ from typing import Dict, Any, Generator
 
 from plastron.context import PlastronContext
 from plastron.jobs.publicationjob import PublicationJob, PublicationAction
-from plastron.stomp.messages import PlastronCommandMessage
+from plastron.messaging.messages import PlastronCommandMessage
 from plastron.utils import strtobool
 
 

@@ -7,11 +7,11 @@ from typing import Dict, Any, Callable, Generator, Iterator
 from stomp.listener import ConnectionListener
 
 from plastron.context import PlastronContext
-from plastron.stomp.broker import Destination
+from plastron.messaging.broker import Destination
+from plastron.messaging.messages import MessageBox, PlastronCommandMessage, PlastronMessage
 from plastron.stomp.commands import get_command_module, get_module_name
 from plastron.stomp.handlers import AsynchronousResponseHandler, SynchronousResponseHandler
 from plastron.stomp.inbox_watcher import InboxWatcher
-from plastron.stomp.messages import MessageBox, PlastronCommandMessage, PlastronMessage
 
 logger = logging.getLogger(__name__)
 version = importlib.metadata.version('plastron-stomp')

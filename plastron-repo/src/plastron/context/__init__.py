@@ -12,9 +12,9 @@ import pysolr
 from plastron.client import Endpoint, Client, RepositoryStructure
 from plastron.client.auth import get_authenticator
 from plastron.handles import HandleServiceClient
+from plastron.messaging.broker import Broker, ServerTuple
 from plastron.models.fedora import FedoraResource
 from plastron.repo import Repository, RepositoryResource, RepositoryError
-from plastron.stomp.broker import Broker, ServerTuple
 
 UUID_REGEX = re.compile(r'([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})', re.IGNORECASE)
 

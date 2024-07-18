@@ -1,13 +1,11 @@
 import logging
-import os
 from pathlib import Path
 from typing import NamedTuple, Optional, Dict, Union
 
 from stomp import Connection11
 from stomp.exception import StompException
 
-from plastron.stomp import __version__
-from plastron.stomp.messages import Message
+from plastron.messaging.messages import Message
 
 logger = logging.getLogger(__name__)
 
@@ -35,10 +33,10 @@ class Broker:
     ):
         self.server = server
         self.connection = Connection11([self.server])
-        self.client_id = f'plastrond/{__version__}-{os.uname().nodename}-{os.getpid()}'
         self.destinations = {key.upper(): Destination(self, value) for key, value in destinations.items()}
         self.message_store_dir = message_store_dir
         self.public_uri_template = public_uri_template
+        self.client_id = None
 
     def __str__(self):
         return f'{self.server} (client-id: {self.client_id})'
@@ -46,23 +44,26 @@ class Broker:
     def __getitem__(self, item) -> 'Destination':
         return self.destination(item)
 
-    def connect(self) -> bool:
+    def connect(self, client_id: str) -> bool:
         if not self.connection.is_connected():
             logger.info(
                 f'Attempting to connect to STOMP message broker ('
                 f'Host: {self.server[0]}, '
                 f'Port: {self.server[1]}, '
-                f'Client ID: {self.client_id})'
+                f'Client ID: {client_id})'
             )
             try:
-                self.connection.connect(wait=True, headers={'client-id': self.client_id})
+                self.connection.connect(wait=True, headers={'client-id': client_id})
             except StompException:
                 logger.error(f'STOMP connection failed for {self}')
                 return False
+            else:
+                self.client_id = client_id
         return self.connection.is_connected()
 
     def disconnect(self):
         self.connection.disconnect()
+        self.client_id = None
 
     def set_listener(self, *args):
         self.connection.set_listener(*args)

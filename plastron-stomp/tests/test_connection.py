@@ -7,7 +7,7 @@ from coilmq.server.socket_server import StompServer
 from coilmq.store.memory import MemoryQueue
 from coilmq.topic import TopicManager
 
-from plastron.stomp.broker import ServerTuple, Broker
+from plastron.messaging.broker import ServerTuple, Broker
 from plastron.stomp.daemon import STOMPDaemon
 
 

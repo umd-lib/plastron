@@ -3,7 +3,7 @@ from typing import Generator, Any, Dict
 
 from plastron.context import PlastronContext
 from plastron.jobs.exportjob import ExportJob
-from plastron.stomp.messages import PlastronCommandMessage
+from plastron.messaging.messages import PlastronCommandMessage
 from plastron.utils import strtobool
 
 logger = logging.getLogger(__name__)

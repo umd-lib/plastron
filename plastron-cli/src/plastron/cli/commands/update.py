@@ -4,8 +4,7 @@ from argparse import FileType, Namespace
 from plastron.cli.commands import BaseCommand
 from plastron.jobs.updatejob import UpdateJob
 from plastron.models import get_model_class
-from plastron.rdf import parse_predicate_list
-from plastron.utils import ItemLog
+from plastron.utils import ItemLog, parse_predicate_list
 
 logger = logging.getLogger(__name__)
 

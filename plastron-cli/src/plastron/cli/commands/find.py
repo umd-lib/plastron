@@ -6,7 +6,8 @@ from rdflib import URIRef, Literal
 
 from plastron.cli.commands import BaseCommand
 from plastron.namespaces import get_manager, rdf
-from plastron.rdf import parse_predicate_list, parse_data_property, parse_object_property, uri_or_curie
+from plastron.cli import parse_data_property, parse_object_property
+from plastron.utils import uri_or_curie, parse_predicate_list
 from plastron.repo import RepositoryResource
 
 logger = logging.getLogger(__name__)

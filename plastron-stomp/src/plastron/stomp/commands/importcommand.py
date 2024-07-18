@@ -8,9 +8,8 @@ from rdflib import URIRef
 from plastron.context import PlastronContext
 from plastron.jobs import Jobs
 from plastron.jobs.importjob import ImportConfig, ImportJob
-from plastron.rdf import uri_or_curie
-from plastron.utils import datetimestamp, strtobool
 from plastron.messaging.messages import PlastronCommandMessage
+from plastron.utils import datetimestamp, strtobool, uri_or_curie
 
 logger = logging.getLogger(__name__)
 

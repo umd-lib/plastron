@@ -4,20 +4,31 @@ Tools for working with a Fedora 4 repository.
 
 ## Architecture
 
-Plastron is composed of several distribution packages:
+Plastron is composed of several distribution packages, arranged in three 
+layers:
 
-* **[plastron-client](plastron-client)**: The Fedora repository API client
-* **[plastron-rdf](plastron-rdf)**: RDF-to-Python property mapping
-* **[plastron-models](plastron-models)**: Content models, CSV
-  serialization
-* **[plastron-repo](plastron-repo)**: Repository operations and structural
-  models (LDP, PCDM, Web Annotations, etc.)
+### Applications
+
 * **[plastron-cli](plastron-cli)**: Command-line tool. Also includes the
   handler classes for the `load` command
 * **[plastron-stomp](plastron-stomp)**: STOMP daemon for handling
   asynchronous operations
 * **[plastron-web](plastron-web)**: Web application for handling
   synchronous operations
+
+### High-Level APIs
+
+* **[plastron-models](plastron-models)**: Content models, CSV
+  serialization
+* **[plastron-repo](plastron-repo)**: Repository operations and structural
+  models (LDP, PCDM, Web Annotations, etc.)
+
+### Low-level APIs
+
+* **[plastron-client](plastron-client)**: The Fedora repository API client
+* **[plastron-messaging](plastron-messaging)**: STOMP message models and 
+  message broker connection handling
+* **[plastron-rdf](plastron-rdf)**: RDF-to-Python property mapping
 * **[plastron-utils](plastron-utils)**: Miscellaneous utilities
 
 The intent is that these distribution packages are independently useful,
@@ -35,15 +46,16 @@ an installed Python 3.8 for you.
 
 To install Plastron in [development mode], do the following:
 
-```bash
+```zsh
 git clone git@github.com:umd-lib/plastron.git
 cd plastron
-python -m venv .venv
+python -m venv --prompt "plastron-py$(cat .python-version)" .venv
 source .venv/bin/activate
 pip install \
     -e './plastron-utils[test]' \
     -e './plastron-client[test]' \
     -e './plastron-rdf[test]' \
+    -e './plastron-messaging[test]' \
     -e './plastron-models[test]' \
     -e './plastron-repo[test]' \
     -e './plastron-web[test]' \

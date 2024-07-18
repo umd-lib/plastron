@@ -1,6 +1,5 @@
 [project]
 name = "plastron-repo"
-version = "4.3.1"
 description = "High-level classes and functions for interacting with a Fedora repository"
 authors = [
     { name='University of Maryland Libraries', email='lib-ssdr@umd.edu' },
@@ -27,6 +26,7 @@ dependencies = [
     "requests",
     "URLObject",
 ]
+dynamic = ["version"]
 
 [project.optional-dependencies]
 test = [
@@ -37,5 +37,8 @@ test = [
 ]
 
 [build-system]
-requires = ["setuptools"]
+requires = ["setuptools>=66.1.0"]
 build-backend = "setuptools.build_meta"
+
+[tool.setuptools.dynamic]
+version = { "file" = "VERSION" }

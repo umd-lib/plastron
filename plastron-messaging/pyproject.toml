@@ -1,6 +1,5 @@
 [project]
 name = "plastron-messaging"
-version = "4.3.1"
 description = "Plastron STOMP messaging tools"
 authors = [
     { name='University of Maryland Libraries', email='lib-ssdr@umd.edu' },
@@ -16,6 +15,7 @@ requires-python = ">= 3.8"
 dependencies = [
     "stomp.py",
 ]
+dynamic = ["version"]
 
 [project.optional-dependencies]
 test = [
@@ -24,5 +24,8 @@ test = [
 ]
 
 [build-system]
-requires = ["setuptools"]
+requires = ["setuptools>=66.1.0"]
 build-backend = "setuptools.build_meta"
+
+[tool.setuptools.dynamic]
+version = { "file" = "VERSION" }

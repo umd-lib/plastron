@@ -1,6 +1,5 @@
 [project]
 name = "plastron-cli"
-version = "4.3.1"
 description = "Plastron command line client"
 authors = [
     { name='University of Maryland Libraries', email='lib-ssdr@umd.edu' },
@@ -25,6 +24,7 @@ dependencies = [
     "PyYAML",
     "rdflib",
 ]
+dynamic = ["version"]
 
 [project.optional-dependencies]
 test = [
@@ -36,8 +36,11 @@ test = [
 plastron = "plastron.cli:main"
 
 [build-system]
-requires = ["setuptools"]
+requires = ["setuptools>=66.1.0"]
 build-backend = "setuptools.build_meta"
+
+[tool.setuptools.dynamic]
+version = { "file" = "VERSION" }
 
 [tool.pytest.ini_options]
 markers = ['jobs_dir']

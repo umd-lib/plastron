@@ -1,6 +1,5 @@
 [project]
 name = 'plastron-utils'
-version = "4.3.1"
 description = 'Utility functions and namespace definitions for Plastron'
 authors = [
     { name='University of Maryland Libraries', email='lib-ssdr@umd.edu' },
@@ -16,6 +15,7 @@ requires-python = '>=3.8'
 dependencies = [
     "rdflib",
 ]
+dynamic = ["version"]
 
 [project.optional-dependencies]
 test = [
@@ -29,5 +29,8 @@ Homepage = 'https://github.com/umd-lib/plastron'
 Source = 'https://github.com/umd-lib/plastron'
 
 [build-system]
-requires = ["setuptools"]
+requires = ["setuptools>=66.1.0"]
 build-backend = "setuptools.build_meta"
+
+[tool.setuptools.dynamic]
+version = { "file" = "VERSION" }

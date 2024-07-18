@@ -1,6 +1,5 @@
 [project]
 name = "plastron-web"
-version = "4.3.1"
 description = "Plastron HTTP web app"
 authors = [
     { name='University of Maryland Libraries', email='lib-ssdr@umd.edu' },
@@ -21,6 +20,7 @@ dependencies = [
     "python-dotenv",
     "waitress",
 ]
+dynamic = ["version"]
 
 [project.optional-dependencies]
 test = [
@@ -32,8 +32,11 @@ test = [
 plastrond-http = 'plastron.web.server:run'
 
 [build-system]
-requires = ["setuptools"]
+requires = ["setuptools>=66.1.0"]
 build-backend = "setuptools.build_meta"
+
+[tool.setuptools.dynamic]
+version = { "file" = "VERSION" }
 
 [tool.pytest.ini_options]
 markers = ['jobs_dir']

@@ -1,6 +1,5 @@
 [project]
 name = "plastron-rdf"
-version = "4.3.1"
 description = "RDF to Python object mapper"
 authors = [
     { name='University of Maryland Libraries', email='lib-ssdr@umd.edu' },
@@ -16,6 +15,7 @@ requires-python = ">= 3.8"
 dependencies = [
     "rdflib",
 ]
+dynamic = ["version"]
 
 [project.optional-dependencies]
 test = [
@@ -25,5 +25,8 @@ test = [
 ]
 
 [build-system]
-requires = ["setuptools"]
+requires = ["setuptools>=66.1.0"]
 build-backend = "setuptools.build_meta"
+
+[tool.setuptools.dynamic]
+version = { "file" = "VERSION" }

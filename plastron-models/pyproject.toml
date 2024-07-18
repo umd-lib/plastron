@@ -20,6 +20,9 @@ dependencies = [
     "requests",
     "paramiko",
     "pillow",
+    "plastron-client",
+    "plastron-rdf",
+    "plastron-utils",
     # rdflib 6.0.0 fixed the 308 HTTP redirect bug
     "rdflib >= 6.0.0",
 ]

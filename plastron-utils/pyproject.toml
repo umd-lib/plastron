@@ -31,3 +31,7 @@ test = [
 Homepage = 'https://github.com/umd-lib/plastron'
 'Bug Reports' = 'https://github.com/umd-lib/plastron/issues'
 Source = 'https://github.com/umd-lib/plastron'
+
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"

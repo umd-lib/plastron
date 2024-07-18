@@ -31,3 +31,7 @@ test = [
     "pytest-cov",
     "pytest-datadir",
 ]
+
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"

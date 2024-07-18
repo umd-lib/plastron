@@ -29,5 +29,9 @@ test = [
 [project.scripts]
 plastrond-http = 'plastron.web.server:run'
 
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
 [tool.pytest.ini_options]
 markers = ['jobs_dir']

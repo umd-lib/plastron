@@ -15,7 +15,7 @@ requires-python = ">= 3.8"
 dependencies = [
     "edtf_validate",
     "iso639",
-    "lxml==4.9.2",
+    "lxml",
     "requests",
     "paramiko",
     "pillow",

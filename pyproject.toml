@@ -1,6 +1,6 @@
 [project]
 name = "plastron"
-dynamic = ["version"]
+dynamic = ["version", "dependencies", "optional-dependencies"]
 authors = [
     { name='University of Maryland Libraries', email='lib-ssdr@umd.edu' },
     { name='Josh Westgard', email='westgard@umd.edu' },
@@ -12,19 +12,6 @@ authors = [
 ]
 readme = "README.md"
 requires-python = ">= 3.8"
-dependencies = [
-    "plastron-client",
-    "plastron-messaging",
-    "plastron-models",
-    "plastron-rdf",
-    "plastron-repo",
-    "plastron-utils",
-]
-
-[project.optional-dependencies]
-cli = ["plastron-cli"]
-stomp = ["plastron-stomp"]
-web = ["plastron-web"]
 
 [build-system]
 requires = ["setuptools>=66.1.0"]
@@ -36,5 +23,9 @@ packages = []
 
 [tool.setuptools.dynamic]
 version = { "file" = "VERSION" }
-# TODO: can we also make the dependencies and optional dependencies dynamic
-# so they can pick up the version number from VERSION too?
+dependencies = { "file" = "dependencies.txt" }
+
+[tool.setuptools.dynamic.optional-dependencies]
+cli = { "file" = "dependencies-cli.txt" }
+stomp = { "file" = "dependencies-stomp.txt" }
+web = { "file" = "dependencies-web.txt" }

@@ -1,4 +1,3 @@
-""".. include:: ../../../README.md"""
 import logging
 import os
 import threading
@@ -22,7 +21,9 @@ logger = logging.getLogger(__name__)
 OMIT_SERVER_MANAGED_TRIPLES = 'return=representation; omit="http://fedora.info/definitions/v4/repository#ServerManaged"'
 
 
-def random_slug(length=6):
+def random_slug(length: int = 6) -> str:
+    """Generate a URL-safe random string of characters. Uses `os.urandom()`
+    as its source of entropy."""
     return urlsafe_b64encode(os.urandom(length)).decode()
 
 
@@ -475,6 +476,17 @@ class Client:
             accept: str = 'application/n-triples',
             include_server_managed: bool = True
     ) -> TypedText:
+        """Get the content at `url` by issuing an HTTP GET request. Defaults to
+        sending an `Accept: application/n-triples` header, but that can be
+        changed by setting the `accept` argument. It also by default includes
+        all the server-managed triples. These can be suppressed by setting the
+        `include_server_managed` argument to `False`.
+
+        Returns a `TypedText` object containing the response body.
+
+        Raises a `ClientError` if it does not get a success response from the
+        server."""
+
         headers = {
             'Accept': accept,
         }
@@ -487,12 +499,20 @@ class Client:
         return TypedText(response.headers['Content-Type'], response.text)
 
     def get_graph(self, url: str, include_server_managed: bool = True) -> Graph:
+        """Get the `rdflib.Graph` object representing the resource at `url`."""
         text = self.get_description(url, include_server_managed=include_server_managed)
         graph = Graph()
         graph.parse(data=text.value, format=text.media_type)
         return graph
 
     def get_description_uri(self, uri: str, response: Response = None) -> str:
+        """Check the `response` for a `Link` header with `rel="describedby"`. If
+        present, returns that URI. Otherwise, assume the resource describes
+        itself, and return the original `uri` argument.
+
+        If no `response` is given, make an HTTP HEAD request to the `uri`.
+
+        Raises a `ClientError` if `response` is not a success response."""
         if response is not None:
             if not response.ok:
                 raise ClientError(response)

@@ -29,7 +29,8 @@ layers:
 * **[plastron-messaging](plastron-messaging)**: STOMP message models and 
   message broker connection handling
 * **[plastron-rdf](plastron-rdf)**: RDF-to-Python property mapping
-* **[plastron-utils](plastron-utils)**: Miscellaneous utilities
+* **[plastron-utils](plastron-utils)**: Namespace definitions 
+  and miscellaneous utilities
 
 The intent is that these distribution packages are independently useful,
 either as tools that can be run or libraries to be included in other projects.
@@ -38,11 +39,35 @@ either as tools that can be run or libraries to be included in other projects.
 
 Requires Python 3.8+
 
+To install just the API libraries (low- and high-level):
+
+```zsh
+pip install plastron
+```
+
+To install the applications as well:
+
+```zsh
+# individually
+pip install 'plastron[cli]'
+pip install 'plastron[stomp]'
+pip install 'plastron[web]'
+
+# all together
+pip install 'plastron[cli,stomp,web]'
+```
+
+## Running
+
+* [Command-line client](plastron-cli/README.md)
+* [STOMP daemon](plastron-stomp/README.md)
+* [HTTP webapp](plastron-web/README.md)
+
+## Development
+
 This repository includes a [.python-version](.python-version) file. If you are
 using a tool like [pyenv] to manage your Python versions, it will select
 an installed Python 3.8 for you.
-
-### Install for development
 
 To install Plastron in [development mode], do the following:
 
@@ -77,12 +102,6 @@ pytest
 
 See the [testing documentation](docs/testing.md) for more
 information.
-
-## Running
-
-* [Command-line client](plastron-cli/README.md)
-* [STOMP daemon](plastron-stomp/README.md)
-* [HTTP webapp](plastron-web/README.md)
 
 ## API Documentation
 

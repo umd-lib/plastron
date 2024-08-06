@@ -1,7 +1,7 @@
 import io
 import logging
 from argparse import ArgumentTypeError
-from typing import Generator, Any, Dict, Optional
+from typing import Any, Dict, Generator, Optional
 
 from rdflib import URIRef
 
@@ -70,9 +70,10 @@ def importcommand(
         job = jobs.get_job(ImportJob, job_id=job_id)
         # update the config with any changes in this request
         job.update_config(job_config_args)
-        job.ssh_private_key = config.get('SSH_PRIVATE_KEY', None)
     else:
         job = jobs.create_job(ImportJob, config=ImportConfig(**job_config_args))
+
+    job.ssh_private_key = config.get('SSH_PRIVATE_KEY', None)
 
     return job.run(
         context=context,

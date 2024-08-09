@@ -23,6 +23,7 @@ dynamic = ["version"]
 [project.optional-dependencies]
 test = [
     "freezegun",
+    "http-server-mock",
     "pytest",
     "pytest-cov",
 ]

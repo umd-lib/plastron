@@ -4,9 +4,9 @@ import pytest
 
 from plastron.context import PlastronContext
 from plastron.jobs import Jobs
+from plastron.messaging.messages import PlastronCommandMessage
 from plastron.repo import Repository
 from plastron.stomp.commands.importcommand import importcommand
-from plastron.stomp.messages import PlastronCommandMessage
 
 
 @pytest.fixture

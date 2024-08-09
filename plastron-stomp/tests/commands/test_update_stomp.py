@@ -4,10 +4,10 @@ import pytest
 from pytest import raises
 
 from plastron.client import Client, Endpoint
+from plastron.messaging.messages import PlastronCommandMessage
 from plastron.models import Letter, Item
 from plastron.repo import Repository
 from plastron.stomp.commands.update import parse_message
-from plastron.stomp.messages import PlastronCommandMessage
 
 
 @pytest.fixture

@@ -170,3 +170,6 @@ cython_debug/
 
 archelon_id*
 docker-plastron.yml
+
+# generated dependency files for the meta-package
+dependencies*.txt

@@ -1,13 +1,11 @@
 import logging
 from argparse import FileType, Namespace
 from typing import Iterable
-from plastron.cli import get_uris
 
+from plastron.cli import get_uris
 from plastron.cli.commands import BaseCommand
-from plastron.repo.publish import get_publication_status, PublishableResource
-from plastron.namespaces import umdaccess
-from plastron.rdfmapping.resources import RDFResource
-from plastron.repo import RepositoryResource, RepositoryError
+from plastron.repo import RepositoryError
+from plastron.repo.publish import PublishableResource
 
 logger = logging.getLogger(__name__)
 

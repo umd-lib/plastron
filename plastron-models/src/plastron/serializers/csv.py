@@ -17,7 +17,6 @@ from plastron.rdfmapping.descriptors import ObjectProperty
 from plastron.rdfmapping.embed import EmbeddedObject
 from plastron.rdfmapping.properties import RDFObjectProperty, RDFDataProperty
 from plastron.rdfmapping.resources import RDFResourceBase, RDFResource
-from plastron.repo import BinaryResource
 
 
 def not_empty(value):
@@ -383,7 +382,7 @@ class CSVSerializer:
     def write(
             self,
             resource: RDFResource,
-            files: Iterable[BinaryResource] = None,
+            files: Iterable = None,
             binaries_dir: str = '',
             public_url: str = None,
     ) -> Dict[str, str]:

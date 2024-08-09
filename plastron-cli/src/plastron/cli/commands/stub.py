@@ -10,7 +10,7 @@ from plastron.cli.commands import BaseCommand
 from plastron.client import ClientError
 from plastron.files import BinarySource, HTTPFileSource, LocalFileSource
 from plastron.models.umd import Stub
-from plastron.rdf import uri_or_curie
+from plastron.utils import uri_or_curie
 from plastron.repo import ContainerResource
 from plastron.repo.pcdm import PCDMFileBearingResource
 from plastron.repo.utils import context

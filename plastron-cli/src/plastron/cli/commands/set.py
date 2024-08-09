@@ -7,7 +7,7 @@ from rdflib import Literal
 
 from plastron.cli.commands import BaseCommand
 from plastron.models import get_model_class
-from plastron.rdf import uri_or_curie
+from plastron.utils import uri_or_curie
 from plastron.rdfmapping.descriptors import DataProperty, ObjectProperty
 from plastron.rdfmapping.resources import RDFResourceBase
 from plastron.repo import RepositoryResource

@@ -5,9 +5,16 @@ import os
 import platform
 import re
 from abc import ABC
+from argparse import ArgumentTypeError
 from datetime import datetime
 from pathlib import Path
-from typing import Union, Mapping, Sequence
+from typing import Union, Mapping, Sequence, Optional, List
+
+from rdflib import URIRef
+from rdflib.term import Node
+from rdflib.util import from_n3
+
+from plastron import namespaces
 
 DEFAULT_LOGGING_OPTIONS = {
     'version': 1,
@@ -257,3 +264,28 @@ class ItemLog(AppendableSequence):
 
 class ItemLogError(Exception):
     pass
+
+
+def uri_or_curie(arg: str) -> URIRef:
+    """Convert a string to a URIRef. If it begins with either `http://`
+    or `https://`, treat it as an absolute HTTP URI. Otherwise, try to
+    parse it as a CURIE (e.g., "dcterms:title") and return the expanded
+    URI. If the prefix is not recognized, or if `from_n3()` returns anything
+    but a URIRef, raises `ArgumentTypeError`."""
+    if arg and (arg.startswith('http://') or arg.startswith('https://')):
+        # looks like an absolute HTTP URI
+        return URIRef(arg)
+    try:
+        term = from_n3(arg, nsm=namespaces.get_manager())
+    except KeyError:
+        raise ArgumentTypeError(f'"{arg[:arg.index(":") + 1]}" is not a known prefix')
+    if not isinstance(term, URIRef):
+        raise ArgumentTypeError(f'"{arg}" must be a URI or CURIE')
+    return term
+
+
+def parse_predicate_list(string: str, delimiter: str = ',') -> Optional[List[Node]]:
+    if string is None:
+        return None
+    manager = namespaces.get_manager()
+    return [from_n3(p, nsm=manager) for p in string.split(delimiter)]

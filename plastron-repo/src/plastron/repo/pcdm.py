@@ -7,27 +7,15 @@ from urlobject import URLObject
 
 from plastron.client import random_slug
 from plastron.files import BinarySource, FileGroup
-from plastron.models import Item
 from plastron.models.annotations import Annotation
-from plastron.models.ore import Proxy
-from plastron.models.umd import Page
 from plastron.models.ldp import LDPContainer
+from plastron.models.ore import Proxy
 from plastron.models.pcdm import PCDMObject, PCDMFile
-from plastron.namespaces import umdform
+from plastron.models.umd import Page
 from plastron.rdfmapping.resources import RDFResourceBase
 from plastron.repo import ContainerResource, Repository, BinaryResource
 
 logger = logging.getLogger(__name__)
-
-
-def get_new_member_title(item: RDFResourceBase, rootname: str, number: int) -> Literal:
-    if isinstance(item, Item) and umdform.pool_reports in item.format:
-        if rootname.startswith('body-'):
-            return Literal('Body')
-        else:
-            return Literal(f'Attachment {number - 1}')
-    else:
-        return Literal(f'Page {number}')
 
 
 class WebAnnotationBearingResource(ContainerResource):

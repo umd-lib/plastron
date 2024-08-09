@@ -6,7 +6,6 @@ from plastron.namespaces import bibo, carriers, dc, dcterms, fabio, ndnp, ore, p
 from plastron.rdf.ocr import ALTOResource
 from plastron.rdfmapping.decorators import rdf_type
 from plastron.rdfmapping.descriptors import DataProperty, ObjectProperty
-from plastron.repo import DataReadError
 from plastron.validation.rules import is_handle, is_iso_8601_date, is_from_vocabulary
 
 
@@ -81,9 +80,9 @@ class Page(PCDMObject):
             with ocr_file.source as stream:
                 tree = parse(stream)
         except OSError:
-            raise DataReadError("Unable to read {0}".format(ocr_file.filename))
+            raise RuntimeError("Unable to read {0}".format(ocr_file.filename))
         except XMLSyntaxError:
-            raise DataReadError("Unable to parse {0} as XML".format(ocr_file.filename))
+            raise RuntimeError("Unable to parse {0} as XML".format(ocr_file.filename))
 
         # read in resolution from issue METS data
         master = next(self.files_for('master'))

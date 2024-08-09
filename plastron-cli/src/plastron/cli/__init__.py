@@ -10,13 +10,15 @@ from argparse import Namespace
 from datetime import datetime
 from importlib import import_module
 from pkgutil import iter_modules
-from typing import Iterable
+from typing import Iterable, Tuple
 
 import yaml
+from rdflib import URIRef, Literal
+from rdflib.util import from_n3
 
 from plastron.cli import commands
 from plastron.context import PlastronContext
-from plastron.utils import DEFAULT_LOGGING_OPTIONS, envsubst, check_python_version
+from plastron.utils import DEFAULT_LOGGING_OPTIONS, envsubst, check_python_version, uri_or_curie
 
 logger = logging.getLogger(__name__)
 now = datetime.utcnow().strftime('%Y%m%d%H%M%S')
@@ -196,3 +198,13 @@ class ConfigError(Exception):
 
     def __str__(self):
         return self.message
+
+
+def parse_data_property(p: str, o: str) -> Tuple[URIRef, Literal]:
+    """Convert a pair of strings to a URIRef predicate and Literal object."""
+    return uri_or_curie(p), Literal(from_n3(o))
+
+
+def parse_object_property(p: str, o: str) -> Tuple[URIRef, URIRef]:
+    """Convert a pair of strings to a URIRef predicate and URIRef object."""
+    return uri_or_curie(p), uri_or_curie(o)

@@ -1,4 +1,4 @@
-from plastron.stomp.messages import PlastronCommandMessage, PlastronErrorMessage, PlastronMessage, \
+from plastron.messaging.messages import PlastronCommandMessage, PlastronErrorMessage, PlastronMessage, \
     PlastronResponseMessage
 
 

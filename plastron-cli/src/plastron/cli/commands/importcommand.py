@@ -7,8 +7,7 @@ from plastron.cli.commands import BaseCommand
 from plastron.jobs.importjob import ImportConfig, ImportJob
 from plastron.jobs import Jobs
 from plastron.models import get_model_class, ModelClassNotFoundError
-from plastron.rdf import uri_or_curie
-from plastron.utils import datetimestamp
+from plastron.utils import datetimestamp, uri_or_curie
 
 logger = logging.getLogger(__name__)
 

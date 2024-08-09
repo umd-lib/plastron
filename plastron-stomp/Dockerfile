@@ -12,6 +12,7 @@ RUN mkdir -p /opt/plastron
 COPY plastron-client /opt/plastron/plastron-client
 COPY plastron-models /opt/plastron/plastron-models
 COPY plastron-rdf /opt/plastron/plastron-rdf
+COPY plastron-messaging /opt/plastron/plastron-messaging
 COPY plastron-repo /opt/plastron/plastron-repo
 COPY plastron-stomp /opt/plastron/plastron-stomp
 COPY plastron-utils /opt/plastron/plastron-utils
@@ -21,6 +22,7 @@ RUN pip install \
     './plastron-utils' \
     './plastron-client' \
     './plastron-rdf' \
+    './plastron-messaging' \
     './plastron-models' \
     './plastron-repo' \
     './plastron-stomp'

@@ -3,7 +3,7 @@ from argparse import Namespace
 
 from plastron.cli import get_uris
 from plastron.cli.commands import BaseCommand
-from plastron.rdf import parse_predicate_list
+from plastron.utils import parse_predicate_list
 from plastron.rdfmapping.resources import RDFResource
 
 logger = logging.getLogger(__name__)

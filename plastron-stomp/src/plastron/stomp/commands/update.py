@@ -4,11 +4,9 @@ from typing import Generator, Any, Dict
 
 from plastron.context import PlastronContext
 from plastron.jobs.updatejob import UpdateJob
+from plastron.messaging.messages import PlastronCommandMessage
 from plastron.models import get_model_class
-from plastron.rdf import parse_predicate_list
-from plastron.repo import Repository
-from plastron.stomp.messages import PlastronCommandMessage
-from plastron.utils import strtobool
+from plastron.utils import strtobool, parse_predicate_list
 
 logger = logging.getLogger(__name__)
 

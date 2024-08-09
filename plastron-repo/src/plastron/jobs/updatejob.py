@@ -8,7 +8,7 @@ from pyparsing import ParseException
 from rdflib import URIRef
 
 from plastron.client import ClientError
-from plastron.rdf import get_title_string
+from plastron.namespaces import dcterms
 from plastron.rdfmapping.resources import RDFResourceBase
 from plastron.rdfmapping.validation import ValidationFailure
 from plastron.repo import RepositoryResource, Repository
@@ -141,3 +141,7 @@ class UpdateJob:
             'type': state,
             'stats': stats
         }
+
+
+def get_title_string(graph, separator='; '):
+    return separator.join([t for t in graph.objects(predicate=dcterms.title)])

@@ -2,8 +2,8 @@ import logging
 import time
 from typing import Generator, Any, Dict
 
+from plastron.messaging.messages import PlastronCommandMessage
 from plastron.repo import Repository
-from plastron.stomp.messages import PlastronCommandMessage
 
 logger = logging.getLogger(__name__)
 

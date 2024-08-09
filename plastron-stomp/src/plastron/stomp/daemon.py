@@ -1,5 +1,6 @@
 import logging
 import logging.config
+import os
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -44,7 +45,7 @@ class STOMPDaemon(Thread):
         self.broker.set_listener('command', self.command_listener)
 
         # connect and listen until the stopped Event is set
-        if self.broker.connect():
+        if self.broker.connect(client_id=f'plastrond/{__version__}-{os.uname().nodename}-{os.getpid()}'):
             self.stopped.wait()
 
             self.broker.disconnect()

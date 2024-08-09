@@ -1,0 +1,31 @@
+[project]
+name = "plastron-messaging"
+description = "Plastron STOMP messaging tools"
+authors = [
+    { name='University of Maryland Libraries', email='lib-ssdr@umd.edu' },
+    { name='Josh Westgard', email='westgard@umd.edu' },
+    { name='Peter Eichman', email='peichman@umd.edu' },
+    { name='Mohamed Abdul Rasheed', email='mohideen@umd.edu' },
+    { name='Ben Wallberg', email='wallberg@umd.edu' },
+    { name='David Steelman', email='dsteelma@umd.edu' },
+    { name='Marc Andreu Grillo Aguilar', email='aguilarm@umd.edu' },
+]
+readme = "README.md"
+requires-python = ">= 3.8"
+dependencies = [
+    "stomp.py",
+]
+dynamic = ["version"]
+
+[project.optional-dependencies]
+test = [
+    "pytest",
+    "pytest-cov",
+]
+
+[build-system]
+requires = ["setuptools>=66.1.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.dynamic]
+version = { "file" = "VERSION" }

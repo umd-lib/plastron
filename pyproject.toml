@@ -1,0 +1,31 @@
+[project]
+name = "plastron"
+dynamic = ["version", "dependencies", "optional-dependencies"]
+authors = [
+    { name='University of Maryland Libraries', email='lib-ssdr@umd.edu' },
+    { name='Josh Westgard', email='westgard@umd.edu' },
+    { name='Peter Eichman', email='peichman@umd.edu' },
+    { name='Mohamed Abdul Rasheed', email='mohideen@umd.edu' },
+    { name='Ben Wallberg', email='wallberg@umd.edu' },
+    { name='David Steelman', email='dsteelma@umd.edu' },
+    { name='Marc Andreu Grillo Aguilar', email='aguilarm@umd.edu' },
+]
+readme = "README.md"
+requires-python = ">= 3.8"
+
+[build-system]
+requires = ["setuptools>=66.1.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+# this is just a meta-package, and includes no code of its own
+packages = []
+
+[tool.setuptools.dynamic]
+version = { "file" = "VERSION" }
+dependencies = { "file" = "dependencies.txt" }
+
+[tool.setuptools.dynamic.optional-dependencies]
+cli = { "file" = "dependencies-cli.txt" }
+stomp = { "file" = "dependencies-stomp.txt" }
+web = { "file" = "dependencies-web.txt" }

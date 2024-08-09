@@ -106,6 +106,7 @@ pipeline {
               -e './plastron-utils[test]' \
               -e './plastron-client[test]' \
               -e './plastron-rdf[test]' \
+              -e './plastron-messaging[test]' \
               -e './plastron-models[test]' \
               -e './plastron-repo[test]' \
               -e './plastron-web[test]' \

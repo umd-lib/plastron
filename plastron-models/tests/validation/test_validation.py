@@ -8,13 +8,11 @@ from httpretty import GET
 from rdflib import URIRef, Literal
 
 from plastron.namespaces import rdfs
-from plastron.rdf.rdf import RDFObjectProperty
 from plastron.rdfmapping.descriptors import DataProperty
 from plastron.rdfmapping.resources import RDFResourceBase
 from plastron.validation import ValidationError
-from plastron.validation.rules import is_edtf_formatted, is_handle, is_from_vocabulary, is_valid_iso639_code, \
-    is_iso_8601_date
-from plastron.validation.vocabularies import get_vocabulary
+from plastron.validation.rules import is_edtf_formatted, is_handle, is_valid_iso639_code, is_iso_8601_date
+from plastron.validation.vocabularies import get_vocabulary_graph, Vocabulary
 
 
 @pytest.mark.parametrize(
@@ -113,27 +111,12 @@ def test_not_handle(handle):
     assert not is_handle(handle)
 
 
-@pytest.mark.parametrize(
-    ('value', 'vocab_uri', 'expected'),
-    [
-        ('http://purl.org/dc/dcmitype/Image', 'http://purl.org/dc/dcmitype/', True),
-        ('http://purl.org/dc/dcmitype/Text', 'http://purl.org/dc/dcmitype/', True),
-        ('http://example.com/Text', 'http://purl.org/dc/dcmitype/', False),
-    ]
-)
-def test_from_vocabulary(value, vocab_uri, expected):
-    prop = RDFObjectProperty()
-    prop.values = [URIRef(value)]
-    fn = is_from_vocabulary(vocab_uri)
-    assert fn(URIRef(value)) == expected
-
-
 @patch('plastron.validation.vocabularies.Graph')
 def test_vocabulary_file_not_found(MockGraph):
     mock_graph = Mock()
     mock_graph.parse.side_effect = [FileNotFoundError, None]
     MockGraph.return_value = mock_graph
-    vocab_graph = get_vocabulary('http://purl.org/dc/dcmitype/')
+    vocab_graph = get_vocabulary_graph(URIRef('http://purl.org/dc/dcmitype/'))
     # parse should be called twice, once with the file location,
     # and once with the remote URI
     assert mock_graph.parse.call_count == 2
@@ -148,7 +131,7 @@ def test_remote_vocab_error(MockGraph):
     # failure to retrieve the vocabulary over HTTP should
     # raise a ValidationError
     with pytest.raises(ValidationError):
-        get_vocabulary('http://example.org/foo/')
+        get_vocabulary_graph(URIRef('http://example.org/foo/'))
 
 
 @httpretty.activate
@@ -177,5 +160,5 @@ def test_remote_vocab_308_redirect(shared_datadir):
         body=(shared_datadir / 'form.json').read_text(),
         content_type='application/ld+json'
     )
-    fn = is_from_vocabulary('http://vocab.lib.umd.edu/form')
-    assert fn(URIRef('http://vocab.lib.umd.edu/form#slides_photographs'))
+    vocab = Vocabulary('http://vocab.lib.umd.edu/form')
+    assert URIRef('http://vocab.lib.umd.edu/form#slides_photographs') in vocab

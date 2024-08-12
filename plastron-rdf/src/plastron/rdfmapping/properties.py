@@ -1,4 +1,4 @@
-from typing import Set, Tuple, Callable, Any, Iterable, TypeVar, Type, Iterator
+from typing import Set, Tuple, Callable, Any, Iterable, TypeVar, Type, Iterator, Container
 
 from rdflib import Literal, URIRef
 from rdflib.term import Identifier, BNode
@@ -18,6 +18,7 @@ class RDFProperty:
             predicate: URIRef,
             required: bool = False,
             repeatable: bool = False,
+            values_from: Container = None,
             validate: Callable[[Any], bool] = None,
     ):
         self.resource = resource
@@ -25,6 +26,7 @@ class RDFProperty:
         self.predicate = predicate
         self.required = required
         self.repeatable = repeatable
+        self.values_from = values_from
         self._validate = validate
 
     @property
@@ -96,6 +98,8 @@ class RDFProperty:
 
         * If the property is required, there must be at least one value
         * If the property is not repeatable, there must be no more than one value
+        * If the property has a `values_from` parameter, then all values must be
+          contained by that object (i.e., `value in prop.values_from` must be true)
         * All additional validation functions, such as that given in the `validate`
           parameter of the constructor, must return true values
 
@@ -108,6 +112,8 @@ class RDFProperty:
             return ValidationFailure(self, 'is required')
         if not self.repeatable and len(self) > 1:
             return ValidationFailure(self, 'is not repeatable')
+        if self.values_from is not None and any(v not in self.values_from for v in self.values):
+            return ValidationFailure(self, f'is not from {self.values_from}')
         if self._validate is not None:
             if all(self._validate(v) for v in self.values):
                 return ValidationSuccess(self)
@@ -125,10 +131,11 @@ class RDFDataProperty(RDFProperty):
             predicate: URIRef,
             required: bool = False,
             repeatable: bool = False,
+            values_from: Container = None,
             validate: Callable[[Any], bool] = None,
             datatype: URIRef = None,
     ):
-        super().__init__(resource, attr_name, predicate, required, repeatable, validate)
+        super().__init__(resource, attr_name, predicate, required, repeatable, values_from, validate)
         self.datatype: URIRef = datatype
         """The datatype of this property"""
 
@@ -183,11 +190,12 @@ class RDFObjectProperty(RDFProperty):
             predicate: URIRef,
             required: bool = False,
             repeatable: bool = False,
+            values_from: Container = None,
             validate: Callable[[Any], bool] = None,
             object_class: Type[T] = None,
             embedded: bool = False,
     ):
-        super().__init__(resource, attr_name, predicate, required, repeatable, validate)
+        super().__init__(resource, attr_name, predicate, required, repeatable, values_from, validate)
         self.object_class = object_class
         self.embedded = embedded
         self._object_map = {}

@@ -1,6 +1,8 @@
 from os.path import abspath, dirname
 from pathlib import Path
 
+from rdflib import URIRef
+
 import plastron.validation.vocabularies
 
 # See "plastron-models/README.md" for more information about this file.
@@ -15,14 +17,14 @@ def pytest_configure(config):
     # "VOCABULARIES" dictionary, because of the fallback behavior in the
     # "get_vocabulary" method of
     # plastron-models/src/plastron/validation/vocabularies/__init__.py
-    plastron.validation.vocabularies.VOCABULARIES_DIR = Path(
-        dirname(abspath(__file__)), 'plastron-models', 'tests', 'data', 'vocabularies'
-    )
+    base_dir = Path(dirname(abspath(__file__)))
+    plastron.validation.vocabularies.VOCABULARIES_DIR = base_dir / 'plastron-models/tests/validation/data/vocabularies'
+
     plastron.validation.vocabularies.VOCABULARIES = {
-        'http://purl.org/dc/dcmitype/': 'dcmitype.ttl',
-        'http://vocab.lib.umd.edu/collection#': 'collection.ttl',
-        'http://vocab.lib.umd.edu/form#': 'form.ttl',
-        'http://vocab.lib.umd.edu/rightsStatement#': 'rightsStatement.ttl',
-        'http://vocab.lib.umd.edu/set#': 'set.ttl',
-        'http://vocab.lib.umd.edu/termsOfUse#': 'termsOfUse.ttl'
+        URIRef('http://purl.org/dc/dcmitype/'): 'dcmitype.ttl',
+        URIRef('http://vocab.lib.umd.edu/collection#'): 'collection.ttl',
+        URIRef('http://vocab.lib.umd.edu/form#'): 'form.ttl',
+        URIRef('http://vocab.lib.umd.edu/rightsStatement#'): 'rightsStatement.ttl',
+        URIRef('http://vocab.lib.umd.edu/set#'): 'set.ttl',
+        URIRef('http://vocab.lib.umd.edu/termsOfUse#'): 'termsOfUse.ttl'
     }

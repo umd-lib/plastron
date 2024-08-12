@@ -1,6 +1,5 @@
 from functools import lru_cache
-from importlib import import_module
-from typing import Union, Any, Dict, Callable
+from typing import Union, Any, Dict, Callable, Container
 
 from rdflib import URIRef, Literal
 
@@ -16,11 +15,13 @@ class Property:
             predicate: URIRef,
             required: bool = False,
             repeatable: bool = False,
+            values_from: Container = None,
             validate: Callable[[Any], bool] = None,
     ):
         self.predicate = predicate
         self.required = required
         self.repeatable = repeatable
+        self.values_from = values_from
         self.validate = validate
 
     def __set_name__(self, owner, name):
@@ -44,6 +45,7 @@ class Property:
             'predicate': self.predicate,
             'required': self.required,
             'repeatable': self.repeatable,
+            'values_from': self.values_from,
             'validate': self.validate,
         }
 
@@ -54,11 +56,12 @@ class ObjectProperty(Property):
             predicate: URIRef,
             required: bool = False,
             repeatable: bool = False,
+            values_from: Container = None,
             validate: Callable[[Any], bool] = None,
             cls: Union[type, str] = None,
             embed: bool = False,
     ):
-        super().__init__(predicate, required, repeatable, validate)
+        super().__init__(predicate, required, repeatable, values_from, validate)
         self.object_class = cls
         self.embed = embed
 
@@ -95,10 +98,11 @@ class DataProperty(Property):
             predicate: URIRef,
             required: bool = False,
             repeatable: bool = False,
+            values_from: Container = None,
             validate: Callable[[Any], bool] = None,
             datatype: URIRef = None,
     ):
-        super().__init__(predicate, required, repeatable, validate)
+        super().__init__(predicate, required, repeatable, values_from, validate)
         self.datatype = datatype
 
     @lru_cache(maxsize=None)

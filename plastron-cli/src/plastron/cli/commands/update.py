@@ -3,7 +3,7 @@ from argparse import FileType, Namespace
 
 from plastron.cli.commands import BaseCommand
 from plastron.jobs.updatejob import UpdateJob
-from plastron.models import get_model_class
+from plastron.models import get_model_from_name
 from plastron.utils import ItemLog, parse_predicate_list
 
 logger = logging.getLogger(__name__)
@@ -73,7 +73,7 @@ class Command(BaseCommand):
             raise RuntimeError("Model must be provided when performing validation")
 
         # Retrieve the model to use for validation
-        model_class = get_model_class(args.model) if args.model else None
+        model_class = get_model_from_name(args.model) if args.model else None
 
         sparql_update = args.update_file.read().encode('utf-8')
 

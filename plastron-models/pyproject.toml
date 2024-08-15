@@ -35,6 +35,12 @@ test = [
     "pytest-cov",
 ]
 
+[project.entry-points.'plastron.content_models']
+Item = "plastron.models.umd:Item"
+Issue = "plastron.models.newspaper:Issue"
+Letter = "plastron.models.letter:Letter"
+Poster = "plastron.models.poster:Poster"
+
 [build-system]
 requires = ["setuptools>=66.1.0"]
 build-backend = "setuptools.build_meta"

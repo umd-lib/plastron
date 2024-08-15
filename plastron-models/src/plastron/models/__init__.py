@@ -1,21 +1,42 @@
-import sys
+from importlib.metadata import entry_points
 from typing import Type
 
-from plastron.models.letter import Letter
-from plastron.models.newspaper import Issue
-from plastron.models.poster import Poster
-from plastron.models.umd import Item
-from plastron.rdfmapping.resources import RDFResourceBase
+from rdflib import URIRef
+
+from plastron.rdfmapping.resources import RDFResourceBase, RDFResource
+
+PLUGIN_GROUP = 'plastron.content_models'
+CONTENT_MODEL_CLASSES = entry_points(group=PLUGIN_GROUP)
 
 
-class ModelClassNotFoundError(Exception):
+class ModelClassError(Exception):
+    pass
+
+
+class ModelClassNotFoundError(ModelClassError):
     def __init__(self, model_name: str, *args):
         super().__init__(*args)
         self.model_name = model_name
 
 
-def get_model_class(model_name: str) -> Type[RDFResourceBase]:
+def get_model_from_name(model_name: str) -> Type[RDFResourceBase]:
     try:
-        return getattr(sys.modules[__package__], model_name)
-    except AttributeError as e:
+        return CONTENT_MODEL_CLASSES[model_name].load()
+    except KeyError as e:
         raise ModelClassNotFoundError(model_name) from e
+
+
+def get_model_from_uri(rdf_type: URIRef) -> Type[RDFResourceBase]:
+    for plugin in CONTENT_MODEL_CLASSES:
+        cls = plugin.load()
+        if rdf_type in cls.default_values.get('rdf_type', set()):
+            return cls
+    raise ModelClassNotFoundError(str(rdf_type))
+
+
+def guess_model(resource: RDFResource) -> Type[RDFResourceBase]:
+    for plugin in CONTENT_MODEL_CLASSES:
+        cls = plugin.load()
+        if cls.default_values.get('rdf_type', set()) <= set(resource.rdf_type.values):
+            return cls
+    raise ModelClassError()

@@ -23,7 +23,7 @@ class AdminSet(RDFResource):
 
 @rdf_type(umd.Item)
 class Item(PCDMObject, HandleBearingResource):
-    member_of = ObjectProperty(pcdm.memberOf, cls=AdminSet)
+    member_of = ObjectProperty(pcdm.memberOf)
     object_type = ObjectProperty(
         dcterms.type,
         required=True,

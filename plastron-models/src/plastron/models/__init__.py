@@ -1,4 +1,4 @@
-from importlib.metadata import entry_points
+from importlib_metadata import entry_points
 from typing import Type
 
 from rdflib import URIRef

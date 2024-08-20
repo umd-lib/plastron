@@ -1,7 +1,7 @@
 import pytest
 from rdflib import Literal
 
-from plastron.models import Item
+from plastron.models.umd import Item
 
 
 @pytest.fixture

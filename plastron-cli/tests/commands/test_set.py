@@ -5,7 +5,7 @@ import pytest
 from rdflib import URIRef, Literal
 
 from plastron.cli.commands.set import get_new_values, set_fields
-from plastron.models import Item
+from plastron.models.umd import Item
 from plastron.rdfmapping.resources import RDFResource
 from plastron.repo import RepositoryResource, Repository
 

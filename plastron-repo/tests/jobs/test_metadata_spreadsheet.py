@@ -5,7 +5,7 @@ from plastron.jobs.importjob.spreadsheet import InvalidRow
 from rdflib import Literal
 
 from plastron.jobs.importjob import MetadataSpreadsheet
-from plastron.models import Item
+from plastron.models.umd import Item
 from plastron.namespaces import umdtype
 from plastron.repo import Repository
 

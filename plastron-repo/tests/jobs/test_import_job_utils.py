@@ -5,7 +5,7 @@ from plastron.files import LocalFileSource, RemoteFileSource, ZipFileSource
 from plastron.jobs.importjob import ImportJob
 from plastron.jobs.importjob.spreadsheet import ColumnSpec, build_fields, build_file_groups, parse_value_string, \
     MetadataError
-from plastron.models import Item
+from plastron.models.umd import Item
 from plastron.namespaces import umdtype
 from plastron.rdfmapping.descriptors import DataProperty
 

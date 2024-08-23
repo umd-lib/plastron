@@ -3,7 +3,9 @@ import logging
 
 from rdflib import URIRef
 
-from plastron.models import Issue, Letter, Poster
+from plastron.models.letter import Letter
+from plastron.models.newspaper import Issue
+from plastron.models.poster import Poster
 from plastron.namespaces import bibo, rdf
 from plastron.serializers.csv import CSVSerializer
 from plastron.serializers.turtle import TurtleSerializer

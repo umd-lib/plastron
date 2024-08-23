@@ -6,7 +6,7 @@ from typing import Iterable, Tuple, Dict, Type
 from rdflib import Literal
 
 from plastron.cli.commands import BaseCommand
-from plastron.models import get_model_class
+from plastron.models import get_model_from_name
 from plastron.utils import uri_or_curie
 from plastron.rdfmapping.descriptors import DataProperty, ObjectProperty
 from plastron.rdfmapping.resources import RDFResourceBase
@@ -64,7 +64,7 @@ def get_new_values(model_class: Type[RDFResourceBase], fields_to_set: Iterable[T
 
 
 def set_fields(ctx, model_name: str, fields_to_set: Iterable[Tuple[str, str]], uris: Iterable[str]):
-    model_class = get_model_class(model_name)
+    model_class = get_model_from_name(model_name)
     values = get_new_values(model_class, fields_to_set)
     for uri in uris:
         resource: RepositoryResource = ctx.obj.repo[uri].read()

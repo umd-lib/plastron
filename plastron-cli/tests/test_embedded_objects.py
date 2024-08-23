@@ -1,7 +1,7 @@
 import pytest
 
 from plastron.jobs.importjob.spreadsheet import MetadataSpreadsheet
-from plastron.models import Item
+from plastron.models.umd import Item
 from plastron.repo import Repository
 
 

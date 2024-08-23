@@ -6,7 +6,7 @@ from typing import TextIO
 from plastron.cli.commands import BaseCommand
 from plastron.jobs.importjob import ImportConfig, ImportJob
 from plastron.jobs import Jobs
-from plastron.models import get_model_class, ModelClassNotFoundError
+from plastron.models import get_model_from_name, ModelClassNotFoundError
 from plastron.utils import datetimestamp, uri_or_curie
 
 logger = logging.getLogger(__name__)
@@ -22,7 +22,7 @@ def percentile(n):
 
 def write_model_template(model_name: str, template_file: TextIO):
     try:
-        model_class = get_model_class(model_name)
+        model_class = get_model_from_name(model_name)
     except ModelClassNotFoundError as e:
         raise RuntimeError(f'Cannot find model class named {model_name}') from e
     if not hasattr(model_class, 'HEADER_MAP'):

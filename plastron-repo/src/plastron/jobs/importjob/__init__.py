@@ -18,7 +18,7 @@ from plastron.files import BinarySource, ZipFileSource, RemoteFileSource, HTTPFi
 from plastron.handles import HandleInfo
 from plastron.jobs import JobError, JobConfig, Job
 from plastron.jobs.importjob.spreadsheet import LineReference, MetadataSpreadsheet, InvalidRow, Row, MetadataError
-from plastron.models import get_model_class, ModelClassNotFoundError
+from plastron.models import get_model_from_name, ModelClassNotFoundError
 from plastron.models.annotations import FullTextAnnotation, TextualBody
 from plastron.namespaces import umdaccess, sc
 from plastron.rdf.pcdm import File, PreservationMasterFile
@@ -320,7 +320,7 @@ class ImportJob(Job):
     @property
     def model_class(self):
         if self._model_class is None:
-            self._model_class = get_model_class(self.config.model)
+            self._model_class = get_model_from_name(self.config.model)
         return self._model_class
 
     def store_metadata_file(self, input_file: IO):

@@ -1,5 +1,6 @@
 from rdflib import URIRef
 
+from plastron.models.authorities import VocabularyTerm
 from plastron.models.pcdm import PCDMObject
 from plastron.namespaces import bibo, dcterms, dc, edm, geo, ore, schema, umd, umdtype
 from plastron.rdfmapping.decorators import rdf_type
@@ -33,6 +34,7 @@ class Poster(PCDMObject):
     terms_of_use = ObjectProperty(
         dcterms.license,
         values_from=Vocabulary('http://vocab.lib.umd.edu/termsOfUse#'),
+        cls=VocabularyTerm,
     )
     copyright_notice = DataProperty(schema.copyrightNotice)
     identifier = DataProperty(dcterms.identifier, required=True)
@@ -42,6 +44,7 @@ class Poster(PCDMObject):
         ore.isAggregatedBy,
         repeatable=True,
         values_from=Vocabulary('http://vocab.lib.umd.edu/set#'),
+        cls=VocabularyTerm,
     )
 
     HEADER_MAP = {

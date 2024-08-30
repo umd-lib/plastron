@@ -1,3 +1,6 @@
+from plastron.handles import HandleBearingResource
+from plastron.models.authorities import VocabularyTerm
+from plastron.models.pcdm import PCDMObject
 from plastron.namespaces import bibo, dc, dcmitype, dcterms, edm, geo, rel, skos, ore, owl, umd, umdtype, schema
 from plastron.rdfmapping.decorators import rdf_type
 from plastron.rdfmapping.descriptors import ObjectProperty, DataProperty
@@ -32,7 +35,7 @@ class Collection(AuthorityRecord):
 
 
 @rdf_type(bibo.Letter, umd.Letter)
-class Letter(RDFResource):
+class Letter(PCDMObject, HandleBearingResource):
     title = DataProperty(dcterms.title, required=True)
     author = ObjectProperty(rel.aut, repeatable=True, embed=True, cls=Agent)
     recipient = ObjectProperty(bibo.recipient, repeatable=True, embed=True, cls=Agent)
@@ -52,12 +55,14 @@ class Letter(RDFResource):
     terms_of_use = ObjectProperty(
         dcterms.license,
         values_from=Vocabulary('http://vocab.lib.umd.edu/termsOfUse#'),
+        cls=VocabularyTerm,
     )
     handle = DataProperty(dcterms.identifier, datatype=umdtype.handle, validate=is_handle)
     presentation_set = ObjectProperty(
         ore.isAggregatedBy,
         repeatable=True,
         values_from=Vocabulary('http://vocab.lib.umd.edu/set#'),
+        cls=VocabularyTerm,
     )
 
     HEADER_MAP = {

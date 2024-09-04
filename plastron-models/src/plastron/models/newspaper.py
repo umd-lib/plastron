@@ -1,6 +1,7 @@
 from lxml.etree import parse, XMLSyntaxError
 
 from plastron.models.annotations import TextblockOnPage
+from plastron.models.authorities import VocabularyTerm
 from plastron.models.pcdm import PCDMObject, PCDMFile
 from plastron.namespaces import bibo, carriers, dc, dcterms, fabio, ndnp, ore, pcdm, pcdmuse, schema, umdtype, umd
 from plastron.rdf.ocr import ALTOResource
@@ -23,11 +24,13 @@ class Issue(PCDMObject):
         ore.isAggregatedBy,
         repeatable=True,
         values_from=Vocabulary('http://vocab.lib.umd.edu/set#'),
+        cls=VocabularyTerm,
     )
     copyright_notice = DataProperty(schema.copyrightNotice)
     terms_of_use = ObjectProperty(
         dcterms.license,
-        values_from=Vocabulary('http://vocab.lib.umd.edu/termsOfUse#')
+        values_from=Vocabulary('http://vocab.lib.umd.edu/termsOfUse#'),
+        cls = VocabularyTerm,
     )
 
     HEADER_MAP = {

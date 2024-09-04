@@ -1,3 +1,5 @@
+from rdflib import URIRef
+
 from plastron.handles import HandleBearingResource
 from plastron.models.authorities import VocabularyTerm
 from plastron.models.pcdm import PCDMObject
@@ -46,7 +48,7 @@ class Letter(PCDMObject, HandleBearingResource):
     copyright_notice = DataProperty(schema.copyrightNotice)
     identifier = DataProperty(dcterms.identifier, required=True)
     type = DataProperty(edm.hasType, required=True)
-    date = DataProperty(dc.date, validate=is_edtf_formatted)
+    date = DataProperty(dc.date, datatype=URIRef('http://id.loc.gov/datatypes/edtf'), validate=is_edtf_formatted)
     language = DataProperty(dc.language, required=True)
     description = DataProperty(dcterms.description, required=True)
     bibliographic_citation = DataProperty(dcterms.bibliographicCitation, required=True)

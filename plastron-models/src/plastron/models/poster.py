@@ -2,7 +2,7 @@ from rdflib import URIRef
 
 from plastron.models.authorities import VocabularyTerm
 from plastron.models.pcdm import PCDMObject
-from plastron.namespaces import bibo, dcterms, dc, edm, geo, ore, schema, umd, umdtype
+from plastron.namespaces import bibo, dcterms, dc, edm, geo, ore, schema, umd, umdtype, xsd
 from plastron.rdfmapping.decorators import rdf_type
 from plastron.rdfmapping.descriptors import ObjectProperty, DataProperty, Property
 from plastron.validation.rules import is_edtf_formatted, is_handle
@@ -20,7 +20,7 @@ class Poster(PCDMObject):
     # this is a Property since the extant data in fcrepo contains both URIs and literals,
     # so neither ObjectProperty nor DataProperty would map all values correctly
     type = Property(edm.hasType, required=True)
-    date = DataProperty(dc.date, validate=is_edtf_formatted)
+    date = DataProperty(dc.date, datatype=xsd.date, validate=is_edtf_formatted)
     language = DataProperty(dc.language, required=True)
     description = DataProperty(dcterms.description)
     extent = DataProperty(dcterms.extent)

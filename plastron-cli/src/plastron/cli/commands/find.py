@@ -1,14 +1,14 @@
 import logging
 from argparse import Namespace
-from typing import List, Tuple, Union, Iterator, Callable, Iterable
+from typing import Callable, Iterable, Iterator, List, Tuple, Union
 
-from rdflib import URIRef, Literal
+from rdflib import Literal, URIRef
 
+from plastron.cli import parse_data_property, parse_object_property
 from plastron.cli.commands import BaseCommand
 from plastron.namespaces import get_manager, rdf
-from plastron.cli import parse_data_property, parse_object_property
-from plastron.utils import uri_or_curie, parse_predicate_list
 from plastron.repo import RepositoryResource
+from plastron.utils import parse_predicate_list, uri_or_curie
 
 logger = logging.getLogger(__name__)
 manager = get_manager()
@@ -95,18 +95,25 @@ class Command(BaseCommand):
 
         if args.match_any:
             self.match = any
-        elif args.match_all:
-            self.match = all
         else:
             self.match = all
 
-        logger.info(f'Matching {self.match.__name__} of these properties:')
-        for p, o in self.properties:
-            logger.info(f'  {p.n3(namespace_manager=manager)} {o.n3(namespace_manager=manager)}')
+        if len(self.properties) == 0:
+            logger.info('Matching all resources')
+        else:
+            logger.info(f'Matching {self.match.__name__} of these properties:')
+            for p, o in self.properties:
+                logger.info(f'  {p.n3(namespace_manager=manager)} {o.n3(namespace_manager=manager)}')
 
         self.resource_count = 0
 
         traverse = parse_predicate_list(args.recursive) if args.recursive else []
+
+        if len(traverse) != 0:
+            logger.info('Predicates used for recusive matching:')
+            for p in traverse:
+                logger.info(f'  {p.n3(namespace_manager=manager)}')
+
         for uri in args.uris:
             for resource in find(
                 start_resource=self.context.repo[uri],

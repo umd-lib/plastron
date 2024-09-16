@@ -30,7 +30,7 @@ class Issue(PCDMObject):
     terms_of_use = ObjectProperty(
         dcterms.license,
         values_from=Vocabulary('http://vocab.lib.umd.edu/termsOfUse#'),
-        cls = VocabularyTerm,
+        cls=VocabularyTerm,
     )
 
     HEADER_MAP = {

@@ -6,7 +6,7 @@ from typing import Union, Dict, ItemsView
 from urllib.error import HTTPError
 
 from rdflib import Graph
-from rdflib.term import URIRef
+from rdflib.term import URIRef, Literal
 
 from plastron.validation import ValidationError
 
@@ -126,6 +126,13 @@ class Vocabulary(Mapping):
 
     def items(self) -> ItemsView[URIRef, Dict]:
         return {term_uri: self[term_uri] for term_uri in self}.items()
+
+    def find(self, p: URIRef, o: Union[URIRef, Literal]) -> Dict:
+        for _, term in self.items():
+            if o in term[p]:
+                return term
+        else:
+            raise KeyError(f'{p} {o}')
 
 
 def get_vocabulary_graph(vocab_uri: URIRef) -> Graph:

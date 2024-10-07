@@ -1,7 +1,9 @@
 from lxml.etree import parse, XMLSyntaxError
 
+from plastron.handles import HandleBearingResource
 from plastron.models.annotations import TextblockOnPage
 from plastron.models.authorities import UMD_TERMS_OF_USE_STATEMENTS, UMD_PRESENTATION_SETS
+from plastron.models.fedora import FedoraResource
 from plastron.models.pcdm import PCDMObject, PCDMFile
 from plastron.namespaces import bibo, carriers, dc, dcterms, fabio, ndnp, ore, pcdm, pcdmuse, schema, umdtype, umd
 from plastron.rdf.ocr import ALTOResource
@@ -12,7 +14,7 @@ from plastron.validation.vocabularies import ControlledVocabularyProperty
 
 
 @rdf_type(bibo.Issue, umd.Newspaper)
-class Issue(PCDMObject):
+class Issue(PCDMObject, HandleBearingResource, FedoraResource):
     """Newspaper issue"""
     title = DataProperty(dcterms.title, required=True)
     date = DataProperty(dc.date, required=True, validate=is_iso_8601_date)

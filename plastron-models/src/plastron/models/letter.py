@@ -2,12 +2,13 @@ from rdflib import URIRef
 
 from plastron.handles import HandleBearingResource
 from plastron.models.authorities import UMD_TERMS_OF_USE_STATEMENTS, UMD_PRESENTATION_SETS
+from plastron.models.fedora import FedoraResource
 from plastron.models.pcdm import PCDMObject
-from plastron.namespaces import bibo, dc, dcmitype, dcterms, edm, geo, rel, skos, ore, owl, umd, umdtype, schema
+from plastron.namespaces import bibo, dc, dcmitype, dcterms, edm, geo, rel, skos, ore, owl, umd, schema
 from plastron.rdfmapping.decorators import rdf_type
 from plastron.rdfmapping.descriptors import ObjectProperty, DataProperty
 from plastron.rdfmapping.resources import RDFResource
-from plastron.validation.rules import is_edtf_formatted, is_handle
+from plastron.validation.rules import is_edtf_formatted
 from plastron.validation.vocabularies import ControlledVocabularyProperty
 
 
@@ -37,7 +38,7 @@ class Collection(AuthorityRecord):
 
 
 @rdf_type(bibo.Letter, umd.Letter)
-class Letter(PCDMObject, HandleBearingResource):
+class Letter(PCDMObject, HandleBearingResource, FedoraResource):
     title = DataProperty(dcterms.title, required=True)
     author = ObjectProperty(rel.aut, repeatable=True, embed=True, cls=Agent)
     recipient = ObjectProperty(bibo.recipient, repeatable=True, embed=True, cls=Agent)
@@ -55,7 +56,6 @@ class Letter(PCDMObject, HandleBearingResource):
     extent = DataProperty(dcterms.extent, required=True)
     rights_holder = DataProperty(dcterms.rightsHolder, required=True)
     terms_of_use = ControlledVocabularyProperty(dcterms.license, vocab=UMD_TERMS_OF_USE_STATEMENTS)
-    handle = DataProperty(dcterms.identifier, datatype=umdtype.handle, validate=is_handle)
     presentation_set = ControlledVocabularyProperty(ore.isAggregatedBy, repeatable=True, vocab=UMD_PRESENTATION_SETS)
 
     HEADER_MAP = {

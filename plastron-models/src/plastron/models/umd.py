@@ -1,6 +1,7 @@
 from plastron.handles import HandleBearingResource
 from plastron.models.authorities import Agent, Subject, Place, DCMI_TYPES, UMD_RIGHTS_STATEMENTS, UMD_FORMATS, \
     UMD_ARCHIVAL_COLLECTIONS, UMD_PRESENTATION_SETS, UMD_TERMS_OF_USE_STATEMENTS
+from plastron.models.fedora import FedoraResource
 from plastron.models.pcdm import PCDMObject
 from plastron.namespaces import dc, dcterms, edm, fabio, pcdm, ore, schema, umdtype, umd
 from plastron.rdfmapping.decorators import rdf_type
@@ -23,7 +24,7 @@ class AdminSet(RDFResource):
 
 
 @rdf_type(umd.Item)
-class Item(PCDMObject, HandleBearingResource):
+class Item(PCDMObject, HandleBearingResource, FedoraResource):
     member_of = ObjectProperty(pcdm.memberOf)
     object_type = ControlledVocabularyProperty(dcterms.type, required=True, vocab=DCMI_TYPES)
     identifier = DataProperty(dcterms.identifier, required=True, repeatable=True)

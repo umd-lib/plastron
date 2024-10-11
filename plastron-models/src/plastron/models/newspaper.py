@@ -1,14 +1,14 @@
 from lxml.etree import parse, XMLSyntaxError
 
 from plastron.models.annotations import TextblockOnPage
-from plastron.models.authorities import VocabularyTerm
+from plastron.models.authorities import UMD_TERMS_OF_USE_STATEMENTS, UMD_PRESENTATION_SETS
 from plastron.models.pcdm import PCDMObject, PCDMFile
 from plastron.namespaces import bibo, carriers, dc, dcterms, fabio, ndnp, ore, pcdm, pcdmuse, schema, umdtype, umd
 from plastron.rdf.ocr import ALTOResource
 from plastron.rdfmapping.decorators import rdf_type
 from plastron.rdfmapping.descriptors import DataProperty, ObjectProperty
 from plastron.validation.rules import is_handle, is_iso_8601_date
-from plastron.validation.vocabularies import Vocabulary
+from plastron.validation.vocabularies import ControlledVocabularyProperty
 
 
 @rdf_type(bibo.Issue, umd.Newspaper)
@@ -20,18 +20,9 @@ class Issue(PCDMObject):
     issue = DataProperty(bibo.issue, required=True)
     edition = DataProperty(bibo.edition, required=True)
     handle = DataProperty(dcterms.identifier, datatype=umdtype.handle, validate=is_handle)
-    presentation_set = ObjectProperty(
-        ore.isAggregatedBy,
-        repeatable=True,
-        values_from=Vocabulary('http://vocab.lib.umd.edu/set#'),
-        cls=VocabularyTerm,
-    )
+    presentation_set = ControlledVocabularyProperty(ore.isAggregatedBy, repeatable=True, vocab=UMD_PRESENTATION_SETS)
     copyright_notice = DataProperty(schema.copyrightNotice)
-    terms_of_use = ObjectProperty(
-        dcterms.license,
-        values_from=Vocabulary('http://vocab.lib.umd.edu/termsOfUse#'),
-        cls=VocabularyTerm,
-    )
+    terms_of_use = ControlledVocabularyProperty(dcterms.license, vocab=UMD_TERMS_OF_USE_STATEMENTS)
 
     HEADER_MAP = {
         'title': 'Title',

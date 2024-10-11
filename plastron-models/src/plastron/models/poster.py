@@ -1,12 +1,12 @@
 from rdflib import URIRef
 
-from plastron.models.authorities import VocabularyTerm
+from plastron.models.authorities import UMD_PRESENTATION_SETS, UMD_TERMS_OF_USE_STATEMENTS
 from plastron.models.pcdm import PCDMObject
 from plastron.namespaces import bibo, dcterms, dc, edm, geo, ore, schema, umd, umdtype, xsd
 from plastron.rdfmapping.decorators import rdf_type
 from plastron.rdfmapping.descriptors import ObjectProperty, DataProperty, Property
 from plastron.validation.rules import is_edtf_formatted, is_handle
-from plastron.validation.vocabularies import Vocabulary
+from plastron.validation.vocabularies import ControlledVocabularyProperty
 
 
 @rdf_type(bibo.Image, umd.Poster)
@@ -31,21 +31,12 @@ class Poster(PCDMObject):
     latitude = DataProperty(geo.lat)
     subject = DataProperty(dc.subject, repeatable=True)
     rights = ObjectProperty(dcterms.rights, required=True)
-    terms_of_use = ObjectProperty(
-        dcterms.license,
-        values_from=Vocabulary('http://vocab.lib.umd.edu/termsOfUse#'),
-        cls=VocabularyTerm,
-    )
+    terms_of_use = ControlledVocabularyProperty(dcterms.license, vocab=UMD_TERMS_OF_USE_STATEMENTS)
     copyright_notice = DataProperty(schema.copyrightNotice)
     identifier = DataProperty(dcterms.identifier, required=True)
     handle = DataProperty(dcterms.identifier, validate=is_handle, datatype=umdtype.handle)
     place = ObjectProperty(dcterms.spatial)
-    presentation_set = ObjectProperty(
-        ore.isAggregatedBy,
-        repeatable=True,
-        values_from=Vocabulary('http://vocab.lib.umd.edu/set#'),
-        cls=VocabularyTerm,
-    )
+    presentation_set = ControlledVocabularyProperty(ore.isAggregatedBy, repeatable=True, vocab=UMD_PRESENTATION_SETS)
 
     HEADER_MAP = {
         'title': 'Title',

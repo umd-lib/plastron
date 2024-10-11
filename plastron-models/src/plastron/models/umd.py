@@ -1,12 +1,13 @@
 from plastron.handles import HandleBearingResource
-from plastron.models.authorities import Agent, Subject, Place, VocabularyTerm
+from plastron.models.authorities import Agent, Subject, Place, DCMI_TYPES, UMD_RIGHTS_STATEMENTS, UMD_FORMATS, \
+    UMD_ARCHIVAL_COLLECTIONS, UMD_PRESENTATION_SETS, UMD_TERMS_OF_USE_STATEMENTS
 from plastron.models.pcdm import PCDMObject
 from plastron.namespaces import dc, dcterms, edm, fabio, pcdm, ore, schema, umdtype, umd
 from plastron.rdfmapping.decorators import rdf_type
 from plastron.rdfmapping.descriptors import ObjectProperty, DataProperty
 from plastron.rdfmapping.resources import RDFResource
 from plastron.validation.rules import is_edtf_formatted, is_valid_iso639_code
-from plastron.validation.vocabularies import Vocabulary
+from plastron.validation.vocabularies import ControlledVocabularyProperty
 
 
 @rdf_type(pcdm.Object)
@@ -24,36 +25,13 @@ class AdminSet(RDFResource):
 @rdf_type(umd.Item)
 class Item(PCDMObject, HandleBearingResource):
     member_of = ObjectProperty(pcdm.memberOf)
-    object_type = ObjectProperty(
-        dcterms.type,
-        required=True,
-        values_from=Vocabulary('http://purl.org/dc/dcmitype/'),
-        cls=VocabularyTerm,
-    )
+    object_type = ControlledVocabularyProperty(dcterms.type, required=True, vocab=DCMI_TYPES)
     identifier = DataProperty(dcterms.identifier, required=True, repeatable=True)
-    rights = ObjectProperty(
-        dcterms.rights,
-        required=True,
-        values_from=Vocabulary('http://vocab.lib.umd.edu/rightsStatement#'),
-        cls=VocabularyTerm,
-    )
+    rights = ControlledVocabularyProperty(dcterms.rights, required=True, vocab=UMD_RIGHTS_STATEMENTS)
     title = DataProperty(dcterms.title, required=True)
-    format = ObjectProperty(
-        edm.hasType,
-        values_from=Vocabulary('http://vocab.lib.umd.edu/form#'),
-        cls=VocabularyTerm,
-    )
-    archival_collection = ObjectProperty(
-        dcterms.isPartOf,
-        values_from=Vocabulary('http://vocab.lib.umd.edu/collection#'),
-        cls=VocabularyTerm,
-    )
-    presentation_set = ObjectProperty(
-        ore.isAggregatedBy,
-        repeatable=True,
-        values_from=Vocabulary('http://vocab.lib.umd.edu/set#'),
-        cls=VocabularyTerm,
-    )
+    format = ControlledVocabularyProperty(edm.hasType, vocab=UMD_FORMATS)
+    archival_collection = ControlledVocabularyProperty(dcterms.isPartOf, vocab=UMD_ARCHIVAL_COLLECTIONS)
+    presentation_set = ControlledVocabularyProperty(ore.isAggregatedBy, repeatable=True, vocab=UMD_PRESENTATION_SETS)
     date = DataProperty(dc.date, validate=is_edtf_formatted)
     description = DataProperty(dcterms.description)
     alternate_title = DataProperty(dcterms.alternative, repeatable=True)
@@ -65,11 +43,7 @@ class Item(PCDMObject, HandleBearingResource):
     subject = ObjectProperty(dcterms.subject, repeatable=True, embed=True, cls=Subject)
     language = DataProperty(dc.language, repeatable=True, validate=is_valid_iso639_code)
     rights_holder = ObjectProperty(dcterms.rightsHolder, repeatable=True, embed=True, cls=Agent)
-    terms_of_use = ObjectProperty(
-        dcterms.license,
-        values_from=Vocabulary('http://vocab.lib.umd.edu/termsOfUse#'),
-        cls=VocabularyTerm,
-    )
+    terms_of_use = ControlledVocabularyProperty(dcterms.license, vocab=UMD_TERMS_OF_USE_STATEMENTS)
     copyright_notice = DataProperty(schema.copyrightNotice)
     bibliographic_citation = DataProperty(dcterms.bibliographicCitation)
     accession_number = DataProperty(dcterms.identifier, datatype=umdtype.accessionNumber)

@@ -1,9 +1,14 @@
-from rdflib import Graph
-
-from plastron.namespaces import rdfs, owl, dcterms, rdf
+from plastron.namespaces import rdfs, owl
 from plastron.rdfmapping.descriptors import DataProperty, ObjectProperty
 from plastron.rdfmapping.resources import RDFResource
-from plastron.validation.vocabularies import get_vocabulary_graph
+from plastron.validation.vocabularies import Vocabulary
+
+DCMI_TYPES = Vocabulary('http://purl.org/dc/dcmitype/')
+UMD_RIGHTS_STATEMENTS = Vocabulary('http://vocab.lib.umd.edu/rightsStatement#')
+UMD_FORMATS = Vocabulary('http://vocab.lib.umd.edu/form#')
+UMD_ARCHIVAL_COLLECTIONS = Vocabulary('http://vocab.lib.umd.edu/collection#')
+UMD_PRESENTATION_SETS = Vocabulary('http://vocab.lib.umd.edu/set#')
+UMD_TERMS_OF_USE_STATEMENTS = Vocabulary('http://vocab.lib.umd.edu/termsOfUse#')
 
 
 class LabeledThing(RDFResource):
@@ -21,19 +26,3 @@ class Subject(LabeledThing):
 
 class Place(LabeledThing):
     pass
-
-
-class VocabularyTerm(RDFResource):
-    label = DataProperty(rdfs.label, required=True)
-    description = DataProperty(dcterms.description)
-    value = DataProperty(rdf.value)
-    comment = DataProperty(rdfs.comment)
-    same_as = ObjectProperty(owl.sameAs, repeatable=True)
-
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-        # we just want the part with the term as the subject
-        term_graph = Graph()
-        for triple in get_vocabulary_graph(self.uri).triples((self.uri, None, None)):
-            term_graph.add(triple)
-        self._graph = term_graph

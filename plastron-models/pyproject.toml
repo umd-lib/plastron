@@ -39,5 +39,11 @@ test = [
 requires = ["setuptools>=66.1.0"]
 build-backend = "setuptools.build_meta"
 
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+"*" = ["*.ttl"]
+
 [tool.setuptools.dynamic]
 version = { "file" = "VERSION" }

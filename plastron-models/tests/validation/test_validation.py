@@ -10,7 +10,6 @@ from rdflib import URIRef, Literal
 from plastron.namespaces import rdfs
 from plastron.rdfmapping.descriptors import DataProperty
 from plastron.rdfmapping.resources import RDFResourceBase
-from plastron.validation import ValidationError
 from plastron.validation.rules import is_edtf_formatted, is_handle, is_valid_iso639_code, is_iso_8601_date
 from plastron.validation.vocabularies import get_vocabulary_graph, Vocabulary
 
@@ -129,8 +128,8 @@ def test_remote_vocab_error(MockGraph):
     mock_graph.parse.side_effect = HTTPError('http://example.org/foo/', 503, '', Message(), None)
     MockGraph.return_value = mock_graph
     # failure to retrieve the vocabulary over HTTP should
-    # raise a ValidationError
-    with pytest.raises(ValidationError):
+    # raise a RuntimeError
+    with pytest.raises(RuntimeError):
         get_vocabulary_graph(URIRef('http://example.org/foo/'))
 
 

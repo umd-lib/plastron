@@ -156,6 +156,9 @@ def main():
         if not hasattr(command_module, 'Command'):
             raise RuntimeError(f'Unable to execute command {args.cmd_name}')
 
+        plastron_context.client.ua_string = f'plastron/{plastron_context.version} ({args.cmd_name})'
+        logger.debug(f'Client User-Agent set to "{plastron_context.client.ua_string}"')
+
         command = command_module.Command(context=plastron_context)
 
         print_header(args)

@@ -194,8 +194,8 @@ class Command(BaseCommand):
             if args.job_id is None:
                 # TODO: generate a more unique id? add in user and hostname?
                 args.job_id = f"import-{datetimestamp()}"
+                logger.info(f'Creating new job {args.job_id}')
 
-            logger.info(f'Creating new job {args.job_id}')
             job = jobs.create_job(
                 job_class=ImportJob,
                 config=ImportConfig(

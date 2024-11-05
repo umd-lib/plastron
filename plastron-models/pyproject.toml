@@ -37,9 +37,11 @@ test = [
 ]
 
 [project.entry-points.'plastron.content_models']
-Item = "plastron.models.umd:Item"
+File = "plastron.models.page:File"
 Issue = "plastron.models.newspaper:Issue"
+Item = "plastron.models.umd:Item"
 Letter = "plastron.models.letter:Letter"
+Page = "plastron.models.page:Page"
 Poster = "plastron.models.poster:Poster"
 
 [build-system]

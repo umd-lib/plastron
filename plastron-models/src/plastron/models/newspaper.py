@@ -1,27 +1,31 @@
 from lxml.etree import parse, XMLSyntaxError
 
 from plastron.handles import HandleBearingResource
+from plastron.models import ContentModeledResource
 from plastron.models.annotations import TextblockOnPage
 from plastron.models.authorities import UMD_TERMS_OF_USE_STATEMENTS, UMD_PRESENTATION_SETS
 from plastron.models.fedora import FedoraResource
 from plastron.models.pcdm import PCDMObject, PCDMFile
-from plastron.namespaces import bibo, carriers, dc, dcterms, fabio, ndnp, ore, pcdm, pcdmuse, schema, umdtype, umd
+from plastron.namespaces import bibo, carriers, dc, dcterms, fabio, ndnp, ore, pcdm, pcdmuse, schema, umd
 from plastron.rdf.ocr import ALTOResource
 from plastron.rdfmapping.decorators import rdf_type
 from plastron.rdfmapping.descriptors import DataProperty, ObjectProperty
-from plastron.validation.rules import is_handle, is_iso_8601_date
+from plastron.validation.rules import is_iso_8601_date
 from plastron.validation.vocabularies import ControlledVocabularyProperty
 
 
 @rdf_type(bibo.Issue, umd.Newspaper)
-class Issue(PCDMObject, HandleBearingResource, FedoraResource):
+class Issue(ContentModeledResource, PCDMObject, HandleBearingResource, FedoraResource):
     """Newspaper issue"""
+    model_name = 'Issue'
+    is_top_level = True
+
+    member_of = ObjectProperty(pcdm.memberOf)
     title = DataProperty(dcterms.title, required=True)
     date = DataProperty(dc.date, required=True, validate=is_iso_8601_date)
     volume = DataProperty(bibo.volume, required=True)
     issue = DataProperty(bibo.issue, required=True)
     edition = DataProperty(bibo.edition, required=True)
-    handle = DataProperty(dcterms.identifier, datatype=umdtype.handle, validate=is_handle)
     presentation_set = ControlledVocabularyProperty(ore.isAggregatedBy, repeatable=True, vocab=UMD_PRESENTATION_SETS)
     copyright_notice = DataProperty(schema.copyrightNotice)
     terms_of_use = ControlledVocabularyProperty(dcterms.license, vocab=UMD_TERMS_OF_USE_STATEMENTS)

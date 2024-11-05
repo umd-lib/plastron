@@ -1,10 +1,12 @@
 from rdflib import URIRef
 
 from plastron.handles import HandleBearingResource
+from plastron.models import ContentModeledResource
 from plastron.models.authorities import UMD_TERMS_OF_USE_STATEMENTS, UMD_PRESENTATION_SETS
 from plastron.models.fedora import FedoraResource
 from plastron.models.pcdm import PCDMObject
-from plastron.namespaces import bibo, dc, dcmitype, dcterms, edm, geo, rel, skos, ore, owl, umd, schema
+from plastron.models.page import Page
+from plastron.namespaces import bibo, dc, dcmitype, dcterms, edm, geo, rel, skos, ore, owl, umd, schema, pcdm
 from plastron.rdfmapping.decorators import rdf_type
 from plastron.rdfmapping.descriptors import ObjectProperty, DataProperty
 from plastron.rdfmapping.resources import RDFResource
@@ -38,7 +40,12 @@ class Collection(AuthorityRecord):
 
 
 @rdf_type(bibo.Letter, umd.Letter)
-class Letter(PCDMObject, HandleBearingResource, FedoraResource):
+class Letter(ContentModeledResource, PCDMObject, HandleBearingResource, FedoraResource):
+    model_name = 'Letter'
+    is_top_level = True
+
+    member_of = ObjectProperty(pcdm.memberOf)
+    has_member = ObjectProperty(pcdm.hasMember, repeatable=True, cls=Page)
     title = DataProperty(dcterms.title, required=True)
     author = ObjectProperty(rel.aut, repeatable=True, embed=True, cls=Agent)
     recipient = ObjectProperty(bibo.recipient, repeatable=True, embed=True, cls=Agent)

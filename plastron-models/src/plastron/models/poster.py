@@ -1,10 +1,12 @@
 from rdflib import URIRef
 
 from plastron.handles import HandleBearingResource
+from plastron.models import ContentModeledResource
 from plastron.models.authorities import UMD_PRESENTATION_SETS, UMD_TERMS_OF_USE_STATEMENTS
 from plastron.models.fedora import FedoraResource
 from plastron.models.pcdm import PCDMObject
-from plastron.namespaces import bibo, dcterms, dc, edm, geo, ore, schema, umd, xsd
+from plastron.models.page import Page
+from plastron.namespaces import bibo, dcterms, dc, edm, geo, ore, schema, umd, xsd, pcdm
 from plastron.rdfmapping.decorators import rdf_type
 from plastron.rdfmapping.descriptors import ObjectProperty, DataProperty, Property
 from plastron.validation.rules import is_edtf_formatted
@@ -12,7 +14,12 @@ from plastron.validation.vocabularies import ControlledVocabularyProperty
 
 
 @rdf_type(bibo.Image, umd.Poster)
-class Poster(PCDMObject, HandleBearingResource, FedoraResource):
+class Poster(ContentModeledResource, PCDMObject, HandleBearingResource, FedoraResource):
+    model_name = 'Poster'
+    is_top_level = True
+
+    member_of = ObjectProperty(pcdm.memberOf)
+    has_member = ObjectProperty(pcdm.hasMember, repeatable=True, cls=Page)
     title = DataProperty(dcterms.title, required=True)
     alternative = DataProperty(dcterms.alternative)
     publisher = DataProperty(dc.publisher)

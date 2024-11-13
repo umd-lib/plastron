@@ -20,6 +20,7 @@ class PCDMFile(RDFResource):
     mime_type = DataProperty(ebucore.hasMimeType)
     filename = DataProperty(ebucore.filename)
     size = DataProperty(premis.hasSize, datatype=xsd.long)
+    checksum = ObjectProperty(premis.hasMessageDigest)
 
     def __str__(self):
         return str(self.title or self.uri)

@@ -1,9 +1,11 @@
 from plastron.handles import HandleBearingResource
+from plastron.models import ContentModeledResource
 from plastron.models.authorities import Agent, Subject, Place, DCMI_TYPES, UMD_RIGHTS_STATEMENTS, UMD_FORMATS, \
     UMD_ARCHIVAL_COLLECTIONS, UMD_PRESENTATION_SETS, UMD_TERMS_OF_USE_STATEMENTS
 from plastron.models.fedora import FedoraResource
+from plastron.models.page import Page
 from plastron.models.pcdm import PCDMObject
-from plastron.namespaces import dc, dcterms, edm, fabio, pcdm, ore, schema, umdtype, umd
+from plastron.namespaces import dc, dcterms, edm, pcdm, ore, schema, umdtype, umd
 from plastron.rdfmapping.decorators import rdf_type
 from plastron.rdfmapping.descriptors import ObjectProperty, DataProperty
 from plastron.rdfmapping.resources import RDFResource
@@ -24,8 +26,12 @@ class AdminSet(RDFResource):
 
 
 @rdf_type(umd.Item)
-class Item(PCDMObject, HandleBearingResource, FedoraResource):
+class Item(ContentModeledResource, PCDMObject, HandleBearingResource, FedoraResource):
+    model_name = 'Item'
+    is_top_level = True
+
     member_of = ObjectProperty(pcdm.memberOf)
+    has_member = ObjectProperty(pcdm.hasMember, repeatable=True, cls=Page)
     object_type = ControlledVocabularyProperty(dcterms.type, required=True, vocab=DCMI_TYPES)
     identifier = DataProperty(dcterms.identifier, required=True, repeatable=True)
     rights = ControlledVocabularyProperty(dcterms.rights, required=True, vocab=UMD_RIGHTS_STATEMENTS)
@@ -92,12 +98,3 @@ class Item(PCDMObject, HandleBearingResource, FedoraResource):
 
     def __str__(self):
         return str(self.title)
-
-
-@rdf_type(fabio.Page)
-class Page(PCDMObject):
-    title = DataProperty(dcterms.title)
-    number = DataProperty(fabio.hasSequenceIdentifier)
-
-    def __str__(self):
-        return str(self.title or self.uri)

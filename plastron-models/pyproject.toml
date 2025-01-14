@@ -37,6 +37,7 @@ test = [
 ]
 
 [project.entry-points.'plastron.content_models']
+AdminSet = "plastron.models.umd:AdminSet"
 File = "plastron.models.page:File"
 Issue = "plastron.models.newspaper:Issue"
 Item = "plastron.models.umd:Item"

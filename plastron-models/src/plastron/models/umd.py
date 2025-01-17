@@ -21,7 +21,10 @@ class Stub(RDFResource):
 
 
 @rdf_type(pcdm.Collection)
-class AdminSet(RDFResource):
+class AdminSet(ContentModeledResource, RDFResource):
+    model_name = 'AdminSet'
+    is_top_level = False
+
     title = DataProperty(dcterms.title, required=True)
 
 

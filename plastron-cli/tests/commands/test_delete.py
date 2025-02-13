@@ -8,7 +8,7 @@ from httpretty import HEAD, GET, DELETE
 
 from plastron.cli.commands.delete import Command
 from plastron.repo import RepositoryError
-from plastron.utils import ItemLog
+from plastron.jobs import ItemLog
 
 
 def register_responses(responses, uri):

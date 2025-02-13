@@ -11,7 +11,7 @@ from plastron.models.annotations import TextblockOnPage
 from plastron.namespaces import pcdmuse
 from plastron.rdf.ocr import ALTOResource
 from plastron.repo.pcdm import PCDMPageResource
-from plastron.utils import ItemLog
+from plastron.jobs import ItemLog
 
 logger = logging.getLogger(__name__)
 now = datetime.utcnow().strftime('%Y%m%d%H%M%S')

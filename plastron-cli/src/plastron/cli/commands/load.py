@@ -11,7 +11,7 @@ from plastron.client import Client, ClientError
 from plastron.cli.commands import BaseCommand
 from plastron.repo import DataReadError
 from plastron.cli import ConfigError
-from plastron.utils import ItemLog
+from plastron.jobs import ItemLog
 
 logger = logging.getLogger(__name__)
 now = datetime.utcnow().strftime('%Y%m%d%H%M%S')

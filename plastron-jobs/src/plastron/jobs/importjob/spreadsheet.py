@@ -19,8 +19,8 @@ from plastron.rdfmapping.descriptors import Property, DataProperty
 from plastron.rdfmapping.embed import EmbeddedObject
 from plastron.rdfmapping.resources import RDFResourceBase, RDFResourceType
 from plastron.repo import DataReadError, Repository, RepositoryResource
-from plastron.serializers import CSVSerializer
-from plastron.serializers.csv import flatten_headers, unflatten, not_empty, split_escaped, build_lookup_index
+from plastron.serializers.csv import flatten_headers, unflatten, not_empty, split_escaped, build_lookup_index, \
+    CSVSerializer
 from plastron.utils import strtobool
 
 nsm = get_manager()
@@ -79,7 +79,7 @@ def build_fields(fieldnames, model_class) -> Dict[str, List[ColumnSpec]]:
             ))
         elif '{' in header:
             # this field has a datatype
-            # header format is "Header Label {Datatype Label}
+            # header format is "Header Label {Datatype Label}"
             header_label, datatype_label = re.search(r'^([^{]+)\s+{(.+)}$', header).groups()
             try:
                 attrs = property_attrs[header_label]

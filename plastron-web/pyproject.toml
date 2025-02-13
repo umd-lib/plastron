@@ -15,6 +15,7 @@ requires-python = ">= 3.8"
 dependencies = [
     "click",
     "flask",
+    "plastron-jobs",
     "plastron-repo",
     "plastron-utils",
     "python-dotenv",

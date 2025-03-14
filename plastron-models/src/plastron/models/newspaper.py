@@ -3,7 +3,7 @@ from lxml.etree import parse, XMLSyntaxError
 from plastron.handles import HandleBearingResource
 from plastron.models import ContentModeledResource
 from plastron.models.annotations import TextblockOnPage
-from plastron.models.authorities import UMD_TERMS_OF_USE_STATEMENTS, UMD_PRESENTATION_SETS
+from plastron.models.authorities import UMD_TERMS_OF_USE_STATEMENTS, UMD_PRESENTATION_SETS, UMD_RIGHTS_STATEMENTS
 from plastron.models.fedora import FedoraResource
 from plastron.models.pcdm import PCDMObject, PCDMFile
 from plastron.namespaces import bibo, carriers, dc, dcterms, fabio, ndnp, ore, pcdm, pcdmuse, schema, umd
@@ -29,6 +29,7 @@ class Issue(ContentModeledResource, PCDMObject, HandleBearingResource, FedoraRes
     presentation_set = ControlledVocabularyProperty(ore.isAggregatedBy, repeatable=True, vocab=UMD_PRESENTATION_SETS)
     copyright_notice = DataProperty(schema.copyrightNotice)
     terms_of_use = ControlledVocabularyProperty(dcterms.license, vocab=UMD_TERMS_OF_USE_STATEMENTS)
+    rights = ControlledVocabularyProperty(dcterms.rights, required=True, vocab=UMD_RIGHTS_STATEMENTS)
 
     HEADER_MAP = {
         'title': 'Title',

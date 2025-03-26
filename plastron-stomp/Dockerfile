@@ -25,6 +25,7 @@ RUN pip install \
     './plastron-messaging' \
     './plastron-models' \
     './plastron-repo' \
+    './plastron-jobs' \
     './plastron-stomp'
 
 ENV PYTHONUNBUFFERED=1

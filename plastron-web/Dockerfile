@@ -27,6 +27,7 @@ RUN pip install \
     './plastron-messaging' \
     './plastron-models' \
     './plastron-repo' \
+    './plastron-jobs' \
     './plastron-web' \
     './plastron-stomp'
 

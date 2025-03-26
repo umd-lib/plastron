@@ -2,7 +2,7 @@ import argparse
 import os
 import tempfile
 from csv import DictReader
-from io import BytesIO, StringIO
+from io import StringIO
 from uuid import uuid4
 
 import pytest

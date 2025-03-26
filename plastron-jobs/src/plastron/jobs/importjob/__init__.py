@@ -16,17 +16,17 @@ from plastron.client import ClientError
 from plastron.context import PlastronContext
 from plastron.files import BinarySource, ZipFileSource, RemoteFileSource, HTTPFileSource, LocalFileSource
 from plastron.handles import HandleInfo
-from plastron.jobs import JobError, JobConfig, Job
-from plastron.jobs.importjob.spreadsheet import LineReference, MetadataSpreadsheet, InvalidRow, Row, MetadataError
+from plastron.jobs import JobError, JobConfig, Job, ItemLog
+from plastron.jobs.importjob.spreadsheet import MetadataSpreadsheet, InvalidRow, Row, MetadataError
 from plastron.models import get_model_from_name, ModelClassNotFoundError
 from plastron.models.annotations import FullTextAnnotation, TextualBody
-from plastron.namespaces import umdaccess, sc
+from plastron.namespaces import sc
 from plastron.rdf.pcdm import File, PreservationMasterFile
 from plastron.rdfmapping.validation import ValidationResultsDict, ValidationResult, ValidationSuccess, ValidationFailure
 from plastron.repo import RepositoryError, ContainerResource
 from plastron.repo.pcdm import PCDMObjectResource
 from plastron.repo.publish import PublishableResource
-from plastron.utils import datetimestamp, ItemLog
+from plastron.utils import datetimestamp
 from plastron.validation import ValidationError
 
 logger = logging.getLogger(__name__)
@@ -173,7 +173,7 @@ class ImportRun:
         )
         logger.info(f'Found {count["initially_completed_items"]} completed items')
         if count['initially_completed_items'] > 0:
-            logger.debug(f'Completed item identifiers: {self.job.completed_log._item_keys}')
+            logger.debug(f'Completed item identifiers: {self.job.completed_log.item_keys}')
 
         for row in metadata.rows(limit=limit, percentage=percentage, completed=self.job.completed_log):
             if isinstance(row, InvalidRow):

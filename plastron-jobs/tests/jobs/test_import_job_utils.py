@@ -1,13 +1,10 @@
 import pytest
-from rdflib import URIRef
 
 from plastron.files import LocalFileSource, RemoteFileSource, ZipFileSource
 from plastron.jobs.importjob import ImportJob
-from plastron.jobs.importjob.spreadsheet import ColumnSpec, build_fields, build_file_groups, parse_value_string, \
-    MetadataError
+from plastron.jobs.importjob.spreadsheet import build_fields, build_file_groups, MetadataError
 from plastron.models.umd import Item
 from plastron.namespaces import umdtype
-from plastron.rdfmapping.descriptors import DataProperty
 
 
 @pytest.mark.parametrize(
@@ -78,25 +75,3 @@ def test_build_fields_without_default_datatype():
 def test_get_source(datadir, base_location, path, expected_class):
     job = ImportJob(job_id='foo', job_dir=datadir)
     assert isinstance(job.get_source(base_location, path), expected_class)
-
-
-@pytest.mark.parametrize(
-    ('input_string', 'expected_count'),
-    [
-        # the empty string should parse to the empty list
-        ('', 0),
-        # single value
-        ('foo', 1),
-        # single value, followed by an empty string
-        ('foo|', 1),
-        # two values
-        ('foo|bar', 2),
-        # two values, with an empty string between
-        ('foo||bar', 2),
-
-    ]
-)
-def test_parse_value_string(input_string, expected_count):
-    prop = DataProperty(predicate=URIRef('http://example.com/test'), datatype=None)
-    column_spec = ColumnSpec(attrs='test', header='Test', prop=prop, lang_code=None, datatype=None)
-    assert len(list(parse_value_string(input_string, column_spec))) == expected_count

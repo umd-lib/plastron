@@ -13,8 +13,6 @@ authors = [
 readme = "README.md"
 requires-python = ">= 3.8"
 dependencies = [
-    "bagit",
-    "beautifulsoup4",
     "paramiko",
     "plastron-client",
     "plastron-messaging",

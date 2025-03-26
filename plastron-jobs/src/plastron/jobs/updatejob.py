@@ -13,7 +13,7 @@ from plastron.rdfmapping.resources import RDFResourceBase
 from plastron.rdfmapping.validation import ValidationFailure
 from plastron.repo import RepositoryResource, Repository
 from plastron.repo.utils import context
-from plastron.utils import NullLog, AppendableSequence
+from plastron.jobs.logs import AppendableSequence, NullLog
 
 logger = logging.getLogger(__name__)
 

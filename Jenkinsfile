@@ -109,6 +109,7 @@ pipeline {
               -e './plastron-messaging[test]' \
               -e './plastron-models[test]' \
               -e './plastron-repo[test]' \
+              -e './plastron-jobs[test]' \
               -e './plastron-web[test]' \
               -e './plastron-stomp[test]' \
               -e './plastron-cli[test]'

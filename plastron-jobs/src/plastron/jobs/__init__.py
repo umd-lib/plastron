@@ -8,7 +8,7 @@ from typing import Union, Dict, Any, Optional, List, Type, TypeVar
 
 import yaml
 
-from plastron.utils import ItemLog
+from plastron.jobs.logs import ItemLog
 
 logger = logging.getLogger(__name__)
 

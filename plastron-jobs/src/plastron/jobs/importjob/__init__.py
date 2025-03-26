@@ -173,7 +173,7 @@ class ImportRun:
         )
         logger.info(f'Found {count["initially_completed_items"]} completed items')
         if count['initially_completed_items'] > 0:
-            logger.debug(f'Completed item identifiers: {self.job.completed_log._item_keys}')
+            logger.debug(f'Completed item identifiers: {self.job.completed_log.item_keys}')
 
         for row in metadata.rows(limit=limit, percentage=percentage, completed=self.job.completed_log):
             if isinstance(row, InvalidRow):

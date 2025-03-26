@@ -50,6 +50,10 @@ class ItemLog(AppendableSequence):
         if self.exists():
             self._load_keys()
 
+    @property
+    def item_keys(self) -> set:
+        return self._item_keys
+
     def exists(self) -> bool:
         """Returns `True` if the CSV log file exists."""
         return self.filename.is_file()

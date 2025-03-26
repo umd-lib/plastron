@@ -7,20 +7,20 @@ from dataclasses import dataclass
 from itertools import chain
 from os.path import splitext, basename
 from pathlib import Path
-from typing import Optional, Dict, List, Tuple, Union, Mapping, Type, Iterator, NamedTuple, Protocol
+from typing import Optional, Dict, List, Tuple, Union, Mapping, Type, Iterator, NamedTuple, Protocol, Generic, TypeVar
 from uuid import uuid4
 
-from rdflib import URIRef, Literal
+from rdflib import URIRef
 from rdflib.util import from_n3
 
 from plastron.files import FileSpec, FileGroup
+from plastron.models import ContentModeledResource
 from plastron.namespaces import get_manager
 from plastron.rdfmapping.descriptors import Property, DataProperty
 from plastron.rdfmapping.embed import EmbeddedObject
 from plastron.rdfmapping.resources import RDFResourceBase, RDFResourceType
 from plastron.repo import DataReadError, Repository, RepositoryResource
-from plastron.serializers.csv import flatten_headers, unflatten, not_empty, split_escaped, build_lookup_index, \
-    CSVSerializer
+from plastron.serializers.csv import flatten_headers, unflatten, build_lookup_index, CSVSerializer
 from plastron.utils import strtobool
 
 nsm = get_manager()
@@ -203,19 +203,6 @@ def build_file_groups(filenames_string: str) -> Dict[str, FileGroup]:
     return file_groups
 
 
-def parse_value_string(value_string, column: ColumnSpec) -> List[Union[Literal, URIRef]]:
-    values = []
-    # filter out empty strings, so we don't get spurious empty values in the properties
-    for value in filter(not_empty, split_escaped(value_string, separator='|')):
-        if isinstance(column.prop, DataProperty):
-            # default to the property's defined datatype
-            # if it was not specified in the column header
-            values.append(Literal(value, lang=column.lang_code, datatype=(column.datatype or column.prop.datatype)))
-        else:
-            values.append(URIRef(value))
-    return values
-
-
 @dataclass
 class InvalidRow:
     line_reference: LineReference
@@ -233,10 +220,13 @@ class Bucket(Sized, Container, Protocol):
     pass
 
 
-class Row:
+ModelType = TypeVar('ModelType', bound=ContentModeledResource)
+
+
+class Row(Generic[ModelType]):
     def __init__(
             self,
-            spreadsheet: 'MetadataSpreadsheet',
+            spreadsheet: 'MetadataSpreadsheet[ModelType]',
             line_reference: LineReference,
             row_number: int,
             data: Mapping[str, str],
@@ -256,10 +246,7 @@ class Row:
     def get(self, key, default=None):
         return self.data.get(key, default)
 
-    def parse_value(self, column: ColumnSpec) -> List[Union[Literal, URIRef]]:
-        return parse_value_string(self[column.header], column)
-
-    def get_object(self, repo: Repository, read_from_repo: bool = False) -> RDFResourceType:
+    def get_object(self, repo: Repository, read_from_repo: bool = False) -> ModelType:
         """Gets an RDF resource to be imported, based on the metadata in this row.
 
         :param repo: the repository configuration
@@ -283,7 +270,7 @@ class Row:
         # to their correct positional locations
         row_index = build_lookup_index(self.index_string)
         params = unflatten(self.data, self.spreadsheet.model_class, self.spreadsheet.model_class.HEADER_MAP, row_index)
-        item: RDFResourceType = self.spreadsheet.model_class(uri=self.uri, graph=resource.graph)
+        item: ModelType = self.spreadsheet.model_class(uri=self.uri, graph=resource.graph)
         item.set_properties(**params)
 
         return item
@@ -333,12 +320,12 @@ class Row:
         return bool(strtobool(self.data.get('HIDDEN', 'False') or 'False'))
 
 
-class MetadataSpreadsheet:
+class MetadataSpreadsheet(Generic[ModelType]):
     """
     Iterable sequence of rows from the metadata CSV file of an import job.
     """
 
-    def __init__(self, metadata_filename: Union[Path, str], model_class: Type[RDFResourceType]):
+    def __init__(self, metadata_filename: Union[Path, str], model_class: Type[ModelType]):
         self.metadata_filename = metadata_filename
         self.metadata_file = None
         self.model_class = model_class
@@ -406,7 +393,7 @@ class MetadataSpreadsheet:
             limit: int = None,
             percentage: int = None,
             completed: Bucket = None,
-    ) -> Iterator[Union[Row, InvalidRow]]:
+    ) -> Iterator[Union[Row[ModelType], InvalidRow]]:
         """Iterator over the rows in this spreadsheet.
 
         :param limit: maximum row number to return

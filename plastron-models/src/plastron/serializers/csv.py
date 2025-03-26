@@ -1,19 +1,20 @@
 import csv
 import os
 import re
-from collections import defaultdict, UserDict
+from collections import defaultdict
 from contextlib import contextmanager
 from itertools import zip_longest
 from pathlib import Path
-from typing import List, Union, Dict, Type, NamedTuple, Mapping, Iterable, TextIO
+from typing import List, Union, Dict, Type, NamedTuple, Mapping, Iterable, TextIO, TypeVar
 
 from rdflib import URIRef, Literal
 from urlobject import URLObject
 
+from plastron.models import ContentModeledResource
 from plastron.models.fedora import FedoraResource
 from plastron.models.pcdm import PCDMFile
 from plastron.namespaces import umdaccess
-from plastron.rdfmapping.descriptors import ObjectProperty
+from plastron.rdfmapping.descriptors import ObjectProperty, DataProperty
 from plastron.rdfmapping.embed import EmbeddedObject
 from plastron.rdfmapping.properties import RDFObjectProperty, RDFDataProperty
 from plastron.rdfmapping.resources import RDFResourceBase, RDFResource
@@ -160,7 +161,7 @@ class ColumnHeader(NamedTuple):
         return f'{self.label} [{self.language}]' if self.language is not None else self.label
 
 
-class ColumnDict(UserDict):
+class ColumnsDict(dict):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.index = []
@@ -169,11 +170,11 @@ class ColumnDict(UserDict):
 def flatten(
     description: RDFResourceBase,
     header_map: Dict[str, Union[str, dict]],
-) -> ColumnDict:
+) -> ColumnsDict:
     """Convert an RDF description to a dictionary with `ColumnHeader` keys and list values, and a
     lookup index list for embedded objects. RDF attributes of the description object are mapped to
     the header keys by the `header_map`."""
-    columns = ColumnDict()
+    columns = ColumnsDict()
     for attr, header in header_map.items():
         if isinstance(header, dict):
             # treat this as an embedded ObjectProperty
@@ -288,13 +289,37 @@ def unflatten(
                 if isinstance(descriptor, ObjectProperty):
                     params[attr].extend(URIRef(v) for v in values)
                 else:
-                    if descriptor.datatype is not None:
-                        if column_header.language is not None:
-                            raise RuntimeError('Cannot apply a language tag to a column with a defined datatype')
-                        params[attr].extend(Literal(v, datatype=descriptor.datatype) for v in values)
-                    else:
-                        params[attr].extend(Literal(v, lang=column_header.language) for v in values)
+                    params[attr].extend(get_literal(column_header, descriptor, v) for v in values)
     return params
+
+
+def get_literal(column_header: ColumnHeader, descriptor: DataProperty, input_value: str) -> Literal:
+    """Given a `ColumnHeader`, a data property descriptor, and a string input value,
+    return an RDF `Literal` with the appropriate value, language, and datatype.
+
+    The language code can either be given in the `language` attribute of the `ColumnHeader`,
+    or in the `input_value` itself. If it is embedded in the `input_value`, it should appear
+    at the start of the string prefixed with `@` and surrounded by square brackets:
+
+    ```
+    "[@en]dog"
+    "[@de]der Hund"
+    "[@ja]イヌ"
+    ```
+    """
+    m = re.match(r'^\[@(\w+)]', input_value)
+    if m:
+        language = m[1]
+        value = input_value[len(language) + 3:]
+    else:
+        language = column_header.language
+        value = input_value
+    if descriptor.datatype is not None:
+        if language is not None:
+            raise RuntimeError('Cannot apply a language tag to a column with a defined datatype')
+        return Literal(value, datatype=descriptor.datatype)
+    else:
+        return Literal(value, lang=language)
 
 
 @contextmanager
@@ -322,7 +347,7 @@ def ensure_binary_mode(file):
 
 
 class Sheet:
-    def __init__(self, model: Type[RDFResourceBase]):
+    def __init__(self, model: Type[ContentModeledResource]):
         self.model_class = model
         self.headers = list(flatten_headers(self.header_map).keys()) + CSVSerializer.SYSTEM_HEADERS
         self.extra_headers = defaultdict(set)
@@ -355,6 +380,9 @@ class Sheet:
                 csv_writer.writerow(row)
 
 
+T = TypeVar('T', ContentModeledResource, RDFResource)
+
+
 class CSVSerializer:
     """Serializer that encodes metadata records with a defined content model as CSV files."""
 
@@ -381,7 +409,7 @@ class CSVSerializer:
 
     def write(
             self,
-            resource: RDFResource,
+            resource: T,
             files: Iterable = None,
             binaries_dir: str = '',
             public_url: str = None,

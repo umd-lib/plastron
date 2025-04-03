@@ -339,6 +339,9 @@ COMMANDS:
       solr-legacy:
         CamelFcrepoIndexingDestinations: activemq:index.solr
         CamelFcrepoSolrIndexingDestinations: direct:solr.LegacyIndex
+      all-solr:
+        CamelFcrepoIndexingDestinations: activemq:index.solr
+        CamelFcrepoSolrIndexingDestinations: direct:solr.Index,direct:solr.LegacyIndex
       triplestore:
         CamelFcrepoIndexingDestinations: activemq:index.triplestore
       all:

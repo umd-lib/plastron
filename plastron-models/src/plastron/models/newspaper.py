@@ -5,6 +5,7 @@ from plastron.models import ContentModeledResource
 from plastron.models.annotations import TextblockOnPage
 from plastron.models.authorities import UMD_TERMS_OF_USE_STATEMENTS, UMD_PRESENTATION_SETS, UMD_RIGHTS_STATEMENTS, Agent
 from plastron.models.fedora import FedoraResource
+from plastron.models.page import Page, File
 from plastron.models.pcdm import PCDMObject, PCDMFile
 from plastron.namespaces import bibo, carriers, dc, dcterms, fabio, ndnp, ore, pcdm, pcdmuse, schema, umd
 from plastron.rdf.ocr import ALTOResource
@@ -21,6 +22,8 @@ class Issue(ContentModeledResource, PCDMObject, HandleBearingResource, FedoraRes
     is_top_level = True
 
     member_of = ObjectProperty(pcdm.memberOf)
+    has_member = ObjectProperty(pcdm.hasMember, repeatable=True, cls=Page)
+    has_file = ObjectProperty(pcdm.hasFile, repeatable=True, cls=File)
     title = DataProperty(dcterms.title, required=True)
     date = DataProperty(dc.date, required=True, validate=is_iso_8601_date)
     volume = DataProperty(bibo.volume, required=True)

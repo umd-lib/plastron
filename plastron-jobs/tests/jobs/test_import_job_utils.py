@@ -53,6 +53,28 @@ def test_build_file_groups_labeled(value, expected_count, expected_labels):
         assert groups[rootname].label == label
 
 
+@pytest.mark.parametrize(
+    ('value', 'expected_count', 'expected_usages'),
+    [
+        ('foo.tif;foo.xml', 1, {'foo': {'foo.tif': None, 'foo.xml': None}}),
+        ('<Preservation>foo.tif;<OCR>foo.xml', 1, {'foo': {'foo.tif': 'Preservation', 'foo.xml': 'OCR'}}),
+        (
+            '<Preservation>foo.tif;<OCR>foo.xml;bar.jpg;bar.xml',
+            2,
+            {'foo': {'foo.tif': 'Preservation', 'foo.xml': 'OCR'}, 'bar': {'bar.jpg': None, 'bar.xml': None}},
+        ),
+        ('Page 1:<Preservation>foo.tif;<OCR>foo.xml', 1, {'foo': {'foo.tif': 'Preservation', 'foo.xml': 'OCR'}}),
+        ('<ocr>0004.xml;<ocr>0004.hocr', 1, {'0004': {'0004.xml': 'ocr', '0004.hocr': 'ocr'}}),
+    ]
+)
+def test_build_file_groups_with_usage(value, expected_count, expected_usages):
+    groups = build_file_groups(value)
+    assert len(groups) == expected_count
+    for rootname, usage_map in expected_usages.items():
+        for name, usage in usage_map.items():
+            assert groups[rootname].file(name).usage == usage
+
+
 def test_build_fields_with_default_datatype():
     fields = build_fields(['Accession Number'], Item)
     assert fields['accession_number'][0].datatype == umdtype.accessionNumber

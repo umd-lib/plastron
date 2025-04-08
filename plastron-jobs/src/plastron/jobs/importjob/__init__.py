@@ -486,7 +486,7 @@ class ImportRow:
             raise RuntimeError('Must specify --binaries-location if the metadata has a FILES and/or ITEM_FILES column')
 
         results['FILES'] = self.validate_files(self.row.filenames)
-        results['ITEM_FILES'] = self.validate_files(self.row.item_filenames)
+        results['ITEM_FILES'] = self.validate_files(f.name for f in self.row.item_files)
 
         return results
 
@@ -582,9 +582,9 @@ class ImportRow:
 
                 # item-level files
                 if self.row.has_item_files:
-                    for filename in self.row.item_filenames:
-                        source = self.job.get_source(self.job.config.binaries_location, filename)
-                        resource.create_file(source=source)
+                    for file in self.row.item_files:
+                        source = self.job.get_source(self.job.config.binaries_location, file.name)
+                        resource.create_file(source=source, rdf_types=file.rdf_types)
 
                 # publish this resource, if requested
                 if self._publish:

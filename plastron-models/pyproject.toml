@@ -25,6 +25,7 @@ dependencies = [
     "python-iso639",
     # rdflib 6.0.0 fixed the 308 HTTP redirect bug
     "rdflib >= 6.0.0",
+    "types-lxml",
 ]
 dynamic = ["version"]
 

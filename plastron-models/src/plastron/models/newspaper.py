@@ -8,7 +8,7 @@ from plastron.models.fedora import FedoraResource
 from plastron.models.page import Page, File
 from plastron.models.pcdm import PCDMObject, PCDMFile
 from plastron.namespaces import bibo, carriers, dc, dcterms, fabio, ndnp, ore, pcdm, pcdmuse, schema, umd
-from plastron.rdf.ocr import ALTOResource
+from plastron.ocr.alto import ALTOResource
 from plastron.rdfmapping.decorators import rdf_type
 from plastron.rdfmapping.descriptors import DataProperty, ObjectProperty
 from plastron.validation.rules import is_iso_8601_date

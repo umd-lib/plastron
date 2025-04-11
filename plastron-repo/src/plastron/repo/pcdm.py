@@ -12,6 +12,7 @@ from plastron.models.ldp import LDPContainer
 from plastron.models.ore import Proxy
 from plastron.models.pcdm import PCDMObject, PCDMFile
 from plastron.models.umd import Page
+from plastron.namespaces import pcdmuse, fabio
 from plastron.rdfmapping.resources import RDFResourceBase
 from plastron.repo import ContainerResource, Repository, BinaryResource, RepositoryResource
 
@@ -71,6 +72,7 @@ class PCDMFileBearingResource(ContainerResource):
             self,
             source: BinarySource,
             slug: Optional[str] = None,
+            rdf_types: Optional[Set] = None,
     ) -> BinaryResource:
         """Create a single file from the given source as a `pcdm:fileOf` this resource.
         If no slug is provided, one is generated using `random_slug()`."""
@@ -104,6 +106,8 @@ class PCDMFileBearingResource(ContainerResource):
         file.file_of.add(parent)
         parent.has_file.add(file)
         file.rdf_type.extend(source.rdf_types)
+        if rdf_types is not None:
+            file.rdf_type.extend(rdf_types)
 
         file_resource.update()
         self.update()
@@ -233,7 +237,7 @@ class PCDMObjectResource(PCDMFileBearingResource, AggregationResource):
         )
         parent.has_member.add(URIRef(page_resource.url))
         for file_spec in file_group.files:
-            page_resource.create_file(source=file_spec.source)
+            page_resource.create_file(source=file_spec.source, rdf_types=file_spec.rdf_types)
         self.update()
         self.member_urls.add(page_resource.url)
         logger.debug(f'Created page {number}: {page_resource.url} "{file_group.label}"')

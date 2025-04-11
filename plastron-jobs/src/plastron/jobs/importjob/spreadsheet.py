@@ -13,7 +13,7 @@ from uuid import uuid4
 from rdflib import URIRef
 from rdflib.util import from_n3
 
-from plastron.files import FileSpec, FileGroup
+from plastron.files import FileSpec, FileGroup, parse_usage_tag
 from plastron.models import ContentModeledResource
 from plastron.namespaces import get_manager
 from plastron.rdfmapping.descriptors import Property, DataProperty
@@ -172,10 +172,8 @@ def build_file_groups(filenames_string: str) -> Dict[str, FileGroup]:
     if filenames_string.strip() == '':
         return file_groups
     for filename in filenames_string.split(';'):
-        if ':' in filename:
-            label, filename = filename.split(':', 1)
-        else:
-            label = None
+        filename, label = parse_label(filename)
+        filename, usage = parse_usage_tag(filename)
         root, ext = splitext(basename(filename))
         if root not in file_groups:
             file_groups[root] = FileGroup(rootname=root, label=label)
@@ -187,7 +185,7 @@ def build_file_groups(filenames_string: str) -> Dict[str, FileGroup]:
             else:
                 file_group.label = label
 
-        file_groups[root].files.append(FileSpec(name=filename))
+        file_groups[root].files.append(FileSpec(name=filename, usage=usage))
 
     labels = [g.label for g in file_groups.values()]
     if any(label is not None for label in labels) and not all(label is not None for label in labels):
@@ -201,6 +199,14 @@ def build_file_groups(filenames_string: str) -> Dict[str, FileGroup]:
     logger.debug(f'Found {len(file_groups)} unique file basename(s)')
     logger.debug(f'File group labels: {labels}')
     return file_groups
+
+
+def parse_label(filename: str) -> Tuple[str, Optional[str]]:
+    if ':' in filename:
+        label, filename = filename.split(':', 1)
+        return filename, label
+    else:
+        return filename, None
 
 
 @dataclass
@@ -304,8 +310,10 @@ class Row(Generic[ModelType]):
         return self._file_groups
 
     @property
-    def item_filenames(self):
-        return self.data['ITEM_FILES'].strip().split(';') if self.has_item_files else []
+    def item_files(self) -> List[FileSpec]:
+        if not self.has_item_files:
+            return []
+        return [FileSpec.parse(v) for v in self.data['ITEM_FILES'].strip().split(';')]
 
     @property
     def index_string(self):

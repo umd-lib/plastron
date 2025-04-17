@@ -4,7 +4,6 @@ from collections import Counter
 from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
-from os.path import basename
 from pathlib import Path
 from shutil import copyfileobj
 from typing import Optional, Any, IO, List, Generator, Dict, Iterable
@@ -21,7 +20,6 @@ from plastron.jobs.importjob.spreadsheet import MetadataSpreadsheet, InvalidRow,
 from plastron.models import get_model_from_name, ModelClassNotFoundError
 from plastron.models.annotations import FullTextAnnotation, TextualBody
 from plastron.namespaces import sc
-from plastron.rdf.pcdm import File, PreservationMasterFile
 from plastron.rdfmapping.validation import ValidationResultsDict, ValidationResult, ValidationSuccess, ValidationFailure
 from plastron.repo import RepositoryError, ContainerResource
 from plastron.repo.pcdm import PCDMObjectResource
@@ -314,7 +312,7 @@ class ImportJob(Job):
         self.validation_reports = []
 
     @property
-    def metadata_filename(self) -> Path:
+    def metadata_file(self) -> Path:
         return self.dir / 'source.csv'
 
     @property
@@ -324,11 +322,11 @@ class ImportJob(Job):
         return self._model_class
 
     def store_metadata_file(self, input_file: IO):
-        with open(self.metadata_filename, mode='w') as file:
+        with self.metadata_file.open(mode='w') as file:
             copyfileobj(input_file, file)
             logger.debug(f"Copied input file {getattr(input_file, 'name', '<>')} to {file.name}")
 
-    def complete(self, row, status: ImportedItemStatus):
+    def complete(self, row: 'ImportRow', status: ImportedItemStatus):
         # write to the completed item log
         self.completed_log.append({
             'id': row.identifier,
@@ -340,7 +338,7 @@ class ImportJob(Job):
 
     def get_metadata(self) -> MetadataSpreadsheet:
         try:
-            return MetadataSpreadsheet(metadata_filename=self.metadata_filename, model_class=self.model_class)
+            return MetadataSpreadsheet(metadata_filename=self.metadata_file, model_class=self.model_class)
         except MetadataError as e:
             raise JobError(job=self) from e
 
@@ -419,29 +417,6 @@ class ImportJob(Job):
             # with no URI prefix, assume a local file path
             return LocalFileSource(localpath=os.path.join(base_location, path))
 
-    def get_file(self, base_location: str, filename: str) -> File:
-        """
-        Get a file object for the given base_location and filename.
-
-        Currently, if the file has an "image/tiff" MIME type, this method returns
-        a :py:class:`plastron.pcdm.PreservationMasterFile`; otherwise it returns
-        a basic :py:class:`plastron.pcdm.File`.
-
-        :param base_location:
-        :param filename:
-        :return:
-        """
-        source = self.get_source(base_location, filename)
-
-        # XXX: hardcoded image/tiff as the preservation master format
-        # TODO: make preservation master format configurable per collection or job
-        if source.mimetype() == 'image/tiff':
-            file_class = PreservationMasterFile
-        else:
-            file_class = File
-
-        return file_class.from_source(title=basename(filename), source=source)
-
 
 class PublishableObjectResource(PCDMObjectResource, PublishableResource):
     pass
@@ -467,7 +442,7 @@ class ImportRow:
         return str(self.row.line_reference)
 
     @property
-    def identifier(self):
+    def identifier(self) -> str:
         return self.row.identifier
 
     def validate_item(self) -> ValidationResultsDict:

@@ -148,7 +148,7 @@ def test_container_is_required_unless_resuming(datadir, plastron_context):
             [
                 'Title', 'Date', 'Volume', 'Issue', 'Edition', 'Handle',
                 'Presentation Set', 'Copyright Notice', 'Terms of Use',
-                'FILES', 'ITEM_FILES'
+                'Rights Statement', 'Rights Holder', 'FILES', 'ITEM_FILES',
             ]
         ),
 
@@ -185,6 +185,8 @@ def create_args(**kwargs):
     params = {
         'job_id': str(uuid4()),
         'delegated_user': None,
+        'convert_from': None,
+        'convert_params': [],
         'resume': False,
         'model': 'Item',
         'access': None,

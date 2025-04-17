@@ -422,6 +422,13 @@ class FileSpec:
         return self.name
 
     @property
+    def spec(self) -> str:
+        if self.usage:
+            return f'<{self.usage}>{self.name}'
+        else:
+            return self.name
+
+    @property
     def rdf_types(self) -> Optional[Set[URIRef]]:
         if self.usage is not None:
             return self.USAGE_TAGS.get(self.usage.lower(), None)

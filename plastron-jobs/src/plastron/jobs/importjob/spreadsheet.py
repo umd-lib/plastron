@@ -381,7 +381,7 @@ class MetadataSpreadsheet(Generic[ModelType]):
 
     @property
     def identifier_column(self):
-        return self.model_class.HEADER_MAP['identifier']
+        return self.model_class.HEADER_MAP.get('identifier') or self.model_class.HEADER_MAP.get('title')
 
     def should_load(self, line) -> bool:
         """Whether the given line is part of the subset of lines to load."""

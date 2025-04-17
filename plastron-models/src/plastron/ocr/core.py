@@ -293,5 +293,13 @@ class OCRError(Exception):
     pass
 
 
+class OCRFileError(OCRError):
+    pass
+
+
+class ImageFileError(OCRError):
+    pass
+
+
 class UnrecognizedOCRFormatError(OCRError):
     pass

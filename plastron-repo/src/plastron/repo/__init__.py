@@ -321,8 +321,10 @@ class BinaryResource(RepositoryResource):
     def open(self):
         """Request the resource, and return a `BytesIO` object of its content."""
         response = self.client.get(self.url, stream=True)
-        if response.ok:
-            yield BytesIO(response.content)
+        if not response.ok:
+            raise RepositoryError(response)
+
+        yield BytesIO(response.content)
 
 
 class RepositoryError(Exception):

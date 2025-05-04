@@ -156,6 +156,14 @@ class RepositoryResource:
     def __str__(self):
         return self.path if self.path is not None else '[NEW]'
 
+    T = TypeVar('T', bound='RepositoryResource')
+
+    def convert_to(self, cls: Type[T]) -> T:
+        try:
+            return cls(repo=self.repo, path=self.path)
+        except TypeError as e:
+            raise RepositoryError(f'Unable to convert {self.__class__.__name__} to {cls.__name__}: {e}')
+
     @property
     def url(self) -> Optional[URLObject]:
         if self.path is not None:

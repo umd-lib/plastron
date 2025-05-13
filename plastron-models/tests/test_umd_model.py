@@ -1,7 +1,9 @@
 from rdflib import Graph, Literal, URIRef
 
+from plastron.models.authorities import Agent
 from plastron.models.umd import Item
-from plastron.namespaces import dcterms, umdtype
+from plastron.namespaces import dcterms, umdtype, rdfs
+from plastron.rdfmapping.embed import embedded
 
 
 def test_identifier_distinct_from_accession_number():
@@ -35,3 +37,13 @@ def test_item_valid_with_only_required_fields():
     item.rights = 'http://vocab.lib.umd.edu/rightsStatement#InC-EDU'
     item.title = 'Test Item'
     assert item.is_valid
+
+
+def test_audience_property():
+    item = Item(uri=URIRef('http://example.com/foo'), audience=embedded(Agent)(label=Literal('John Doe')))
+
+    audience_triples = list(item.graph.triples((URIRef('http://example.com/foo'), dcterms.audience, None)))
+    assert len(audience_triples) == 1
+    embedded_subject = audience_triples[0][2]
+    label_triples = list(item.graph.triples((embedded_subject, rdfs.label, Literal('John Doe'))))
+    assert len(label_triples) == 1

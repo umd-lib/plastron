@@ -116,9 +116,10 @@ def test_container_is_required_unless_resuming(datadir, plastron_context):
                 'Format', 'Archival Collection', 'Presentation Set', 'Date',
                 'Description', 'Alternate Title', 'Creator', 'Creator URI',
                 'Contributor', 'Contributor URI', 'Publisher', 'Publisher URI',
-                'Location', 'Extent', 'Subject', 'Language', 'Rights Holder',
-                'Terms of Use', 'Copyright Notice', 'Collection Information',
-                'Accession Number', 'Handle', 'FILES', 'ITEM_FILES'
+                'Audience', 'Audience URI', 'Location', 'Extent', 'Subject',
+                'Language', 'Rights Holder', 'Terms of Use', 'Copyright Notice',
+                'Collection Information', 'Accession Number', 'Handle', 'FILES',
+                'ITEM_FILES'
             ]
         ),
         (

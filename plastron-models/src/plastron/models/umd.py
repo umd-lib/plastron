@@ -49,6 +49,7 @@ class Item(ContentModeledResource, PCDMObject, HandleBearingResource, FedoraReso
     creator = ObjectProperty(dcterms.creator, repeatable=True, embed=True, cls=Agent)
     contributor = ObjectProperty(dcterms.contributor, repeatable=True, embed=True, cls=Agent)
     publisher = ObjectProperty(dcterms.publisher, repeatable=True, embed=True, cls=Agent)
+    audience = ObjectProperty(dcterms.audience, repeatable=True, embed=True, cls=Agent)
     location = ObjectProperty(dcterms.spatial, repeatable=True, embed=True, cls=Place)
     extent = DataProperty(dcterms.extent, repeatable=True)
     subject = ObjectProperty(dcterms.subject, repeatable=True, embed=True, cls=Subject)
@@ -81,6 +82,10 @@ class Item(ContentModeledResource, PCDMObject, HandleBearingResource, FedoraReso
         'publisher': {
             'label': 'Publisher',
             'same_as': 'Publisher URI',
+        },
+        'audience': {
+            'label': 'Audience',
+            'same_as': 'Audience URI',
         },
         'location': {
             'label': 'Location',

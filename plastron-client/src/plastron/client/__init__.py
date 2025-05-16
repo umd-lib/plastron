@@ -319,6 +319,10 @@ class Client:
     forwarded_protocol = SessionHeaderAttribute('X-Forwarded-Proto')
     """`X-Forwarded-Proto` header value. This is automatically set if the
     `endpoint` has an `external_url`."""
+    session: Session
+    """Underlying Requests library
+    [Session object](https://requests.readthedocs.io/en/latest/user/advanced/#session-objects),
+    or a subclass thereof"""
 
     def __init__(
         self,
@@ -328,14 +332,19 @@ class Client:
         ua_string: str = None,
         on_behalf_of: str = None,
         load_binaries: bool = True,
+        session: Session = None,
     ):
         self.endpoint: Endpoint = endpoint
         """Fedora repository endpoint"""
         self.load_binaries: bool = load_binaries
 
-        self.session: Session = Session()
-        """Underlying Requests library
-        [Session object](https://requests.readthedocs.io/en/latest/user/advanced/#session-objects)"""
+        if session is None:
+            # defaults to a basic requests.Session object
+            self.session = Session()
+        else:
+            # otherwise, use the session object as is
+            self.session = session
+
         self.session.auth = auth
         if server_cert is not None:
             self.session.verify = server_cert
@@ -362,7 +371,14 @@ class Client:
             message = ' '.join(str(arg) for arg in e.args)
             logger.error(message)
             raise RuntimeError(f'Connection error: {message}') from e
-        logger.debug(f'{response.status_code} {response.reason}')
+        # be aware of an optional requests cache
+        if hasattr(response, 'from_cache'):
+            if response.from_cache:
+                logger.debug(f'Cache hit for {url}')
+            else:
+                logger.debug(f'Cache miss for {url}')
+        reason = response.reason or HTTPStatus(response.status_code).phrase
+        logger.debug(f'{response.status_code} {reason}')
         return response
 
     def post(self, url: str, **kwargs) -> Response:

@@ -12,11 +12,6 @@ from plastron.client.auth import ClientCertAuth
 
 
 @pytest.fixture()
-def endpoint():
-    return Endpoint(url='http://example.com/repo')
-
-
-@pytest.fixture()
 def client(endpoint):
     return Client(endpoint=endpoint)
 

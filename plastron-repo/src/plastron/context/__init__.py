@@ -39,7 +39,7 @@ class PlastronContext:
 
     @property
     def version(self):
-        return version('plastron-cli')
+        return version('plastron-repo')
 
     @property
     def endpoint(self) -> Endpoint:

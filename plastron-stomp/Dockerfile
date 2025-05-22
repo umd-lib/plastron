@@ -9,6 +9,7 @@
 FROM python:3.8.18-slim
 
 RUN mkdir -p /opt/plastron
+COPY VERSION /opt/plastron/VERSION
 COPY plastron-client /opt/plastron/plastron-client
 COPY plastron-models /opt/plastron/plastron-models
 COPY plastron-rdf /opt/plastron/plastron-rdf

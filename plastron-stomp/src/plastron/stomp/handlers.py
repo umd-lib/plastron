@@ -1,4 +1,5 @@
 import logging
+import traceback
 
 from plastron.messaging.broker import Destination
 from plastron.messaging.messages import PlastronMessage, PlastronErrorMessage
@@ -15,6 +16,7 @@ class AsynchronousResponseHandler:
     def __call__(self, future):
         e = future.exception()
         if e:
+            traceback.print_exc()
             logger.error(f"Job {self.message.job_id} failed: {e}")
             response = PlastronErrorMessage(job_id=self.message.job_id, error=str(e))
         else:
@@ -45,6 +47,7 @@ class SynchronousResponseHandler:
     def __call__(self, future):
         e = future.exception()
         if e:
+            traceback.print_exc()
             logger.error(f"Job {self.message.job_id} failed: {e}")
             self.reply_queue.send(PlastronErrorMessage(job_id=self.message.job_id, error=str(e)))
         else:

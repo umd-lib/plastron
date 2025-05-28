@@ -4,7 +4,6 @@ from collections import Counter
 from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
-from os.path import basename
 from pathlib import Path
 from shutil import copyfileobj
 from typing import Optional, Any, IO, List, Generator, Dict, Iterable
@@ -16,17 +15,16 @@ from plastron.client import ClientError
 from plastron.context import PlastronContext
 from plastron.files import BinarySource, ZipFileSource, RemoteFileSource, HTTPFileSource, LocalFileSource
 from plastron.handles import HandleInfo
-from plastron.jobs import JobError, JobConfig, Job
-from plastron.jobs.importjob.spreadsheet import LineReference, MetadataSpreadsheet, InvalidRow, Row, MetadataError
-from plastron.models import get_model_class, ModelClassNotFoundError
+from plastron.jobs import JobError, JobConfig, Job, ItemLog
+from plastron.jobs.importjob.spreadsheet import MetadataSpreadsheet, InvalidRow, Row, MetadataError
+from plastron.models import get_model_from_name, ModelClassNotFoundError
 from plastron.models.annotations import FullTextAnnotation, TextualBody
-from plastron.namespaces import umdaccess, sc
-from plastron.rdf.pcdm import File, PreservationMasterFile
+from plastron.namespaces import sc
 from plastron.rdfmapping.validation import ValidationResultsDict, ValidationResult, ValidationSuccess, ValidationFailure
 from plastron.repo import RepositoryError, ContainerResource
 from plastron.repo.pcdm import PCDMObjectResource
 from plastron.repo.publish import PublishableResource
-from plastron.utils import datetimestamp, ItemLog
+from plastron.utils import datetimestamp
 from plastron.validation import ValidationError
 
 logger = logging.getLogger(__name__)
@@ -173,7 +171,7 @@ class ImportRun:
         )
         logger.info(f'Found {count["initially_completed_items"]} completed items')
         if count['initially_completed_items'] > 0:
-            logger.debug(f'Completed item identifiers: {self.job.completed_log._item_keys}')
+            logger.debug(f'Completed item identifiers: {self.job.completed_log.item_keys}')
 
         for row in metadata.rows(limit=limit, percentage=percentage, completed=self.job.completed_log):
             if isinstance(row, InvalidRow):
@@ -314,21 +312,21 @@ class ImportJob(Job):
         self.validation_reports = []
 
     @property
-    def metadata_filename(self) -> Path:
+    def metadata_file(self) -> Path:
         return self.dir / 'source.csv'
 
     @property
     def model_class(self):
         if self._model_class is None:
-            self._model_class = get_model_class(self.config.model)
+            self._model_class = get_model_from_name(self.config.model)
         return self._model_class
 
     def store_metadata_file(self, input_file: IO):
-        with open(self.metadata_filename, mode='w') as file:
+        with self.metadata_file.open(mode='w') as file:
             copyfileobj(input_file, file)
             logger.debug(f"Copied input file {getattr(input_file, 'name', '<>')} to {file.name}")
 
-    def complete(self, row, status: ImportedItemStatus):
+    def complete(self, row: 'ImportRow', status: ImportedItemStatus):
         # write to the completed item log
         self.completed_log.append({
             'id': row.identifier,
@@ -340,7 +338,7 @@ class ImportJob(Job):
 
     def get_metadata(self) -> MetadataSpreadsheet:
         try:
-            return MetadataSpreadsheet(metadata_filename=self.metadata_filename, model_class=self.model_class)
+            return MetadataSpreadsheet(metadata_filename=self.metadata_file, model_class=self.model_class)
         except MetadataError as e:
             raise JobError(job=self) from e
 
@@ -419,29 +417,6 @@ class ImportJob(Job):
             # with no URI prefix, assume a local file path
             return LocalFileSource(localpath=os.path.join(base_location, path))
 
-    def get_file(self, base_location: str, filename: str) -> File:
-        """
-        Get a file object for the given base_location and filename.
-
-        Currently, if the file has an "image/tiff" MIME type, this method returns
-        a :py:class:`plastron.pcdm.PreservationMasterFile`; otherwise it returns
-        a basic :py:class:`plastron.pcdm.File`.
-
-        :param base_location:
-        :param filename:
-        :return:
-        """
-        source = self.get_source(base_location, filename)
-
-        # XXX: hardcoded image/tiff as the preservation master format
-        # TODO: make preservation master format configurable per collection or job
-        if source.mimetype() == 'image/tiff':
-            file_class = PreservationMasterFile
-        else:
-            file_class = File
-
-        return file_class.from_source(title=basename(filename), source=source)
-
 
 class PublishableObjectResource(PCDMObjectResource, PublishableResource):
     pass
@@ -467,7 +442,7 @@ class ImportRow:
         return str(self.row.line_reference)
 
     @property
-    def identifier(self):
+    def identifier(self) -> str:
         return self.row.identifier
 
     def validate_item(self) -> ValidationResultsDict:
@@ -486,7 +461,7 @@ class ImportRow:
             raise RuntimeError('Must specify --binaries-location if the metadata has a FILES and/or ITEM_FILES column')
 
         results['FILES'] = self.validate_files(self.row.filenames)
-        results['ITEM_FILES'] = self.validate_files(self.row.item_filenames)
+        results['ITEM_FILES'] = self.validate_files(f.name for f in self.row.item_files)
 
         return results
 
@@ -582,9 +557,9 @@ class ImportRow:
 
                 # item-level files
                 if self.row.has_item_files:
-                    for filename in self.row.item_filenames:
-                        source = self.job.get_source(self.job.config.binaries_location, filename)
-                        resource.create_file(source=source)
+                    for file in self.row.item_files:
+                        source = self.job.get_source(self.job.config.binaries_location, file.name)
+                        resource.create_file(source=source, rdf_types=file.rdf_types)
 
                 # publish this resource, if requested
                 if self._publish:

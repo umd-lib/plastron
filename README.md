@@ -22,6 +22,8 @@ layers:
   serialization
 * **[plastron-repo](plastron-repo)**: Repository operations and structural
   models (LDP, PCDM, Web Annotations, etc.)
+* **[plastron-jobs](plastron-jobs)**: Batch repository operations
+  (import, export, publish, etc.)
 
 ### Low-level APIs
 
@@ -83,6 +85,7 @@ pip install \
     -e './plastron-messaging[test]' \
     -e './plastron-models[test]' \
     -e './plastron-repo[test]' \
+    -e './plastron-jobs[test]' \
     -e './plastron-web[test]' \
     -e './plastron-stomp[test]' \
     -e './plastron-cli[test]'

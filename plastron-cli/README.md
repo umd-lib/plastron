@@ -304,18 +304,49 @@ optional arguments:
 
 ```text
 $ plastron reindex --help
-usage: plastron reindex [-h] [-R RECURSIVE] [uris [uris ...]]
+usage: plastron reindex [-h] [-R PREDICATES] [-i KEY] [uri [uri ...]]
 
 Reindex objects in the repository
 
 positional arguments:
-  uris                  URIs of repository objects to reindex
+  uri                   URI of repository object to reindex
 
 optional arguments:
   -h, --help            show this help message and exit
-  -R RECURSIVE, --recursive RECURSIVE
-                        Reindex additional objects found by traversing the
+  -R PREDICATES, --recursive PREDICATES
+                        reindex additional objects found by traversing the
                         given predicate(s)
+  -i KEY, --index KEY   configuration key for the index to target; defaults
+                        to "all"
+
+```
+
+Index targets are configured in the `COMMANDS.REINDEX` section of the
+config file. It should have a `ROUTING_HEADERS` key whose value is a
+mapping of short names to dictionaries of additional STOMP headers to
+include in the reindexing message. At a minimum, there should be an "all"
+key, as this is what the `-i|--index` option defaults to.
+
+Example:
+
+```yaml
+COMMANDS:
+  REINDEX:
+    ROUTING_HEADERS:
+      solr:
+        CamelFcrepoIndexingDestinations: activemq:index.solr
+        CamelFcrepoSolrIndexingDestinations: direct:solr.Index
+      solr-legacy:
+        CamelFcrepoIndexingDestinations: activemq:index.solr
+        CamelFcrepoSolrIndexingDestinations: direct:solr.LegacyIndex
+      all-solr:
+        CamelFcrepoIndexingDestinations: activemq:index.solr
+        CamelFcrepoSolrIndexingDestinations: direct:solr.Index,direct:solr.LegacyIndex
+      triplestore:
+        CamelFcrepoIndexingDestinations: activemq:index.triplestore
+      all:
+        CamelFcrepoIndexingDestinations: activemq:index.solr,activemq:index.triplestore
+        CamelFcrepoSolrIndexingDestinations: direct:solr.Index,direct:solr.LegacyIndex
 ```
 
 ### Stub (stub)

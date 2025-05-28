@@ -2,7 +2,7 @@ import argparse
 import os
 import tempfile
 from csv import DictReader
-from io import BytesIO, StringIO
+from io import StringIO
 from uuid import uuid4
 
 import pytest
@@ -116,9 +116,10 @@ def test_container_is_required_unless_resuming(datadir, plastron_context):
                 'Format', 'Archival Collection', 'Presentation Set', 'Date',
                 'Description', 'Alternate Title', 'Creator', 'Creator URI',
                 'Contributor', 'Contributor URI', 'Publisher', 'Publisher URI',
-                'Location', 'Extent', 'Subject', 'Language', 'Rights Holder',
-                'Terms of Use', 'Copyright Notice', 'Collection Information',
-                'Accession Number', 'Handle', 'FILES', 'ITEM_FILES'
+                'Audience', 'Audience URI', 'Location', 'Extent', 'Subject',
+                'Language', 'Rights Holder', 'Terms of Use', 'Copyright Notice',
+                'Collection Information', 'Accession Number', 'Handle', 'FILES',
+                'ITEM_FILES'
             ]
         ),
         (
@@ -148,7 +149,7 @@ def test_container_is_required_unless_resuming(datadir, plastron_context):
             [
                 'Title', 'Date', 'Volume', 'Issue', 'Edition', 'Handle',
                 'Presentation Set', 'Copyright Notice', 'Terms of Use',
-                'FILES', 'ITEM_FILES'
+                'Rights Statement', 'Rights Holder', 'FILES', 'ITEM_FILES',
             ]
         ),
 
@@ -185,6 +186,8 @@ def create_args(**kwargs):
     params = {
         'job_id': str(uuid4()),
         'delegated_user': None,
+        'convert_from': None,
+        'convert_params': [],
         'resume': False,
         'model': 'Item',
         'access': None,

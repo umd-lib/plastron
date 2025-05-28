@@ -16,6 +16,7 @@ dependencies = [
     "BeautifulSoup4",
     "lxml",
     "Pillow",
+    "plastron-jobs",
     "plastron-models",
     "plastron-repo",
     "plastron-utils",

@@ -1,6 +1,6 @@
 import logging
 from os.path import basename
-from typing import Optional, Set, List, Iterable, Iterator, Dict
+from typing import Optional, Set, List, Iterable, Iterator, Dict, Type, Union
 
 from rdflib import Literal, URIRef
 from urlobject import URLObject
@@ -12,8 +12,9 @@ from plastron.models.ldp import LDPContainer
 from plastron.models.ore import Proxy
 from plastron.models.pcdm import PCDMObject, PCDMFile
 from plastron.models.umd import Page
+from plastron.namespaces import pcdmuse, fabio
 from plastron.rdfmapping.resources import RDFResourceBase
-from plastron.repo import ContainerResource, Repository, BinaryResource
+from plastron.repo import ContainerResource, Repository, BinaryResource, RepositoryResource
 
 logger = logging.getLogger(__name__)
 
@@ -71,6 +72,7 @@ class PCDMFileBearingResource(ContainerResource):
             self,
             source: BinarySource,
             slug: Optional[str] = None,
+            rdf_types: Optional[Set] = None,
     ) -> BinaryResource:
         """Create a single file from the given source as a `pcdm:fileOf` this resource.
         If no slug is provided, one is generated using `random_slug()`."""
@@ -104,6 +106,8 @@ class PCDMFileBearingResource(ContainerResource):
         file.file_of.add(parent)
         parent.has_file.add(file)
         file.rdf_type.extend(source.rdf_types)
+        if rdf_types is not None:
+            file.rdf_type.extend(rdf_types)
 
         file_resource.update()
         self.update()
@@ -150,10 +154,11 @@ class AggregationResource(ContainerResource):
         super().__init__(repo, path)
         self.proxies_container: Optional[ContainerResource] = None
 
-    def get_sequence(self) -> 'ProxyIterator':
+    def get_sequence(self, resource_type: Type[RepositoryResource] = None) -> 'ProxyIterator':
         """Iterates over the ordered proxies of this resource, and returns
-        the URLs of the proxied resources."""
-        return ProxyIterator(self)
+        the URLs of the proxied resources. If a `resource_type` is given,
+        returns full objects of that type instead."""
+        return ProxyIterator(self, resource_type)
 
     def create_proxy(self, proxy_for: RDFResourceBase, title: str) -> ContainerResource:
         """Create a proxy resource for the given target."""
@@ -232,7 +237,7 @@ class PCDMObjectResource(PCDMFileBearingResource, AggregationResource):
         )
         parent.has_member.add(URIRef(page_resource.url))
         for file_spec in file_group.files:
-            page_resource.create_file(source=file_spec.source)
+            page_resource.create_file(source=file_spec.source, rdf_types=file_spec.rdf_types)
         self.update()
         self.member_urls.add(page_resource.url)
         logger.debug(f'Created page {number}: {page_resource.url} "{file_group.label}"')
@@ -247,7 +252,7 @@ class PCDMObjectResource(PCDMFileBearingResource, AggregationResource):
         self.create_sequence(create_pages())
 
 
-class ProxyIterator(Iterator[URLObject]):
+class ProxyIterator(Iterator[Union[URLObject, RepositoryResource]]):
     """Iterator over the sequence of proxied resources of an `AggregationResource`.
     It begins by following the `iana:first` relation from the `resource` to the
     first proxy, and then follows the `iana:next` relations between the subsequent
@@ -255,9 +260,11 @@ class ProxyIterator(Iterator[URLObject]):
 
     For each proxy in the sequence, it yields the value of its `ore:proxyFor`
     relation as a `URLObject`."""
-    def __init__(self, resource: AggregationResource):
+    def __init__(self, resource: AggregationResource, resource_type: Type[RepositoryResource] = None):
         self.resource: AggregationResource = resource
         """Aggregation resource"""
+        self.resource_type = resource_type
+        """Resource class to use to instantiate the proxied objects; if `None`, returns just the URL"""
         self._repo: Repository = resource.repo
         self._next_proxy_uri = None
 
@@ -271,7 +278,11 @@ class ProxyIterator(Iterator[URLObject]):
             raise StopIteration
         current_proxy = self._repo[self._next_proxy_uri:ContainerResource].read().describe(Proxy)
         self._next_proxy_uri = current_proxy.next.value
-        return URLObject(current_proxy.proxy_for.value)
+        url = URLObject(current_proxy.proxy_for.value)
+        if self.resource_type is not None:
+            return self._repo[url:self.resource_type]
+        else:
+            return url
 
 
 class PCDMPageResource(PCDMFileBearingResource, WebAnnotationBearingResource):

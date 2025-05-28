@@ -7,20 +7,20 @@ from dataclasses import dataclass
 from itertools import chain
 from os.path import splitext, basename
 from pathlib import Path
-from typing import Optional, Dict, List, Tuple, Union, Mapping, Type, Iterator, NamedTuple, Protocol
+from typing import Optional, Dict, List, Tuple, Union, Mapping, Type, Iterator, NamedTuple, Protocol, Generic, TypeVar
 from uuid import uuid4
 
-from rdflib import URIRef, Literal
+from rdflib import URIRef
 from rdflib.util import from_n3
 
-from plastron.files import FileSpec, FileGroup
+from plastron.files import FileSpec, FileGroup, parse_usage_tag
+from plastron.models import ContentModeledResource
 from plastron.namespaces import get_manager
 from plastron.rdfmapping.descriptors import Property, DataProperty
 from plastron.rdfmapping.embed import EmbeddedObject
 from plastron.rdfmapping.resources import RDFResourceBase, RDFResourceType
 from plastron.repo import DataReadError, Repository, RepositoryResource
-from plastron.serializers import CSVSerializer
-from plastron.serializers.csv import flatten_headers, unflatten, not_empty, split_escaped, build_lookup_index
+from plastron.serializers.csv import flatten_headers, unflatten, build_lookup_index, CSVSerializer
 from plastron.utils import strtobool
 
 nsm = get_manager()
@@ -79,7 +79,7 @@ def build_fields(fieldnames, model_class) -> Dict[str, List[ColumnSpec]]:
             ))
         elif '{' in header:
             # this field has a datatype
-            # header format is "Header Label {Datatype Label}
+            # header format is "Header Label {Datatype Label}"
             header_label, datatype_label = re.search(r'^([^{]+)\s+{(.+)}$', header).groups()
             try:
                 attrs = property_attrs[header_label]
@@ -172,10 +172,8 @@ def build_file_groups(filenames_string: str) -> Dict[str, FileGroup]:
     if filenames_string.strip() == '':
         return file_groups
     for filename in filenames_string.split(';'):
-        if ':' in filename:
-            label, filename = filename.split(':', 1)
-        else:
-            label = None
+        filename, label = parse_label(filename)
+        filename, usage = parse_usage_tag(filename)
         root, ext = splitext(basename(filename))
         if root not in file_groups:
             file_groups[root] = FileGroup(rootname=root, label=label)
@@ -187,7 +185,7 @@ def build_file_groups(filenames_string: str) -> Dict[str, FileGroup]:
             else:
                 file_group.label = label
 
-        file_groups[root].files.append(FileSpec(name=filename))
+        file_groups[root].files.append(FileSpec(name=filename, usage=usage))
 
     labels = [g.label for g in file_groups.values()]
     if any(label is not None for label in labels) and not all(label is not None for label in labels):
@@ -203,17 +201,12 @@ def build_file_groups(filenames_string: str) -> Dict[str, FileGroup]:
     return file_groups
 
 
-def parse_value_string(value_string, column: ColumnSpec) -> List[Union[Literal, URIRef]]:
-    values = []
-    # filter out empty strings, so we don't get spurious empty values in the properties
-    for value in filter(not_empty, split_escaped(value_string, separator='|')):
-        if isinstance(column.prop, DataProperty):
-            # default to the property's defined datatype
-            # if it was not specified in the column header
-            values.append(Literal(value, lang=column.lang_code, datatype=(column.datatype or column.prop.datatype)))
-        else:
-            values.append(URIRef(value))
-    return values
+def parse_label(filename: str) -> Tuple[str, Optional[str]]:
+    if ':' in filename:
+        label, filename = filename.split(':', 1)
+        return filename, label
+    else:
+        return filename, None
 
 
 @dataclass
@@ -233,10 +226,13 @@ class Bucket(Sized, Container, Protocol):
     pass
 
 
-class Row:
+ModelType = TypeVar('ModelType', bound=ContentModeledResource)
+
+
+class Row(Generic[ModelType]):
     def __init__(
             self,
-            spreadsheet: 'MetadataSpreadsheet',
+            spreadsheet: 'MetadataSpreadsheet[ModelType]',
             line_reference: LineReference,
             row_number: int,
             data: Mapping[str, str],
@@ -256,10 +252,7 @@ class Row:
     def get(self, key, default=None):
         return self.data.get(key, default)
 
-    def parse_value(self, column: ColumnSpec) -> List[Union[Literal, URIRef]]:
-        return parse_value_string(self[column.header], column)
-
-    def get_object(self, repo: Repository, read_from_repo: bool = False) -> RDFResourceType:
+    def get_object(self, repo: Repository, read_from_repo: bool = False) -> ModelType:
         """Gets an RDF resource to be imported, based on the metadata in this row.
 
         :param repo: the repository configuration
@@ -283,7 +276,7 @@ class Row:
         # to their correct positional locations
         row_index = build_lookup_index(self.index_string)
         params = unflatten(self.data, self.spreadsheet.model_class, self.spreadsheet.model_class.HEADER_MAP, row_index)
-        item: RDFResourceType = self.spreadsheet.model_class(uri=self.uri, graph=resource.graph)
+        item: ModelType = self.spreadsheet.model_class(uri=self.uri, graph=resource.graph)
         item.set_properties(**params)
 
         return item
@@ -317,8 +310,10 @@ class Row:
         return self._file_groups
 
     @property
-    def item_filenames(self):
-        return self.data['ITEM_FILES'].strip().split(';') if self.has_item_files else []
+    def item_files(self) -> List[FileSpec]:
+        if not self.has_item_files:
+            return []
+        return [FileSpec.parse(v) for v in self.data['ITEM_FILES'].strip().split(';')]
 
     @property
     def index_string(self):
@@ -333,12 +328,12 @@ class Row:
         return bool(strtobool(self.data.get('HIDDEN', 'False') or 'False'))
 
 
-class MetadataSpreadsheet:
+class MetadataSpreadsheet(Generic[ModelType]):
     """
     Iterable sequence of rows from the metadata CSV file of an import job.
     """
 
-    def __init__(self, metadata_filename: Union[Path, str], model_class: Type[RDFResourceType]):
+    def __init__(self, metadata_filename: Union[Path, str], model_class: Type[ModelType]):
         self.metadata_filename = metadata_filename
         self.metadata_file = None
         self.model_class = model_class
@@ -386,7 +381,7 @@ class MetadataSpreadsheet:
 
     @property
     def identifier_column(self):
-        return self.model_class.HEADER_MAP['identifier']
+        return self.model_class.HEADER_MAP.get('identifier') or self.model_class.HEADER_MAP.get('title')
 
     def should_load(self, line) -> bool:
         """Whether the given line is part of the subset of lines to load."""
@@ -406,7 +401,7 @@ class MetadataSpreadsheet:
             limit: int = None,
             percentage: int = None,
             completed: Bucket = None,
-    ) -> Iterator[Union[Row, InvalidRow]]:
+    ) -> Iterator[Union[Row[ModelType], InvalidRow]]:
         """Iterator over the rows in this spreadsheet.
 
         :param limit: maximum row number to return

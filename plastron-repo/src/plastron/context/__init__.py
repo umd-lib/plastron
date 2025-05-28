@@ -39,7 +39,7 @@ class PlastronContext:
 
     @property
     def version(self):
-        return version('plastron-cli')
+        return version('plastron-repo')
 
     @property
     def endpoint(self) -> Endpoint:
@@ -65,7 +65,7 @@ class PlastronContext:
                 self._client = Client(
                     endpoint=self.endpoint,
                     auth=get_authenticator(repo_config),
-                    ua_string=f'plastron/{version}',
+                    ua_string=f'plastron/{self.version}',
                     on_behalf_of=self.args.delegated_user,
                     structure=RepositoryStructure[repo_config.get('STRUCTURE', 'flat').upper()]
                 )

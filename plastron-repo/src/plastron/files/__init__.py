@@ -1,12 +1,13 @@
 import hashlib
 import io
+import re
 import urllib
 import zipfile
 from dataclasses import dataclass, field
 from http import HTTPStatus
 from mimetypes import guess_type
 from os.path import basename, isfile
-from typing import Mapping, Any, Protocol, Union, Set, List
+from typing import Mapping, Any, Protocol, Union, Set, List, Tuple, Optional, ClassVar, Dict
 from urllib.parse import urlsplit
 
 from paramiko import SFTPClient, SSHClient, AutoAddPolicy, SSHException
@@ -14,7 +15,7 @@ from paramiko.config import SSH_PORT
 from rdflib import URIRef
 from requests import Response, Session
 
-from plastron.namespaces import pcdmuse
+from plastron.namespaces import pcdmuse, fabio
 
 
 def get_ssh_client(sftp_uri: Union[str, urllib.parse.SplitResult], **kwargs) -> SSHClient:
@@ -403,10 +404,34 @@ class ZipFileSource(BinarySource):
 @dataclass
 class FileSpec:
     name: str
+    usage: str = None
     source: BinarySource = None
+
+    USAGE_TAGS: ClassVar[Dict[str, Set[URIRef]]] = {
+        'preservation': {pcdmuse.PreservationMasterFile},
+        'ocr': {pcdmuse.ExtractedText},
+        'metadata': {fabio.MetadataFile},
+    }
+
+    @classmethod
+    def parse(cls, data: str):
+        name, usage = parse_usage_tag(data)
+        return cls(name=name, usage=usage)
 
     def __str__(self):
         return self.name
+
+    @property
+    def spec(self) -> str:
+        if self.usage:
+            return f'<{self.usage}>{self.name}'
+        else:
+            return self.name
+
+    @property
+    def rdf_types(self) -> Optional[Set[URIRef]]:
+        if self.usage is not None:
+            return self.USAGE_TAGS.get(self.usage.lower(), None)
 
 
 @dataclass
@@ -422,3 +447,16 @@ class FileGroup:
     @property
     def filenames(self) -> List[str]:
         return [file.name for file in self.files]
+
+    def file(self, name: str) -> FileSpec:
+        for file in self.files:
+            if file.name == name:
+                return file
+        raise RuntimeError(f'{name} is not in file group {self}')
+
+
+def parse_usage_tag(filename: str) -> Tuple[str, Optional[str]]:
+    if m := re.search(r'^<([^>]+)>(.*)', filename):
+        return m[2], m[1]
+    else:
+        return filename, None

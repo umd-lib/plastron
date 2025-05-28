@@ -15,6 +15,7 @@ COPY plastron-rdf /opt/plastron/plastron-rdf
 COPY plastron-messaging /opt/plastron/plastron-messaging
 COPY plastron-repo /opt/plastron/plastron-repo
 COPY plastron-utils /opt/plastron/plastron-utils
+COPY plastron-jobs /opt/plastron/plastron-jobs
 COPY plastron-web /opt/plastron/plastron-web
 COPY plastron-cli /opt/plastron/plastron-cli
 COPY plastron-stomp /opt/plastron/plastron-stomp
@@ -27,6 +28,8 @@ RUN pip install \
     './plastron-messaging' \
     './plastron-models' \
     './plastron-repo' \
+    './plastron-jobs' \
+    './plastron-cli' \
     './plastron-web' \
     './plastron-stomp'
 

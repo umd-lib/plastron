@@ -1,12 +1,17 @@
-from rdflib import Namespace
+from rdflib import URIRef
 
+from plastron.handles import HandleBearingResource
+from plastron.models import ContentModeledResource
+from plastron.models.authorities import UMD_TERMS_OF_USE_STATEMENTS, UMD_PRESENTATION_SETS
+from plastron.models.fedora import FedoraResource
+from plastron.models.pcdm import PCDMObject
+from plastron.models.page import Page
+from plastron.namespaces import bibo, dc, dcmitype, dcterms, edm, geo, rel, skos, ore, owl, umd, schema, pcdm
 from plastron.rdfmapping.decorators import rdf_type
 from plastron.rdfmapping.descriptors import ObjectProperty, DataProperty
 from plastron.rdfmapping.resources import RDFResource
-from plastron.validation.rules import is_edtf_formatted, is_handle, is_from_vocabulary
-from plastron.namespaces import bibo, dc, dcmitype, dcterms, edm, geo, ore, owl, rel, schema, skos, umd
-
-umdtype = Namespace('http://vocab.lib.umd.edu/datatype#')
+from plastron.validation.rules import is_edtf_formatted
+from plastron.validation.vocabularies import ControlledVocabularyProperty
 
 
 class AuthorityRecord(RDFResource):
@@ -35,7 +40,12 @@ class Collection(AuthorityRecord):
 
 
 @rdf_type(bibo.Letter, umd.Letter)
-class Letter(RDFResource):
+class Letter(ContentModeledResource, PCDMObject, HandleBearingResource, FedoraResource):
+    model_name = 'Letter'
+    is_top_level = True
+
+    member_of = ObjectProperty(pcdm.memberOf)
+    has_member = ObjectProperty(pcdm.hasMember, repeatable=True, cls=Page)
     title = DataProperty(dcterms.title, required=True)
     author = ObjectProperty(rel.aut, repeatable=True, embed=True, cls=Agent)
     recipient = ObjectProperty(bibo.recipient, repeatable=True, embed=True, cls=Agent)
@@ -46,22 +56,14 @@ class Letter(RDFResource):
     copyright_notice = DataProperty(schema.copyrightNotice)
     identifier = DataProperty(dcterms.identifier, required=True)
     type = DataProperty(edm.hasType, required=True)
-    date = DataProperty(dc.date, validate=is_edtf_formatted)
+    date = DataProperty(dc.date, datatype=URIRef('http://id.loc.gov/datatypes/edtf'), validate=is_edtf_formatted)
     language = DataProperty(dc.language, required=True)
     description = DataProperty(dcterms.description, required=True)
     bibliographic_citation = DataProperty(dcterms.bibliographicCitation, required=True)
     extent = DataProperty(dcterms.extent, required=True)
     rights_holder = DataProperty(dcterms.rightsHolder, required=True)
-    terms_of_use = ObjectProperty(
-        dcterms.license,
-        validate=is_from_vocabulary('http://vocab.lib.umd.edu/termsOfUse#')
-    )
-    handle = DataProperty(dcterms.identifier, datatype=umdtype.handle, validate=is_handle)
-    presentation_set = ObjectProperty(
-        ore.isAggregatedBy,
-        repeatable=True,
-        validate=is_from_vocabulary('http://vocab.lib.umd.edu/set#'),
-    )
+    terms_of_use = ControlledVocabularyProperty(dcterms.license, vocab=UMD_TERMS_OF_USE_STATEMENTS)
+    presentation_set = ControlledVocabularyProperty(ore.isAggregatedBy, repeatable=True, vocab=UMD_PRESENTATION_SETS)
 
     HEADER_MAP = {
         'title': 'Title',
@@ -97,104 +99,3 @@ class Letter(RDFResource):
         'handle': 'Handle',
         'presentation_set': 'Presentation Set',
     }
-
-
-"""
-@rdf.object_property('author', rel.aut, embed=True, obj_class=Author)
-@rdf.object_property('recipient', bibo.recipient, embed=True, obj_class=Recipient)
-@rdf.object_property('part_of', dcterms.isPartOf, embed=True, obj_class=Collection)
-@rdf.object_property('place', dcterms.spatial, embed=True, obj_class=Place)
-@rdf.object_property('subject', dcterms.subject, embed=True, obj_class=Subject)
-@rdf.object_property('rights', dcterms.rights)
-@rdf.data_property('identifier', dcterms.identifier)
-@rdf.data_property('type', edm.hasType)
-@rdf.data_property('date', dc.date)
-@rdf.data_property('language', dc.language)
-@rdf.data_property('description', dcterms.description)
-@rdf.data_property('bibliographic_citation', dcterms.bibliographicCitation)
-@rdf.data_property('extent', dcterms.extent)
-@rdf.data_property('rights_holder', dcterms.rightsHolder)
-@rdf.data_property('handle', dcterms.identifier, datatype=umdtype.handle)
-@rdf.rdf_class(bibo.Letter)
-class Letter(pcdm.Object):
-    HEADER_MAP = {
-        'title': 'Title',
-        'rights_holder': 'Rights Holder',
-        'extent': 'Extent',
-        'bibliographic_citation': 'Bibliographic Citation',
-        'description': 'Description',
-        'language': 'Language',
-        'date': 'Date',
-        'type': 'Resource Type',
-        'rights': 'Rights',
-        'subject.label': 'Subject',
-        'place.label': 'Location',
-        'place.lon': 'Longitude',
-        'place.lat': 'Latitude',
-        'part_of.label': 'Archival Collection',
-        'part_of.same_as': 'Handle/Link',
-        'identifier': 'Identifier',
-        'recipient.label': 'Recipient',
-        'author.label': 'Author',
-        'handle': 'Handle'
-    }
-    VALIDATION_RULESET = {
-        'author': {
-        },
-        'recipient': {
-        },
-        'part_of': {
-            'required': True,
-            'exactly': 1
-        },
-        'place': {
-        },
-        'subject': {
-        },
-        'rights': {
-            'required': True,
-            'exactly': 1
-        },
-        'identifier': {
-            'required': True
-        },
-        'type': {
-            'required': True,
-            'exactly': 1
-        },
-        'date': {
-            # Can't do "exactly 1", because that makes it required
-            # 'exactly': 1,
-            'function': is_edtf_formatted
-        },
-        'language': {
-            'required': True,
-            'exactly': 1
-        },
-        'description': {
-            'required': True,
-            'exactly': 1
-        },
-        'bibliographic_citation': {
-            'required': True,
-            'exactly': 1
-        },
-        'extent': {
-            'required': True,
-            'exactly': 1
-        },
-        'rights_holder': {
-            'required': True,
-            'exactly': 1
-        },
-        'title': {
-            'required': True,
-            'exactly': 1
-        },
-        'handle': {
-            'required': False,
-            # 'exactly': 1,
-            'function': is_handle
-        },
-    }
-"""

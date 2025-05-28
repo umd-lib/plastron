@@ -14,7 +14,7 @@ readme = "README.md"
 requires-python = ">= 3.8"
 dependencies = [
     "edtf_validate",
-    "iso639",
+    "importlib_metadata",
     "lxml",
     "requests",
     "paramiko",
@@ -22,8 +22,10 @@ dependencies = [
     "plastron-client",
     "plastron-rdf",
     "plastron-utils",
+    "python-iso639",
     # rdflib 6.0.0 fixed the 308 HTTP redirect bug
     "rdflib >= 6.0.0",
+    "types-lxml",
 ]
 dynamic = ["version"]
 
@@ -34,6 +36,15 @@ test = [
     "pytest",
     "pytest-cov",
 ]
+
+[project.entry-points.'plastron.content_models']
+AdminSet = "plastron.models.umd:AdminSet"
+File = "plastron.models.page:File"
+Issue = "plastron.models.newspaper:Issue"
+Item = "plastron.models.umd:Item"
+Letter = "plastron.models.letter:Letter"
+Page = "plastron.models.page:Page"
+Poster = "plastron.models.poster:Poster"
 
 [build-system]
 requires = ["setuptools>=66.1.0"]

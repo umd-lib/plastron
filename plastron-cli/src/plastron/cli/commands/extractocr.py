@@ -9,9 +9,9 @@ from plastron.repo.utils import context
 from plastron.cli.commands import BaseCommand
 from plastron.models.annotations import TextblockOnPage
 from plastron.namespaces import pcdmuse
-from plastron.rdf.ocr import ALTOResource
+from plastron.ocr.alto import ALTOResource
 from plastron.repo.pcdm import PCDMPageResource
-from plastron.utils import ItemLog
+from plastron.jobs import ItemLog
 
 logger = logging.getLogger(__name__)
 now = datetime.utcnow().strftime('%Y%m%d%H%M%S')
@@ -95,7 +95,7 @@ class Command(BaseCommand):
                     xmldoc = etree.parse(fh)
 
                 alto = ALTOResource(xmldoc, (400, 400))
-                for textblock in alto.textblocks():
+                for textblock in alto.textblocks:
                     # TODO: better argument structuring
                     annotation = TextblockOnPage.from_textblock(
                         textblock=textblock,

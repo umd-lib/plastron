@@ -15,6 +15,7 @@ requires-python = ">= 3.8"
 dependencies = [
     "click",
     "BeautifulSoup4",
+    "plastron-jobs",
     "plastron-models",
     "plastron-repo",
     "plastron-utils",

@@ -8,7 +8,7 @@ from typing import Union, Dict, Any, Optional, List, Type, TypeVar
 
 import yaml
 
-from plastron.utils import ItemLog
+from plastron.jobs.logs import ItemLog
 
 logger = logging.getLogger(__name__)
 
@@ -119,6 +119,7 @@ class Jobs:
             raise RuntimeError(f'Job directory {job_dir} for job id {config.job_id} already exists')
         job_dir.mkdir(parents=True, exist_ok=True)
         config.save(job_dir / 'config.yml')
+        logger.info(f'Created job with id {config.job_id}')
         return job_class(job_id=config.job_id, job_dir=job_dir).load_config()
 
     def get_job(self, job_class: Type[J], job_id: str) -> J:

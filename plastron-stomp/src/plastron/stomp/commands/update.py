@@ -5,7 +5,7 @@ from typing import Generator, Any, Dict
 from plastron.context import PlastronContext
 from plastron.jobs.updatejob import UpdateJob
 from plastron.messaging.messages import PlastronCommandMessage
-from plastron.models import get_model_class
+from plastron.models import get_model_from_name
 from plastron.utils import strtobool, parse_predicate_list
 
 logger = logging.getLogger(__name__)
@@ -24,7 +24,7 @@ def parse_message(message: PlastronCommandMessage) -> Dict[str, Any]:
         raise RuntimeError("Model must be provided when performing validation")
 
     # Retrieve the model to use for validation
-    model_class = get_model_class(model) if model else None
+    model_class = get_model_from_name(model) if model else None
 
     traverse = parse_predicate_list(recursive) if recursive is not None else []
     return {

@@ -97,6 +97,8 @@ class Destination:
         return self.name
 
     def send(self, message: Message):
+        logger.debug(f'Sending message to {self.name}')
+        logger.debug(f'Message headers: {message.headers}')
         self.broker.connection.send(destination=self.name, headers=message.headers, body=message.body)
 
     def subscribe(self, id: str, ack: str = 'auto', headers: Dict = None, **kwargs):

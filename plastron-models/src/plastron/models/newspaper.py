@@ -1,33 +1,39 @@
 from lxml.etree import parse, XMLSyntaxError
 
+from plastron.handles import HandleBearingResource
+from plastron.models import ContentModeledResource
 from plastron.models.annotations import TextblockOnPage
+from plastron.models.authorities import UMD_TERMS_OF_USE_STATEMENTS, UMD_PRESENTATION_SETS, UMD_RIGHTS_STATEMENTS, Agent
+from plastron.models.fedora import FedoraResource
+from plastron.models.page import Page, File
 from plastron.models.pcdm import PCDMObject, PCDMFile
-from plastron.namespaces import bibo, carriers, dc, dcterms, fabio, ndnp, ore, pcdm, pcdmuse, schema, umdtype, umd
-from plastron.rdf.ocr import ALTOResource
+from plastron.namespaces import bibo, carriers, dc, dcterms, fabio, ndnp, ore, pcdm, pcdmuse, schema, umd
+from plastron.ocr.alto import ALTOResource
 from plastron.rdfmapping.decorators import rdf_type
 from plastron.rdfmapping.descriptors import DataProperty, ObjectProperty
-from plastron.validation.rules import is_handle, is_iso_8601_date, is_from_vocabulary
+from plastron.validation.rules import is_iso_8601_date
+from plastron.validation.vocabularies import ControlledVocabularyProperty
 
 
 @rdf_type(bibo.Issue, umd.Newspaper)
-class Issue(PCDMObject):
+class Issue(ContentModeledResource, PCDMObject, HandleBearingResource, FedoraResource):
     """Newspaper issue"""
+    model_name = 'Issue'
+    is_top_level = True
+
+    member_of = ObjectProperty(pcdm.memberOf)
+    has_member = ObjectProperty(pcdm.hasMember, repeatable=True, cls=Page)
+    has_file = ObjectProperty(pcdm.hasFile, repeatable=True, cls=File)
     title = DataProperty(dcterms.title, required=True)
     date = DataProperty(dc.date, required=True, validate=is_iso_8601_date)
     volume = DataProperty(bibo.volume, required=True)
     issue = DataProperty(bibo.issue, required=True)
     edition = DataProperty(bibo.edition, required=True)
-    handle = DataProperty(dcterms.identifier, datatype=umdtype.handle, validate=is_handle)
-    presentation_set = ObjectProperty(
-        ore.isAggregatedBy,
-        repeatable=True,
-        validate=is_from_vocabulary('http://vocab.lib.umd.edu/set#'),
-    )
+    presentation_set = ControlledVocabularyProperty(ore.isAggregatedBy, repeatable=True, vocab=UMD_PRESENTATION_SETS)
     copyright_notice = DataProperty(schema.copyrightNotice)
-    terms_of_use = ObjectProperty(
-        dcterms.license,
-        validate=is_from_vocabulary('http://vocab.lib.umd.edu/termsOfUse#')
-    )
+    terms_of_use = ControlledVocabularyProperty(dcterms.license, vocab=UMD_TERMS_OF_USE_STATEMENTS)
+    rights = ControlledVocabularyProperty(dcterms.rights, required=True, vocab=UMD_RIGHTS_STATEMENTS)
+    rights_holder = ObjectProperty(dcterms.rightsHolder, repeatable=True, embed=True, cls=Agent)
 
     HEADER_MAP = {
         'title': 'Title',
@@ -39,6 +45,10 @@ class Issue(PCDMObject):
         'presentation_set': 'Presentation Set',
         'copyright_notice': 'Copyright Notice',
         'terms_of_use': 'Terms of Use',
+        'rights': 'Rights Statement',
+        'rights_holder': {
+            'label': 'Rights Holder',
+        },
     }
 
 

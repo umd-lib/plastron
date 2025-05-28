@@ -8,7 +8,8 @@ from plastron.cli.commands import BaseCommand
 from plastron.client import ClientError
 from plastron.models.pcdm import PCDMObject
 from plastron.repo import RepositoryError
-from plastron.utils import ItemLog, parse_predicate_list
+from plastron.utils import parse_predicate_list
+from plastron.jobs import ItemLog
 
 logger = logging.getLogger(__name__)
 

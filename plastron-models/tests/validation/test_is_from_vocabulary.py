@@ -4,9 +4,9 @@ import httpretty
 import pytest
 from rdflib import Graph, URIRef, Literal
 
-import plastron.validation.vocabularies
+import plastron.validation
 from plastron.namespaces import rdfs
-from plastron.validation.rules import is_from_vocabulary
+from plastron.validation.vocabularies import Vocabulary
 
 
 @pytest.fixture
@@ -28,21 +28,35 @@ def graph_response(graph: Graph, media_type: str = 'text/turtle') -> httpretty.R
     )
 
 
-def test_is_from_vocabulary_doc_string():
-    is_valid = is_from_vocabulary('http://example.com/vocab#')
-    assert is_valid.__doc__ == 'from vocabulary http://example.com/vocab#'
+@pytest.mark.parametrize(
+    ('vocab_uri', 'term_count', 'valid_term', 'invalid_term'),
+    [
+        ('http://vocab.lib.umd.edu/termsOfUse#', 1, 'test', 'INVALID'),
+        ('http://vocab.lib.umd.edu/set#', 1, 'test', 'INVALID'),
+        ('http://vocab.lib.umd.edu/form#', 55, 'photographs', 'INVALID'),
+        ('http://vocab.lib.umd.edu/rightsStatement#', 8, 'InC', 'INVALID'),
+        ('http://vocab.lib.umd.edu/collection#', 1376, '0001-GDOC', 'INVALID'),
+        ('http://purl.org/dc/dcmitype/', 12, 'Image', 'INVALID'),
+    ]
+)
+def test_vocabulary(vocab_uri, term_count, valid_term, invalid_term):
+    vocab = Vocabulary(vocab_uri)
+    assert len(vocab) == term_count
+    assert valid_term in vocab
+    assert URIRef(vocab_uri + valid_term) in vocab
+    assert invalid_term not in vocab
 
 
 def test_is_from_vocabulary_with_updates_via_mock(monkeypatch, empty_graph, one_subject_graph):
     mock_get_vocabulary = MagicMock()
     mock_get_vocabulary.side_effect = [empty_graph, one_subject_graph]
-    monkeypatch.setattr(plastron.validation.vocabularies, 'get_vocabulary', mock_get_vocabulary)
-    is_valid = is_from_vocabulary('http://example.com/vocab#')
+    monkeypatch.setattr(plastron.validation.vocabularies, 'get_vocabulary_graph', mock_get_vocabulary)
+    vocab = Vocabulary('http://example.com/vocab#')
     term = URIRef('http://example.com/vocab#term')
     # this first call should fail, the second should succeed
-    # because get_vocabulary is called twice
-    assert not is_valid(term)
-    assert is_valid(term)
+    # because get_vocabulary_graph is called twice
+    assert term not in vocab
+    assert term in vocab
     assert mock_get_vocabulary.call_count == 2
 
 
@@ -56,9 +70,9 @@ def test_is_from_vocabulary_with_updates_via_http(empty_graph, one_subject_graph
             graph_response(one_subject_graph),
         ],
     )
-    is_valid = is_from_vocabulary('http://example.com/vocab#')
+    vocab = Vocabulary('http://example.com/vocab#')
     term = URIRef('http://example.com/vocab#term')
     # this first call should fail, the second should succeed
     # because two HTTP requests are made with different responses
-    assert not is_valid(term)
-    assert is_valid(term)
+    assert term not in vocab
+    assert term in vocab

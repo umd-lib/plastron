@@ -20,7 +20,7 @@ def test_model_with_terms_of_use(model_class):
 
 
 @pytest.mark.parametrize("model_class", [Item, Letter, Poster, Issue])
-def test_model_validation_with_valid_terms_of_user(model_class):
+def test_model_validation_with_valid_terms_of_use(model_class):
     model = create_model_with_terms_of_use(
         model_class, base_uri, 'test'
     )

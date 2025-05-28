@@ -185,3 +185,29 @@ titles on the member objects.
 * If no relpaths have labels, the default behavior of assigning the labels 
   "Page 1" through "Page N" based on the document order of the relpaths 
   will be used
+
+Each relpath may have a usage tag prepended to it.
+
+* The usage tag is enclosed in angle brackets (e.g., `<ocr>`)
+* The usage tag follows the optional page label but precedes the filename 
+  (e.g., `Page 1:<ocr>0001.xml`)
+* Not all files need a usage tag (e.g., `0002.jpg;<ocr>0002.hocr`)
+* Multiple files may have the same usage tag (e.g.,
+  `<ocr>0004.xml;<ocr>0004.hocr`)
+* Usage tags are matched case insensitively. Unrecognized usage tags are 
+  ignored (e.g., `<OCR>0005.html;<ignore ME>0005.txt`)
+* Usage tags map to a set of RDF types that are added to the file's 
+  metadata during import
+
+Recognized usage tags and their mapping are:
+
+| Tag            | RDF Type                         |
+|----------------|----------------------------------|
+| `preservation` | [pcdmuse:PreservationMasterFile] |
+| `ocr`          | [pcdmuse:ExtractedText]          |
+| `metadata`     | [fabio:MetadataFile]             |
+
+
+[pcdmuse:PreservationMasterFile]: https://pcdm.org/use#PreservationMasterFile
+[pcdmuse:ExtractedText]: https://pcdm.org/use#ExtractedText
+[fabio:MetadataFile]: http://purl.org/spar/fabio/MetadataFile

@@ -1,14 +1,25 @@
 from rdflib import URIRef
 
+from plastron.handles import HandleBearingResource
+from plastron.models import ContentModeledResource
+from plastron.models.authorities import UMD_PRESENTATION_SETS, UMD_TERMS_OF_USE_STATEMENTS
+from plastron.models.fedora import FedoraResource
 from plastron.models.pcdm import PCDMObject
-from plastron.namespaces import bibo, dcterms, dc, edm, geo, ore, schema, umd, umdtype
+from plastron.models.page import Page
+from plastron.namespaces import bibo, dcterms, dc, edm, geo, ore, schema, umd, xsd, pcdm
 from plastron.rdfmapping.decorators import rdf_type
 from plastron.rdfmapping.descriptors import ObjectProperty, DataProperty, Property
-from plastron.validation.rules import is_edtf_formatted, is_handle, is_from_vocabulary
+from plastron.validation.rules import is_edtf_formatted
+from plastron.validation.vocabularies import ControlledVocabularyProperty
 
 
 @rdf_type(bibo.Image, umd.Poster)
-class Poster(PCDMObject):
+class Poster(ContentModeledResource, PCDMObject, HandleBearingResource, FedoraResource):
+    model_name = 'Poster'
+    is_top_level = True
+
+    member_of = ObjectProperty(pcdm.memberOf)
+    has_member = ObjectProperty(pcdm.hasMember, repeatable=True, cls=Page)
     title = DataProperty(dcterms.title, required=True)
     alternative = DataProperty(dcterms.alternative)
     publisher = DataProperty(dc.publisher)
@@ -18,7 +29,7 @@ class Poster(PCDMObject):
     # this is a Property since the extant data in fcrepo contains both URIs and literals,
     # so neither ObjectProperty nor DataProperty would map all values correctly
     type = Property(edm.hasType, required=True)
-    date = DataProperty(dc.date, validate=is_edtf_formatted)
+    date = DataProperty(dc.date, datatype=xsd.date, validate=is_edtf_formatted)
     language = DataProperty(dc.language, required=True)
     description = DataProperty(dcterms.description)
     extent = DataProperty(dcterms.extent)
@@ -29,19 +40,11 @@ class Poster(PCDMObject):
     latitude = DataProperty(geo.lat)
     subject = DataProperty(dc.subject, repeatable=True)
     rights = ObjectProperty(dcterms.rights, required=True)
-    terms_of_use = ObjectProperty(
-        dcterms.license,
-        validate=is_from_vocabulary('http://vocab.lib.umd.edu/termsOfUse#')
-    )
+    terms_of_use = ControlledVocabularyProperty(dcterms.license, vocab=UMD_TERMS_OF_USE_STATEMENTS)
     copyright_notice = DataProperty(schema.copyrightNotice)
     identifier = DataProperty(dcterms.identifier, required=True)
-    handle = DataProperty(dcterms.identifier, validate=is_handle, datatype=umdtype.handle)
     place = ObjectProperty(dcterms.spatial)
-    presentation_set = ObjectProperty(
-        ore.isAggregatedBy,
-        repeatable=True,
-        validate=is_from_vocabulary('http://vocab.lib.umd.edu/set#'),
-    )
+    presentation_set = ControlledVocabularyProperty(ore.isAggregatedBy, repeatable=True, vocab=UMD_PRESENTATION_SETS)
 
     HEADER_MAP = {
         'title': 'Title',

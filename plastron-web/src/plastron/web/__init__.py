@@ -1,20 +1,24 @@
+import importlib.metadata
 import logging
 import os
-import yaml
 import urllib.parse
-from pathlib import Path
 from argparse import Namespace
-from flask import Flask, url_for
-from werkzeug.exceptions import NotFound
+from pathlib import Path
 
+import yaml
+from flask import Flask, url_for
+from werkzeug.exceptions import NotFound, HTTPException
+
+from plastron.web.flask_problem import problem_detail_response
 from plastron.context import PlastronContext
-from plastron.jobs.importjob import ImportJob
 from plastron.jobs import JobError, JobConfigError, JobNotFoundError, Jobs
-from plastron.web.activitystream import activitystream_bp
+from plastron.jobs.importjob import ImportJob
 from plastron.utils import envsubst
+from plastron.web.blueprints import activitystream_blueprint, resources_blueprint
+
+__version__ = importlib.metadata.version('plastron-web')
 
 logger = logging.getLogger(__name__)
-
 
 def job_url(job_id):
     return url_for('show_job', _external=True, job_id=job_id)
@@ -46,10 +50,15 @@ def create_app(config_file: str):
         app.config['CONTEXT'] = PlastronContext(config=config, args=Namespace(delegated_user=None))
     jobs_dir = Path(os.environ.get('JOBS_DIR', 'jobs'))
     jobs = Jobs(directory=jobs_dir)
-    app.register_blueprint(activitystream_bp)
+    app.register_blueprint(activitystream_blueprint)
+    app.register_blueprint(resources_blueprint, url_prefix='/resources')
 
     def get_job(job_id: str):
         return jobs.get_job(ImportJob, urllib.parse.unquote(job_id))
+
+    @app.route('/')
+    def root():
+        return {'version': __version__}
 
     @app.route('/jobs')
     def list_jobs():
@@ -83,5 +92,7 @@ def create_app(config_file: str):
             }
         except JobError as e:
             raise NotFound from e
+
+    app.register_error_handler(HTTPException, problem_detail_response)
 
     return app

@@ -1,11 +1,18 @@
-import os
-
 import pytest
+
+from plastron.web import create_app
 
 
 @pytest.fixture
-def config_file_path():
-    def _config_file_path(request):
-        test_dir = os.path.dirname(request.module.__file__)
-        return os.path.join(test_dir, "configs/plastron-config.yml")
-    return _config_file_path
+def config_file_path(shared_datadir):
+    return shared_datadir / 'plastron-config.yml'
+
+
+@pytest.fixture
+def app(config_file_path):
+    return create_app(config_file_path)
+
+
+@pytest.fixture
+def app_client(app):
+    return app.test_client()

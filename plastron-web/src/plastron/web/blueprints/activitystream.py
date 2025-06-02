@@ -11,10 +11,10 @@ from plastron.repo.publish import PublishableResource
 
 logger = logging.getLogger(__name__)
 
-activitystream_bp = Blueprint('activitystream', __name__, template_folder='templates')
+blueprint = Blueprint('activitystream', __name__, template_folder='templates')
 
 
-@activitystream_bp.route('/inbox', methods=['POST'])
+@blueprint.route('/inbox', methods=['POST'])
 def new_activity():
     try:
         activity = Activity(from_json=request.get_json())

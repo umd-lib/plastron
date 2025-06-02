@@ -4,11 +4,11 @@ from plastron.web import create_app
 
 
 @pytest.fixture
-def app_client(config_file_path, datadir, monkeypatch, request):
+def app_client(config_file_path, datadir, monkeypatch):
     def _create_app_client(jobs_dir):
         test_jobs_dir = datadir / jobs_dir
         monkeypatch.setenv('JOBS_DIR', str(test_jobs_dir))
-        app = create_app(config_file_path(request))
+        app = create_app(config_file_path)
 
         return app.test_client()
 

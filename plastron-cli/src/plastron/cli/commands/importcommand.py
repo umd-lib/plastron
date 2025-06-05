@@ -247,7 +247,6 @@ class Command(BaseCommand):
                     ),
                 )
 
-
         logger.debug(f'Running job {job.id}')
         self.run(job.run(
             context=self.context,

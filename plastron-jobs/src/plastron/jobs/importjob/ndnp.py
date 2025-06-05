@@ -120,7 +120,6 @@ class NDNPBatch:
     """Main XML file describing this NDNP package. Defaults to `batch.xml`
     in the batch's `root_dir`"""
 
-
     def __init__(self, batch_dir: Union[str, Path], batch_file: str = 'batch.xml'):
         self.root_dir = Path(batch_dir)
         if not self.root_dir.is_dir():
@@ -154,7 +153,7 @@ class NDNPBatch:
             )
 
 
-def write_import_csv(batch: NDNPBatch, fh = None):
+def write_import_csv(batch: NDNPBatch, fh=None):
     """Iterates over issues in the given `NDNPBatch` and uses `get_issue_data()`
     to get mapping data for writing to the given file handle `fh` in CSV format.
     If no `fh` is given, it uses `sys.stdout` to write the CSV file to STDOUT."""
@@ -218,7 +217,7 @@ def get_article_data(article_path) -> Iterator[Dict[str, Any]]:
     except OSError:
         raise DataReadError(f"Unable to read {article_path}")
     except XMLSyntaxError:
-        raise DataReadError(f"Unable to parse {article_path} as XML" )
+        raise DataReadError(f"Unable to parse {article_path} as XML")
 
     article_root = article_tree.getroot()
     for article in article_root.findall(METS.div + '[@TYPE="article"]'):

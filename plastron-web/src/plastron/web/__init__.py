@@ -20,6 +20,7 @@ __version__ = importlib.metadata.version('plastron-web')
 
 logger = logging.getLogger(__name__)
 
+
 def job_url(job_id):
     return url_for('show_job', _external=True, job_id=job_id)
 

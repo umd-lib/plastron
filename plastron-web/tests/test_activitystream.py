@@ -7,19 +7,6 @@ from plastron.context import PlastronContext
 from plastron.handles import HandleServiceClient, HandleInfo
 from plastron.repo import Repository
 from plastron.repo.publish import PublishableResource
-from plastron.web import create_app
-
-
-# from plastron.web.activitystream
-
-@pytest.fixture
-def app(config_file_path, request):
-    return create_app(config_file_path(request))
-
-
-@pytest.fixture
-def app_client(app):
-    return app.test_client()
 
 
 @pytest.fixture

@@ -22,7 +22,7 @@ dependencies = [
     "pyparsing",
     "PyYAML",
     "stomp.py",
-    'watchdog==0.10.3',
+    "watchdog",
 ]
 dynamic = ["version"]
 

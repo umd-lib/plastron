@@ -37,6 +37,34 @@ layers:
 The intent is that these distribution packages are independently useful,
 either as tools that can be run or libraries to be included in other projects.
 
+### Package Dependency Diagram
+
+This "layer cake" style diagram represents the dependencies among the 
+`plastron-*` distribution packages.
+
+<table style="text-align:center">
+  <tr>
+    <td colspan="2">cli</td>
+    <td colspan="2">web</td>
+    <td colspan="2">stomp</td>
+  </tr>
+  <tr>
+    <td colspan="6">jobs</td>
+  </tr>
+  <tr>
+    <td colspan="4">repo</td>
+    <td colspan="2" rowspan="3">messaging</td>
+  </tr>
+  <tr>
+    <td colspan="2" rowspan="2">client</td>
+    <td colspan="2">models</td>
+  </tr>
+  <tr>
+    <td>rdf</td>
+    <td>utils</td>
+  </tr>
+</table>
+
 ## Installation
 
 Requires Python 3.8+

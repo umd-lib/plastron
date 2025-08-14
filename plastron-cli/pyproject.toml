@@ -14,7 +14,7 @@ readme = "README.md"
 requires-python = ">= 3.8"
 dependencies = [
     "BeautifulSoup4",
-    "lxml",
+    "lxml<6.0",
     "Pillow",
     "plastron-jobs",
     "plastron-models",

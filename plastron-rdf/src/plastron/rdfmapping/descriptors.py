@@ -1,4 +1,3 @@
-from functools import lru_cache
 from typing import Union, Any, Dict, Callable, Container
 
 from rdflib import URIRef, Literal
@@ -26,17 +25,22 @@ class Property:
 
     def __set_name__(self, owner, name):
         self.name = name
+        self.private_name = f'_{name}'
 
-    @lru_cache(maxsize=None)
     def __get__(self, instance, owner):
         if instance is None:
             return self
-        return RDFProperty(**self._get_property_kwargs(instance))
+        if not hasattr(instance, self.private_name):
+            setattr(instance, self.private_name, self._get_property(instance))
+        return getattr(instance, self.private_name)
 
     def __set__(self, instance, value):
         prop = self.__get__(instance, instance.__class__)
         prop.clear()
         prop.add(value)
+
+    def _get_property(self, instance) -> RDFProperty:
+        return RDFProperty(**self._get_property_kwargs(instance))
 
     def _get_property_kwargs(self, instance) -> Dict[str, Any]:
         return {
@@ -65,10 +69,7 @@ class ObjectProperty(Property):
         self.object_class = cls
         self.embed = embed
 
-    @lru_cache(maxsize=None)
-    def __get__(self, instance, owner):
-        if instance is None:
-            return self
+    def _get_property(self, instance) -> RDFObjectProperty:
         if isinstance(self.object_class, str):
             self.object_class = OBJECT_CLASSES[self.object_class]
         return RDFObjectProperty(
@@ -105,10 +106,7 @@ class DataProperty(Property):
         super().__init__(predicate, required, repeatable, values_from, validate)
         self.datatype = datatype
 
-    @lru_cache(maxsize=None)
-    def __get__(self, instance, owner):
-        if instance is None:
-            return self
+    def _get_property(self, instance) -> RDFDataProperty:
         return RDFDataProperty(
             **self._get_property_kwargs(instance),
             datatype=self.datatype,

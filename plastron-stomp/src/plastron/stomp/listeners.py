@@ -72,7 +72,7 @@ class CommandListener(ConnectionListener):
 
     def process_message(self, message, response_handler):
         # send to a message processor thread
-        self.executor.submit(self.processor, message, self.broker['JOB_PROGRESS']).add_done_callback(response_handler)
+        self.executor.submit(self.processor, message, self.broker['JOB_STATUS']).add_done_callback(response_handler)
 
     def on_disconnected(self):
         logger.warning('Disconnected from the STOMP message broker')

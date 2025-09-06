@@ -65,7 +65,8 @@ def test_publication_job(action, with_errors, expected_status, expected_done, ex
 
     def check_status(status):
         assert 'count' in status
-        assert 'result' in status
+        assert 'state' in status
+        assert 'progress' in status
 
     result = JobRunner(job, callback=check_status).run()
 

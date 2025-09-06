@@ -39,7 +39,12 @@ class PublicationJob(Job):
             done=0,
             errors=0,
         )
-        for uri in self.uris:
+        yield {
+            'count': count,
+            'state': 'publish_in_progress',
+            'progress': 0,
+        }
+        for n, uri in enumerate(self.uris, 1):
             try:
                 resource: PublishableResource = self.context.repo[uri:PublishableResource].read()
 
@@ -79,9 +84,14 @@ class PublicationJob(Job):
             yield {
                 'count': count,
                 'result': result,
+                'state': 'publish_in_progress',
+                'progress': int(n / count['total'] * 100)
             }
 
+        state = PublicationAction.get_final_state(self.action, count)
         return {
-            'type': PublicationAction.get_final_state(self.action, count),
+            'type': state,
             'count': count,
+            'state': state,
+            'progress': 100,
         }

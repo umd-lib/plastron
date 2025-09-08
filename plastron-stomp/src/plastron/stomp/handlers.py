@@ -36,23 +36,3 @@ class AsynchronousResponseHandler:
 
         # remove the message from the outbox now that sending has completed
         self.listener.outbox.remove(job_id)
-
-
-class SynchronousResponseHandler:
-    def __init__(self, listener, message: PlastronMessage):
-        self.listener = listener
-        self.message = message
-        self.reply_queue = Destination(self.listener.broker, message.headers['reply-to'])
-
-    def __call__(self, future):
-        e = future.exception()
-        if e:
-            traceback.print_exc()
-            logger.error(f"Job {self.message.job_id} failed: {e}")
-            self.reply_queue.send(PlastronErrorMessage(job_id=self.message.job_id, error=str(e)))
-        else:
-            # assume no errors, return the response
-            response = future.result()
-            # send to the specified "reply to" queue
-            self.reply_queue.send(response)
-            logger.debug(f'Response message sent to {self.reply_queue} with headers: {response.headers}')

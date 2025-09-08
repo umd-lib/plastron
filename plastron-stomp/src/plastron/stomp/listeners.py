@@ -10,7 +10,7 @@ from plastron.context import PlastronContext
 from plastron.messaging.broker import Destination
 from plastron.messaging.messages import MessageBox, PlastronCommandMessage, PlastronMessage
 from plastron.stomp.commands import get_command_module, get_module_name
-from plastron.stomp.handlers import AsynchronousResponseHandler, SynchronousResponseHandler
+from plastron.stomp.handlers import AsynchronousResponseHandler
 from plastron.stomp.inbox_watcher import InboxWatcher
 
 logger = logging.getLogger(__name__)
@@ -50,8 +50,6 @@ class CommandListener(ConnectionListener):
 
         # subscribe to receive asynchronous jobs
         self.broker['JOBS'].subscribe(id='plastron', ack='client-individual')
-        # subscribe to receive synchronous jobs
-        self.broker['SYNCHRONOUS_JOBS'].subscribe(id='plastron-synchronous', ack='client-individual')
 
         self.inbox_watcher = InboxWatcher(self, self.inbox)
         self.inbox_watcher.start()
@@ -63,12 +61,7 @@ class CommandListener(ConnectionListener):
         headers = frame.headers
         body = frame.body
         logger.debug(f'Received message on {headers["destination"]} with headers: {headers}')
-        if headers['destination'] == self.broker['SYNCHRONOUS_JOBS'].name:
-            message = PlastronCommandMessage(headers=headers, body=body)
-            self.process_message(message, SynchronousResponseHandler(self, message))
-            self.broker.ack(message.id, 'plastron-synchronous')
-
-        elif headers['destination'] == self.broker['JOBS'].name:
+        if headers['destination'] == self.broker['JOBS'].name:
             # save the message in the inbox until we can process it
             # Note: Processing will occur via the InboxWatcher, which will
             # respond to the inbox placing a file in the inbox message directory

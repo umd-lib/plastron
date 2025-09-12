@@ -1,5 +1,6 @@
 from contextlib import nullcontext
 from pathlib import Path
+from typing import Generator
 from unittest.mock import MagicMock
 
 import pytest
@@ -79,7 +80,11 @@ def test_import_job_create_resource(import_file, jobs):
     mock_context = MagicMock(spec=PlastronContext, repo=mock_repo)
 
     import_job = jobs.create_job(ImportJob, config=ImportConfig(job_id='123', model='Item'))
-    for i, stats in enumerate(import_job.run(context=mock_context, import_file=import_file.open())):
+    run_iterator = import_job.run(context=mock_context, import_file=import_file.open())
+    # get initial pre-run progress message
+    stats = next(run_iterator)
+    assert stats['progress'] == 0
+    for _ in run_iterator:
         assert mock_container.obj is not None
         # PUBLISH and HIDDEN columns should be ignored, all items
         # should be unpublished
@@ -94,7 +99,11 @@ def test_import_job_create_resource_publish_all(import_file, jobs):
     mock_context = MagicMock(spec=PlastronContext, repo=mock_repo)
 
     import_job = jobs.create_job(ImportJob, config=ImportConfig(job_id='123', model='Item'))
-    for i, stats in enumerate(import_job.run(context=mock_context, publish=True, import_file=import_file.open())):
+    run_iterator = import_job.run(context=mock_context, publish=True, import_file=import_file.open())
+    # get initial pre-run progress message
+    stats = next(run_iterator)
+    assert stats['progress'] == 0
+    for _ in run_iterator:
         assert mock_container.obj is not None
         # HIDDEN column should be ignored, all items should be published
         assert get_publication_status(mock_container.obj) == 'Published'
@@ -135,6 +144,22 @@ def test_config_write_none_as_null(jobs):
     assert 'access: null\n' in contents
 
 
+class JobRunner:
+    def __init__(self):
+        self.result = None
+
+    def _run(self, job_run: Generator):
+        # delegating generator; each progress step is passed to the calling
+        # method, and the return value from the command is stored as the result
+        self.result = yield from job_run
+
+    def run(self, job_run: Generator):
+        # Run the delegating generator to exhaustion, discarding the intermediate
+        # yielded values. Return the final result.
+        for _ in self._run(job_run):
+            pass
+        return self.result
+
 def test_import_job_validation_fails_for_job_with_files_column_and_file_missing(jobs, datadir):
     """
     Verifies that import validation fails when
@@ -142,7 +167,6 @@ def test_import_job_validation_fails_for_job_with_files_column_and_file_missing(
     - A "binaries_location" parameter is provided
     - The file is not found
     """
-    import_file = datadir / 'item_with_file_in_item_files_column.csv'
     binaries_location = 'test_binaries_location'
     mock_repo = MagicMock(spec=Repository)
     mock_context = MagicMock(spec=PlastronContext, repo=mock_repo)
@@ -151,29 +175,32 @@ def test_import_job_validation_fails_for_job_with_files_column_and_file_missing(
         ImportJob,
         config=ImportConfig(job_id='456', model='Item', binaries_location=binaries_location)
     )
-    with pytest.raises(StopIteration) as exc_info:
-        next(import_job.run(context=mock_context, validate_only=True, import_file=import_file.open()))
+    runner = JobRunner()
+    result = runner.run(import_job.run(
+        context=mock_context,
+        validate_only=True,
+        import_file=(datadir / 'item_with_file_in_item_files_column.csv').open(),
+    ))
+    assert result['type'] == 'validate_failed'
 
-    return_value = exc_info.value.value
-    assert return_value['type'] == 'validate_failed'
 
-
-def test_import_job_raises_runtime_error_job_with_files_and_no_binaries_location(jobs, datadir):
+def test_import_job_validation_fails_for_job_with_files_and_no_binaries_location(jobs, datadir):
     """
-    Verifies that the import job raises a RuntimeError when:
+    Verifies that import validation fails when:
     - The CSV file contains a "FILES" or "ITEM_FILES" column that contains non-empty values
     - A "binaries_location" parameter is NOT provided
     """
-    import_file = datadir / 'item_with_file_in_item_files_column.csv'
     mock_repo = MagicMock(spec=Repository)
     mock_context = MagicMock(spec=PlastronContext, repo=mock_repo)
 
     import_job = jobs.create_job(ImportJob, config=ImportConfig(job_id='456', model='Item'))
-    with pytest.raises(RuntimeError) as exc_info:
-        next(import_job.run(context=mock_context, validate_only=True, import_file=import_file.open()))
-
-    expected_message = 'Must specify --binaries-location if the metadata has a FILES and/or ITEM_FILES column'
-    assert expected_message == str(exc_info.value)
+    runner = JobRunner()
+    result = runner.run(import_job.run(
+        context=mock_context,
+        validate_only=True,
+        import_file=(datadir / 'item_with_file_in_item_files_column.csv').open(),
+    ))
+    assert result['type'] == 'validate_failed'
 
 
 def test_import_job_validation_succeeds_for_job_with_files_column_and_file_exists(jobs, datadir, tmpdir):
@@ -183,7 +210,6 @@ def test_import_job_validation_succeeds_for_job_with_files_column_and_file_exist
     - A "binaries_location" parameter is provided
     - The indicated file is found
     """
-    import_file = datadir / 'item_with_file_in_item_files_column.csv'
     binaries_location = tmpdir.mkdir('test_binary_location')
     temp_binary_file = binaries_location / 'test_file.tif'
     temp_binary_file.write('Test file')
@@ -195,11 +221,13 @@ def test_import_job_validation_succeeds_for_job_with_files_column_and_file_exist
         ImportJob,
         config=ImportConfig(job_id='456', model='Item', binaries_location=str(binaries_location))
     )
-    with pytest.raises(StopIteration) as exc_info:
-        next(import_job.run(context=mock_context, validate_only=True, import_file=import_file.open()))
-
-    return_value = exc_info.value.value
-    assert return_value['type'] == 'validate_success'
+    runner = JobRunner()
+    result = runner.run(import_job.run(
+        context=mock_context,
+        validate_only=True,
+        import_file=(datadir / 'item_with_file_in_item_files_column.csv').open(),
+    ))
+    assert result['type'] == 'validate_success'
 
 
 def test_import_job_validation_passes_for_job_with_files_column_and_no_files_specified(jobs, datadir):
@@ -208,14 +236,14 @@ def test_import_job_validation_passes_for_job_with_files_column_and_no_files_spe
     - The CSV file contains an "ITEM_FILES" column that is empty for ALL rows
     - A "binaries_location" parameter is not provided
     """
-    import_file = datadir / 'item_with_empty_item_files_column.csv'
-    binaries_location = 'test_binaries_location'
     mock_repo = MagicMock(spec=Repository)
     mock_context = MagicMock(spec=PlastronContext, repo=mock_repo)
 
     import_job = jobs.create_job(ImportJob, config=ImportConfig(job_id='456', model='Item'))
-    with pytest.raises(StopIteration) as exc_info:
-        next(import_job.run(context=mock_context, validate_only=True, import_file=import_file.open()))
-
-    return_value = exc_info.value.value
-    assert return_value['type'] == 'validate_success'
+    runner = JobRunner()
+    result = runner.run(import_job.run(
+        context=mock_context,
+        validate_only=True,
+        import_file=(datadir / 'item_with_empty_item_files_column.csv').open(),
+    ))
+    assert result['type'] == 'validate_success'

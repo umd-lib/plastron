@@ -264,7 +264,7 @@ class ImportRun:
 
         if validate_only:
             # validate phase
-            if self.count['invalid_items'] == 0:
+            if self.count['invalid_items'] == 0 and self.count['errors'] == 0:
                 self.state = 'validate_success'
             else:
                 self.state = 'validate_failed'

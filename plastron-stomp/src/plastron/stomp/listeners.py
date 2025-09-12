@@ -133,7 +133,6 @@ class MessageProcessor:
                         body=status,
                     ))
 
-
         logger.info(f'Job {message.job_id} complete')
 
         # default message state is "Done"

@@ -32,8 +32,6 @@ DROPPED_INVALID_FIELDNAMES = ['id', 'timestamp', 'title', 'uri', 'reason']
 DROPPED_FAILED_FIELDNAMES = ['id', 'timestamp', 'title', 'uri', 'reason']
 
 
-
-
 class ImportedItemStatus(Enum):
     CREATED = 'created'
     MODIFIED = 'modified'

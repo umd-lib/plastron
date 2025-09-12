@@ -160,6 +160,7 @@ class JobRunner:
             pass
         return self.result
 
+
 def test_import_job_validation_fails_for_job_with_files_column_and_file_missing(jobs, datadir):
     """
     Verifies that import validation fails when

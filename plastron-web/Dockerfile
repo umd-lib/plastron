@@ -35,12 +35,6 @@ RUN pip install './plastron-repo'
 COPY plastron-jobs /opt/plastron/plastron-jobs
 RUN pip install './plastron-jobs'
 
-COPY plastron-cli /opt/plastron/plastron-cli
-RUN pip install './plastron-cli'
-
-COPY plastron-stomp /opt/plastron/plastron-stomp
-RUN pip install './plastron-stomp'
-
 COPY plastron-web /opt/plastron/plastron-web
 RUN pip install './plastron-web'
 

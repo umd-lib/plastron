@@ -8,7 +8,7 @@ from stomp.listener import ConnectionListener
 
 from plastron.context import PlastronContext
 from plastron.messaging.broker import Destination
-from plastron.messaging.messages import MessageBox, PlastronCommandMessage, PlastronMessage
+from plastron.messaging.messages import MessageBox, PlastronCommandMessage, PlastronMessage, PlastronResponseMessage
 from plastron.stomp.commands import get_command_module, get_module_name
 from plastron.stomp.handlers import AsynchronousResponseHandler
 from plastron.stomp.inbox_watcher import InboxWatcher
@@ -72,7 +72,7 @@ class CommandListener(ConnectionListener):
 
     def process_message(self, message, response_handler):
         # send to a message processor thread
-        self.executor.submit(self.processor, message, self.broker['JOB_PROGRESS']).add_done_callback(response_handler)
+        self.executor.submit(self.processor, message, self.broker['JOB_STATUS']).add_done_callback(response_handler)
 
     def on_disconnected(self):
         logger.warning('Disconnected from the STOMP message broker')
@@ -109,6 +109,9 @@ class MessageProcessor:
 
         logger.info(f'Received message to initiate job {message.job_id}')
 
+        if message.status_url is not None:
+            logger.info(f'Callback status notifications will be sent to {message.status_url}')
+
         # determine which command to load to process the message
         command = get_command(message.command)
 
@@ -123,7 +126,12 @@ class MessageProcessor:
             ua_string=f'plastron/{version}',
         ) as run_context:
             for status in self._run(command(run_context, message)):
-                progress_topic.send(PlastronMessage(job_id=message.job_id, body=status))
+                progress_topic.send(
+                    PlastronResponseMessage(
+                        job_id=message.job_id,
+                        status_url=message.status_url,
+                        body=status,
+                    ))
 
         logger.info(f'Job {message.job_id} complete')
 

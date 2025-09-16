@@ -140,7 +140,13 @@ class ExportJob(Job):
 
         export_dir = os.path.join(temp_dir.name, 'data')
         serializer = serializer_class(directory=export_dir)
-        for uri in self.uris:
+        yield {
+            'time': timer.now(),
+            'count': count,
+            'state': 'in_progress',
+            'progress': 0,
+        }
+        for n, uri in enumerate(self.uris, 1):
             try:
                 logger.info(f'Exporting item {count["exported"] + 1}/{count["total"]}: {uri}')
 
@@ -199,6 +205,8 @@ class ExportJob(Job):
             yield {
                 'time': timer.now(),
                 'count': count,
+                'state': 'in_progress',
+                'progress': int(n / count['total'] * 100),
             }
 
         try:
@@ -231,9 +239,12 @@ class ExportJob(Job):
         # write out a single ZIP file of the whole bag
         compress_bag(bag, destination, root)
 
+        state = 'export_complete' if count['exported'] == count['total'] else 'partial_export'
         return {
-            'type': 'export_complete' if count["exported"] == count["total"] else 'partial_export',
+            'type': state,
             'content_type': serializer.content_type,
             'file_extension': serializer.file_extension,
             'count': count,
+            'state': state,
+            'progress': 100,
         }

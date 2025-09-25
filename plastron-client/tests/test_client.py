@@ -3,7 +3,6 @@ from http.client import RemoteDisconnected
 from unittest.mock import MagicMock
 
 import pytest
-import requests
 from requests import Session, Request
 from requests.exceptions import ConnectionError
 from requests_jwtauth import HTTPBearerAuth
@@ -40,12 +39,6 @@ def repo_forwarded_config(repo_base_config):
     return repo_base_config
 
 
-def mock_request(response):
-    def _request(*_args, **_kwargs):
-        return response
-    return _request
-
-
 class MockOKResponse:
     ok = True
     status_code = 200
@@ -66,20 +59,20 @@ class MockDescribedbyHeaderResponse(MockOKResponse):
     links = {'describedby': {'url': 'describedby_url'}}
 
 
-def test_get_description_uri_failed_response(monkeypatch, client):
-    monkeypatch.setattr(requests.Session, 'request', mock_request(MockNotFoundResponse()))
+def test_get_description_uri_failed_response(monkeypatch_request, client):
+    monkeypatch_request(MockNotFoundResponse)
     with pytest.raises(ClientError):
         client.get_description_uri('http://example.com/repo/foo')
 
 
-def test_get_description_uri_no_describedby(monkeypatch, client):
-    monkeypatch.setattr(requests.Session, 'request', mock_request(MockNoDescribedbyHeaderResponse()))
+def test_get_description_uri_no_describedby(monkeypatch_request, client):
+    monkeypatch_request(MockNoDescribedbyHeaderResponse)
     description_uri = client.get_description_uri('uri')
     assert 'uri' == description_uri
 
 
-def test_get_description_uri(monkeypatch, client):
-    monkeypatch.setattr(requests.Session, 'request', mock_request(MockDescribedbyHeaderResponse()))
+def test_get_description_uri(monkeypatch_request, client):
+    monkeypatch_request(MockDescribedbyHeaderResponse)
     description_uri = client.get_description_uri('uri')
     assert 'describedby_url' == description_uri
 
@@ -95,15 +88,15 @@ class MockCreatedResponseDescribedby(MockCreatedResponse):
     links = {'describedby': {'url': 'describedby_url'}}
 
 
-def test_create_with_no_describedby(monkeypatch, client):
-    monkeypatch.setattr(requests.Session, 'request', mock_request(MockCreatedResponse()))
+def test_create_with_no_describedby(monkeypatch_request, client):
+    monkeypatch_request(MockCreatedResponse)
     resource_uri = client.create()
     assert 'location_url' == resource_uri.uri
     assert 'location_url' == resource_uri.description_uri
 
 
-def test_create_with_describedby(monkeypatch, client):
-    monkeypatch.setattr(requests.Session, 'request', mock_request(MockCreatedResponseDescribedby()))
+def test_create_with_describedby(monkeypatch_request, client):
+    monkeypatch_request(MockCreatedResponseDescribedby)
     resource_uri = client.create()
     assert 'location_url' == resource_uri.uri
     assert 'describedby_url' == resource_uri.description_uri
@@ -338,8 +331,8 @@ def test_creator_structure_invalid(endpoint):
         Client(endpoint=endpoint, structure='foo')
 
 
-def test_get_graph_not_found(monkeypatch, client):
-    monkeypatch.setattr(requests.Session, 'request', mock_request(MockNotFoundResponse()))
+def test_get_graph_not_found(monkeypatch_request, client):
+    monkeypatch_request(MockNotFoundResponse)
     with pytest.raises(ClientError):
         client.get_graph('http://localhost:9999/fcrepo/rest/123')
 

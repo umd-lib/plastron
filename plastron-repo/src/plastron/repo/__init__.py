@@ -1,7 +1,8 @@
 import logging
 from contextlib import contextmanager
+from http import HTTPStatus
 from io import BytesIO
-from typing import Optional, Type, TypeVar, Iterator
+from typing import Optional, Type, TypeVar, Iterator, Union
 from uuid import uuid4
 
 import yaml
@@ -188,6 +189,10 @@ class RepositoryResource:
         return self.url is not None and self._head().ok
 
     @property
+    def is_gone(self) -> bool:
+        return self.url is not None and self._head().status_code == HTTPStatus.GONE
+
+    @property
     def is_binary(self) -> bool:
         if self._types is None:
             raise RepositoryError('Resource types unknown')
@@ -262,22 +267,29 @@ class RepositoryResource:
             raise RepositoryError(f'Unable to delete {self.url}: {e}') from e
 
     def walk(
-            self,
-            traverse: list[URIRef] = None,
-            max_depth: int = inf,
-            min_depth: int = -1,
-            _current_depth: int = 0,
-    ) -> Iterator['RepositoryResource']:
+        self,
+        traverse: list[URIRef] = None,
+        max_depth: int = inf,
+        min_depth: int = -1,
+        include_tombstones: bool = False,
+        _current_depth: int = 0,
+    ) -> Iterator[Union['RepositoryResource', 'Tombstone']]:
         if min_depth > max_depth:
             raise ValueError(f'min_depth ({min_depth}) cannot be greater than max_depth ({max_depth})')
+
         if traverse is None:
             # default to walking the ldp:contains relationships
             traverse = [ldp.contains]
-        if not self.exists:
-            return
+
         if _current_depth > min_depth:
-            self.read()
-            yield self
+            if self.is_gone and include_tombstones:
+                yield Tombstone(self)
+            elif self.exists:
+                yield self.read()
+            else:
+                logger.error(f'{self.url} (or its tombstone) not found')
+                return
+
         if traverse and _current_depth < max_depth:
             for _, p, o in self.graph.triples((URIRef(self.url), None, None)):
                 if p in traverse:
@@ -286,6 +298,19 @@ class RepositoryResource:
                         max_depth=max_depth,
                         _current_depth=_current_depth + 1,
                     )
+
+
+class Tombstone:
+    def __init__(self, resource: RepositoryResource):
+        self._resource = resource
+
+    @property
+    def url(self) -> Optional[URLObject]:
+        return self._resource.url
+
+    @property
+    def path(self) -> Optional[str]:
+        return self._resource.path
 
 
 class ContainerResource(RepositoryResource):

@@ -1,5 +1,5 @@
 from concurrent.futures import Future
-from typing import cast, Dict, Type
+from typing import cast, Type
 from unittest import TestCase
 from unittest.mock import Mock
 
@@ -72,7 +72,7 @@ def test_asynchronous_response_handler_call_with_exception_removes_inbox_and_out
 
 
 def assert_sent_message(queue: Destination, message_class: Type[Message],
-                        expected_message_headers: Dict[str, str], expected_body: str):
+                        expected_message_headers: dict[str, str], expected_body: str):
     status_queue_send_args = cast(Mock, queue).send.call_args[0]  # using cast, so mypy doesn't complain
     sent_message = status_queue_send_args[0]
     assert isinstance(sent_message, message_class)

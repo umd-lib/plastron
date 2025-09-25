@@ -1,4 +1,4 @@
-from typing import NamedTuple, Tuple, Iterator, TypeVar, Optional, Iterable
+from typing import NamedTuple, Iterator, TypeVar, Optional, Iterable
 
 # noinspection PyProtectedMember
 from lxml.etree import _Element
@@ -103,7 +103,7 @@ class Scale(NamedTuple):
     """Vertical scaling factor"""
 
     @classmethod
-    def from_resolution(cls, image_resolution: Tuple[int, int], unit: str = 'pixel'):
+    def from_resolution(cls, image_resolution: tuple[int, int], unit: str = 'pixel'):
         xres = image_resolution[0]
         yres = image_resolution[1]
         if unit == 'inch1200':

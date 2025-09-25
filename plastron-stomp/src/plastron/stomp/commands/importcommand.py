@@ -1,7 +1,7 @@
 import io
 import logging
 from argparse import ArgumentTypeError
-from typing import Any, Dict, Generator, Optional
+from typing import Any, Generator, Optional
 
 from rdflib import URIRef
 
@@ -26,7 +26,7 @@ def get_access_uri(access) -> Optional[URIRef]:
 def importcommand(
         context: PlastronContext,
         message: PlastronCommandMessage,
-) -> Generator[Dict[str, Any], None, Dict[str, Any]]:
+) -> Generator[dict[str, Any], None, dict[str, Any]]:
     """
     Performs the import
 

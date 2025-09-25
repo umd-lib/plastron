@@ -2,7 +2,7 @@ import logging
 from collections.abc import Mapping
 from os.path import abspath, dirname
 from pathlib import Path
-from typing import Union, Dict, ItemsView
+from typing import ItemsView
 from urllib.error import HTTPError, URLError
 
 from rdflib import Graph
@@ -99,7 +99,7 @@ class Vocabulary(Mapping):
     `Vocabulary` objects can also be used in the `values_from` attribute of RDF
     property mapping fields.
     """
-    def __init__(self, uri: Union[URIRef, str]):
+    def __init__(self, uri: URIRef | str):
         self.uri = URIRef(uri)
 
     @property
@@ -110,7 +110,7 @@ class Vocabulary(Mapping):
     def _term_uri(self, item) -> URIRef:
         return item if isinstance(item, URIRef) else URIRef(self.uri + item)
 
-    def term_graph(self, term: Union[URIRef, str]) -> TrackChangesGraph:
+    def term_graph(self, term: URIRef | str) -> TrackChangesGraph:
         """Returns a graph containing all the triples with the given `term`
         as their subject."""
         graph = TrackChangesGraph()
@@ -136,13 +136,13 @@ class Vocabulary(Mapping):
             raise KeyError(item)
         return {p: o for p, o in get_vocabulary_graph(self.uri).predicate_objects(term_uri)}
 
-    def items(self) -> ItemsView[URIRef, Dict]:
+    def items(self) -> ItemsView[URIRef, dict]:
         """Returns an `ItemsView` mapping each term URI to a dictionary mapping
         of predicates to objects. Allows for easy iteration over the vocabulary
         as if it were a dictionary."""
         return {term_uri: self[term_uri] for term_uri in self}.items()
 
-    def find(self, p: URIRef, o: Union[URIRef, Literal]) -> Dict:
+    def find(self, p: URIRef, o: URIRef | Literal) -> dict:
         """Finds the first term with a triple matching the given predicate `p`
         and object `o` in the vocabulary. Raises a `KeyError` if no such term
         can be found."""

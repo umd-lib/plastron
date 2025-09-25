@@ -5,7 +5,7 @@ import sys
 from csv import DictWriter
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Union, Iterator, Optional, Dict, Any
+from typing import Iterator, Optional, Any
 
 from lxml import etree
 # noinspection PyProtectedMember
@@ -120,7 +120,7 @@ class NDNPBatch:
     """Main XML file describing this NDNP package. Defaults to `batch.xml`
     in the batch's `root_dir`"""
 
-    def __init__(self, batch_dir: Union[str, Path], batch_file: str = 'batch.xml'):
+    def __init__(self, batch_dir: str | Path, batch_file: str = 'batch.xml'):
         self.root_dir = Path(batch_dir)
         if not self.root_dir.is_dir():
             raise DataReadError(f'{self.root_dir} is not a directory')
@@ -167,7 +167,7 @@ def write_import_csv(batch: NDNPBatch, fh=None):
         writer.writerow(row)
 
 
-def get_issue_data(issue: NDNPIssue) -> Dict[str, str]:
+def get_issue_data(issue: NDNPIssue) -> dict[str, str]:
     """Transforms an `NDNPIssue` into a mapping suitable for writing to a
     CSV file using a `csv.DictWriter`"""
 
@@ -207,7 +207,7 @@ def get_issue_data(issue: NDNPIssue) -> Dict[str, str]:
     }
 
 
-def get_article_data(article_path) -> Iterator[Dict[str, Any]]:
+def get_article_data(article_path) -> Iterator[dict[str, Any]]:
     """**Note:** Not currently used, may be deprecated in the future.
 
     Iterates over the article METS XML file and extract the metadata

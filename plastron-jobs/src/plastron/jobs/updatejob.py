@@ -2,18 +2,18 @@ import logging
 from collections import defaultdict
 from dataclasses import dataclass
 from email.utils import parsedate_to_datetime
-from typing import Union, Mapping, ItemsView, Type, Iterable, Dict, Any, Generator, List
+from typing import Mapping, ItemsView, Type, Iterable, Any, Generator
 
 from pyparsing import ParseException
 from rdflib import URIRef
 
 from plastron.client import ClientError
+from plastron.jobs.logs import AppendableSequence, NullLog
 from plastron.namespaces import dcterms
 from plastron.rdfmapping.resources import RDFResourceBase
 from plastron.rdfmapping.validation import ValidationFailure
 from plastron.repo import RepositoryResource, Repository
 from plastron.repo.utils import context
-from plastron.jobs.logs import AppendableSequence, NullLog
 
 logger = logging.getLogger(__name__)
 
@@ -27,7 +27,7 @@ class UpdateError(Exception):
 
 
 class ValidationFailed(Exception):
-    def __init__(self, failures: Union[Mapping[str, ValidationFailure], ItemsView[str, ValidationFailure]], *args):
+    def __init__(self, failures: Mapping[str, ValidationFailure] | ItemsView[str, ValidationFailure], *args):
         super().__init__(*args)
         self.failures = failures
 
@@ -37,7 +37,7 @@ def update(
         sparql_update: str,
         model_class: Type[RDFResourceBase] = None,
         dry_run: bool = False,
-) -> Dict[str, str]:
+) -> dict[str, str]:
     """Update a single resource using a SPARQL Update Query."""
     if model_class is not None:
         try:
@@ -85,12 +85,12 @@ class UpdateJob:
     uris: Iterable[str]
     sparql_update: str
     model_class: Type[RDFResourceBase]
-    traverse: List[URIRef] = None
+    traverse: list[URIRef] = None
     completed: AppendableSequence = None
     dry_run: bool = False
     use_transactions: bool = True
 
-    def run(self) -> Generator[Dict[str, Any], None, Dict[str, Any]]:
+    def run(self) -> Generator[dict[str, Any], None, dict[str, Any]]:
         if self.completed is None:
             self.completed = NullLog()
 

@@ -1,5 +1,5 @@
 from importlib import import_module
-from typing import Generator, Dict, Any
+from typing import Generator, Any
 
 from plastron.context import PlastronContext
 
@@ -10,7 +10,7 @@ class BaseCommand:
         self.result = None
 
     @property
-    def config(self) -> Dict[str, Any]:
+    def config(self) -> dict[str, Any]:
         name = self.__module__.split('.')[-1]
         if name == 'importcommand':
             name = 'import'

@@ -1,16 +1,16 @@
 import logging
 from argparse import Namespace
 from collections import defaultdict
-from typing import Iterable, Tuple, Dict, Type
+from typing import Iterable, Type
 
 from rdflib import Literal
 
 from plastron.cli.commands import BaseCommand
 from plastron.models import get_model_from_name
-from plastron.utils import uri_or_curie
 from plastron.rdfmapping.descriptors import DataProperty, ObjectProperty
 from plastron.rdfmapping.resources import RDFResourceBase
 from plastron.repo import RepositoryResource
+from plastron.utils import uri_or_curie
 
 logger = logging.getLogger(__name__)
 
@@ -52,7 +52,7 @@ class Command(BaseCommand):
         return set_fields(ctx, args.model_name, args.fields_to_set, args.uris)
 
 
-def get_new_values(model_class: Type[RDFResourceBase], fields_to_set: Iterable[Tuple[str, str]]) -> Dict[str, set]:
+def get_new_values(model_class: Type[RDFResourceBase], fields_to_set: Iterable[tuple[str, str]]) -> dict[str, set]:
     values = defaultdict(set)
     for field_name, value in fields_to_set:
         prop = getattr(model_class, field_name)
@@ -63,7 +63,7 @@ def get_new_values(model_class: Type[RDFResourceBase], fields_to_set: Iterable[T
     return values
 
 
-def set_fields(ctx, model_name: str, fields_to_set: Iterable[Tuple[str, str]], uris: Iterable[str]):
+def set_fields(ctx, model_name: str, fields_to_set: Iterable[tuple[str, str]], uris: Iterable[str]):
     model_class = get_model_from_name(model_name)
     values = get_new_values(model_class, fields_to_set)
     for uri in uris:

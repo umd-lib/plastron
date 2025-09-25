@@ -7,7 +7,7 @@ from contextlib import contextmanager
 from enum import Enum
 from http import HTTPStatus
 from pathlib import Path
-from typing import Any, Optional, List, Callable, NamedTuple, Union
+from typing import Any, Optional, Callable, NamedTuple
 
 import requests
 from rdflib import Graph, URIRef, Literal
@@ -27,7 +27,7 @@ def random_slug(length: int = 6) -> str:
     return urlsafe_b64encode(os.urandom(length)).decode()
 
 
-def paths_to_create(client: 'Client', path: Path) -> List[Path]:
+def paths_to_create(client: 'Client', path: Path) -> list[Path]:
     if client.path_exists(str(path)):
         return []
     to_create = [path]
@@ -39,7 +39,7 @@ def paths_to_create(client: 'Client', path: Path) -> List[Path]:
 
 def serialize(graph: Graph, **kwargs):
     logger.info('Including properties:')
-    for _, p, o in graph:  # type: _, URIRef, Union[URIRef, Literal]
+    for _, p, o in graph:  # type: _, URIRef, URIRef | Literal
         pred = p.n3(namespace_manager=graph.namespace_manager)
         obj = o.n3(namespace_manager=graph.namespace_manager)
         logger.info(f'  {pred} {obj}')
@@ -631,7 +631,7 @@ class Client:
         logger.info(f'Created {resource}')
         return resource
 
-    def create_all(self, container_path: str, resources: List[Any], name_function: Callable = None):
+    def create_all(self, container_path: str, resources: list[Any], name_function: Callable = None):
         # ensure the container exists
         if len(resources) > 0 and not self.path_exists(container_path):
             self.create(path=container_path)

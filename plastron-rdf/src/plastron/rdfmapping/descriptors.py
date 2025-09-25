@@ -1,4 +1,4 @@
-from typing import Union, Any, Dict, Callable, Container
+from typing import Any, Callable, Container
 
 from rdflib import URIRef, Literal
 
@@ -42,7 +42,7 @@ class Property:
     def _get_property(self, instance) -> RDFProperty:
         return RDFProperty(**self._get_property_kwargs(instance))
 
-    def _get_property_kwargs(self, instance) -> Dict[str, Any]:
+    def _get_property_kwargs(self, instance) -> dict[str, Any]:
         return {
             'resource': instance,
             'attr_name': self.name,
@@ -62,7 +62,7 @@ class ObjectProperty(Property):
             repeatable: bool = False,
             values_from: Container = None,
             validate: Callable[[Any], bool] = None,
-            cls: Union[type, str] = None,
+            cls: type | str = None,
             embed: bool = False,
     ):
         super().__init__(predicate, required, repeatable, values_from, validate)

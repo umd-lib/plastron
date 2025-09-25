@@ -4,7 +4,7 @@ import platform
 import re
 from argparse import ArgumentTypeError
 from datetime import datetime
-from typing import Union, Mapping, Optional, List
+from typing import Mapping, Optional
 
 from rdflib import URIRef
 from rdflib.term import Node
@@ -78,7 +78,7 @@ def datetimestamp(digits_only: bool = True) -> str:
         return now
 
 
-def envsubst(value: Union[str, list, dict], env: Mapping[str, str] = None) -> Union[str, list, dict]:
+def envsubst(value: str | list | dict, env: Mapping[str, str] = None) -> str | list | dict:
     """
     Recursively replace `${VAR_NAME}` placeholders in value with the values of the
     corresponding keys of env. If env is not given, it defaults to the environment
@@ -169,7 +169,7 @@ def uri_or_curie(arg: str) -> URIRef:
     return term
 
 
-def parse_predicate_list(string: str, delimiter: str = ',') -> Optional[List[Node]]:
+def parse_predicate_list(string: str, delimiter: str = ',') -> Optional[list[Node]]:
     if string is None:
         return None
     manager = namespaces.get_manager()

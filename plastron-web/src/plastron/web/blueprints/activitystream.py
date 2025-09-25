@@ -1,6 +1,5 @@
 import json
 import logging
-from typing import List
 from uuid import uuid4
 
 from flask import Blueprint, current_app, jsonify, request
@@ -86,7 +85,7 @@ class Activity:
         return self._force_hidden
 
     @property
-    def objects(self) -> List[str]:
+    def objects(self) -> list[str]:
         return self._objects
 
 

@@ -1,13 +1,12 @@
 import logging
 from argparse import Namespace
 from pathlib import Path
-from typing import List, Tuple, Union
 
 from rdflib import Graph, Literal, URIRef
 
+from plastron.cli import parse_data_property, parse_object_property
 from plastron.cli.commands import BaseCommand
 from plastron.namespaces import dcterms, get_manager, pcdm, rdf
-from plastron.cli import parse_data_property, parse_object_property
 from plastron.utils import uri_or_curie
 
 logger = logging.getLogger(__name__)
@@ -84,7 +83,7 @@ def configure_cli(subparsers):
 
 class Command(BaseCommand):
     def __call__(self, args: Namespace):
-        properties: List[Tuple[URIRef, Union[Literal, URIRef]]] = [
+        properties: list[tuple[URIRef, Literal | URIRef]] = [
             *(parse_data_property(p, o) for p, o in args.data_properties),
             *(parse_object_property(p, o) for p, o in args.object_properties)
         ]

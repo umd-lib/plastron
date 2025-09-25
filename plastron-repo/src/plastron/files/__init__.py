@@ -7,7 +7,7 @@ from dataclasses import dataclass, field
 from http import HTTPStatus
 from mimetypes import guess_type
 from os.path import basename, isfile
-from typing import Mapping, Any, Protocol, Union, Set, List, Tuple, Optional, ClassVar, Dict
+from typing import Mapping, Any, Protocol, Optional, ClassVar
 from urllib.parse import urlsplit
 
 from paramiko import SFTPClient, SSHClient, AutoAddPolicy, SSHException
@@ -18,7 +18,7 @@ from requests import Response, Session
 from plastron.namespaces import pcdmuse, fabio
 
 
-def get_ssh_client(sftp_uri: Union[str, urllib.parse.SplitResult], **kwargs) -> SSHClient:
+def get_ssh_client(sftp_uri: str | urllib.parse.SplitResult, **kwargs) -> SSHClient:
     """Create, connect, and return an `SSHClient` object. The username and hostname (and,
     optionally, the port) to connect to are taken from the `sftp_uri`. Additional keyword
     arguments in `**kwargs` are passed directly to the `SSHClient.connect()` method.
@@ -101,7 +101,7 @@ class BinarySource:
         return 'sha1=' + sha1.hexdigest()
 
     @property
-    def rdf_types(self) -> Set[URIRef]:
+    def rdf_types(self) -> set[URIRef]:
         """Return a set of additional RDF types that describe this source.
 
         * `pcdmuse:PreservationMasterFile` if it has the `image/tiff` MIME type
@@ -407,7 +407,7 @@ class FileSpec:
     usage: str = None
     source: BinarySource = None
 
-    USAGE_TAGS: ClassVar[Dict[str, Set[URIRef]]] = {
+    USAGE_TAGS: ClassVar[dict[str, set[URIRef]]] = {
         'preservation': {pcdmuse.PreservationMasterFile},
         'ocr': {pcdmuse.ExtractedText},
         'metadata': {fabio.MetadataFile},
@@ -429,7 +429,7 @@ class FileSpec:
             return self.name
 
     @property
-    def rdf_types(self) -> Optional[Set[URIRef]]:
+    def rdf_types(self) -> Optional[set[URIRef]]:
         if self.usage is not None:
             return self.USAGE_TAGS.get(self.usage.lower(), None)
 
@@ -438,14 +438,14 @@ class FileSpec:
 class FileGroup:
     rootname: str
     label: str = None
-    files: List[FileSpec] = field(default_factory=list)
+    files: list[FileSpec] = field(default_factory=list)
 
     def __str__(self):
         extensions = list(map(lambda f: str(f).replace(self.rootname, ''), self.files))
         return f'{self.rootname}{{{",".join(extensions)}}}'
 
     @property
-    def filenames(self) -> List[str]:
+    def filenames(self) -> list[str]:
         return [file.name for file in self.files]
 
     def file(self, name: str) -> FileSpec:
@@ -455,7 +455,7 @@ class FileGroup:
         raise RuntimeError(f'{name} is not in file group {self}')
 
 
-def parse_usage_tag(filename: str) -> Tuple[str, Optional[str]]:
+def parse_usage_tag(filename: str) -> tuple[str, Optional[str]]:
     if m := re.search(r'^<([^>]+)>(.*)', filename):
         return m[2], m[1]
     else:

@@ -9,7 +9,7 @@ from os.path import splitext, basename
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from time import mktime
-from typing import Optional, List, Generator, Dict, Any, Iterator
+from typing import Optional, Generator, Any, Iterator
 from urllib.parse import urlsplit
 from zipfile import ZipFile
 
@@ -21,8 +21,8 @@ from plastron.client import ClientError
 from plastron.context import PlastronContext
 from plastron.files import get_ssh_client
 from plastron.jobs import Job
-from plastron.models.umd import Item
 from plastron.models.pcdm import PCDMFile
+from plastron.models.umd import Item
 from plastron.repo import DataReadError, BinaryResource
 from plastron.repo.pcdm import PCDMObjectResource, AggregationResource, PCDMFileBearingResource
 from plastron.serializers import SERIALIZER_CLASSES, detect_resource_class
@@ -66,7 +66,7 @@ class Stopwatch:
     def __init__(self):
         self._start = datetime.now().timestamp()
 
-    def now(self) -> Dict[str, float]:
+    def now(self) -> dict[str, float]:
         now = datetime.now().timestamp()
         return {
             'started': self._start,
@@ -91,10 +91,10 @@ class ExportJob(Job):
     binary_types: str
     output_dest: str
     uri_template: str
-    uris: List[str]
+    uris: list[str]
     key: str
 
-    def list_binaries_to_export(self, resource: PCDMObjectResource) -> Optional[List[BinaryResource]]:
+    def list_binaries_to_export(self, resource: PCDMObjectResource) -> Optional[list[BinaryResource]]:
         if not self.export_binaries:
             return None
 
@@ -116,7 +116,7 @@ class ExportJob(Job):
 
         return binaries
 
-    def run(self) -> Generator[Dict[str, Any], None, Dict[str, Any]]:
+    def run(self) -> Generator[dict[str, Any], None, dict[str, Any]]:
         logger.info(f'Requested export format is {self.export_format}')
 
         timer = Stopwatch()

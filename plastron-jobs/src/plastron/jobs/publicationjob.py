@@ -2,7 +2,7 @@ import logging
 from collections import Counter
 from dataclasses import dataclass
 from enum import Enum
-from typing import List, Generator, Dict, Any, Mapping, Union
+from typing import Generator, Any, Mapping
 
 from plastron.context import PlastronContext
 from plastron.jobs import Job
@@ -17,7 +17,7 @@ class PublicationAction(Enum):
     UNPUBLISH = 'unpublish'
 
     @classmethod
-    def get_final_state(cls, action: Union[str, Enum], count: Mapping[str, int]):
+    def get_final_state(cls, action: str | Enum, count: Mapping[str, int]):
         try:
             return cls(action).value + ('_incomplete' if count['done'] < count['total'] else '_complete')
         except ValueError as e:
@@ -28,12 +28,12 @@ class PublicationAction(Enum):
 @dataclass
 class PublicationJob(Job):
     context: PlastronContext
-    uris: List[str]
+    uris: list[str]
     action: PublicationAction
     force_hidden: bool = False
     force_visible: bool = False
 
-    def run(self) -> Generator[Dict[str, Any], None, Dict[str, Any]]:
+    def run(self) -> Generator[dict[str, Any], None, dict[str, Any]]:
         count = Counter(
             total=len(self.uris),
             done=0,

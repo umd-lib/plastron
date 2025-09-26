@@ -6,7 +6,7 @@ from datetime import datetime
 from enum import Enum
 from pathlib import Path
 from shutil import copyfileobj
-from typing import Optional, Any, IO, List, Generator, Dict, Iterable
+from typing import Optional, Any, IO, Generator, Iterable
 
 from bs4 import BeautifulSoup
 from rdflib import URIRef
@@ -103,7 +103,7 @@ class ImportRun:
             self._failed_items = ItemLog(self.dir / 'dropped-failed.log.csv', DROPPED_FAILED_FIELDNAMES, 'id')
         return self._failed_items
 
-    def progress_message(self, n: int, **kwargs) -> Dict[str, Any]:
+    def progress_message(self, n: int, **kwargs) -> dict[str, Any]:
         now = datetime.now().timestamp()
         return {
             'time': {
@@ -128,7 +128,7 @@ class ImportRun:
             validate_only: bool = False,
             import_file: IO = None,
             publish: bool = False,
-    ) -> Generator[Dict[str, Any], None, Dict[str, Any]]:
+    ) -> Generator[dict[str, Any], None, dict[str, Any]]:
         """Execute this import run. Returns a generator that yields a dictionary of
         current status after each item. The generator also returns a final status
         dictionary after the run has completed. This value can be captured using
@@ -376,7 +376,7 @@ class ImportJob(Job):
             validate_only: bool = False,
             import_file: IO = None,
             publish: bool = False,
-    ) -> Generator[Dict[str, Any], None, Dict[str, Any]]:
+    ) -> Generator[dict[str, Any], None, dict[str, Any]]:
         run = self.new_run()
         return run(
             context=context,
@@ -402,7 +402,7 @@ class ImportJob(Job):
             return None
 
     @property
-    def extract_text_types(self) -> List[str]:
+    def extract_text_types(self) -> list[str]:
         if self.config.extract_text_types is not None:
             return self.config.extract_text_types.split(',')
         else:

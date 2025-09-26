@@ -1,6 +1,6 @@
 import logging
 from pathlib import Path
-from typing import NamedTuple, Optional, Dict, Union
+from typing import NamedTuple, Optional
 
 from stomp import Connection11
 from stomp.exception import StompException
@@ -27,8 +27,8 @@ class Broker:
     def __init__(
             self,
             server: ServerTuple,
-            message_store_dir: Union[Path, str],
-            destinations: Optional[Dict[str, str]] = None,
+            message_store_dir: Path | str,
+            destinations: Optional[dict[str, str]] = None,
             public_uri_template: Optional[str] = None,
     ):
         self.server = server
@@ -101,7 +101,7 @@ class Destination:
         logger.debug(f'Message headers: {message.headers}')
         self.broker.connection.send(destination=self.name, headers=message.headers, body=message.body)
 
-    def subscribe(self, id: str, ack: str = 'auto', headers: Dict = None, **kwargs):
+    def subscribe(self, id: str, ack: str = 'auto', headers: dict = None, **kwargs):
         self.broker.connection.subscribe(destination=self.name, id=id, ack=ack, headers=headers, **kwargs)
         logger.info(f"Subscribed to {self.name}")
         logger.debug(f"id={id} ack={ack} headers={headers} {kwargs}")

@@ -5,7 +5,7 @@ from collections import defaultdict
 from contextlib import contextmanager
 from itertools import zip_longest
 from pathlib import Path
-from typing import List, Union, Dict, Type, NamedTuple, Mapping, Iterable, TextIO, TypeVar
+from typing import Type, NamedTuple, Mapping, Iterable, TextIO, TypeVar
 
 from rdflib import URIRef, Literal
 from urlobject import URLObject
@@ -25,7 +25,7 @@ def not_empty(value):
     return value is not None and value != ''
 
 
-def split_escaped(string: str, separator: str = '|') -> List[str]:
+def split_escaped(string: str, separator: str = '|') -> list[str]:
     """Split a string on the separator, taking into account escaped instances
     of the separator.
 
@@ -47,7 +47,7 @@ def split_escaped(string: str, separator: str = '|') -> List[str]:
     return [re.sub(r'\\(.)', r'\1', v) for v in values]
 
 
-def join_values(values: List[Union[list, str]]) -> str:
+def join_values(values: list[list[str] | str]) -> str:
     """Join either a list of strings, or a list of lists of strings. A list of
     strings will be separated with "|". A list of lists will be separated by ";".
 
@@ -72,7 +72,7 @@ def join_values(values: List[Union[list, str]]) -> str:
         return '|'.join(str(v) for v in values)
 
 
-def build_lookup_index(index_string: str) -> Dict[str, Dict[int, str]]:
+def build_lookup_index(index_string: str) -> dict[str, dict[int, str]]:
     """Build a lookup dictionary for embedded object properties of an item.
 
     From this `index_string`:
@@ -109,7 +109,7 @@ def build_lookup_index(index_string: str) -> Dict[str, Dict[int, str]]:
     return index
 
 
-def flatten_headers(header_map: Dict[str, Union[str, dict]], prefix='') -> Dict[str, str]:
+def flatten_headers(header_map: dict[str, str | dict], prefix: str = '') -> dict[str, str]:
     """Transform a possibly nested mapping of attribute name to header label into a
     flat mapping of header label to attribute name. Nesting of the attribute names is
     indicated by a ".".
@@ -169,7 +169,7 @@ class ColumnsDict(dict):
 
 def flatten(
     description: RDFResourceBase,
-    header_map: Dict[str, Union[str, dict]],
+    header_map: dict[str, str | dict],
 ) -> ColumnsDict:
     """Convert an RDF description to a dictionary with `ColumnHeader` keys and list values, and a
     lookup index list for embedded objects. RDF attributes of the description object are mapped to
@@ -201,7 +201,7 @@ def flatten(
     return columns
 
 
-def get_column_headers(headers: Iterable[str], base_header: str) -> List[ColumnHeader]:
+def get_column_headers(headers: Iterable[str], base_header: str) -> list[ColumnHeader]:
     """From `headers`, return a column `ColumnHeader` for each header whose label is `base_header`.
 
     ```pycon
@@ -222,7 +222,7 @@ def get_column_headers(headers: Iterable[str], base_header: str) -> List[ColumnH
     ]
 
 
-def get_embedded_params(row: Mapping[str, str], header_labels: Iterable[str]) -> List[Dict[str, str]]:
+def get_embedded_params(row: Mapping[str, str], header_labels: Iterable[str]) -> list[dict[str, str]]:
     """From a data row and a set of header labels, construct a list of parameter
     dictionaries for one or more parallel embedded objects.
 
@@ -263,9 +263,9 @@ def get_embedded_params(row: Mapping[str, str], header_labels: Iterable[str]) ->
 def unflatten(
         row_data: Mapping[str, str],
         resource_class: Type[RDFResourceBase],
-        header_map: Mapping[str, Union[str, dict]],
+        header_map: Mapping[str, str | dict],
         index: Mapping[str, Mapping[int, str]] = None,
-) -> Dict[str, List[Union[Literal, URIRef, EmbeddedObject]]]:
+) -> dict[str, list[Literal | URIRef | EmbeddedObject]]:
     """Transform a mapping of column headers to values (such as would be returned by a
     `csv.DictReader`) into a dictionary of parameters that can be passed to the constructor
     of an RDF description class to create an RDF description object."""
@@ -390,7 +390,7 @@ class CSVSerializer:
         'URI', 'PUBLIC URI', 'CREATED', 'MODIFIED', 'INDEX', 'FILES', 'ITEM_FILES', 'PUBLISH', 'HIDDEN'
     ]
 
-    def __init__(self, directory: Union[str, Path] = None):
+    def __init__(self, directory: str | Path = None):
         self.directory = Path(directory) if directory is not None else Path.cwd()
         """Destination directory for the CSV file(s)"""
 
@@ -413,7 +413,7 @@ class CSVSerializer:
             files: Iterable = None,
             binaries_dir: str = '',
             public_url: str = None,
-    ) -> Dict[str, str]:
+    ) -> dict[str, str]:
         """
         Serializes the given resource as a CSV row using the `flatten()` function. The resulting row is
         added to an internal accumulator. The CSV file or files themselves are not actually written until

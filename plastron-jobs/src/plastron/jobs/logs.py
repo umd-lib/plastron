@@ -3,7 +3,7 @@ import csv
 import logging
 from abc import ABC
 from pathlib import Path
-from typing import Union, Sequence
+from typing import Sequence
 
 logger = logging.getLogger(__name__)
 
@@ -39,7 +39,7 @@ class ItemLog(AppendableSequence):
     `ItemLog` objects are iterable, and support direct indexing to a row
     by key.
     """
-    def __init__(self, filename: Union[str, Path], fieldnames: Sequence[str], keyfield: str, header: bool = True):
+    def __init__(self, filename: str | Path, fieldnames: Sequence[str], keyfield: str, header: bool = True):
         self.filename: Path = Path(filename)
         self.fieldnames: Sequence[str] = fieldnames
         self.keyfield: str = keyfield

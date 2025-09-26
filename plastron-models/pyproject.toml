@@ -11,7 +11,7 @@ authors = [
     { name='Marc Andreu Grillo Aguilar', email='aguilarm@umd.edu' },
 ]
 readme = "README.md"
-requires-python = ">= 3.8"
+requires-python = ">= 3.10"
 dependencies = [
     "edtf_validate",
     "importlib_metadata",

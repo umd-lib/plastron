@@ -6,7 +6,7 @@
 #
 # where <VERSION> is the Docker image version to create.
 
-FROM python:3.8.18-slim
+FROM python:3.10.18-slim
 
 RUN mkdir -p /opt/plastron
 COPY VERSION /opt/plastron/VERSION

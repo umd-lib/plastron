@@ -5,7 +5,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from importlib.metadata import version
 from string import Formatter
-from typing import Dict, Any, Optional
+from typing import Any, Optional
 
 import pysolr
 
@@ -28,7 +28,7 @@ def get_uuid_from_uri(uri: str) -> Optional[str]:
 
 @dataclass
 class PlastronContext:
-    config: Dict[str, Any] = None
+    config: dict[str, Any] = None
     args: Namespace = None
     _repo: Repository = None
     _endpoint: Endpoint = None

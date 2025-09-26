@@ -4,7 +4,7 @@ import re
 import urllib.parse
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Union, Dict, Any, Optional, List, Type, TypeVar
+from typing import Any, Optional, Type, TypeVar
 
 import yaml
 
@@ -22,7 +22,7 @@ class JobConfig:
     job_id: str
 
     @classmethod
-    def from_file(cls, filename: Union[str, Path]):
+    def from_file(cls, filename: str | Path):
         try:
             with open(filename) as file:
                 config = yaml.safe_load(file)
@@ -36,7 +36,7 @@ class JobConfig:
                 config[key] = None
         return cls(**config)
 
-    def save(self, filename: Union[str, Path]):
+    def save(self, filename: str | Path):
         config = {k: str(v) if v is not None else v for k, v in vars(self).items()}
         with open(filename, mode='w') as file:
             yaml.dump(data=config, stream=file)
@@ -69,7 +69,7 @@ class Job:
         self.config = self.config_class.from_file(self.config_filename)
         return self
 
-    def update_config(self, job_config_args: Dict[str, Any]):
+    def update_config(self, job_config_args: dict[str, Any]):
         """Update the config with values from `job_config_args` that are not `None`."""
         self.config = dataclasses.replace(self.config, **{k: v for k, v in job_config_args.items() if v is not None})
         return self
@@ -85,7 +85,7 @@ class Job:
             return self.run_class(self).load(timestamp)
 
     @property
-    def runs(self) -> List[str]:
+    def runs(self) -> list[str]:
         return sorted((d.name for d in filter(is_run_dir, self.dir.iterdir())), reverse=True)
 
     def latest_run(self):
@@ -99,7 +99,7 @@ class Jobs:
     J = TypeVar('J')
     C = TypeVar('C')
 
-    def __init__(self, directory: Union[Path, str]):
+    def __init__(self, directory: Path | str):
         self.dir = Path(directory)
 
     def create_job(self, job_class: Type[J], job_id: str = None, config: C = None) -> J:

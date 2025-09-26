@@ -1,6 +1,6 @@
 """[ALTO](https://www.loc.gov/standards/alto/) (Analyzed Layout and Text Object) OCR classes"""
 
-from typing import Union, Tuple, Iterator
+from typing import Union, Iterator
 
 # noinspection PyProtectedMember
 from lxml.etree import _Element, _ElementTree, QName
@@ -15,7 +15,7 @@ class ALTOResource(OCRResource):
     unit given in the ALTO document combined with the image resolution passed to
     the constructor. If no measurement unit can be found, raises an `OCRError`."""
 
-    def __init__(self, doc: _ElementTree, image_resolution: Tuple[int, int]):
+    def __init__(self, doc: _ElementTree, image_resolution: tuple[int, int]):
         self.doc = doc
         try:
             unit = self.doc.xpath('/alto:alto/alto:Description/alto:MeasurementUnit', namespaces=XMLNS)[0].text

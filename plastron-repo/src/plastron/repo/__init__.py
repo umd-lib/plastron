@@ -1,7 +1,7 @@
 import logging
 from contextlib import contextmanager
 from io import BytesIO
-from typing import Optional, Type, Dict, Union, TypeVar, Set, List, Iterator
+from typing import Optional, Type, TypeVar, Iterator
 from uuid import uuid4
 
 import yaml
@@ -40,7 +40,7 @@ class Repository:
             return cls.from_config(config=yaml.safe_load(file).get('REPOSITORY', {}))
 
     @classmethod
-    def from_config(cls, config: Dict[str, str]) -> 'Repository':
+    def from_config(cls, config: dict[str, str]) -> 'Repository':
         endpoint = Endpoint(
             url=config['REST_ENDPOINT'],
             default_path=config.get('RELPATH', '/'),
@@ -83,9 +83,9 @@ class Repository:
             resource_class = RepositoryResource
 
         if path.startswith(self.endpoint.url):
-            path = path[len(self.endpoint.url):]
+            path = path[len(str(self.endpoint.url)):]
         elif self.endpoint.external_url is not None and path.startswith(self.endpoint.external_url):
-            path = path[len(self.endpoint.external_url):]
+            path = path[len(str(self.endpoint.external_url)):]
         else:
             path = path
 
@@ -94,7 +94,7 @@ class Repository:
         except TypeError as e:
             raise RepositoryError(f'Cannot get "{path}" as type "{resource_class.__name__}": {e}"') from e
 
-    def __getitem__(self, item: Union[str, slice]) -> ResourceType:
+    def __getitem__(self, item: str | slice) -> ResourceType:
         """Syntactic sugar for the `get_resource method`. It accepts either a string or a slice.
 
         If a string is used, it is used as the path, and the resource class defaults to
@@ -148,7 +148,7 @@ class RepositoryResource:
     def __init__(self, repo: Repository, path: str = None):
         self.repo = repo
         self.path = path
-        self._types: Optional[Set[URLObject]] = None
+        self._types: Optional[set[URLObject]] = None
         self._description_url: Optional[URLObject] = None
         self._graph: TrackChangesGraph = TrackChangesGraph()
         self._headers = None
@@ -263,7 +263,7 @@ class RepositoryResource:
 
     def walk(
             self,
-            traverse: List[URIRef] = None,
+            traverse: list[URIRef] = None,
             max_depth: int = inf,
             min_depth: int = -1,
             _current_depth: int = 0,

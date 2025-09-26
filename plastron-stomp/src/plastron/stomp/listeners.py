@@ -2,7 +2,7 @@ import importlib.metadata
 import logging
 import os
 from concurrent.futures import ThreadPoolExecutor
-from typing import Dict, Any, Callable, Generator, Iterator
+from typing import Any, Callable, Generator, Iterator
 
 from stomp.listener import ConnectionListener
 
@@ -84,7 +84,7 @@ class CommandListener(ConnectionListener):
 
 # type alias for command functions that take a context and a message, and return a generator that yields
 # status updates in the form of dictionaries, and returns a final state, also as a dictionary
-STOMPCommandFunction = Callable[[PlastronContext, PlastronMessage], Generator[Dict[str, Any], None, Dict[str, Any]]]
+STOMPCommandFunction = Callable[[PlastronContext, PlastronMessage], Generator[dict[str, Any], None, dict[str, Any]]]
 
 
 def get_command(command_name: str) -> STOMPCommandFunction:
@@ -138,7 +138,7 @@ class MessageProcessor:
         # default message state is "Done"
         return message.response(state=self.result.get('type', 'Done'), body=self.result)
 
-    def _run(self, command: Generator[Dict, None, Dict]) -> Iterator[Dict[str, Any]]:
+    def _run(self, command: Generator[dict, None, dict]) -> Iterator[dict[str, Any]]:
         # delegating generator; each progress step is passed to the calling
         # method, and the return value from the command is stored as the result
         self.result = yield from command

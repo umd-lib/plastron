@@ -54,7 +54,7 @@ block-beta
 
 ## Installation
 
-Requires Python 3.8+
+Requires Python 3.10+
 
 To install just the API libraries (low- and high-level):
 
@@ -93,7 +93,8 @@ git clone git@github.com:umd-lib/plastron.git
 cd plastron
 python -m venv --prompt "plastron-py$(cat .python-version)" .venv
 source .venv/bin/activate
-pip install \
+pip install --upgrade pip
+pip install --use-pep517 \
     -e './plastron-utils[test]' \
     -e './plastron-client[test]' \
     -e './plastron-rdf[test]' \

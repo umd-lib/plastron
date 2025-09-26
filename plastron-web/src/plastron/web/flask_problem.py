@@ -1,5 +1,5 @@
 import json
-from typing import Any, Dict
+from typing import Any
 
 from werkzeug import Response
 from werkzeug.exceptions import HTTPException
@@ -28,7 +28,7 @@ class ProblemDetailError(HTTPException):
         super().__init__(description, response)
         self.params = params
 
-    def as_problem_detail(self) -> Dict[str, Any]:
+    def as_problem_detail(self) -> dict[str, Any]:
         """Format the exception information as a dictionary with keys as
         specified in the [RFC 9457](https://www.rfc-editor.org/rfc/rfc9457)
         JSON Problem Details format.

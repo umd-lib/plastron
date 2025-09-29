@@ -44,4 +44,5 @@ VOLUME /var/opt/plastron/jobs
 
 EXPOSE 5000
 
-ENTRYPOINT ["plastrond-http", "-c", "/etc/plastron-config.yml"]
+ENTRYPOINT ["plastrond-http"]
+CMD ["--config-file", "/etc/plastrond.yml"]

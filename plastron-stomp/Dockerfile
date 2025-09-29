@@ -42,4 +42,5 @@ ENV PYTHONUNBUFFERED=1
 VOLUME /var/opt/plastron/msg
 VOLUME /var/opt/plastron/jobs
 
-ENTRYPOINT ["plastrond-stomp", "-c", "/etc/plastrond.yml", "-v"]
+ENTRYPOINT ["plastrond-stomp"]
+CMD ["--config-file", "/etc/plastrond.yml", "--verbose"]

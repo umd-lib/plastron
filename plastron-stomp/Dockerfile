@@ -43,4 +43,4 @@ VOLUME /var/opt/plastron/msg
 VOLUME /var/opt/plastron/jobs
 
 ENTRYPOINT ["plastrond-stomp"]
-CMD ["--config-file", "/etc/plastron.yml", "--verbose"]
+CMD ["--config-file", "/etc/plastrond.yml", "--verbose"]

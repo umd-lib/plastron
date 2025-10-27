@@ -11,6 +11,7 @@ def test_default_client_session(endpoint):
 class CustomSession(Session):
     pass
 
+
 def test_custom_client_session(endpoint):
     session = CustomSession()
     client = Client(endpoint=endpoint, session=session)

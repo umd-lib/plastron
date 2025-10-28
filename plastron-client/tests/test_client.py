@@ -7,14 +7,8 @@ from requests import Session, Request
 from requests.exceptions import ConnectionError
 from requests_jwtauth import HTTPBearerAuth
 
-from plastron.client import Endpoint, Client, random_slug, ResourceURI, RepositoryStructure, \
-    FlatCreator, HierarchicalCreator, ClientError
+from plastron.client import Endpoint, Client, random_slug, ResourceURI, ClientError
 from plastron.client.auth import ClientCertAuth
-
-
-@pytest.fixture()
-def endpoint():
-    return Endpoint(url='http://example.com/repo')
 
 
 @pytest.fixture()
@@ -311,24 +305,6 @@ def test_repo_external_url():
     client = Client(endpoint=repo)
     assert client.session.headers['X-Forwarded-Host'] == 'example.com'
     assert client.session.headers['X-Forwarded-Proto'] == 'https'
-
-
-@pytest.mark.parametrize(
-    ('config_value', 'creator_type'),
-    [
-        (RepositoryStructure.FLAT, FlatCreator),
-        (RepositoryStructure.HIERARCHICAL, HierarchicalCreator),
-    ]
-)
-def test_creator_structure(endpoint, config_value, creator_type):
-    client = Client(endpoint=endpoint, structure=config_value)
-    assert isinstance(client.creator, creator_type)
-
-
-def test_creator_structure_invalid(endpoint):
-    with pytest.raises(RuntimeError):
-        # noinspection PyTypeChecker
-        Client(endpoint=endpoint, structure='foo')
 
 
 def test_get_graph_not_found(monkeypatch_request, client):

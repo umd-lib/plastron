@@ -34,7 +34,6 @@ repo = Repository.from_config({
     'REST_ENDPOINT': 'http://localhost:8080/fcrepo/rest',
     'RELPATH': '/',
     'REPO_EXTERNAL_URL': 'http://fcrepo-local/fcrepo/rest',
-    'STRUCTURE': 'hierarchical',
     'SERVER_CERT': 'path/to/cert.pem',
     # authentication section
     'FEDORA_USER': 'username',
@@ -57,7 +56,7 @@ You can always use the full constructor as well.
 from requests.auth import HTTPBasicAuth
 
 from plastron.client import Client, Endpoint
-from plastron.repo import Repository, RepositoryStructure
+from plastron.repo import Repository
 
 repo = Repository(
     client=Client(
@@ -67,7 +66,6 @@ repo = Repository(
             external_url='http://fcrepo-local/fcrepo/rest',
         ),
         auth=HTTPBasicAuth('username', 'password'),
-        structure=RepositoryStructure.HIERARCHICAL,
         server_cert='path/to/cert.pem',
         ua_string='my-client/3.14',
         on_behalf_of='user',

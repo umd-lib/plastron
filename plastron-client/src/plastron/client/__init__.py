@@ -4,7 +4,6 @@ import threading
 from base64 import urlsafe_b64encode
 from collections import namedtuple
 from contextlib import contextmanager
-from enum import Enum
 from http import HTTPStatus
 from pathlib import Path
 from typing import Any, Optional, Callable, NamedTuple
@@ -133,71 +132,6 @@ class ClientError(Exception):
         return f'{self.status_code} {self.reason}'
 
 
-class FlatCreator:
-    """
-    Creates all linked objects at the same container level as the initial item.
-    However, proxies and annotations are still created within child containers
-    of the item.
-    """
-
-    def __init__(self, client: 'Client'):
-        self.client = client
-
-    def create_members(self, item):
-        self.client.create_all(item.container_path, item.members)
-
-    def create_files(self, item):
-        self.client.create_all(item.container_path, item.files)
-
-    def create_proxies(self, item):
-        # create as child resources, grouped by relationship
-        self.client.create_all(item.path + '/x', item.proxies(), name_function=random_slug)
-
-    def create_related(self, item):
-        self.client.create_all(item.container_path, item.related)
-
-    def create_annotations(self, item):
-        # create as child resources, grouped by relationship
-        self.client.create_all(item.path + '/a', item.annotations, name_function=random_slug)
-
-
-class HierarchicalCreator:
-    """
-    Creates linked objects in an ldp:contains hierarchy, using intermediate
-    containers to group by relationship:
-
-    * Members = /m
-    * Files = /f
-    * Proxies = /x
-    * Annotations = /a
-
-    Related items, however, are created in the same container as the initial
-    item.
-    """
-
-    def __init__(self, client: 'Client'):
-        self.client = client
-
-    def create_members(self, item):
-        self.client.create_all(item.path + '/m', item.members, name_function=random_slug)
-
-    def create_files(self, item):
-        # create as child resources, grouped by relationship
-        self.client.create_all(item.path + '/f', item.files, name_function=random_slug)
-
-    def create_proxies(self, item):
-        # create as child resources, grouped by relationship
-        self.client.create_all(item.path + '/x', item.proxies(), name_function=random_slug)
-
-    def create_related(self, item):
-        # create related objects at the same container level as this object
-        self.client.create_all(item.container_path, item.related)
-
-    def create_annotations(self, item):
-        # create as child resources, grouped by relationship
-        self.client.create_all(item.path + '/a', item.annotations, name_function=random_slug)
-
-
 class Endpoint:
     """Conceptual entry point for a Fedora repository."""
 
@@ -285,11 +219,6 @@ class Endpoint:
     def transaction_endpoint(self) -> str:
         """Send an HTTP POST request to this URL to create a new transaction."""
         return os.path.join(self.url, 'fcr:tx')
-
-
-class RepositoryStructure(Enum):
-    FLAT = 0
-    HIERARCHICAL = 1
 
 
 class SessionHeaderAttribute:
@@ -390,25 +319,32 @@ class Client:
     forwarded_protocol = SessionHeaderAttribute('X-Forwarded-Proto')
     """`X-Forwarded-Proto` header value. This is automatically set if the
     `endpoint` has an `external_url`."""
+    session: Session
+    """Underlying Requests library
+    [Session object](https://requests.readthedocs.io/en/latest/user/advanced/#session-objects),
+    or a subclass thereof"""
 
     def __init__(
-            self,
-            endpoint: Endpoint,
-            structure: RepositoryStructure = RepositoryStructure.FLAT,
-            auth: AuthBase = None,
-            server_cert: str = None,
-            ua_string: str = None,
-            on_behalf_of: str = None,
-            load_binaries: bool = True,
+        self,
+        endpoint: Endpoint,
+        auth: AuthBase = None,
+        server_cert: str = None,
+        ua_string: str = None,
+        on_behalf_of: str = None,
+        load_binaries: bool = True,
+        session: Session = None,
     ):
         self.endpoint: Endpoint = endpoint
         """Fedora repository endpoint"""
-        self.structure: RepositoryStructure = structure
         self.load_binaries: bool = load_binaries
 
-        self.session: Session = Session()
-        """Underlying Requests library
-        [Session object](https://requests.readthedocs.io/en/latest/user/advanced/#session-objects)"""
+        if session is None:
+            # defaults to a basic requests.Session object
+            self.session = Session()
+        else:
+            # otherwise, use the session object as is
+            self.session = session
+
         self.session.auth = auth
         if server_cert is not None:
             self.session.verify = server_cert
@@ -424,14 +360,6 @@ class Client:
                 self.forwarded_host = self.endpoint.external_url.hostname
             self.forwarded_protocol = self.endpoint.external_url.scheme
 
-        # set creator strategy for the repository
-        if self.structure is RepositoryStructure.HIERARCHICAL:
-            self.creator = HierarchicalCreator(self)
-        elif self.structure is RepositoryStructure.FLAT:
-            self.creator = FlatCreator(self)
-        else:
-            raise RuntimeError(f'Unknown STRUCTURE value: {structure}')
-
     def request(self, method: str, url: str, **kwargs) -> Response:
         """Send an HTTP request using the configured `session`. Additional
         keyword arguments are passed to the underlying `session.request()`
@@ -443,7 +371,14 @@ class Client:
             message = ' '.join(str(arg) for arg in e.args)
             logger.error(message)
             raise RuntimeError(f'Connection error: {message}') from e
-        logger.debug(f'{response.status_code} {response.reason}')
+        # be aware of an optional requests cache
+        if hasattr(response, 'from_cache'):
+            if response.from_cache:
+                logger.debug(f'Cache hit for {url}')
+            else:
+                logger.debug(f'Cache miss for {url}')
+        reason = response.reason or HTTPStatus(response.status_code).phrase
+        logger.debug(f'{response.status_code} {reason}')
         return response
 
     def post(self, url: str, **kwargs) -> Response:
@@ -644,21 +579,6 @@ class Client:
                 slug = name_function() if callable(name_function) else None
                 obj.create(self, container_path=container_path, slug=slug)
 
-    def create_members(self, item):
-        self.creator.create_members(item)
-
-    def create_files(self, item):
-        self.creator.create_files(item)
-
-    def create_proxies(self, item):
-        self.creator.create_proxies(item)
-
-    def create_related(self, item):
-        self.creator.create_related(item)
-
-    def create_annotations(self, item):
-        self.creator.create_annotations(item)
-
     def put_graph(self, url, graph: Graph) -> Response:
         return self.put(
             self.get_description_uri(url),
@@ -751,7 +671,6 @@ class TransactionClient(Client):
         """Build a `TransactionClient` from a regular `Client` object."""
         return cls(
             endpoint=client.endpoint,
-            structure=client.structure,
             auth=client.session.auth,
             server_cert=client.session.verify,
             ua_string=client.ua_string,

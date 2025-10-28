@@ -9,7 +9,7 @@ from typing import Any, Optional
 
 import pysolr
 
-from plastron.client import Endpoint, Client, RepositoryStructure
+from plastron.client import Endpoint, Client
 from plastron.client.auth import get_authenticator
 from plastron.handles import HandleServiceClient
 from plastron.messaging.broker import Broker, ServerTuple
@@ -67,7 +67,6 @@ class PlastronContext:
                     auth=get_authenticator(repo_config),
                     ua_string=f'plastron/{self.version}',
                     on_behalf_of=self.args.delegated_user,
-                    structure=RepositoryStructure[repo_config.get('STRUCTURE', 'flat').upper()]
                 )
             except KeyError as e:
                 raise RuntimeError(f"Missing configuration key {e} in section 'REPOSITORY'")

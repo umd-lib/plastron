@@ -12,7 +12,7 @@ from requests import Response
 from requests.auth import AuthBase
 from urlobject import URLObject
 
-from plastron.client import Client, Endpoint, ClientError, RepositoryStructure
+from plastron.client import Client, Endpoint, ClientError
 from plastron.client.auth import get_authenticator
 from plastron.rdfmapping.graph import TrackChangesGraph
 from plastron.rdfmapping.resources import RDFResourceBase, RDFResourceType
@@ -23,12 +23,6 @@ ldp = Namespace('http://www.w3.org/ns/ldp#')
 
 def mint_fragment_identifier() -> str:
     return str(uuid4())
-
-
-def get_structure(structure_name: Optional[str]) -> RepositoryStructure:
-    if structure_name is None:
-        return RepositoryStructure.FLAT
-    return RepositoryStructure[structure_name.upper()]
 
 
 ResourceType = TypeVar('ResourceType', bound='RepositoryResource')
@@ -47,12 +41,7 @@ class Repository:
             default_path=config.get('RELPATH', '/'),
             external_url=config.get('REPO_EXTERNAL_URL', None)
         )
-        client = Client(
-            endpoint=endpoint,
-            auth=get_authenticator(config),
-            structure=get_structure(config.get('STRUCTURE', None)),
-            server_cert=config.get('SERVER_CERT', None),
-        )
+        client = Client(endpoint=endpoint, auth=get_authenticator(config), server_cert=config.get('SERVER_CERT', None))
         return cls(client=client)
 
     @classmethod

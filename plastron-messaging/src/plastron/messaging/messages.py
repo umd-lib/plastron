@@ -89,11 +89,14 @@ class PlastronMessage(Message):
 
 class PlastronResponseMessage(PlastronMessage):
     state = MessageHeader('PlastronJobState')
+    status_url = MessageHeader('PlastronStatusURL')
 
-    def __init__(self, state: str = None, **kwargs):
+    def __init__(self, state: str = None, status_url: str = None, **kwargs):
         super().__init__(**kwargs)
         if state is not None:
             self.state = state
+        if status_url is not None:
+            self.status_url = status_url
 
 
 class PlastronErrorMessage(PlastronMessage):
@@ -107,11 +110,14 @@ class PlastronErrorMessage(PlastronMessage):
 
 class PlastronCommandMessage(PlastronMessage):
     command = MessageHeader('PlastronCommand')
+    status_url = MessageHeader('PlastronStatusURL')
 
-    def __init__(self, command: str = None, args: dict = None, **kwargs):
+    def __init__(self, command: str = None, status_url: str = None, args: dict = None, **kwargs):
         super().__init__(**kwargs)
         if command is not None:
             self.command = command
+        if status_url is not None:
+            self.status_url = status_url
         if args is not None:
             for name, value in args.items():
                 self.headers[f'PlastronArg-{name}'] = value
@@ -122,10 +128,10 @@ class PlastronCommandMessage(PlastronMessage):
 
     def response(self, state: str, body) -> PlastronResponseMessage:
         """
-        Return a new PlastronResponseMessage with the same job_id as this message,
-        plus the given state and body.
+        Return a new PlastronResponseMessage with the same `job_id` and `status_url`
+        as this message, plus the given state and body.
         """
-        return PlastronResponseMessage(job_id=self.job_id, state=state, body=body)
+        return PlastronResponseMessage(job_id=self.job_id, status_url=self.status_url, state=state, body=body)
 
 
 class MessageBox:

@@ -1,6 +1,6 @@
 import logging
 from argparse import Namespace
-from typing import Callable, Iterable, Iterator, List, Tuple, Union
+from typing import Callable, Iterable, Iterator
 
 from rdflib import Literal, URIRef
 
@@ -85,7 +85,7 @@ def configure_cli(subparsers):
 
 class Command(BaseCommand):
     def __call__(self, args: Namespace):
-        self.properties: List[Tuple[URIRef, Union[Literal, URIRef]]] = [
+        self.properties: list[tuple[URIRef, Literal | URIRef]] = [
             *(parse_data_property(p, o) for p, o in args.data_properties),
             *(parse_object_property(p, o) for p, o in args.object_properties)
         ]
@@ -110,7 +110,7 @@ class Command(BaseCommand):
         traverse = parse_predicate_list(args.recursive) if args.recursive else []
 
         if len(traverse) != 0:
-            logger.info('Predicates used for recusive matching:')
+            logger.info('Predicates used for recursive matching:')
             for p in traverse:
                 logger.info(f'  {p.n3(namespace_manager=manager)}')
 
@@ -130,8 +130,8 @@ class Command(BaseCommand):
 def find(
         start_resource: RepositoryResource,
         matcher: Callable[[Iterable], bool],
-        traverse: List[URIRef] = None,
-        properties: List[Tuple] = None
+        traverse: list[URIRef] = None,
+        properties: list[tuple] = None
 ) -> Iterator[RepositoryResource]:
     if traverse is None:
         traverse = []

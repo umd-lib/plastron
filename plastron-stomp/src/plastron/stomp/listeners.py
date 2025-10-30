@@ -2,13 +2,13 @@ import importlib.metadata
 import logging
 import os
 from concurrent.futures import ThreadPoolExecutor
-from typing import Dict, Any, Callable, Generator, Iterator
+from typing import Any, Callable, Generator, Iterator
 
 from stomp.listener import ConnectionListener
 
 from plastron.context import PlastronContext
 from plastron.messaging.broker import Destination
-from plastron.messaging.messages import MessageBox, PlastronCommandMessage, PlastronMessage
+from plastron.messaging.messages import MessageBox, PlastronCommandMessage, PlastronMessage, PlastronResponseMessage
 from plastron.stomp.commands import get_command_module, get_module_name
 from plastron.stomp.handlers import AsynchronousResponseHandler
 from plastron.stomp.inbox_watcher import InboxWatcher
@@ -72,7 +72,7 @@ class CommandListener(ConnectionListener):
 
     def process_message(self, message, response_handler):
         # send to a message processor thread
-        self.executor.submit(self.processor, message, self.broker['JOB_PROGRESS']).add_done_callback(response_handler)
+        self.executor.submit(self.processor, message, self.broker['JOB_STATUS']).add_done_callback(response_handler)
 
     def on_disconnected(self):
         logger.warning('Disconnected from the STOMP message broker')
@@ -84,7 +84,7 @@ class CommandListener(ConnectionListener):
 
 # type alias for command functions that take a context and a message, and return a generator that yields
 # status updates in the form of dictionaries, and returns a final state, also as a dictionary
-STOMPCommandFunction = Callable[[PlastronContext, PlastronMessage], Generator[Dict[str, Any], None, Dict[str, Any]]]
+STOMPCommandFunction = Callable[[PlastronContext, PlastronMessage], Generator[dict[str, Any], None, dict[str, Any]]]
 
 
 def get_command(command_name: str) -> STOMPCommandFunction:
@@ -109,6 +109,9 @@ class MessageProcessor:
 
         logger.info(f'Received message to initiate job {message.job_id}')
 
+        if message.status_url is not None:
+            logger.info(f'Callback status notifications will be sent to {message.status_url}')
+
         # determine which command to load to process the message
         command = get_command(message.command)
 
@@ -123,14 +126,19 @@ class MessageProcessor:
             ua_string=f'plastron/{version}',
         ) as run_context:
             for status in self._run(command(run_context, message)):
-                progress_topic.send(PlastronMessage(job_id=message.job_id, body=status))
+                progress_topic.send(
+                    PlastronResponseMessage(
+                        job_id=message.job_id,
+                        status_url=message.status_url,
+                        body=status,
+                    ))
 
         logger.info(f'Job {message.job_id} complete')
 
         # default message state is "Done"
         return message.response(state=self.result.get('type', 'Done'), body=self.result)
 
-    def _run(self, command: Generator[Dict, None, Dict]) -> Iterator[Dict[str, Any]]:
+    def _run(self, command: Generator[dict, None, dict]) -> Iterator[dict[str, Any]]:
         # delegating generator; each progress step is passed to the calling
         # method, and the return value from the command is stored as the result
         self.result = yield from command

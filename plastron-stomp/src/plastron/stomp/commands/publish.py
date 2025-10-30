@@ -1,4 +1,4 @@
-from typing import Dict, Any, Generator
+from typing import Any, Generator
 
 from plastron.context import PlastronContext
 from plastron.jobs.publicationjob import PublicationJob, PublicationAction
@@ -9,7 +9,7 @@ from plastron.utils import strtobool
 def publish(
         context: PlastronContext,
         message: PlastronCommandMessage,
-) -> Generator[Dict[str, Any], None, Dict[str, Any]]:
+) -> Generator[dict[str, Any], None, dict[str, Any]]:
     job = PublicationJob(
         context=context,
         uris=message.body.strip().split('\n'),

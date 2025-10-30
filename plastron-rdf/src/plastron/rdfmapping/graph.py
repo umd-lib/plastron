@@ -1,5 +1,5 @@
 import pathlib
-from typing import Optional, Union, IO, TextIO, BinaryIO, Any, Tuple
+from typing import Optional, IO, TextIO, BinaryIO, Any
 
 from rdflib import Graph, URIRef
 from rdflib.parser import InputSource
@@ -22,7 +22,7 @@ def update_node(node: Node, old_uri: URIRef, new_uri: URIRef) -> Node:
         return node
 
 
-def new_triple(old_uri: URIRef, new_uri: URIRef, s: Node, p: Node, o: Node) -> Tuple[Node, Node, Node]:
+def new_triple(old_uri: URIRef, new_uri: URIRef, s: Node, p: Node, o: Node) -> tuple[Node, Node, Node]:
     """Update instances of `old_uri` to `new_uri` in `s`, `p`, and `o`,
     and return the updated triple."""
     new_s = update_node(s, old_uri, new_uri)
@@ -41,13 +41,13 @@ class TrackChangesGraph(Graph):
     def parse(
         self,
         source: Optional[
-            Union[IO[bytes], TextIO, InputSource, str, bytes, pathlib.PurePath]
+            IO[bytes] | TextIO | InputSource | str | bytes | pathlib.PurePath
         ] = None,
         publicID: Optional[str] = None,  # noqa: N803
         format: Optional[str] = None,
         location: Optional[str] = None,
-        file: Optional[Union[BinaryIO, TextIO]] = None,
-        data: Optional[Union[str, bytes]] = None,
+        file: Optional[BinaryIO | TextIO] = None,
+        data: Optional[str | bytes] = None,
         **args: Any,
     ) -> 'TrackChangesGraph':
         """Parses the graph normally, and then saves a copy of the original."""

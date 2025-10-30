@@ -1,4 +1,4 @@
-from typing import Set, Tuple, Callable, Any, Iterable, TypeVar, Type, Iterator, Container
+from typing import Callable, Any, Iterable, TypeVar, Type, Iterator, Container
 
 from rdflib import Literal, URIRef
 from rdflib.term import Identifier, BNode
@@ -69,7 +69,7 @@ class RDFProperty:
         """Remove a single value from this property."""
         self.resource.graph.remove((self.resource.uri, self.predicate, value))
 
-    def update(self, new_values: Iterable) -> Tuple[Set, Set]:
+    def update(self, new_values: Iterable) -> tuple[set, set]:
         """Update this property to have only the new values.
 
         This method takes the set differences between the current values and the

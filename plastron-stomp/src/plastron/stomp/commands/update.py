@@ -1,6 +1,6 @@
 import json
 import logging
-from typing import Generator, Any, Dict
+from typing import Generator, Any
 
 from plastron.context import PlastronContext
 from plastron.jobs.updatejob import UpdateJob
@@ -11,7 +11,7 @@ from plastron.utils import strtobool, parse_predicate_list
 logger = logging.getLogger(__name__)
 
 
-def parse_message(message: PlastronCommandMessage) -> Dict[str, Any]:
+def parse_message(message: PlastronCommandMessage) -> dict[str, Any]:
     message.body = message.body.encode('utf-8').decode('utf-8-sig')
     body = json.loads(message.body)
     uris = body['uris']
@@ -41,5 +41,5 @@ def parse_message(message: PlastronCommandMessage) -> Dict[str, Any]:
 def update(
         context: PlastronContext,
         message: PlastronCommandMessage,
-) -> Generator[Dict[str, str], None, Dict[str, Any]]:
+) -> Generator[dict[str, str], None, dict[str, Any]]:
     return UpdateJob(repo=context.repo, **parse_message(message)).run()

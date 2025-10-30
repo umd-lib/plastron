@@ -1,7 +1,7 @@
 """[hOCR](https://kba.github.io/hocr-spec/1.2/) OCR classes"""
 
 import re
-from typing import Tuple, Iterable
+from typing import Iterable
 
 # noinspection PyProtectedMember
 from lxml.etree import _ElementTree, _Element
@@ -13,7 +13,7 @@ XMLNS = {'html': 'http://www.w3.org/1999/xhtml'}
 
 class HOCRResource(OCRResource):
     """hOCR OCR HTML resource"""
-    def __init__(self, doc: _ElementTree, image_resolution: Tuple[int, int]):
+    def __init__(self, doc: _ElementTree, image_resolution: tuple[int, int]):
         self.doc = doc
         capabilities_element = self.doc.xpath('//html:meta[@name="ocr-capabilities"]', namespaces=XMLNS)[0]
         self.capabilities = capabilities_element.get('content').split(' ')

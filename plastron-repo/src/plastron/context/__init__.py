@@ -5,11 +5,11 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from importlib.metadata import version
 from string import Formatter
-from typing import Dict, Any, Optional
+from typing import Any, Optional
 
 import pysolr
 
-from plastron.client import Endpoint, Client, RepositoryStructure
+from plastron.client import Endpoint, Client
 from plastron.client.auth import get_authenticator
 from plastron.handles import HandleServiceClient
 from plastron.messaging.broker import Broker, ServerTuple
@@ -28,7 +28,7 @@ def get_uuid_from_uri(uri: str) -> Optional[str]:
 
 @dataclass
 class PlastronContext:
-    config: Dict[str, Any] = None
+    config: dict[str, Any] = None
     args: Namespace = None
     _repo: Repository = None
     _endpoint: Endpoint = None
@@ -67,7 +67,6 @@ class PlastronContext:
                     auth=get_authenticator(repo_config),
                     ua_string=f'plastron/{self.version}',
                     on_behalf_of=self.args.delegated_user,
-                    structure=RepositoryStructure[repo_config.get('STRUCTURE', 'flat').upper()]
                 )
             except KeyError as e:
                 raise RuntimeError(f"Missing configuration key {e} in section 'REPOSITORY'")

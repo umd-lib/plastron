@@ -1,7 +1,8 @@
 import logging
 from contextlib import contextmanager
+from http import HTTPStatus
 from io import BytesIO
-from typing import Optional, Type, Dict, Union, TypeVar, Set, List, Iterator
+from typing import Optional, Type, TypeVar, Iterator, Union
 from uuid import uuid4
 
 import yaml
@@ -11,7 +12,7 @@ from requests import Response
 from requests.auth import AuthBase
 from urlobject import URLObject
 
-from plastron.client import Client, Endpoint, ClientError, RepositoryStructure
+from plastron.client import Client, Endpoint, ClientError
 from plastron.client.auth import get_authenticator
 from plastron.rdfmapping.graph import TrackChangesGraph
 from plastron.rdfmapping.resources import RDFResourceBase, RDFResourceType
@@ -24,12 +25,6 @@ def mint_fragment_identifier() -> str:
     return str(uuid4())
 
 
-def get_structure(structure_name: Optional[str]) -> RepositoryStructure:
-    if structure_name is None:
-        return RepositoryStructure.FLAT
-    return RepositoryStructure[structure_name.upper()]
-
-
 ResourceType = TypeVar('ResourceType', bound='RepositoryResource')
 
 
@@ -40,18 +35,13 @@ class Repository:
             return cls.from_config(config=yaml.safe_load(file).get('REPOSITORY', {}))
 
     @classmethod
-    def from_config(cls, config: Dict[str, str]) -> 'Repository':
+    def from_config(cls, config: dict[str, str]) -> 'Repository':
         endpoint = Endpoint(
             url=config['REST_ENDPOINT'],
             default_path=config.get('RELPATH', '/'),
             external_url=config.get('REPO_EXTERNAL_URL', None)
         )
-        client = Client(
-            endpoint=endpoint,
-            auth=get_authenticator(config),
-            structure=get_structure(config.get('STRUCTURE', None)),
-            server_cert=config.get('SERVER_CERT', None),
-        )
+        client = Client(endpoint=endpoint, auth=get_authenticator(config), server_cert=config.get('SERVER_CERT', None))
         return cls(client=client)
 
     @classmethod
@@ -83,9 +73,9 @@ class Repository:
             resource_class = RepositoryResource
 
         if path.startswith(self.endpoint.url):
-            path = path[len(self.endpoint.url):]
+            path = path[len(str(self.endpoint.url)):]
         elif self.endpoint.external_url is not None and path.startswith(self.endpoint.external_url):
-            path = path[len(self.endpoint.external_url):]
+            path = path[len(str(self.endpoint.external_url)):]
         else:
             path = path
 
@@ -94,7 +84,7 @@ class Repository:
         except TypeError as e:
             raise RepositoryError(f'Cannot get "{path}" as type "{resource_class.__name__}": {e}"') from e
 
-    def __getitem__(self, item: Union[str, slice]) -> ResourceType:
+    def __getitem__(self, item: str | slice) -> ResourceType:
         """Syntactic sugar for the `get_resource method`. It accepts either a string or a slice.
 
         If a string is used, it is used as the path, and the resource class defaults to
@@ -148,7 +138,7 @@ class RepositoryResource:
     def __init__(self, repo: Repository, path: str = None):
         self.repo = repo
         self.path = path
-        self._types: Optional[Set[URLObject]] = None
+        self._types: Optional[set[URLObject]] = None
         self._description_url: Optional[URLObject] = None
         self._graph: TrackChangesGraph = TrackChangesGraph()
         self._headers = None
@@ -186,6 +176,10 @@ class RepositoryResource:
     @property
     def exists(self) -> bool:
         return self.url is not None and self._head().ok
+
+    @property
+    def is_gone(self) -> bool:
+        return self.url is not None and self._head().status_code == HTTPStatus.GONE
 
     @property
     def is_binary(self) -> bool:
@@ -262,22 +256,29 @@ class RepositoryResource:
             raise RepositoryError(f'Unable to delete {self.url}: {e}') from e
 
     def walk(
-            self,
-            traverse: List[URIRef] = None,
-            max_depth: int = inf,
-            min_depth: int = -1,
-            _current_depth: int = 0,
-    ) -> Iterator['RepositoryResource']:
+        self,
+        traverse: list[URIRef] = None,
+        max_depth: int = inf,
+        min_depth: int = -1,
+        include_tombstones: bool = False,
+        _current_depth: int = 0,
+    ) -> Iterator[Union['RepositoryResource', 'Tombstone']]:
         if min_depth > max_depth:
             raise ValueError(f'min_depth ({min_depth}) cannot be greater than max_depth ({max_depth})')
+
         if traverse is None:
             # default to walking the ldp:contains relationships
             traverse = [ldp.contains]
-        if not self.exists:
-            return
+
         if _current_depth > min_depth:
-            self.read()
-            yield self
+            if self.is_gone and include_tombstones:
+                yield Tombstone(self)
+            elif self.exists:
+                yield self.read()
+            else:
+                logger.error(f'{self.url} (or its tombstone) not found')
+                return
+
         if traverse and _current_depth < max_depth:
             for _, p, o in self.graph.triples((URIRef(self.url), None, None)):
                 if p in traverse:
@@ -286,6 +287,19 @@ class RepositoryResource:
                         max_depth=max_depth,
                         _current_depth=_current_depth + 1,
                     )
+
+
+class Tombstone:
+    def __init__(self, resource: RepositoryResource):
+        self._resource = resource
+
+    @property
+    def url(self) -> Optional[URLObject]:
+        return self._resource.url
+
+    @property
+    def path(self) -> Optional[str]:
+        return self._resource.path
 
 
 class ContainerResource(RepositoryResource):

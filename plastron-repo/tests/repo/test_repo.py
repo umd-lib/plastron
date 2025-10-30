@@ -1,6 +1,6 @@
 import pytest
 
-from plastron.repo import Repository, RepositoryResource, ContainerResource
+from plastron.repo import Repository, RepositoryResource, ContainerResource, Tombstone
 
 
 @pytest.fixture
@@ -39,3 +39,24 @@ def test_get_item(repository, input_value, expected_path, expected_class):
     resource = repository[input_value]
     assert resource.path == expected_path
     assert isinstance(resource, expected_class)
+
+
+class MockGoneResponse:
+    ok = False
+    status_code = 410
+    reason = 'Gone'
+    headers = {}
+    links = {}
+
+
+def test_walk_exclude_tombstones(repository, monkeypatch_request):
+    origin = RepositoryResource(repository, '/foo')
+    monkeypatch_request(MockGoneResponse)
+    assert len(list(origin.walk(include_tombstones=False))) == 0
+
+
+def test_walk_include_tombstones(repository, monkeypatch_request):
+    origin = RepositoryResource(repository, '/foo')
+    monkeypatch_request(MockGoneResponse)
+    resource = next(origin.walk(include_tombstones=True))
+    assert isinstance(resource, Tombstone)

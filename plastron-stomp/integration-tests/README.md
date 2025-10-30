@@ -15,7 +15,6 @@ REPOSITORY:
    RELPATH: /
    AUTH_TOKEN: ... # JWT token generated from http://fcrepo-local:8080/fcrepo/user
    LOG_DIR: logs
-   STRUCTURE: hierarchical
 MESSAGE_BROKER:
    SERVER: localhost:61613
    MESSAGE_STORE_DIR: msg

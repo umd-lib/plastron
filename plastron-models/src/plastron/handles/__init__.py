@@ -1,7 +1,7 @@
 import dataclasses
 import logging
 from dataclasses import dataclass
-from typing import List, Dict, Any
+from typing import Any
 
 from requests import Session
 from requests_jwtauth import HTTPBearerAuth
@@ -14,7 +14,7 @@ from plastron.validation.rules import is_handle
 logger = logging.getLogger(__name__)
 
 
-def parse_handle_string(handle: str) -> List[str]:
+def parse_handle_string(handle: str) -> list[str]:
     if handle.startswith('hdl:'):
         handle = handle[4:]
     try:
@@ -25,7 +25,7 @@ def parse_handle_string(handle: str) -> List[str]:
         ) from e
 
 
-def parse_result(result: Dict[str, Any]) -> Dict[str, Any]:
+def parse_result(result: dict[str, Any]) -> dict[str, Any]:
     logger.debug(f'Raw result: {result}')
     if 'request' in result:
         request = result['request']

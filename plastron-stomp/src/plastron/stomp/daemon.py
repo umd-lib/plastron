@@ -5,7 +5,7 @@ import sys
 from datetime import datetime
 from pathlib import Path
 from threading import Event, Thread
-from typing import TextIO, Dict, Any
+from typing import TextIO, Any
 
 import click
 import yaml
@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 
 
 class STOMPDaemon(Thread):
-    def __init__(self, config: Dict[str, Any], **kwargs):
+    def __init__(self, config: dict[str, Any], **kwargs):
         super().__init__(**kwargs)
         self.context = PlastronContext(config)
         self.started = Event()

@@ -1,11 +1,13 @@
+"""Common test fixtures for all Plastron packages"""
+
 from os.path import abspath, dirname
 from pathlib import Path
 
+import pytest
+import requests
 from rdflib import URIRef
 
 import plastron.validation.vocabularies
-
-# See "plastron-models/README.md" for more information about this file.
 
 
 def pytest_configure(config):
@@ -28,3 +30,12 @@ def pytest_configure(config):
         URIRef('http://vocab.lib.umd.edu/set#'): 'set.ttl',
         URIRef('http://vocab.lib.umd.edu/termsOfUse#'): 'termsOfUse.ttl'
     }
+
+
+@pytest.fixture
+def monkeypatch_request(monkeypatch):
+    def _monkeypatch_request(response):
+        if isinstance(response, type):
+            response = response()
+        monkeypatch.setattr(requests.Session, 'request', lambda *args, **kwargs: response)
+    return _monkeypatch_request

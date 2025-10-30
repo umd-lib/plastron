@@ -6,7 +6,7 @@ from datetime import datetime
 from enum import Enum
 from pathlib import Path
 from shutil import copyfileobj
-from typing import Optional, Any, IO, List, Generator, Dict, Iterable
+from typing import Optional, Any, IO, Generator, Iterable
 
 from bs4 import BeautifulSoup
 from rdflib import URIRef
@@ -68,6 +68,9 @@ class ImportRun:
         self.timestamp = None
         self._invalid_items = None
         self._failed_items = None
+        self.start_time = None
+        self.count = None
+        self.state = None
 
     def load(self, timestamp: str):
         """
@@ -100,6 +103,20 @@ class ImportRun:
             self._failed_items = ItemLog(self.dir / 'dropped-failed.log.csv', DROPPED_FAILED_FIELDNAMES, 'id')
         return self._failed_items
 
+    def progress_message(self, n: int, **kwargs) -> dict[str, Any]:
+        now = datetime.now().timestamp()
+        return {
+            'time': {
+                'started': self.start_time,
+                'now': now,
+                'elapsed': now - self.start_time
+            },
+            'count': self.count,
+            'state': self.state,
+            'progress': int(n / self.count['total_items'] * 100),
+            **kwargs,
+        }
+
     def __call__(self, *args, **kwargs):
         return self.run(*args, **kwargs)
 
@@ -111,7 +128,7 @@ class ImportRun:
             validate_only: bool = False,
             import_file: IO = None,
             publish: bool = False,
-    ) -> Generator[Dict[str, Any], None, Dict[str, Any]]:
+    ) -> Generator[dict[str, Any], None, dict[str, Any]]:
         """Execute this import run. Returns a generator that yields a dictionary of
         current status after each item. The generator also returns a final status
         dictionary after the run has completed. This value can be captured using
@@ -136,7 +153,7 @@ class ImportRun:
         self.timestamp = datetimestamp()
         self.dir = self.job.dir / self.timestamp
         self.dir.mkdir(parents=True, exist_ok=True)
-        start_time = datetime.now().timestamp()
+        self.start_time = datetime.now().timestamp()
 
         if percentage:
             logger.info(f'Loading {percentage}% of the total items')
@@ -156,7 +173,7 @@ class ImportRun:
         except JobError as e:
             raise RuntimeError(str(e)) from e
 
-        count = Counter(
+        self.count = Counter(
             total_items=metadata.total,
             rows=0,
             errors=0,
@@ -169,30 +186,45 @@ class ImportRun:
             unchanged_items=0,
             skipped_items=0,
         )
-        logger.info(f'Found {count["initially_completed_items"]} completed items')
-        if count['initially_completed_items'] > 0:
+        logger.info(f'Found {self.count["initially_completed_items"]} completed items')
+        if self.count['initially_completed_items'] > 0:
             logger.debug(f'Completed item identifiers: {self.job.completed_log.item_keys}')
 
-        for row in metadata.rows(limit=limit, percentage=percentage, completed=self.job.completed_log):
+        self.state = 'validate_in_progress' if validate_only else 'import_in_progress'
+        yield self.progress_message(0)
+        for n, row in enumerate(metadata.rows(limit=limit, percentage=percentage, completed=self.job.completed_log), 1):
             if isinstance(row, InvalidRow):
                 self.drop_invalid(item=None, line_reference=row.line_reference, reason=row.reason)
-                count['invalid_items'] += 1
+                self.count['invalid_items'] += 1
+                yield self.progress_message(n)
                 continue
 
             logger.debug(f'Row data: {row.data}')
             import_row = ImportRow(self.job, context, row, validate_only, publish)
 
             # count the number of files referenced in this row
-            count['files'] += len(row.filenames)
+            self.count['files'] += len(row.filenames)
 
             # validate metadata and files
-            validation = import_row.validate_item()
+            try:
+                validation = import_row.validate_item()
+            except RuntimeError as e:
+                self.count['errors'] += 1
+                logger.warning(f'"{import_row}" caused an error, skipping')
+                self.drop_failed(
+                    item=import_row.item,
+                    line_reference=row.line_reference,
+                    reason=str(e),
+                )
+                yield self.progress_message(n)
+                continue
+
             if validation.ok:
-                count['valid_items'] += 1
+                self.count['valid_items'] += 1
                 logger.info(f'"{import_row}" is valid')
             else:
                 # drop invalid items
-                count['invalid_items'] += 1
+                self.count['invalid_items'] += 1
                 logger.warning(f'"{import_row}" is invalid, skipping')
                 reasons = [f'{name} {result}' for name, result in validation.failures()]
                 self.drop_invalid(
@@ -200,58 +232,52 @@ class ImportRun:
                     line_reference=row.line_reference,
                     reason=f'Validation failures: {"; ".join(reasons)}'
                 )
+                yield self.progress_message(n)
                 continue
 
             if validate_only:
                 # validation-only mode
+                yield self.progress_message(n)
                 continue
 
             try:
                 status = import_row.update_repo()
                 self.complete(import_row, status)
                 if status == ImportedItemStatus.CREATED:
-                    count['created_items'] += 1
+                    self.count['created_items'] += 1
                 elif status == ImportedItemStatus.MODIFIED:
-                    count['updated_items'] += 1
+                    self.count['updated_items'] += 1
                 elif status == ImportedItemStatus.UNCHANGED:
-                    count['unchanged_items'] += 1
-                    count['skipped_items'] += 1
+                    self.count['unchanged_items'] += 1
+                    self.count['skipped_items'] += 1
                 else:
                     raise RuntimeError(f'Unknown status "{status}" returned when importing "{import_row.item}"')
             except JobError as e:
-                count['items_with_errors'] += 1
+                self.count['items_with_errors'] += 1
                 logger.error(f'{import_row} import failed: {e}')
                 self.drop_failed(import_row.item, row.line_reference, reason=str(e))
 
             # update the status
-            now = datetime.now().timestamp()
-            yield {
-                'time': {
-                    'started': start_time,
-                    'now': now,
-                    'elapsed': now - start_time
-                },
-                'count': count,
-            }
+            yield self.progress_message(n)
 
         if validate_only:
             # validate phase
-            if count['invalid_items'] == 0:
-                result_type = 'validate_success'
+            if self.count['invalid_items'] == 0 and self.count['errors'] == 0:
+                self.state = 'validate_success'
             else:
-                result_type = 'validate_failed'
+                self.state = 'validate_failed'
         else:
             # import phase
-            if len(self.job.completed_log) == count['total_items']:
-                result_type = 'import_complete'
+            if len(self.job.completed_log) == self.count['total_items']:
+                self.state = 'import_complete'
             else:
-                result_type = 'import_incomplete'
+                self.state = 'import_incomplete'
 
-        return {
-            'type': result_type,
-            'validation': self.job.validation_reports,
-            'count': count,
-        }
+        return self.progress_message(
+            n=self.count['total_items'],
+            type=self.state,
+            validation=self.job.validation_reports,
+        )
 
     def drop_failed(self, item, line_reference, reason=''):
         """
@@ -350,7 +376,7 @@ class ImportJob(Job):
             validate_only: bool = False,
             import_file: IO = None,
             publish: bool = False,
-    ) -> Generator[Dict[str, Any], None, Dict[str, Any]]:
+    ) -> Generator[dict[str, Any], None, dict[str, Any]]:
         run = self.new_run()
         return run(
             context=context,
@@ -376,7 +402,7 @@ class ImportJob(Job):
             return None
 
     @property
-    def extract_text_types(self) -> List[str]:
+    def extract_text_types(self) -> list[str]:
         if self.config.extract_text_types is not None:
             return self.config.extract_text_types.split(',')
         else:

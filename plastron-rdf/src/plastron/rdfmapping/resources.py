@@ -1,6 +1,6 @@
 from collections import defaultdict
 from copy import deepcopy, copy
-from typing import List, Optional, Union, Any, Type, TypeVar, Set, Dict, Callable
+from typing import Optional, Any, Type, TypeVar, Callable
 from uuid import uuid4
 
 from rdflib import Graph, URIRef
@@ -29,9 +29,9 @@ def is_iterable(value: Any) -> bool:
 
 class RDFResourceBase:
     """Base class for RDF description classes."""
-    rdf_property_names: Set = set()
-    default_values: Dict[Any, Set] = defaultdict(set)
-    validators: List[Callable[['RDFResourceBase'], bool]] = []
+    rdf_property_names: set = set()
+    default_values: dict[Any, set] = defaultdict(set)
+    validators: list[Callable[['RDFResourceBase'], bool]] = []
 
     def __init_subclass__(cls, **kwargs):
         # make new copies of the class variables for the subclasses
@@ -51,7 +51,7 @@ class RDFResourceBase:
         # build the lookup table of class name to class
         OBJECT_CLASSES[cls.__name__] = cls
 
-    def __init__(self, uri: Union[URIRef, str] = None, graph: Graph = None, **kwargs):
+    def __init__(self, uri: URIRef | str = None, graph: Graph = None, **kwargs):
         if uri is not None:
             self._uri = URIRef(uri)
         else:
@@ -89,7 +89,7 @@ class RDFResourceBase:
         fragment = object_class(uri=uri, graph=self._graph)
         return fragment
 
-    def _update_properties(self, properties: Dict[str, Any], clear_existing=False):
+    def _update_properties(self, properties: dict[str, Any], clear_existing=False):
         for name, value in properties.items():
             if name not in self.rdf_property_names:
                 raise ValueError(f'Unknown property name: {name}')
@@ -134,7 +134,7 @@ class RDFResourceBase:
         self._graph.change_uri(self._uri, new_uri)
         self._uri = new_uri
 
-    def rdf_properties(self) -> List[RDFProperty]:
+    def rdf_properties(self) -> list[RDFProperty]:
         return [getattr(self, attr_name) for attr_name in self.rdf_property_names]
 
     @property

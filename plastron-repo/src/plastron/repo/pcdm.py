@@ -1,6 +1,6 @@
 import logging
 from os.path import basename
-from typing import Optional, Set, List, Iterable, Iterator, Dict, Type, Union
+from typing import Optional, Iterable, Iterator, Type
 
 from rdflib import Literal, URIRef
 from urlobject import URLObject
@@ -12,7 +12,6 @@ from plastron.models.ldp import LDPContainer
 from plastron.models.ore import Proxy
 from plastron.models.pcdm import PCDMObject, PCDMFile
 from plastron.models.umd import Page
-from plastron.namespaces import pcdmuse, fabio
 from plastron.rdfmapping.resources import RDFResourceBase
 from plastron.repo import ContainerResource, Repository, BinaryResource, RepositoryResource
 
@@ -25,7 +24,7 @@ class WebAnnotationBearingResource(ContainerResource):
     def __init__(self, repo: Repository, path: str = None):
         super().__init__(repo, path)
         self.annotations_container = self.get_resource('a', ContainerResource)
-        self.annotation_urls: Set[URLObject] = set()
+        self.annotation_urls: set[URLObject] = set()
 
     def read(self):
         super().read()
@@ -59,7 +58,7 @@ class PCDMFileBearingResource(ContainerResource):
     def __init__(self, repo: Repository, path: str = None):
         super().__init__(repo, path)
         self.files_container = self.get_resource('f', ContainerResource)
-        self.file_urls: Set[URLObject] = set()
+        self.file_urls: set[URLObject] = set()
 
     def read(self):
         super().read()
@@ -72,7 +71,7 @@ class PCDMFileBearingResource(ContainerResource):
             self,
             source: BinarySource,
             slug: Optional[str] = None,
-            rdf_types: Optional[Set] = None,
+            rdf_types: Optional[set] = None,
     ) -> BinaryResource:
         """Create a single file from the given source as a `pcdm:fileOf` this resource.
         If no slug is provided, one is generated using `random_slug()`."""
@@ -116,7 +115,7 @@ class PCDMFileBearingResource(ContainerResource):
         logger.debug(f'Created file: {file_resource.url} {title}')
         return file_resource
 
-    def get_files(self, rdf_type: Optional[URIRef] = None, mime_type: Optional[str] = None) -> List[BinaryResource]:
+    def get_files(self, rdf_type: Optional[URIRef] = None, mime_type: Optional[str] = None) -> list[BinaryResource]:
         """Return a list of BinaryResource objects that match either the
         given RDF type or MIME type. If neither is given, includes all files
         for this resource."""
@@ -206,7 +205,7 @@ class PCDMObjectResource(PCDMFileBearingResource, AggregationResource):
     def __init__(self, repo: Repository, path: str = None):
         super().__init__(repo, path)
         self.members_container = self.get_resource('m', ContainerResource)
-        self.member_urls: Set[URLObject] = set()
+        self.member_urls: set[URLObject] = set()
 
     def read(self):
         super().read()
@@ -214,7 +213,7 @@ class PCDMObjectResource(PCDMFileBearingResource, AggregationResource):
             self.member_urls.add(URLObject(member_uri))
         return self
 
-    def get_members(self) -> List['PCDMObjectResource']:
+    def get_members(self) -> list['PCDMObjectResource']:
         return [self.repo[url:PCDMObjectResource] for url in self.member_urls]
 
     def create_page(self, number: int, file_group: FileGroup, slug: str = None) -> 'PCDMPageResource':
@@ -243,7 +242,7 @@ class PCDMObjectResource(PCDMFileBearingResource, AggregationResource):
         logger.debug(f'Created page {number}: {page_resource.url} "{file_group.label}"')
         return page_resource
 
-    def create_page_sequence(self, file_groups: Dict[str, FileGroup]):
+    def create_page_sequence(self, file_groups: dict[str, FileGroup]):
         def create_pages() -> Iterator[PCDMObject]:
             for n, file_group in enumerate(file_groups.values(), 1):
                 page_resource = self.create_page(number=n, file_group=file_group)
@@ -252,7 +251,7 @@ class PCDMObjectResource(PCDMFileBearingResource, AggregationResource):
         self.create_sequence(create_pages())
 
 
-class ProxyIterator(Iterator[Union[URLObject, RepositoryResource]]):
+class ProxyIterator(Iterator[URLObject | RepositoryResource]):
     """Iterator over the sequence of proxied resources of an `AggregationResource`.
     It begins by following the `iana:first` relation from the `resource` to the
     first proxy, and then follows the `iana:next` relations between the subsequent

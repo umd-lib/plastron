@@ -6,7 +6,7 @@
 #
 # where <VERSION> is the Docker image version to create.
 
-FROM python:3.8.18-slim
+FROM python:3.10.18-slim
 
 RUN mkdir -p /opt/plastron
 COPY VERSION /opt/plastron/VERSION
@@ -35,12 +35,6 @@ RUN pip install './plastron-repo'
 COPY plastron-jobs /opt/plastron/plastron-jobs
 RUN pip install './plastron-jobs'
 
-COPY plastron-cli /opt/plastron/plastron-cli
-RUN pip install './plastron-cli'
-
-COPY plastron-stomp /opt/plastron/plastron-stomp
-RUN pip install './plastron-stomp'
-
 COPY plastron-web /opt/plastron/plastron-web
 RUN pip install './plastron-web'
 
@@ -50,4 +44,5 @@ VOLUME /var/opt/plastron/jobs
 
 EXPOSE 5000
 
-ENTRYPOINT ["plastrond-http", "-c", "/etc/plastron-config.yml"]
+ENTRYPOINT ["plastrond-http"]
+CMD ["--config-file", "/etc/plastrond.yml"]

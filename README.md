@@ -56,23 +56,28 @@ block-beta
 
 Requires Python 3.10+
 
-To install just the API libraries (low- and high-level):
+To install the applications (with their dependencies):
 
 ```zsh
-pip install plastron
+pip install plastron-cli
+pip install plastron-stomp
+pip install plastron-web
 ```
 
-To install the applications as well:
+If you just need to run the applications, we recommend installing via [pipx] 
+instead: 
 
 ```zsh
-# individually
-pip install 'plastron[cli]'
-pip install 'plastron[stomp]'
-pip install 'plastron[web]'
-
-# all together
-pip install 'plastron[cli,stomp,web]'
+pipx install plastron-cli
+pipx install plastron-stomp
+pipx install plastron-web
 ```
+
+This will place the executables `plastron`, `plastrond-stomp`, and 
+`plastrond-http` on your system path.
+
+To install just the API libraries (low- and high-level), use `pip install` 
+with the appropriate package name.
 
 ## Running
 

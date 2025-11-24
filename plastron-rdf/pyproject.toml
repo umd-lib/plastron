@@ -13,7 +13,14 @@ authors = [
 readme = "README.md"
 requires-python = ">= 3.10"
 dependencies = [
-    "rdflib",
+    # rdflib 7.3+ does not currently work with the TrackChangesGraph
+    # due to an explicit type check in rdflib.plugins.sparql.update.
+    # A comment above this type check code indicates that the rdflib
+    # maintainers intend to remove this type check once a series of
+    # modifications and deprecations in the ConjunctiveGraph and
+    # Dataset classes. For the time-being, though, we are pinning
+    # rdflib to a version before this type check was introduced.
+    "rdflib<7.3.0",
 ]
 dynamic = ["version"]
 

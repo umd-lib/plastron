@@ -73,5 +73,5 @@ class Word(HOCRRegion, WordRegion):
     """Wraps an hOCR `.ocrx_word` element."""
 
     def get_content(self) -> str:
-        """Get the string content of this word's element."""
-        return self.element.text
+        """Get the string content of this word's element, and any child elements."""
+        return ''.join(self.element.itertext())

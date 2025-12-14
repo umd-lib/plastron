@@ -49,7 +49,6 @@ class PlastronContext:
                 self._endpoint = Endpoint(
                     url=repo_config['REST_ENDPOINT'],
                     default_path=repo_config.get('RELPATH', '/'),
-                    external_url=repo_config.get('REPO_EXTERNAL_URL'),
                 )
             except KeyError as e:
                 raise RuntimeError(f"Missing configuration key {e} in section 'REPOSITORY'")

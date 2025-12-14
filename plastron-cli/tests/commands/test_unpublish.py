@@ -2,8 +2,9 @@ from argparse import Namespace
 from unittest.mock import MagicMock
 
 from plastron.cli.commands.unpublish import Command, unpublish
+from plastron.client.utils import TypedText
 from plastron.context import PlastronContext
-from plastron.client import Endpoint, Client, TypedText
+from plastron.client import Endpoint, Client
 from plastron.models.umd import Item
 from plastron.namespaces import umdaccess
 from plastron.repo import Repository, RepositoryError

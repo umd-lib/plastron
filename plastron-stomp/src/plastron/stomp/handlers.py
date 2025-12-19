@@ -1,6 +1,8 @@
 import logging
 import traceback
 
+from stomp.exception import StompException
+
 from plastron.messaging.broker import Destination
 from plastron.messaging.messages import PlastronMessage, PlastronErrorMessage
 
@@ -31,7 +33,14 @@ class AsynchronousResponseHandler:
         self.listener.inbox.remove(self.message.id)
 
         # send the job completed message
-        self.reply_queue.send(response)
+        try:
+            self.reply_queue.send(response)
+        except StompException as e:
+            logger.error(f'Unable to send response message to {self.reply_queue}: {e}')
+            # keep the message in the outbox by just returning here;
+            # the next time the stomp daemon starts, it will attempt to redeliver
+            return
+
         logger.debug(f'Response message sent to {self.reply_queue} with headers: {response.headers}')
 
         # remove the message from the outbox now that sending has completed

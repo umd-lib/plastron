@@ -49,7 +49,7 @@ def mock_future_failure():
     return _mock_future
 
 
-def test_asynchronous_response_handler_successful_call_removes_inbox_and_outbox_entries(mock_listener, mock_future, incoming_message):
+def test_successful_call_removes_inbox_and_outbox_entries(mock_listener, mock_future, incoming_message):
     job_id = incoming_message.job_id
     result = PlastronMessage(headers={'PlastronJobId': job_id}, body="Success!")
     future = mock_future(result)
@@ -65,7 +65,7 @@ def test_asynchronous_response_handler_successful_call_removes_inbox_and_outbox_
     mock_listener.outbox.remove.assert_called_once_with(job_id)
 
 
-def test_asynchronous_response_handler_call_with_exception_removes_inbox_and_outbox_entries(mock_listener, mock_future_failure, incoming_message):
+def test_call_with_exception_removes_inbox_and_outbox_entries(mock_listener, mock_future_failure, incoming_message):
     job_id = incoming_message.job_id
     exception_message = 'An error occurred'
 

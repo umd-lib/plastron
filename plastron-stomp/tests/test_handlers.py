@@ -1,14 +1,12 @@
 from concurrent.futures import Future
-from typing import cast, Type
-from unittest import TestCase
+from typing import cast
 from unittest.mock import Mock, MagicMock
 
 import pytest
 from stomp.exception import StompException
 
 from plastron.messaging.broker import Destination
-from plastron.messaging.messages import MessageBox, PlastronCommandMessage, PlastronErrorMessage, PlastronMessage, \
-    Message
+from plastron.messaging.messages import MessageBox, PlastronCommandMessage, PlastronErrorMessage, PlastronMessage
 from plastron.stomp.handlers import AsynchronousResponseHandler
 from plastron.stomp.listeners import CommandListener
 
@@ -80,24 +78,21 @@ def test_asynchronous_response_handler_call_with_exception_removes_inbox_and_out
     mock_listener.inbox.remove.assert_called_once_with(incoming_message.id)
 
     mock_listener.broker['JOB_STATUS'].send.assert_called_once()
-    expected_msg_headers = {
+    expected_message_headers = {
         'PlastronJobId': job_id,
         'PlastronJobError': exception_message,
         'PlastronStatusURL': 'http://example.com/status',
         'persistent': 'true',
     }
-    assert_sent_message(mock_listener.broker['JOB_STATUS'], PlastronErrorMessage, expected_msg_headers, '')
-
-    mock_listener.outbox.remove.assert_called_once_with(job_id)
-
-
-def assert_sent_message(queue: Destination, message_class: Type[Message],
-                        expected_message_headers: dict[str, str], expected_body: str):
+    queue = mock_listener.broker['JOB_STATUS']
+    message_class = PlastronErrorMessage
+    expected_body = '{"state": "test_error", "progress": 0}'
     status_queue_send_args = cast(Mock, queue).send.call_args[0]  # using cast, so mypy doesn't complain
     sent_message = status_queue_send_args[0]
     assert isinstance(sent_message, message_class)
-    TestCase().assertDictEqual(sent_message.headers, expected_message_headers)
+    assert sent_message.headers == expected_message_headers
     assert sent_message.body == expected_body
+    mock_listener.outbox.remove.assert_called_once_with(job_id)
 
 
 def test_handler_preserves_response_on_exception(mock_listener, mock_future, incoming_message):

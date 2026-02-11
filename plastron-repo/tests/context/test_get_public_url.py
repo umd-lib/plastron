@@ -35,6 +35,12 @@ from plastron.repo import RepositoryResource
             'http://fcrepo-test/fcrepo/rest/pcdm',
             'http://digital-test/result/?path=/pcdm/f4/f0/46/77/f4f04677-6ebe-4166-b30d-232fd2ad4e10',
         ),
+        (
+            'http://digital-test/search/id/{iiif_id}',
+            'http://fcrepo-test/fcrepo/rest/pcdm/f4/f0/46/77/f4f04677-6ebe-4166-b30d-232fd2ad4e10',
+            'http://fcrepo-test/fcrepo/rest/pcdm',
+            'http://digital-test/search/id/fcrepo:pcdm:f4:f0:46:77:f4f04677-6ebe-4166-b30d-232fd2ad4e10',
+        ),
     ]
 )
 def test_get_public_url(public_url_pattern, resource_url, container_url, expected_public_url):

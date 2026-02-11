@@ -139,6 +139,7 @@ class PlastronContext:
         * `container_path`: the repository path to the resource's parent container
         * `relpath`: same as `container_path`, but omits the leading "/"
         * `uuid`: the UUID portion of the resource's path
+        * `iiif_id`: the repository path, with slashes replaced by colons and prefixed with "fcrepo"
 
         If one of these fields is requested by the pattern, but the context is unable to get a value
         for that field, raises a `RuntimeError`. If there is not a public URL pattern config value,
@@ -167,5 +168,8 @@ class PlastronContext:
             if uuid is None:
                 raise RuntimeError(f'Cannot create public URL; unable to find UUID in {resource.url}')
             data['uuid'] = uuid.lower()
+
+        if 'iiif_id' in field_names:
+            data['iiif_id'] = 'fcrepo' + self.endpoint.repo_path(resource.url).replace('/', ':')
 
         return public_url_pattern.format(**data)

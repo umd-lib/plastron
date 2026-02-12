@@ -12,7 +12,7 @@ import pysolr
 from plastron.client import Endpoint, Client
 from plastron.client.auth import get_authenticator
 from plastron.handles import HandleServiceClient
-from plastron.messaging.broker import Broker, ServerTuple
+from plastron.messaging.broker import Broker, ServerTuple, HeartbeatTuple
 from plastron.models.fedora import FedoraResource
 from plastron.repo import Repository, RepositoryResource, RepositoryError
 
@@ -91,11 +91,17 @@ class PlastronContext:
     def broker(self) -> Broker:
         if self._broker is None:
             broker_config = self.config.get('MESSAGE_BROKER', {})
+            heartbeat_intervals = broker_config.get('HEARTBEAT')
+            if heartbeat_intervals is not None:
+                heartbeat = HeartbeatTuple.from_dict(heartbeat_intervals)
+            else:
+                heartbeat = None
             try:
                 self._broker = Broker(
                     server=ServerTuple.from_string(broker_config['SERVER']),
                     message_store_dir=broker_config['MESSAGE_STORE_DIR'],
                     destinations=broker_config['DESTINATIONS'],
+                    heartbeat=heartbeat,
                 )
             except KeyError as e:
                 raise RuntimeError(f"Missing configuration key {e} in section 'MESSAGE_BROKER'")

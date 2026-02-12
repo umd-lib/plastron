@@ -6,6 +6,7 @@ from typing import TextIO, Any
 
 import click
 import yaml
+from stomp.listener import HeartbeatListener
 
 from plastron.context import PlastronContext
 from plastron.stomp import __version__
@@ -44,7 +45,13 @@ class STOMPDaemon(Thread):
     def run(self):
         # setup listeners
         self.broker.set_listener('command', self.command_listener)
-
+        if self.broker.heartbeat is not None:
+            logger.info(
+                'Starting heartbeat; '
+                f'Send interval: {self.broker.heartbeat.send}ms; '
+                f'Receive interval: {self.broker.heartbeat.receive}ms'
+            )
+            self.broker.set_listener('heartbeat', HeartbeatListener(self.broker.transport, self.broker.heartbeat))
         # connect and listen until the stopped Event is set
         if self.broker.connect(client_id=f'plastrond/{__version__}-{os.uname().nodename}-{os.getpid()}'):
             self.stopped.wait()

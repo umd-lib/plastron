@@ -49,6 +49,7 @@ def create_app(config_file: str):
     with open(config_file, "r") as stream:
         config = envsubst(yaml.safe_load(stream))
         app.config['CONTEXT'] = PlastronContext(config=config, args=Namespace(delegated_user=None))
+        app.config['CONTEXT'].client.ua_string = f'plastrond-http/{__version__}'
     jobs_dir = Path(os.environ.get('JOBS_DIR', 'jobs'))
     jobs = Jobs(directory=jobs_dir)
     app.register_blueprint(activitystream_blueprint)

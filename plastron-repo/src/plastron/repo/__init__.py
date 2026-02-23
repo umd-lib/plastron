@@ -14,6 +14,7 @@ from urlobject import URLObject
 
 from plastron.client import Client, Endpoint, ClientError
 from plastron.client.auth import get_authenticator
+from plastron.client.transactions import transaction
 from plastron.rdfmapping.graph import TrackChangesGraph
 from plastron.rdfmapping.resources import RDFResourceBase, RDFResourceType
 
@@ -39,7 +40,6 @@ class Repository:
         endpoint = Endpoint(
             url=config['REST_ENDPOINT'],
             default_path=config.get('RELPATH', '/'),
-            external_url=config.get('REPO_EXTERNAL_URL', None)
         )
         client = Client(endpoint=endpoint, auth=get_authenticator(config), server_cert=config.get('SERVER_CERT', None))
         return cls(client=client)
@@ -74,8 +74,6 @@ class Repository:
 
         if path.startswith(self.endpoint.url):
             path = path[len(str(self.endpoint.url)):]
-        elif self.endpoint.external_url is not None and path.startswith(self.endpoint.external_url):
-            path = path[len(str(self.endpoint.external_url)):]
         else:
             path = path
 
@@ -118,7 +116,7 @@ class Repository:
     @contextmanager
     def transaction(self, keep_alive: int = 90):
         try:
-            with self.client.transaction(keep_alive) as txn_client:
+            with transaction(self.client, keep_alive) as txn_client:
                 self._txn_client = txn_client
                 yield self._txn_client
         finally:

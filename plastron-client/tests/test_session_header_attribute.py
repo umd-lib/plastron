@@ -1,6 +1,6 @@
 from requests import Session
 
-from plastron.client import SessionHeaderAttribute
+from plastron.client.utils import SessionHeaderAttribute
 
 
 class Foo:
@@ -37,3 +37,8 @@ def test_get_session_header():
     foo = Foo()
     foo.x_test_header = 'ABC'
     assert foo.x_test_header == 'ABC'
+
+
+def test_get_session_header_descriptor():
+    desc = Foo.x_test_header
+    assert isinstance(desc, SessionHeaderAttribute)

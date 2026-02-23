@@ -4,7 +4,8 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from plastron.client import Endpoint, Client, TypedText
+from plastron.client import Endpoint, Client
+from plastron.client.utils import TypedText
 from plastron.handles import HandleInfo, HandleServerError
 from plastron.namespaces import umdaccess
 from plastron.rdfmapping.resources import RDFResource

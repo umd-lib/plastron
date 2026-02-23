@@ -5,7 +5,7 @@ from typing import Optional, Iterable, Iterator, Type
 from rdflib import Literal, URIRef
 from urlobject import URLObject
 
-from plastron.client import random_slug
+from plastron.client.utils import random_slug
 from plastron.files import BinarySource, FileGroup
 from plastron.models.annotations import Annotation
 from plastron.models.ldp import LDPContainer

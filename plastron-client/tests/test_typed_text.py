@@ -1,6 +1,6 @@
 import pytest
 
-from plastron.client import TypedText
+from plastron.client.utils import TypedText
 
 
 @pytest.mark.parametrize(

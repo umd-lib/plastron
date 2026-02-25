@@ -5,18 +5,26 @@ import sys
 from csv import DictWriter
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterator, Optional, Any
+from typing import Any, Iterator, Optional
 
 from lxml import etree
-# noinspection PyProtectedMember
-from lxml.etree import XMLSyntaxError, _ElementTree, QName, _Element
 
+# noinspection PyProtectedMember
+from lxml.etree import QName, XMLSyntaxError, _Element, _ElementTree
 from plastron.files import FileSpec
 from plastron.repo import DataReadError
 
 logger = logging.getLogger(__name__)
 
-ISSUE_FIELDNAMES = ['Title', 'Date', 'Volume', 'Issue', 'Edition', 'Rights Statement', 'FILES', 'ITEM_FILES']
+ISSUE_FIELDNAMES = ['Title',
+                    'Date',
+                    'Volume',
+                    'Issue',
+                    'Edition',
+                    'Rights Statement',
+                    'Presentation Set',
+                    'FILES',
+                    'ITEM_FILES']
 
 
 class XMLNS:
@@ -119,9 +127,21 @@ class NDNPBatch:
     batch_file: Path
     """Main XML file describing this NDNP package. Defaults to `batch.xml`
     in the batch's `root_dir`"""
+    presentation_set: str
+    """Presentation Set for this batch, if provided from the convert-options parameter"""
+    rights: str
+    """Rights Statement URI for this batch. Defaults to `http://vocab.lib.umd.edu/rightsStatement#InC-NC`
+    if not provided from the convert-options parameter from the command line."""
 
-    def __init__(self, batch_dir: str | Path, batch_file: str = 'batch.xml'):
-        self.root_dir = Path(batch_dir)
+    def __init__(self,
+                 dir: str | Path,
+                 batch_file: str = 'batch.xml',
+                 rights: str = 'http://vocab.lib.umd.edu/rightsStatement#InC-NC',
+                 presentation_set: str = ''):
+        self.root_dir = Path(dir)
+        self.presentation_set = presentation_set
+        self.rights = rights
+
         if not self.root_dir.is_dir():
             raise DataReadError(f'{self.root_dir} is not a directory')
         self.batch_file = self.root_dir / batch_file
@@ -201,7 +221,8 @@ def get_issue_data(issue: NDNPIssue) -> dict[str, str]:
         'Volume': issue.get_volume(),
         'Issue': issue.get_issue(),
         'Edition': issue.get_edition(),
-        'Rights Statement': 'http://vocab.lib.umd.edu/rightsStatement#InC-NC',
+        'Rights Statement': issue.batch.rights,
+        'Presentation Set': issue.batch.presentation_set,
         'FILES': ';'.join(f.spec for f in files),
         'ITEM_FILES': ';'.join(f.spec for f in item_files),
     }

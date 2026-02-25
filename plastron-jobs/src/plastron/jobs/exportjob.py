@@ -24,7 +24,8 @@ from plastron.jobs import Job
 from plastron.models.pcdm import PCDMFile
 from plastron.models.umd import Item
 from plastron.repo import DataReadError, BinaryResource
-from plastron.repo.pcdm import PCDMObjectResource, AggregationResource, PCDMFileBearingResource
+from plastron.repo.pcdm import PCDMObjectResource, PCDMFileBearingResource
+from plastron.repo.aggregation import AggregationResource
 from plastron.serializers import SERIALIZER_CLASSES, detect_resource_class
 from plastron.serializers.csv import EmptyItemListError
 

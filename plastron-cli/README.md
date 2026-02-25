@@ -199,6 +199,24 @@ optional arguments:
                         resource in the result list
 ```
 
+### Fix Page Order (fixpageorder)
+
+```text
+$ plastron fixpageorder --help
+usage: plastron fixpageorder [-h] [-f URIS_FILE] [-n] [uris ...]
+
+Fix the order of pages in an object, using the page titles as a guide
+
+positional arguments:
+  uris                  URIs of objects to fix
+
+options:
+  -h, --help            show this help message and exit
+  -f URIS_FILE, --uris-file URIS_FILE
+                        file containing URIs of objects to fix
+  -n, --dry-run         dry run; do not actually modify the pages
+```
+
 ### Image Size (imgsize)
 
 ```text

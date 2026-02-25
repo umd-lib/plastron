@@ -367,6 +367,26 @@ COMMANDS:
         CamelFcrepoSolrIndexingDestinations: direct:solr.Index,direct:solr.LegacyIndex
 ```
 
+### Replace (replace)
+
+```text
+$ plastron replace --help
+usage: plastron replace [-h] [--binary-file BINARY_FILE] [--mime-type MIME_TYPE] URI|PATH
+
+Replace a binary resource in the repository
+
+positional arguments:
+  URI|PATH              URI or repository path of the resource to replace
+
+options:
+  -h, --help            show this help message and exit
+  --binary-file BINARY_FILE
+                        local path to the binary file
+  --mime-type MIME_TYPE
+                        use this MIME type instead of auto-detecting based on the BINARY_FILE
+
+```
+
 ### Stub (stub)
 
 ```text

@@ -65,6 +65,7 @@ class BinarySource:
     """
     Base class for reading binary content from arbitrary locations.
     """
+    filename: str
 
     def __enter__(self):
         return self.open()

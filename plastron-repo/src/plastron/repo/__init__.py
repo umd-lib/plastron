@@ -15,6 +15,7 @@ from urlobject import URLObject
 from plastron.client import Client, Endpoint, ClientError
 from plastron.client.auth import get_authenticator
 from plastron.client.transactions import transaction
+from plastron.files import BinarySource, BinarySourceError
 from plastron.rdfmapping.graph import TrackChangesGraph
 from plastron.rdfmapping.resources import RDFResourceBase, RDFResourceType
 
@@ -24,6 +25,10 @@ ldp = Namespace('http://www.w3.org/ns/ldp#')
 
 def mint_fragment_identifier() -> str:
     return str(uuid4())
+
+
+def is_http_uri(uri: str) -> bool:
+    return uri.startswith('http://') or uri.startswith('https://')
 
 
 ResourceType = TypeVar('ResourceType', bound='RepositoryResource')
@@ -72,10 +77,9 @@ class Repository:
         if resource_class is None:
             resource_class = RepositoryResource
 
-        if path.startswith(self.endpoint.url):
-            path = path[len(str(self.endpoint.url)):]
-        else:
-            path = path
+        path = path.removeprefix(self.endpoint.url)
+        if is_http_uri(path) and path not in self.endpoint:
+            raise RepositoryError(f'URI "{path}" is not from this repository: {self.endpoint.url}')
 
         try:
             return resource_class(repo=self, path=path)
@@ -345,6 +349,29 @@ class BinaryResource(RepositoryResource):
             raise RepositoryError(response)
 
         yield BytesIO(response.content)
+
+    def update_binary(self, source: BinarySource, mime_type: str = None):
+        try:
+            headers = {
+                'Content-Type': mime_type or source.mimetype() or 'application/octet-stream',
+                'Digest': source.digest(),
+                'Content-Disposition': f'attachment; filename="{source.filename}"',
+            }
+            logger.info(f'Updating binary content at {self.url}')
+            logger.debug(f'Headers: {headers}')
+            with source.open() as stream:
+                response = self.client.put(
+                    url=self.url,
+                    data=stream,
+                    headers=headers,
+                )
+        except (ClientError | BinarySourceError) as e:
+            raise RepositoryError(f'Unable to update {self.url}: {e}') from e
+
+        if not response.ok:
+            raise RepositoryError(f'Unable to update {self.url}: {response}')
+
+        return response
 
 
 class RepositoryError(Exception):

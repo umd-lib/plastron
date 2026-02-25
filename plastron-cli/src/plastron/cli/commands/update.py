@@ -2,10 +2,11 @@ import logging
 from argparse import FileType, Namespace
 
 from plastron.cli.commands import BaseCommand
-from plastron.jobs.updatejob import UpdateJob
-from plastron.models import get_model_from_name
-from plastron.utils import parse_predicate_list
 from plastron.jobs import ItemLog
+from plastron.jobs.updatejob import UpdateJob
+from plastron.utils import parse_predicate_list
+
+from plastron.models import get_model_from_name
 
 logger = logging.getLogger(__name__)
 
@@ -88,9 +89,22 @@ class Command(BaseCommand):
 
         traverse = parse_predicate_list(args.recursive) if args.recursive is not None else []
 
+        uris = set()
+
+        if args.file:
+            try:
+                with open(args.file, 'r') as f:
+                    file_uris = [line.strip() for line in f if line.strip()]
+                uris = uris | set(file_uris)
+            except FileNotFoundError:
+                raise RuntimeError(f"File {args.file} not found")
+
+        if args.uris:
+            uris = uris | set(args.uris)
+
         update_job = UpdateJob(
             repo=self.context.repo,
-            uris=args.uris,
+            uris=uris,
             sparql_update=sparql_update,
             model_class=model_class,
             traverse=traverse,

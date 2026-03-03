@@ -52,7 +52,18 @@ This section configures the [STOMP] message broker (e.g., ActiveMQ).
 |---------------------|---------------------------------------------------------------|
 | `SERVER`            | Hostname and port of the STOMP server, e.g. `localhost:61613` |
 | `MESSAGE_STORE_DIR` | Path to the directory to hold the message inbox and outbox    |
+| `HEARTBEAT`         | Sub-section containing STOMP heartbeat intervals *(optional)* |
 | `DESTINATIONS`      | Sub-section containing queue and topic names                  |
+
+### `HEARTBEAT` sub-section
+
+This subsection configures the [heart-beating] for the STOMP connection to 
+this broker.
+
+| Option    | Description                                           |
+|-----------|-------------------------------------------------------|
+| `SEND`    | Interval (in ms) between outgoing heartbeats          |
+| `RECEIVE` | Interval (in ms) between expected incoming heartbeats |
 
 ### `DESTINATIONS` sub-section
 
@@ -108,4 +119,5 @@ service to fetch, update, and mint handles when publishing resources.
 
 
 [STOMP]: https://stomp.github.io/
+[heart-beating]: https://stomp.github.io/stomp-specification-1.2.html#Heart-beating
 [umd-handle]: https://github.com/umd-lib/umd-handle

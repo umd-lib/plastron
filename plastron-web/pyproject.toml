@@ -41,3 +41,7 @@ version = { "file" = "VERSION" }
 
 [tool.pytest.ini_options]
 markers = ['jobs_dir']
+# these warnings are coming from third-party code
+filterwarnings = [
+    'ignore:ConjunctiveGraph is deprecated:DeprecationWarning',
+]

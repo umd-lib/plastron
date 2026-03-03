@@ -9,6 +9,7 @@ from time import sleep
 
 from plastron.client import Client, ClientError
 from plastron.cli.commands import BaseCommand
+from plastron.client.transactions import transaction
 from plastron.repo import DataReadError
 from plastron.cli import ConfigError
 from plastron.jobs import ItemLog
@@ -247,7 +248,7 @@ def load_item(client: Client, batch_item, args, extra=None):
 
     if args.use_transactions:
         # open transaction
-        with client.transaction(keep_alive=90) as txn_client:  # type: TransactionClient
+        with transaction(client, keep_alive=90) as txn_client:  # type: TransactionClient
             # create item and its components
             try:
                 load_item_internal(txn_client, item, args, extra)

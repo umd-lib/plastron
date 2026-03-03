@@ -4,6 +4,7 @@ from typing import NamedTuple, Optional
 
 from stomp import Connection11
 from stomp.exception import StompException
+from stomp.transport import Transport
 
 from plastron.messaging.messages import Message
 
@@ -23,19 +24,30 @@ class ServerTuple(NamedTuple):
         return f'{self.host}:{self.port}'
 
 
+class HeartbeatTuple(NamedTuple):
+    send: int = 0
+    receive: int = 0
+
+    @classmethod
+    def from_dict(cls, value: dict) -> 'HeartbeatTuple':
+        return HeartbeatTuple(**{k.lower(): v for k, v in value.items()})
+
+
 class Broker:
     def __init__(
-            self,
-            server: ServerTuple,
-            message_store_dir: Path | str,
-            destinations: Optional[dict[str, str]] = None,
-            public_uri_template: Optional[str] = None,
+        self,
+        server: ServerTuple,
+        message_store_dir: Path | str,
+        destinations: Optional[dict[str, str]] = None,
+        public_uri_template: Optional[str] = None,
+        heartbeat: HeartbeatTuple = None,
     ):
         self.server = server
         self.connection = Connection11([self.server])
         self.destinations = {key.upper(): Destination(self, value) for key, value in destinations.items()}
         self.message_store_dir = message_store_dir
         self.public_uri_template = public_uri_template
+        self.heartbeat = heartbeat
         self.client_id = None
 
     def __str__(self):
@@ -44,12 +56,16 @@ class Broker:
     def __getitem__(self, item) -> 'Destination':
         return self.destination(item)
 
+    @property
+    def transport(self) -> Transport:
+        return self.connection.transport
+
     def connect(self, client_id: str) -> bool:
         if not self.connection.is_connected():
             logger.info(
                 f'Attempting to connect to STOMP message broker ('
-                f'Host: {self.server[0]}, '
-                f'Port: {self.server[1]}, '
+                f'Host: {self.server.host}, '
+                f'Port: {self.server.port}, '
                 f'Client ID: {client_id})'
             )
             try:

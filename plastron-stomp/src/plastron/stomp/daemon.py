@@ -1,20 +1,22 @@
 import logging
-import logging.config
 import os
 import sys
-from datetime import datetime
-from pathlib import Path
 from threading import Event, Thread
 from typing import TextIO, Any
 
 import click
 import yaml
+from stomp.listener import HeartbeatListener
 
 from plastron.context import PlastronContext
 from plastron.stomp import __version__
 from plastron.stomp.listeners import CommandListener
-from plastron.utils import DEFAULT_LOGGING_OPTIONS, envsubst
+from plastron.utils import envsubst
 
+logging.basicConfig(
+    level=os.environ.get('LOG_LEVEL', 'INFO').upper(),
+    format='%(levelname)s:%(threadName)s:%(name)s:%(message)s',
+)
 logger = logging.getLogger(__name__)
 
 
@@ -43,7 +45,13 @@ class STOMPDaemon(Thread):
     def run(self):
         # setup listeners
         self.broker.set_listener('command', self.command_listener)
-
+        if self.broker.heartbeat is not None:
+            logger.info(
+                'Starting heartbeat; '
+                f'Send interval: {self.broker.heartbeat.send}ms; '
+                f'Receive interval: {self.broker.heartbeat.receive}ms'
+            )
+            self.broker.set_listener('heartbeat', HeartbeatListener(self.broker.transport, self.broker.heartbeat))
         # connect and listen until the stopped Event is set
         if self.broker.connect(client_id=f'plastrond/{__version__}-{os.uname().nodename}-{os.getpid()}'):
             self.stopped.wait()
@@ -53,25 +61,6 @@ class STOMPDaemon(Thread):
                 self.command_listener.inbox_watcher.stop()
         else:
             logger.error('Unable to connect to STOMP broker')
-
-
-def configure_logging(log_filename_base: str, log_dir: str = 'logs', verbose: bool = False) -> None:
-    logging_options = DEFAULT_LOGGING_OPTIONS
-
-    # log file configuration
-    log_dirname = Path(log_dir)
-    log_dirname.mkdir(parents=True, exist_ok=True)
-    now = datetime.utcnow().strftime('%Y%m%d%H%M%S')
-    log_filename = '.'.join((log_filename_base, now, 'log'))
-    logfile = log_dirname / log_filename
-    logging_options['handlers']['file']['filename'] = str(logfile)
-
-    # manipulate console verbosity
-    if verbose:
-        logging_options['handlers']['console']['level'] = 'DEBUG'
-
-    # configure logging
-    logging.config.dictConfig(logging_options)
 
 
 @click.command
@@ -85,15 +74,14 @@ def configure_logging(log_filename_base: str, log_dir: str = 'logs', verbose: bo
     '-v', '--verbose',
     is_flag=True,
     help='increase the verbosity of the status output',
+    deprecated='Set an explicit log level using the "LOG_LEVEL" environment variable.',
 )
 def main(config_file: TextIO, verbose: bool):
+    if verbose:
+        # set the root logger level
+        logging.getLogger().setLevel(logging.DEBUG)
+
     config = envsubst(yaml.safe_load(config_file))
-    repo_config = config.get('REPOSITORY', {})
-    configure_logging(
-        log_filename_base='plastron.daemon',
-        log_dir=repo_config.get('LOG_DIR', 'logs'),
-        verbose=verbose,
-    )
     daemon_description = f'plastrond-stomp/{__version__}'
     logger.info(f'Starting {daemon_description}')
     thread = STOMPDaemon(config=config)

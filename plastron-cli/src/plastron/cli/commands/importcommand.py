@@ -1,14 +1,15 @@
 import csv
 import logging
-from argparse import FileType, ArgumentTypeError, Namespace
+from argparse import ArgumentTypeError, FileType, Namespace
 from typing import TextIO
 
 from plastron.cli.commands import BaseCommand
-from plastron.jobs.importjob.ndnp import NDNPBatch, write_import_csv
-from plastron.jobs.importjob import ImportConfig, ImportJob
 from plastron.jobs import Jobs
-from plastron.models import get_model_from_name, ModelClassNotFoundError
+from plastron.jobs.importjob import ImportConfig, ImportJob
+from plastron.jobs.importjob.ndnp import NDNPBatch, write_import_csv
 from plastron.utils import datetimestamp, uri_or_curie
+
+from plastron.models import ModelClassNotFoundError, get_model_from_name
 
 logger = logging.getLogger(__name__)
 
@@ -212,7 +213,7 @@ class Command(BaseCommand):
             if args.convert_from is not None:
                 if args.convert_from == 'ndnp':
                     params = dict(args.convert_params or [])
-                    batch = NDNPBatch(params['dir'], params['batch_file'])
+                    batch = NDNPBatch(**params)
                     logger.info(f'Converting NDNP batch at {batch.batch_file} to import job {args.job_id}')
                     job = jobs.create_job(job_class=ImportJob, config=ImportConfig(
                         job_id=args.job_id,

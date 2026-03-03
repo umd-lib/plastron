@@ -29,3 +29,9 @@ dependencies = { "file" = "dependencies.txt" }
 cli = { "file" = "dependencies-cli.txt" }
 stomp = { "file" = "dependencies-stomp.txt" }
 web = { "file" = "dependencies-web.txt" }
+
+[tool.pytest.ini_options]
+# these warnings are coming from third-party code
+filterwarnings = [
+   'ignore:ConjunctiveGraph is deprecated:DeprecationWarning',
+]

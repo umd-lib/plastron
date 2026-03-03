@@ -6,7 +6,8 @@ from unittest.mock import MagicMock
 import pytest
 
 from plastron.cli.commands.publish import Command, publish
-from plastron.client import Endpoint, Client, TypedText
+from plastron.client import Endpoint, Client
+from plastron.client.utils import TypedText
 from plastron.context import PlastronContext
 from plastron.handles import HandleInfo, HandleServerError
 from plastron.models.umd import Item

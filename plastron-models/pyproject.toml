@@ -58,3 +58,9 @@ where = ["src"]
 
 [tool.setuptools.dynamic]
 version = { "file" = "VERSION" }
+
+[tool.pytest.ini_options]
+# these warnings are coming from third-party code
+filterwarnings = [
+    'ignore:ConjunctiveGraph is deprecated:DeprecationWarning',
+]

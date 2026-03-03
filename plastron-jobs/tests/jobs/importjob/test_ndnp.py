@@ -1,18 +1,17 @@
 import pytest
-
 from plastron.jobs.importjob.ndnp import NDNPBatch, get_issue_data, write_import_csv
 from plastron.repo import DataReadError
 
 
 def test_batch(datadir):
-    batch = NDNPBatch(datadir, 'small.xml')
+    batch = NDNPBatch(dir=datadir, batch_file='small.xml')
     assert batch.root_dir == datadir
     issues = list(batch.issues())
     assert len(issues) == 5
 
 
 def test_issue(datadir):
-    batch = NDNPBatch(datadir, 'small.xml')
+    batch = NDNPBatch(dir=datadir, batch_file='small.xml')
     issue = next(batch.issues())
     assert issue.lccn == 'sn90057049'
     assert issue.issue_date == '1926-01-12'
@@ -26,13 +25,13 @@ def test_issue(datadir):
 
 
 def test_non_existent_issue_detail(datadir):
-    batch = NDNPBatch(datadir, 'small.xml')
+    batch = NDNPBatch(dir=datadir, batch_file='small.xml')
     issue = next(batch.issues())
     assert issue._get_detail_number('FAKE_DETAIL') is None
 
 
 def test_get_issue_data(datadir):
-    batch = NDNPBatch(datadir, 'small.xml')
+    batch = NDNPBatch(dir=datadir, batch_file='small.xml')
     issue = next(batch.issues())
     data = get_issue_data(issue)
     assert data == {
@@ -42,6 +41,7 @@ def test_get_issue_data(datadir):
         'Issue': '13',
         'Edition': '1',
         'Rights Statement': 'http://vocab.lib.umd.edu/rightsStatement#InC-NC',
+        'Presentation Set': '',
         'FILES': ';'.join([
             '<preservation>sn90057049/7637/1926011201/0002.tif',
             '<service>sn90057049/7637/1926011201/0002.jp2',
@@ -68,28 +68,28 @@ def test_get_issue_data(datadir):
 
 
 def test_write_import_csv(datadir, capsys):
-    batch = NDNPBatch(datadir, 'small.xml')
+    batch = NDNPBatch(dir=datadir, batch_file='small.xml')
     write_import_csv(batch)
     captured = capsys.readouterr()
-    assert 'Title,Date,Volume,Issue,Edition,Rights Statement,FILES,ITEM_FILES\r\n' in captured.out
+    assert 'Title,Date,Volume,Issue,Edition,Rights Statement,Presentation Set,FILES,ITEM_FILES\r\n' in captured.out
     assert len(captured.out.split('\r\n')) == 7
 
 
 def test_batch_dir_not_found():
     with pytest.raises(DataReadError):
-        NDNPBatch('FAKE', 'DOES_NOT_EXIST.xml')
+        NDNPBatch(dir='FAKE', batch_file='DOES_NOT_EXIST.xml')
 
 
 def test_batch_dir_not_a_dir(datadir):
     with pytest.raises(DataReadError):
-        NDNPBatch(datadir / 'plain.txt', 'DOES_NOT_EXIST.xml')
+        NDNPBatch(dir=datadir / 'plain.txt', batch_file='DOES_NOT_EXIST.xml')
 
 
 def test_batch_file_not_found(datadir):
     with pytest.raises(DataReadError):
-        NDNPBatch(datadir, 'DOES_NOT_EXIST.xml')
+        NDNPBatch(dir=datadir, batch_file='DOES_NOT_EXIST.xml')
 
 
 def test_batch_file_not_xml(datadir):
     with pytest.raises(DataReadError):
-        NDNPBatch(datadir, 'plain.txt')
+        NDNPBatch(dir=datadir, batch_file='plain.txt')

@@ -199,6 +199,24 @@ optional arguments:
                         resource in the result list
 ```
 
+### Fix Page Order (fixpageorder)
+
+```text
+$ plastron fixpageorder --help
+usage: plastron fixpageorder [-h] [-f URIS_FILE] [-n] [uris ...]
+
+Fix the order of pages in an object, using the page titles as a guide
+
+positional arguments:
+  uris                  URIs of objects to fix
+
+options:
+  -h, --help            show this help message and exit
+  -f URIS_FILE, --uris-file URIS_FILE
+                        file containing URIs of objects to fix
+  -n, --dry-run         dry run; do not actually modify the pages
+```
+
 ### Image Size (imgsize)
 
 ```text
@@ -347,6 +365,26 @@ COMMANDS:
       all:
         CamelFcrepoIndexingDestinations: activemq:index.solr,activemq:index.triplestore
         CamelFcrepoSolrIndexingDestinations: direct:solr.Index,direct:solr.LegacyIndex
+```
+
+### Replace (replace)
+
+```text
+$ plastron replace --help
+usage: plastron replace [-h] [--binary-file BINARY_FILE] [--mime-type MIME_TYPE] URI|PATH
+
+Replace a binary resource in the repository
+
+positional arguments:
+  URI|PATH              URI or repository path of the resource to replace
+
+options:
+  -h, --help            show this help message and exit
+  --binary-file BINARY_FILE
+                        local path to the binary file
+  --mime-type MIME_TYPE
+                        use this MIME type instead of auto-detecting based on the BINARY_FILE
+
 ```
 
 ### Stub (stub)

@@ -101,11 +101,14 @@ class PlastronResponseMessage(PlastronMessage):
 
 class PlastronErrorMessage(PlastronMessage):
     error = MessageHeader('PlastronJobError')
+    status_url = MessageHeader('PlastronStatusURL')
 
-    def __init__(self, error: str = None, **kwargs):
+    def __init__(self, error: str = None, status_url: str = None, **kwargs):
         super().__init__(**kwargs)
         if error is not None:
             self.error = error
+        if status_url is not None:
+            self.status_url = status_url
 
 
 class PlastronCommandMessage(PlastronMessage):

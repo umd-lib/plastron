@@ -29,6 +29,7 @@ test = [
     "freezegun",
     "pytest",
     "pytest-cov",
+    "ruff",
 ]
 
 [build-system]

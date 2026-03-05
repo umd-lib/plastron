@@ -35,6 +35,7 @@ test = [
     "httpretty",
     "pytest",
     "pytest-cov",
+    "ruff",
 ]
 
 [project.entry-points.'plastron.content_models']

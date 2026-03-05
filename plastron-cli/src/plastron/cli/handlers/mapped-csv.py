@@ -4,12 +4,12 @@ import os
 from collections import OrderedDict
 
 import yaml
-from rdflib import Literal, URIRef
-from rdflib.util import from_n3
-
 from plastron.cli import ConfigError
 from plastron.files import LocalFileSource, RemoteFileSource
 from plastron.rdf import pcdm, rdf
+from rdflib import Literal, URIRef
+from rdflib.util import from_n3
+
 from plastron import namespaces
 
 nsm = namespaces.get_manager()
@@ -125,7 +125,7 @@ class Batch:
         elif dirname_column is not None:
             # this mapping describes a directory of files that should be
             # subdivided based on filename into member objects
-            dirname_conf = mapping[dirname_column]
+            _ = mapping[dirname_column]
             for line in lines:
                 dirname = line.get(dirname_column, None)
                 if dirname is not None:

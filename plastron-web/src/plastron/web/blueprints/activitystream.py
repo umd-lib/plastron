@@ -65,9 +65,9 @@ class Activity:
                 else:
                     raise ValidationError(f'Invalid Activity type: {str(o)}')
         if not self.publish and not self.unpublish:
-            raise ValidationError(f'Invalid JSON-LD provided: Type not specified.')
+            raise ValidationError('Invalid JSON-LD provided: Type not specified.')
         if not self.objects:
-            raise ValidationError(f'Invalid JSON-LD provided: Object(s) not specified.')
+            raise ValidationError('Invalid JSON-LD provided: Object(s) not specified.')
 
     def __str__(self):
         return self.id

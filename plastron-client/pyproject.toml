@@ -26,6 +26,7 @@ test = [
     "http-server-mock",
     "pytest",
     "pytest-cov",
+    "ruff",
 ]
 
 [build-system]

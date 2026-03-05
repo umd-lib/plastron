@@ -1,9 +1,13 @@
-from PIL import Image, UnidentifiedImageError
 from lxml import etree
 from lxml.etree import XMLSyntaxError
-
+from PIL import Image, UnidentifiedImageError
 from plastron.ocr.alto import ALTOResource
-from plastron.ocr.core import OCRError, UnrecognizedOCRFormatError, OCRResource, ImageFileError, OCRFileError
+from plastron.ocr.core import (
+    ImageFileError,
+    OCRFileError,
+    OCRResource,
+    UnrecognizedOCRFormatError,
+)
 from plastron.ocr.hocr import HOCRResource
 from plastron.repo import BinaryResource, RepositoryError
 

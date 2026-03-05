@@ -1,5 +1,4 @@
 from requests import Response
-from urlobject import URLObject
 
 from plastron.client.base import Client
 from plastron.client.endpoint import Endpoint

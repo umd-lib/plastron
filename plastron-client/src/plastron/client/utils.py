@@ -4,7 +4,7 @@ from base64 import urlsafe_b64encode
 from collections import namedtuple
 from typing import NamedTuple
 
-from rdflib import Graph, URIRef, Literal
+from rdflib import Graph, Literal, URIRef
 
 logger = logging.getLogger(__name__)
 
@@ -18,8 +18,11 @@ def random_slug(length: int = 6) -> str:
 
 
 def serialize(graph: Graph, **kwargs):
+    p: URIRef
+    o: URIRef | Literal
+
     logger.info('Including properties:')
-    for _, p, o in graph:  # type: _, URIRef, URIRef | Literal
+    for _, p, o in graph:
         pred = p.n3(namespace_manager=graph.namespace_manager)
         obj = o.n3(namespace_manager=graph.namespace_manager)
         logger.info(f'  {pred} {obj}')

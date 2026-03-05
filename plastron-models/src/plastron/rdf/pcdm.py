@@ -1,7 +1,8 @@
 from PIL import Image
+from plastron.files import LocalFileSource, RepositoryFileSource
+from plastron.rdf import ldp, ore, rdf
 
 from plastron.namespaces import dcterms, ebucore, fabio, pcdm, pcdmuse, premis
-from plastron.rdf import ldp, ore, rdf
 
 # alias the rdflib Namespace
 ns = pcdm

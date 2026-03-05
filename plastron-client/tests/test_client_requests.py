@@ -3,7 +3,7 @@ from unittest.mock import MagicMock
 import pytest
 from requests import Session
 
-from plastron.client import Client, Endpoint
+from plastron.client import Client
 
 
 class MockOKResponse:

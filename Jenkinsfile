@@ -137,21 +137,21 @@ pipeline {
         sh '''
           . .venv/bin/activate
 
-          # Install pycodestyle
-          pip install pycodestyle
+          # Install ruff
+          pip install ruff
 
-          # Run pycodesytyle
+          # Run ruff
           # Send output to standard out for "Record compiler warnings and static analysis results"
           # post-build action
           #
           # Using "|| true" so that build will be considered successful, even if there are violations.
-          pycodestyle --format pylint . || true
+          ruff check --output-format pylint . || true
         '''
       }
       post {
         always {
-          // Collect pycodestyle reports
-          recordIssues(tools: [pyLint(reportEncoding: 'UTF-8', name: 'pycodestyle')],
+          // Collect ruff reports
+          recordIssues(tools: [pyLint(reportEncoding: 'UTF-8', name: 'ruff')],
                        qualityGates: [[threshold: 1, type: 'TOTAL', criticality: 'UNSTABLE']]
           )
         }

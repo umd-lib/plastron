@@ -6,7 +6,8 @@ import pytest
 from plastron.cli.commands.replace import replace
 from plastron.context import PlastronContext
 from plastron.models.pcdm import PCDMFile
-from plastron.repo import Repository, RepositoryError, BinaryResource
+from plastron.repo import Repository, RepositoryError
+from plastron.files import BinaryResource
 
 
 def test_replace_repository_error():

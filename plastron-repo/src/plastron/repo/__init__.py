@@ -1,7 +1,6 @@
 import logging
 from contextlib import contextmanager
 from http import HTTPStatus
-from io import BytesIO
 from typing import Optional, Type, TypeVar, Iterator, Union
 from uuid import uuid4
 
@@ -15,7 +14,6 @@ from urlobject import URLObject
 from plastron.client import Client, Endpoint, ClientError
 from plastron.client.auth import get_authenticator
 from plastron.client.transactions import transaction
-from plastron.files import BinarySource, BinarySourceError
 from plastron.rdfmapping.graph import TrackChangesGraph
 from plastron.rdfmapping.resources import RDFResourceBase, RDFResourceType
 
@@ -332,46 +330,6 @@ class ContainerResource(RepositoryResource):
         else:
             resource = self.repo.create(resource_class=resource_class, container_path=self.path, **kwargs)
         return resource
-
-
-class BinaryResource(RepositoryResource):
-    """An [LDP Non-RDF Source](https://www.w3.org/TR/ldp/#ldpnr) resource."""
-    @property
-    def size(self) -> int:
-        """Size of the resource in bytes, as reported by the HTTP `Content-Length` header."""
-        return int(self._headers['Content-Length'])
-
-    @contextmanager
-    def open(self):
-        """Request the resource, and return a `BytesIO` object of its content."""
-        response = self.client.get(self.url, stream=True)
-        if not response.ok:
-            raise RepositoryError(response)
-
-        yield BytesIO(response.content)
-
-    def update_binary(self, source: BinarySource, mime_type: str = None):
-        try:
-            headers = {
-                'Content-Type': mime_type or source.mimetype() or 'application/octet-stream',
-                'Digest': source.digest(),
-                'Content-Disposition': f'attachment; filename="{source.filename}"',
-            }
-            logger.info(f'Updating binary content at {self.url}')
-            logger.debug(f'Headers: {headers}')
-            with source.open() as stream:
-                response = self.client.put(
-                    url=self.url,
-                    data=stream,
-                    headers=headers,
-                )
-        except (ClientError | BinarySourceError) as e:
-            raise RepositoryError(f'Unable to update {self.url}: {e}') from e
-
-        if not response.ok:
-            raise RepositoryError(f'Unable to update {self.url}: {response}')
-
-        return response
 
 
 class RepositoryError(Exception):

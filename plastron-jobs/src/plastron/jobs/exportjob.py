@@ -15,21 +15,20 @@ from zipfile import ZipFile
 
 from bagit import make_bag
 from paramiko import SFTPClient, SSHException
-from plastron.client import ClientError
-from plastron.context import PlastronContext
-from plastron.files import get_ssh_client
-from plastron.jobs import Job
-from plastron.models.ore import Proxy
-from plastron.models.pcdm import PCDMFile
-from plastron.models.umd import Item
-from plastron.repo import BinaryResource, DataReadError
-from plastron.repo.aggregation import AggregationResource
-from plastron.repo.pcdm import PCDMFileBearingResource, PCDMObjectResource
-from plastron.serializers import SERIALIZER_CLASSES, detect_resource_class
-from plastron.serializers.csv import EmptyItemListError
 from requests import ConnectionError
 
+from plastron.client import ClientError
+from plastron.context import PlastronContext
+from plastron.files import get_ssh_client, FileSpec, BinaryResource
+from plastron.jobs import Job
+from plastron.models.pcdm import PCDMFile, PCDMObject
+from plastron.models.umd import Item
 from plastron.namespaces import fabio, pcdmuse
+from plastron.repo import DataReadError
+from plastron.repo.aggregation import AggregationResource
+from plastron.repo.pcdm import PCDMFileBearingResource, PCDMObjectResource, PCDMPageResource
+from plastron.serializers import SERIALIZER_CLASSES, detect_resource_class
+from plastron.serializers.csv import EmptyItemListError
 
 UUID_REGEX = re.compile(r'([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})', re.IGNORECASE)
 
@@ -58,7 +57,7 @@ def compress_bag(bag, dest, root_dirname=''):
                 zip_file.write(filename=src_filename, arcname=archived_name)
 
 
-def get_function_tag(file_resource: BinaryResource) -> str:
+def get_usage_tag(file_resource: BinaryResource) -> str:
     """
     Map a file's RDF types to a PCDM use function tag.
 
@@ -78,41 +77,45 @@ def get_function_tag(file_resource: BinaryResource) -> str:
         return ''
 
 
-def gather_files_with_pages(
+def gather_page_files(
     resource: AggregationResource,
-    mime_type: str = None
-) -> list[tuple[str, BinaryResource, str]]:
-    """
-    Collect files from a resource, preserving page labels and function tags.
+    mime_type: str = None,
+    binaries_dir: str = None,
+) -> Iterator[FileSpec]:
+    """Returns an iterator of `FileSpec` objects representing each file for
+    each page in the given `resource`."""
 
-    Returns a list of tuples (page_label, file_resource, function_tag) where:
-    - page_label is the title from the proxy (e.g., "Page 1")
-    - file_resource is the BinaryResource
-    - function_tag is '' or one of: 'preservation', 'ocr', 'metadata'
-    """
-    files_with_pages = []
+    for page_resource in resource.get_sequence(PCDMPageResource):
+        page_obj = page_resource.read().describe(PCDMObject)
+        page_label = page_obj.title.value
 
-    # Iterate through proxies to get page labels and maintain order
-    for proxy_resource in resource.get_proxies():
-        proxy = proxy_resource.describe(Proxy)
-        page_label = str(proxy.title.value) if proxy.title.value else 'Page'
-
-        # Get the page resource from the proxy
-        page_url = proxy.proxy_for.value
-        page_resource = resource.repo[page_url:PCDMFileBearingResource]
-
-        # Get all files for this page
-        for file_resource in page_resource.get_files(mime_type=mime_type):
-            function_tag = get_function_tag(file_resource)
-            files_with_pages.append((page_label, file_resource, function_tag))
-
-    return files_with_pages
+        yield from gather_files(
+            resource=page_resource,
+            mime_type=mime_type,
+            label=page_label,
+            binaries_dir=binaries_dir,
+        )
 
 
-def gather_files(resource: AggregationResource, mime_type: str = None) -> Iterator[BinaryResource]:
-    """Legacy function for backwards compatibility. Returns just the file resources."""
-    for _, file_resource, _ in gather_files_with_pages(resource, mime_type=mime_type):
-        yield file_resource
+def gather_files(
+    resource: PCDMFileBearingResource,
+    label: str = None,
+    mime_type: str = None,
+    binaries_dir: str = None,
+) -> Iterator[FileSpec]:
+    binaries_path = Path(binaries_dir) if binaries_dir else None
+    for file_resource in resource.get_files(mime_type=mime_type):
+        function_tag = get_usage_tag(file_resource)
+        file_obj = file_resource.describe(PCDMFile)
+        filename = file_obj.filename.value
+        if binaries_path:
+            filename = str(binaries_path / filename)
+        yield FileSpec(
+            name=filename,
+            label=label,
+            source=file_resource,
+            usage=function_tag,
+        )
 
 
 class Stopwatch:
@@ -147,47 +150,49 @@ class ExportJob(Job):
     uris: list[str]
     key: str
 
-    def list_binaries_to_export(self, resource: PCDMObjectResource) \
-            -> tuple[Optional[list[tuple[str, BinaryResource, str]]], Optional[list[BinaryResource]]]:
-        """
-        Gather binaries for export, separated into page member files and item-level files.
-
-        Returns a tuple of (page_files, item_files) where:
-        - page_files is a list of tuples (page_label, file_resource (BinaryResource), function_tag) or None
-        - item_files is a list of BinaryResource objects or None
-        """
-        if not self.export_binaries:
-            return None, None
-
+    def __post_init__(self):
         if self.binary_types is not None:
             accepted_types = self.binary_types.split(',')
 
             # filter files by their MIME type
-            def mime_type_filter(file):
-                return str(file.headers['Content-Type']) in accepted_types
+            def mime_type_filter(file_spec: FileSpec) -> bool:
+                return str(file_spec.source.headers['Content-Type']) in accepted_types
+
+            self.mime_type_filter = mime_type_filter
         else:
             # default filter is None; in this case filter() will return
             # all items that evaluate to true
-            mime_type_filter = None
+            self.mime_type_filter = None
 
-        logger.info(f'Gathering binaries for {resource.url}')
+    def get_page_files(self, resource: PCDMObjectResource, item_dir: str = None) -> tuple[list[FileSpec], FileSize]:
+        if not self.export_binaries:
+            return [], FileSize(0)
 
-        page_files = gather_files_with_pages(resource, mime_type=None)
-        if mime_type_filter is not None:
-            page_files = [(label, file, tag) for label, file, tag in page_files if mime_type_filter(file)]
+        logger.info(f'Gathering binaries for the pages of {resource.url}')
 
-        # item-level files are from items with the pcdm:hasFile properly
-        item_files = list(filter(mime_type_filter, resource.get_files(mime_type=None)))
+        files = list(filter(self.mime_type_filter, gather_page_files(resource, mime_type=None, binaries_dir=item_dir)))
+        total_size = FileSize(sum(f.source.size for f in files))
+        logger.info(f'Total size of page member files: {total_size}')
 
-        page_files_size = FileSize(sum(file.size for _, file, _ in page_files)) if page_files else FileSize(0)
-        item_files_size = FileSize(sum(file.size for file in item_files)) if item_files else FileSize(0)
-        logger.info(f'Total size of page member files: {page_files_size}')
-        logger.info(f'Total size of item-level files: {item_files_size}')
+        return files, total_size
 
-        return (page_files if page_files else None), (item_files if item_files else None)
+    def get_item_files(self, resource: PCDMObjectResource, item_dir: str = None) -> tuple[list[FileSpec], FileSize]:
+        if not self.export_binaries:
+            return [], FileSize(0)
+
+        logger.info(f'Gathering item-level binaries for {resource.url}')
+
+        files = list(filter(self.mime_type_filter, gather_files(resource, mime_type=None, binaries_dir=item_dir)))
+        total_size = FileSize(sum(f.source.size for f in files))
+        logger.info(f'Total size of item-level files: {total_size}')
+
+        return files, total_size
 
     def run(self) -> Generator[dict[str, Any], None, dict[str, Any]]:
         logger.info(f'Requested export format is {self.export_format}')
+        if self.export_binaries:
+            types = self.binary_types or '*/*'
+            logger.info(f'Exporting binaries with types: {types}')
 
         timer = Stopwatch()
         count = Counter(
@@ -227,32 +232,30 @@ class ExportJob(Job):
                 item_dir = resource.path.lstrip('/').replace('/', '.')
 
                 model_class = detect_resource_class(resource.graph, resource.url, fallback=Item)
-                page_files, item_files = self.list_binaries_to_export(resource)
 
                 # write the metadata for this object
                 obj = resource.describe(model=model_class)
                 # use the identifier field from the model as a better item directory name
                 if hasattr(obj, 'identifier'):
                     item_dir = str(obj.identifier.value or item_dir)
+
+                page_files, page_files_size = self.get_page_files(resource, item_dir=item_dir)
+                item_files, item_files_size = self.get_item_files(resource, item_dir=item_dir)
                 serializer.write(
                     obj,
                     files=page_files,
                     item_files=item_files,
-                    binaries_dir=item_dir,
                     public_url=self.context.get_public_url(resource),
                 )
 
                 # Write binary files for page member and item-level files
-                all_files = []
-                if page_files is not None:
-                    all_files.extend([(label, file, tag) for label, file, tag in page_files])
-                if item_files is not None:
-                    all_files.extend([(None, file, '') for file in item_files])
+                all_files = [*page_files, *item_files]
 
                 if all_files:
                     binaries_dir = Path(export_dir, item_dir)
                     binaries_dir.mkdir(parents=True, exist_ok=True)
-                    for _, file_resource, _ in all_files:
+                    for file_spec in all_files:
+                        file_resource = file_spec.source
                         accessed = parsedate(file_resource.headers['Date'])
                         modified = parsedate(file_resource.headers['Last-Modified'])
                         file = file_resource.describe(PCDMFile)

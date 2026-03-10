@@ -13,7 +13,7 @@ from uuid import uuid4
 from rdflib import URIRef
 from rdflib.util import from_n3
 
-from plastron.files import FileSpec, FileGroup, parse_usage_tag
+from plastron.files import FileSpec, FileGroup, parse_usage_tag, parse_label
 from plastron.models import ContentModeledResource
 from plastron.namespaces import get_manager
 from plastron.rdfmapping.descriptors import Property, DataProperty
@@ -199,14 +199,6 @@ def build_file_groups(filenames_string: str) -> dict[str, FileGroup]:
     logger.debug(f'Found {len(file_groups)} unique file basename(s)')
     logger.debug(f'File group labels: {labels}')
     return file_groups
-
-
-def parse_label(filename: str) -> tuple[str, Optional[str]]:
-    if ':' in filename:
-        label, filename = filename.split(':', 1)
-        return filename, label
-    else:
-        return filename, None
 
 
 @dataclass

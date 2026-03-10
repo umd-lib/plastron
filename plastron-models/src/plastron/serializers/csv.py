@@ -1,5 +1,4 @@
 import csv
-import os
 import re
 from collections import defaultdict
 from contextlib import contextmanager
@@ -7,17 +6,16 @@ from itertools import zip_longest
 from pathlib import Path
 from typing import Iterable, Mapping, NamedTuple, TextIO, Type, TypeVar
 
-from plastron.models.fedora import FedoraResource
-from plastron.models.pcdm import PCDMFile
-from plastron.rdfmapping.descriptors import DataProperty, ObjectProperty
-from plastron.rdfmapping.embed import EmbeddedObject
-from plastron.rdfmapping.properties import RDFDataProperty, RDFObjectProperty
-from plastron.rdfmapping.resources import RDFResource, RDFResourceBase
 from rdflib import Literal, URIRef
 from urlobject import URLObject
 
 from plastron.models import ContentModeledResource
-from plastron.namespaces import fabio, pcdmuse, umdaccess
+from plastron.models.fedora import FedoraResource
+from plastron.namespaces import umdaccess
+from plastron.rdfmapping.descriptors import DataProperty, ObjectProperty
+from plastron.rdfmapping.embed import EmbeddedObject
+from plastron.rdfmapping.properties import RDFDataProperty, RDFObjectProperty
+from plastron.rdfmapping.resources import RDFResource, RDFResourceBase
 
 
 def not_empty(value):
@@ -412,7 +410,6 @@ class CSVSerializer:
             resource: T,
             files: Iterable = None,
             item_files: Iterable = None,
-            binaries_dir: str = '',
             public_url: str = None,
     ) -> dict[str, str]:
         """
@@ -441,11 +438,11 @@ class CSVSerializer:
 
         # FILES column contains page member files with labels and function tags
         if files is not None:
-            row['FILES'] = self._format_page_files(files, binaries_dir)
+            row['FILES'] = ';'.join(str(file_spec) for file_spec in files)
 
         # ITEM_FILES column just contains files with function tags only
         if item_files is not None:
-            row['ITEM_FILES'] = self._format_item_files(item_files, binaries_dir)
+            row['ITEM_FILES'] = ';'.join(str(file_spec) for file_spec in item_files)
 
         fedora_resource = resource.redescribe(FedoraResource)
         row['CREATED'] = str(fedora_resource.created.value)
@@ -460,69 +457,6 @@ class CSVSerializer:
         sheet.rows.append(row)
 
         return row
-
-    def _format_page_files(self, files: Iterable, binaries_dir: str) -> str:
-        """
-        Format page member files with page labels and function tags.
-        Format: Page 1:<func>file.ext;<func>file.ext;Page 2:<func>file.ext
-
-        The page label appears once at the start of each page's file group,
-        followed by the files for that page, with optional function tags.
-        """
-        if not files:
-            return ''
-
-        file_parts = []
-        current_label = None
-
-        for page_label, file_resource, function_tag in files:
-            file = file_resource.describe(PCDMFile)
-            filename = os.path.join(binaries_dir, str(file.filename.value))
-
-            # Add page label if it changes
-            if page_label != current_label:
-                # Start of a new page group - add the label followed by first file
-                file_entry = f'<{function_tag}>{filename}' if function_tag else filename
-                file_parts.append(f'{page_label}:{file_entry}')
-                current_label = page_label
-            else:
-                # Same page - just add the file without label
-                file_entry = f'<{function_tag}>{filename}' if function_tag else filename
-                file_parts.append(file_entry)
-
-        return ';'.join(file_parts)
-
-    def _format_item_files(self, item_files: Iterable, binaries_dir: str) -> str:
-        """
-        Format item-level files with function tags only (no page labels).
-        Format: <func>file.ext;<func>file.ext
-        """
-        if not item_files:
-            return ''
-
-        file_parts = []
-        for file_resource in item_files:
-            file = file_resource.describe(PCDMFile)
-            filename = os.path.join(binaries_dir, str(file.filename.value))
-
-            # Get functional tag for this file
-            file_types = file.rdf_type.values
-            function_tag = ''
-
-            if pcdmuse.PreservationMasterFile in file_types:
-                function_tag = 'preservation'
-            elif pcdmuse.ExtractedText in file_types:
-                function_tag = 'ocr'
-            elif fabio.MetadataFile in file_types:
-                function_tag = 'metadata'
-
-            # Add functional tag if present
-            if function_tag:
-                file_parts.append(f'<{function_tag}>{filename}')
-            else:
-                file_parts.append(filename)
-
-        return ';'.join(file_parts)
 
     LANGUAGE_NAMES = {
         'ja': 'Japanese',

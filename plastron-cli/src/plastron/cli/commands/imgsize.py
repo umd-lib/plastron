@@ -5,7 +5,7 @@ from PIL import Image
 
 from plastron.cli.commands import BaseCommand
 from plastron.models.pcdm import PCDMImageFile
-from plastron.repo import BinaryResource
+from plastron.files import BinaryResource
 from plastron.repo.utils import context
 
 Image.MAX_IMAGE_PIXELS = None

@@ -9,7 +9,8 @@ from plastron.ocr.core import (
     UnrecognizedOCRFormatError,
 )
 from plastron.ocr.hocr import HOCRResource
-from plastron.repo import BinaryResource, RepositoryError
+from plastron.repo import RepositoryError
+from plastron.files import BinaryResource
 
 
 class ImageWithOCR:

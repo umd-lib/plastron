@@ -6,12 +6,12 @@ from rdflib import Literal, URIRef
 from urlobject import URLObject
 
 from plastron.client.utils import random_slug
-from plastron.files import BinarySource, FileGroup
+from plastron.files import BinarySource, FileGroup, BinaryResource
 from plastron.models.annotations import Annotation
 from plastron.models.ldp import LDPContainer
 from plastron.models.pcdm import PCDMObject, PCDMFile
 from plastron.models.umd import Page
-from plastron.repo import ContainerResource, Repository, BinaryResource
+from plastron.repo import ContainerResource, Repository
 from plastron.repo.aggregation import AggregationResource
 
 logger = logging.getLogger(__name__)

@@ -1,13 +1,16 @@
 import hashlib
 import io
+import logging
 import re
 import urllib
 import zipfile
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from http import HTTPStatus
+from io import BytesIO
 from mimetypes import guess_type
-from os.path import basename, isfile
-from typing import Mapping, Any, Protocol, Optional, ClassVar
+from os.path import basename, isfile, splitext
+from typing import Mapping, Any, Protocol
 from urllib.parse import urlsplit
 
 from paramiko import SFTPClient, SSHClient, AutoAddPolicy, SSHException
@@ -15,7 +18,72 @@ from paramiko.config import SSH_PORT
 from rdflib import URIRef
 from requests import Response, Session
 
+from plastron.client import ClientError
 from plastron.namespaces import pcdmuse, fabio
+from plastron.repo import RepositoryResource, RepositoryError
+
+logger = logging.getLogger(__name__)
+
+USAGE_TAGS: dict[str, set[URIRef]] = {
+    'preservation': {pcdmuse.PreservationMasterFile},
+    'ocr': {pcdmuse.ExtractedText},
+    'metadata': {fabio.MetadataFile},
+}
+
+
+def parse_usage_tag(filename: str) -> tuple[str, str | None]:
+    if m := re.search(r'^<([^>]+)>(.*)', filename):
+        return m[2], m[1]
+    else:
+        return filename, None
+
+
+def parse_label(filename: str) -> tuple[str, str | None]:
+    if ':' in filename:
+        label, filename = filename.split(':', 1)
+        return filename, label
+    else:
+        return filename, None
+
+
+class BinaryResource(RepositoryResource):
+    """An [LDP Non-RDF Source](https://www.w3.org/TR/ldp/#ldpnr) resource."""
+    @property
+    def size(self) -> int:
+        """Size of the resource in bytes, as reported by the HTTP `Content-Length` header."""
+        return int(self._headers['Content-Length'])
+
+    @contextmanager
+    def open(self):
+        """Request the resource, and return a `BytesIO` object of its content."""
+        response = self.client.get(self.url, stream=True)
+        if not response.ok:
+            raise RepositoryError(response)
+
+        yield BytesIO(response.content)
+
+    def update_binary(self, source: 'BinarySource', mime_type: str = None):
+        try:
+            headers = {
+                'Content-Type': mime_type or source.mimetype() or 'application/octet-stream',
+                'Digest': source.digest(),
+                'Content-Disposition': f'attachment; filename="{source.filename}"',
+            }
+            logger.info(f'Updating binary content at {self.url}')
+            logger.debug(f'Headers: {headers}')
+            with source.open() as stream:
+                response = self.client.put(
+                    url=self.url,
+                    data=stream,
+                    headers=headers,
+                )
+        except (ClientError | BinarySourceError) as e:
+            raise RepositoryError(f'Unable to update {self.url}: {e}') from e
+
+        if not response.ok:
+            raise RepositoryError(f'Unable to update {self.url}: {response}')
+
+        return response
 
 
 def get_ssh_client(sftp_uri: str | urllib.parse.SplitResult, **kwargs) -> SSHClient:
@@ -96,7 +164,7 @@ class BinarySource:
         """Generates the SHA-1 checksum. Returns a hex-encoded SHA-1 digest,
         prepended with the string "sha1="."""
         sha1 = hashlib.sha1()
-        with self as stream:
+        with self.open() as stream:
             for block in stream:
                 sha1.update(block)
         return 'sha1=' + sha1.hexdigest()
@@ -405,34 +473,37 @@ class ZipFileSource(BinarySource):
 @dataclass
 class FileSpec:
     name: str
+    label: str = None
     usage: str = None
-    source: BinarySource = None
-
-    USAGE_TAGS: ClassVar[dict[str, set[URIRef]]] = {
-        'preservation': {pcdmuse.PreservationMasterFile},
-        'ocr': {pcdmuse.ExtractedText},
-        'metadata': {fabio.MetadataFile},
-    }
+    source: BinarySource | BinaryResource = None
 
     @classmethod
-    def parse(cls, data: str):
-        name, usage = parse_usage_tag(data)
-        return cls(name=name, usage=usage)
+    def parse(cls, spec_string: str):
+        name, label = parse_label(spec_string)
+        name, usage = parse_usage_tag(name)
+        return cls(name=name, label=label, usage=usage)
 
     def __str__(self):
-        return self.name
+        return self.spec
+
+    @property
+    def rootname(self) -> str:
+        return splitext(self.name)[0]
 
     @property
     def spec(self) -> str:
+        name = self.name
         if self.usage:
-            return f'<{self.usage}>{self.name}'
-        else:
-            return self.name
+            name = f'<{self.usage}>{name}'
+        if self.label:
+            name = f'{self.label}:{name}'
+        return name
 
     @property
-    def rdf_types(self) -> Optional[set[URIRef]]:
+    def rdf_types(self) -> set[URIRef]:
         if self.usage is not None:
-            return self.USAGE_TAGS.get(self.usage.lower(), None)
+            return USAGE_TAGS.get(self.usage.lower(), None)
+        return set()
 
 
 @dataclass
@@ -454,10 +525,3 @@ class FileGroup:
             if file.name == name:
                 return file
         raise RuntimeError(f'{name} is not in file group {self}')
-
-
-def parse_usage_tag(filename: str) -> tuple[str, Optional[str]]:
-    if m := re.search(r'^<([^>]+)>(.*)', filename):
-        return m[2], m[1]
-    else:
-        return filename, None

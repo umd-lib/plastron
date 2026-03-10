@@ -4,9 +4,9 @@ from argparse import Namespace
 from rdflib import Literal
 
 from plastron.cli.commands import BaseCommand
-from plastron.files import LocalFileSource
+from plastron.files import LocalFileSource, BinaryResource
 from plastron.models.pcdm import PCDMFile
-from plastron.repo import Repository, BinaryResource, RepositoryError
+from plastron.repo import Repository, RepositoryError
 
 logger = logging.getLogger(__name__)
 

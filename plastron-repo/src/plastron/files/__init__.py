@@ -19,6 +19,7 @@ from rdflib import URIRef
 from requests import Response, Session
 
 from plastron.client import ClientError
+from plastron.models.pcdm import PCDMFile
 from plastron.namespaces import pcdmuse, fabio
 from plastron.repo import RepositoryResource, RepositoryError
 
@@ -29,6 +30,21 @@ USAGE_TAGS: dict[str, set[URIRef]] = {
     'ocr': {pcdmuse.ExtractedText},
     'metadata': {fabio.MetadataFile},
 }
+
+
+def get_usage_tag(file_obj: PCDMFile) -> str | None:
+    """Map a file's RDF types to a usage tag.
+
+    Returns the usage tag (preservation, ocr, or metadata) if the file
+    has a corresponding RDF type, otherwise returns `None`."""
+    file_types = set(file_obj.rdf_type.values)
+    for tag, types in USAGE_TAGS.items():
+        # as long as the types for this tag are a subset of
+        # all the types for the file, use this tag
+        if types <= file_types:
+            return tag
+    else:
+        return None
 
 
 def parse_usage_tag(filename: str) -> tuple[str, str | None]:

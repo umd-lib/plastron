@@ -19,11 +19,10 @@ from requests import ConnectionError
 
 from plastron.client import ClientError
 from plastron.context import PlastronContext
-from plastron.files import get_ssh_client, FileSpec, BinaryResource
+from plastron.files import get_ssh_client, FileSpec, get_usage_tag
 from plastron.jobs import Job
 from plastron.models.pcdm import PCDMFile, PCDMObject
 from plastron.models.umd import Item
-from plastron.namespaces import fabio, pcdmuse
 from plastron.repo import DataReadError
 from plastron.repo.aggregation import AggregationResource
 from plastron.repo.pcdm import PCDMFileBearingResource, PCDMObjectResource, PCDMPageResource
@@ -57,26 +56,6 @@ def compress_bag(bag, dest, root_dirname=''):
                 zip_file.write(filename=src_filename, arcname=archived_name)
 
 
-def get_usage_tag(file_resource: BinaryResource) -> str:
-    """
-    Map a file's RDF types to a PCDM use function tag.
-
-    Returns the function tag (preservation, ocr, or metadata) if the file
-    has a corresponding RDF type, otherwise returns empty string.
-    """
-    file = file_resource.describe(PCDMFile)
-    file_types = file.rdf_type.values
-
-    if pcdmuse.PreservationMasterFile in file_types:
-        return 'preservation'
-    elif pcdmuse.ExtractedText in file_types:
-        return 'ocr'
-    elif fabio.MetadataFile in file_types:
-        return 'metadata'
-    else:
-        return ''
-
-
 def gather_page_files(
     resource: AggregationResource,
     mime_type: str = None,
@@ -103,9 +82,11 @@ def gather_files(
     mime_type: str = None,
     binaries_dir: str = None,
 ) -> Iterator[FileSpec]:
+    """Returns an iterator of `FileSpec` objects representing each file of
+    the given `resource`."""
+
     binaries_path = Path(binaries_dir) if binaries_dir else None
     for file_resource in resource.get_files(mime_type=mime_type):
-        function_tag = get_usage_tag(file_resource)
         file_obj = file_resource.describe(PCDMFile)
         filename = file_obj.filename.value
         if binaries_path:
@@ -114,7 +95,7 @@ def gather_files(
             name=filename,
             label=label,
             source=file_resource,
-            usage=function_tag,
+            usage=get_usage_tag(file_obj),
         )
 
 
@@ -151,7 +132,7 @@ class ExportJob(Job):
     key: str
 
     def __post_init__(self):
-        if self.binary_types is not None:
+        if self.binary_types:
             accepted_types = self.binary_types.split(',')
 
             # filter files by their MIME type

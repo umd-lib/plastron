@@ -10,7 +10,9 @@ usage: plastron import [-h] [-m MODEL] [-l LIMIT] [-% PERCENTAGE]
                        [--access URI|CURIE] [--member-of URI]
                        [--binaries-location LOCATION] [--container PATH]
                        [--job-id JOB_ID] [--resume]
-                       [--extract-text-from MIME_TYPES] [--publish]
+                       [--extract-text-from MIME_TYPES]
+                       [--group-by {rootname,none}]
+                       [--publish]
                        [import_file]
 
 Import data to the repository
@@ -25,17 +27,17 @@ options:
   -l LIMIT, --limit LIMIT
                         limit the number of rows to read from the import file
   -% PERCENTAGE, --percent PERCENTAGE
-                        select an evenly spaced subset of items to import; 
-                        the size of this set will be as close as possible 
+                        select an evenly spaced subset of items to import;
+                        the size of this set will be as close as possible
                         to the specified percentage of the total items
   --validate-only       only validate, do not do the actual import
   --make-template FILENAME
                         create a CSV template for the given model
   --convert-from {ndnp}
-                        use a pre-processor to transform another data 
+                        use a pre-processor to transform another data
                         format into an import job
   --convert-option NAME VALUE, -o NAME VALUE
-                        set a parameter to used by the --convert-from 
+                        set a parameter to used by the --convert-from
                         pre-processor; repeatable
   --access URI|CURIE    URI or CURIE of the access class to apply to new items
   --member-of URI       URI of the object that new items are PCDM members of
@@ -44,15 +46,19 @@ options:
                         a "zip:<path to zipfile>" URI, an SFTP URI in the
                         form "sftp://<user>@<host>/<path to dir>", or a URI
                         in the form "zip+sftp://<user>@<host>/<path to zipfile>"
-  --container PATH      parent container for new items; defaults to the 
+  --container PATH      parent container for new items; defaults to the
                         RELPATH in the repo configuration file
-  --job-id JOB_ID       unique identifier for this job; defaults to 
+  --job-id JOB_ID       unique identifier for this job; defaults to
                         "import-{timestamp}"
   --resume              resume a job that has been started; requires
                         --job-id {id} to be present
   --extract-text-from MIME_TYPES, -x MIME_TYPES
-                        extract text from binaries of the given MIME types, 
+                        extract text from binaries of the given MIME types,
                         and add as annotations
+  --group-by {rootname,none}
+                        method for grouping related files into file groups;
+                        "rootname" (default) groups files by shared base name,
+                        "none" treats each file as a separate group
   --publish             automatically publish all items in this import
 ```
 
@@ -199,25 +205,25 @@ of remaining items, Plastron will import all the remaining items.
 
 ## Pre-Processors
 
-In order to handle importing from data sources other than its standard CSV 
-spreadsheet format, the `import` command provides the ability to use a 
-pre-processor to convert data from some other format to a standard import 
+In order to handle importing from data sources other than its standard CSV
+spreadsheet format, the `import` command provides the ability to use a
+pre-processor to convert data from some other format to a standard import
 CSV spreadsheet.
 
 Currently available pre-processors:
 
 * [ndnp](#ndnp-pre-processor)
 
-To use a pre-processor, provide the `--convert-from` option to the import 
+To use a pre-processor, provide the `--convert-from` option to the import
 command, along with the name of the pre-processor to use.
 
-Some pre-processors take initialization parameters. These are provided 
-using the `--convert-option` or `-o` switches, followed by the parameter 
+Some pre-processors take initialization parameters. These are provided
+using the `--convert-option` or `-o` switches, followed by the parameter
 name and value as two separate strings. For example, `-o batch_file small.xml`
 sets the `batch_file` parameter to `'small.xml'`.
 
-Jobs initiated using a pre-processor do **not** need special handling when 
-resuming. At that point, it is just a standard job with a standard import 
+Jobs initiated using a pre-processor do **not** need special handling when
+resuming. At that point, it is just a standard job with a standard import
 CSV spreadsheet.
 
 ### ndnp Pre-processor
@@ -225,7 +231,7 @@ CSV spreadsheet.
 * Name: `ndnp`
 * Options:
   * `dir` Base directory of the NDNP file tree
-  * `batch_file` Name of the XML file that describes this NDNP package; 
+  * `batch_file` Name of the XML file that describes this NDNP package;
     relative the `dir` parameter
 
 Example:

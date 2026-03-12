@@ -46,6 +46,7 @@ class ImportConfig(JobConfig):
     container: Optional[str] = None
     binaries_location: Optional[str] = None
     extract_text_types: Optional[str] = None
+    file_grouping_strategy: str = 'rootname'
 
 
 def get_loggable_uri(item):
@@ -364,7 +365,11 @@ class ImportJob(Job):
 
     def get_metadata(self) -> MetadataSpreadsheet:
         try:
-            return MetadataSpreadsheet(metadata_filename=self.metadata_file, model_class=self.model_class)
+            return MetadataSpreadsheet(
+                metadata_filename=self.metadata_file,
+                model_class=self.model_class,
+                file_grouping_strategy=self.config.file_grouping_strategy
+            )
         except MetadataError as e:
             raise JobError(job=self) from e
 

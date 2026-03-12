@@ -187,6 +187,12 @@ class ExportJob(Job):
         except KeyError:
             raise RuntimeError(f'Unknown format: {self.export_format}')
 
+        if not self.output_dest.endswith('.zip'):
+            logger.warning(
+                f'Output destination should end with ".zip"; changing "{self.output_dest}" to "{self.output_dest}.zip"'
+            )
+            self.output_dest += '.zip'
+
         logger.info(f'Export destination: {self.output_dest}')
 
         # create a bag in a temporary directory to hold exported items

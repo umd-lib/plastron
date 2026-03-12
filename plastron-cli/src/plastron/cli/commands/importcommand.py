@@ -166,7 +166,6 @@ def configure_cli(subparsers):
         help=(
             'method for grouping related files into file groups; '
             '"rootname" (default) groups files by shared base name, '
-            '"label" groups files by assigned label, '
             '"none" treats each file as a separate group'
         ),
         choices=['rootname', 'none'],

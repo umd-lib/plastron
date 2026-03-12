@@ -200,7 +200,6 @@ def build_file_groups(filenames_string: str, grouping_strategy: str = 'rootname'
         for idx, filename in enumerate(filenames_string.split(';'), 1):
             filename, label = parse_label(filename)
             filename, usage = parse_usage_tag(filename)
-            root, ext = splitext(basename(filename))
             # Use the full filename as the key to ensure uniqueness
             group_key = filename
             file_groups[group_key] = FileGroup(

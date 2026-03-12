@@ -16,12 +16,12 @@ class BaseCommand:
             name = 'import'
         return self.context.config.get('COMMANDS', {}).get(name.upper(), {})
 
-    def _run(self, command: Generator):
+    def _run(self, command: Generator[dict[str, Any], None, dict[str, Any]]):
         # delegating generator; each progress step is passed to the calling
         # method, and the return value from the command is stored as the result
         self.result = yield from command
 
-    def run(self, command: Generator):
+    def run(self, command: Generator[Any, None, dict[str, Any]]) -> dict[str, Any]:
         # Run the delegating generator to exhaustion, discarding the intermediate
         # yielded values. Return the final result.
         for _ in self._run(command):

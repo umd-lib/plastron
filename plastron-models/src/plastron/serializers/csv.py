@@ -1,10 +1,11 @@
 import csv
 import re
 from collections import defaultdict
+from collections.abc import Iterable, Mapping
 from contextlib import contextmanager
 from itertools import zip_longest
 from pathlib import Path
-from typing import Iterable, Mapping, NamedTuple, TextIO, Type, TypeVar
+from typing import TextIO, TypeVar, IO, NamedTuple
 
 from rdflib import Literal, URIRef
 from urlobject import URLObject
@@ -19,7 +20,7 @@ from plastron.rdfmapping.properties import RDFDataProperty, RDFObjectProperty
 from plastron.rdfmapping.resources import RDFResource, RDFResourceBase
 
 
-def not_empty(value):
+def not_empty(value: str) -> bool:
     """Returns true if `value` is not `None` and is not the empty string."""
     return value is not None and value != ''
 
@@ -166,6 +167,26 @@ class ColumnsDict(dict):
         self.index = []
 
 
+def language_tagged_str(literal: Literal) -> str:
+    """If `literal` has a language tag, return a string in the format
+    `"[@lang]value"`. If `literal` has no language tag, just return its
+    value.
+
+    ```pycon
+    >>> language_tagged_str(Literal('Book'))
+    'Book'
+
+    >>> language_tagged_str(Literal('das Buch', lang='de'))
+    '[@de]das Buch'
+
+    ```
+    """
+    if literal.language:
+        return f'[@{literal.language}]{literal.value}'
+    else:
+        return literal.value
+
+
 def flatten(
     description: RDFResourceBase,
     header_map: dict[str, str | dict],
@@ -183,25 +204,30 @@ def flatten(
                 # add this embedded object to the index for this row
                 columns.index.append([f'{attr}[{n}]=#{URLObject(obj.uri).fragment}'])
                 embedded_columns = flatten(obj, header)
-                columns.update(embedded_columns)
+                for k, v in embedded_columns.items():
+                    if k not in columns:
+                        columns[k] = []
+                    # the values list for each separate embedded object must
+                    # be added as a list to the main column (forming a list
+                    # of lists) so the join_values() function knows to use the
+                    # proper ";" separator between parallel objects
+                    columns[k].append(v)
         else:
-            if description is not None:
-                prop = getattr(description, attr)
-                if isinstance(prop, RDFDataProperty):
-                    # handle language tags on literals
-                    languages = list(prop.languages)
-                    if languages:
-                        for language in languages:
-                            columns[ColumnHeader(label=header, language=language)] = [
-                                v for v in prop.values if v.language == language
-                            ]
-                    else:
-                        columns[ColumnHeader(label=header)] = []
-                else:
-                    columns[ColumnHeader(label=header)] = list(prop.values)
-            else:
-                columns[ColumnHeader(label=header)] = []
+            columns[ColumnHeader(label=header)] = flatten_basic_property(description, attr)
+
     return columns
+
+
+def flatten_basic_property(description: RDFResourceBase, attr: str) -> list[str]:
+    if description is None:
+        return []
+
+    prop = getattr(description, attr)
+    if isinstance(prop, RDFDataProperty):
+        # handle language tags on literals
+        return [language_tagged_str(v) for v in prop.values]
+    else:
+        return [str(v) for v in prop.values]
 
 
 def get_column_headers(headers: Iterable[str], base_header: str) -> list[ColumnHeader]:
@@ -264,10 +290,10 @@ def get_embedded_params(row: Mapping[str, str], header_labels: Iterable[str]) ->
 
 
 def unflatten(
-        row_data: Mapping[str, str],
-        resource_class: Type[RDFResourceBase],
-        header_map: Mapping[str, str | dict],
-        index: Mapping[str, Mapping[int, str]] = None,
+    row_data: Mapping[str, str],
+    resource_class: type[RDFResourceBase],
+    header_map: Mapping[str, str | dict],
+    index: Mapping[str, Mapping[int, str]] = None,
 ) -> dict[str, list[Literal | URIRef | EmbeddedObject]]:
     """Transform a mapping of column headers to values (such as would be returned by a
     `csv.DictReader`) into a dictionary of parameters that can be passed to the constructor
@@ -326,7 +352,7 @@ def get_literal(column_header: ColumnHeader, descriptor: DataProperty, input_val
 
 
 @contextmanager
-def ensure_text_mode(file):
+def ensure_text_mode(file: IO):
     if 'b' in file.mode:
         # re-open in text mode
         fh = open(file.fileno(), mode=file.mode.replace('b', ''), closefd=False)
@@ -338,7 +364,7 @@ def ensure_text_mode(file):
 
 
 @contextmanager
-def ensure_binary_mode(file):
+def ensure_binary_mode(file: IO):
     if 'b' not in file.mode:
         # re-open in binary mode
         fh = open(file.fileno(), mode=file.mode + 'b', closefd=False)
@@ -350,14 +376,14 @@ def ensure_binary_mode(file):
 
 
 class Sheet:
-    def __init__(self, model: Type[ContentModeledResource]):
+    def __init__(self, model: type[ContentModeledResource]):
         self.model_class = model
         self.headers = list(flatten_headers(self.header_map).keys()) + CSVSerializer.SYSTEM_HEADERS
         self.extra_headers = defaultdict(set)
         self.rows = []
 
     @property
-    def header_map(self):
+    def header_map(self) -> dict[str, str | dict[str, str]]:
         return self.model_class.HEADER_MAP
 
     def write_csv_file(self, file: TextIO):
@@ -405,11 +431,11 @@ class CSVSerializer:
         self.finish()
 
     def write(
-            self,
-            resource: T,
-            files: Iterable[FileSpec] = None,
-            item_files: Iterable[FileSpec] = None,
-            public_url: str = None,
+        self,
+        resource: T,
+        files: Iterable[FileSpec] = None,
+        item_files: Iterable[FileSpec] = None,
+        public_url: str = None,
     ) -> dict[str, str]:
         """
         Serializes the given resource as a CSV row using the `flatten()` function. The resulting row is

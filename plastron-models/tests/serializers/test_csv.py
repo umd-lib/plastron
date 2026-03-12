@@ -1,8 +1,12 @@
 import pytest
 from rdflib import URIRef
 
+from plastron.models import ContentModeledResource
 from plastron.models.umd import Item
-from plastron.namespaces import umdaccess
+from plastron.namespaces import umdaccess, dcterms, dcmitype
+from plastron.rdfmapping.decorators import rdf_type
+from plastron.rdfmapping.descriptors import DataProperty
+from plastron.rdfmapping.resources import RDFResource
 from plastron.serializers import CSVSerializer
 
 
@@ -46,3 +50,21 @@ def test_serialize_multiple_languages(multilingual_item, header_map):
     expected_values = {'Title': 'The Trial', 'Title [de]': 'Der Prozeß'}
     for key, value in expected_values.items():
         assert row[key] == value
+
+
+@rdf_type(dcmitype.Text)
+class SimpleModel(RDFResource, ContentModeledResource):
+    title = DataProperty(dcterms.title)
+    description = DataProperty(dcterms.description)
+
+    HEADER_MAP = {
+        'title': 'Title',
+        'description': 'Description',
+    }
+
+
+def test_serialize_all_columns():
+    serializer = CSVSerializer()
+    obj = SimpleModel()
+    row = serializer.write(obj)
+    assert len(row) == len(SimpleModel.HEADER_MAP) + len(CSVSerializer.SYSTEM_HEADERS)

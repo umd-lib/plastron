@@ -9,6 +9,7 @@ from typing import Iterable, Mapping, NamedTuple, TextIO, Type, TypeVar
 from rdflib import Literal, URIRef
 from urlobject import URLObject
 
+from plastron.files import FileSpec
 from plastron.models import ContentModeledResource
 from plastron.models.fedora import FedoraResource
 from plastron.namespaces import umdaccess
@@ -188,10 +189,14 @@ def flatten(
                 prop = getattr(description, attr)
                 if isinstance(prop, RDFDataProperty):
                     # handle language tags on literals
-                    for language in set(v.language for v in prop.values):
-                        columns[ColumnHeader(label=header, language=language)] = [
-                            v for v in prop.values if v.language == language
-                        ]
+                    languages = list(prop.languages)
+                    if languages:
+                        for language in languages:
+                            columns[ColumnHeader(label=header, language=language)] = [
+                                v for v in prop.values if v.language == language
+                            ]
+                    else:
+                        columns[ColumnHeader(label=header)] = []
                 else:
                     columns[ColumnHeader(label=header)] = list(prop.values)
             else:
@@ -362,12 +367,6 @@ class Sheet:
             for i, new_header in enumerate(sorted(new_headers), start=1):
                 self.headers.insert(header_index + i, new_header)
 
-        # strip out headers that aren't used in any row
-        for header in self.headers:
-            has_column_values = any([True for row in self.rows if header in row])
-            if not has_column_values:
-                self.headers.remove(header)
-
         # write the CSV file;
         # file must be opened in text mode, otherwise csv complains
         # about wanting str and not bytes
@@ -408,8 +407,8 @@ class CSVSerializer:
     def write(
             self,
             resource: T,
-            files: Iterable = None,
-            item_files: Iterable = None,
+            files: Iterable[FileSpec] = None,
+            item_files: Iterable[FileSpec] = None,
             public_url: str = None,
     ) -> dict[str, str]:
         """
@@ -421,6 +420,11 @@ class CSVSerializer:
         - files: Iterable of tuples (page_label, file_resource (BinaryResource), function_tag) for page member files
         - item_files: Iterable of BinaryResource objects for item-level files
         """
+        if files is None:
+            files = []
+        if item_files is None:
+            item_files = []
+
         resource_class = type(resource)
 
         if resource_class not in self.sheets:
@@ -436,19 +440,13 @@ class CSVSerializer:
         row['URI'] = str(resource.uri)
         row['INDEX'] = join_values(columns.index)
 
-        # FILES column contains page member files with labels and function tags
-        if files is not None:
-            row['FILES'] = ';'.join(str(file_spec) for file_spec in files)
-
-        # ITEM_FILES column just contains files with function tags only
-        if item_files is not None:
-            row['ITEM_FILES'] = ';'.join(str(file_spec) for file_spec in item_files)
+        row['FILES'] = ';'.join(str(file_spec) for file_spec in files)
+        row['ITEM_FILES'] = ';'.join(str(file_spec) for file_spec in item_files)
 
         fedora_resource = resource.redescribe(FedoraResource)
-        row['CREATED'] = str(fedora_resource.created.value)
-        row['MODIFIED'] = str(fedora_resource.last_modified.value)
-        if public_url is not None:
-            row['PUBLIC URI'] = public_url
+        row['CREATED'] = fedora_resource.created.value or ''
+        row['MODIFIED'] = fedora_resource.last_modified.value or ''
+        row['PUBLIC URI'] = public_url or ''
 
         # set publication and visibility state
         row['PUBLISH'] = str(umdaccess.Published in resource.rdf_type.values)

@@ -2,26 +2,40 @@ import csv
 import logging
 import re
 from collections import defaultdict
-from collections.abc import Sized, Container
+from collections.abc import Container, Sized
 from dataclasses import dataclass
 from itertools import chain
-from os.path import splitext, basename
+from os.path import basename, splitext
 from pathlib import Path
-from typing import Optional, Mapping, Type, Iterator, NamedTuple, Protocol, TypeVar, Generic
+from typing import (
+    Generic,
+    Iterator,
+    Mapping,
+    NamedTuple,
+    Optional,
+    Protocol,
+    Type,
+    TypeVar,
+)
 from uuid import uuid4
 
-from rdflib import URIRef
-from rdflib.util import from_n3
-
-from plastron.files import FileSpec, FileGroup, parse_usage_tag, parse_label
-from plastron.models import ContentModeledResource
-from plastron.namespaces import get_manager
-from plastron.rdfmapping.descriptors import Property, DataProperty
+from plastron.files import FileGroup, FileSpec, parse_label, parse_usage_tag
+from plastron.rdfmapping.descriptors import DataProperty, Property
 from plastron.rdfmapping.embed import EmbeddedObject
 from plastron.rdfmapping.resources import RDFResourceBase, RDFResourceType
 from plastron.repo import DataReadError, Repository, RepositoryResource
-from plastron.serializers.csv import flatten_headers, unflatten, build_lookup_index, CSVSerializer
+from plastron.serializers.csv import (
+    CSVSerializer,
+    build_lookup_index,
+    flatten_headers,
+    unflatten,
+)
 from plastron.utils import strtobool
+from rdflib import URIRef
+from rdflib.util import from_n3
+
+from plastron.models import ContentModeledResource
+from plastron.namespaces import get_manager
 
 nsm = get_manager()
 logger = logging.getLogger(__name__)
@@ -130,10 +144,15 @@ def get_final_prop(model_class: Type[RDFResourceType], attrs: list[str]) -> Prop
     return get_final_prop(next_attr.object_class, attrs)
 
 
-def build_file_groups(filenames_string: str) -> dict[str, FileGroup]:
+def build_file_groups(filenames_string: str, grouping_strategy: str = 'rootname') -> dict[str, FileGroup]:
     """Parses a string containing zero or more file paths with optional
     labels into a dictionary whose values are `FileGroup` objects, and
     whose keys are the file basenames from those `FileGroup` objects.
+
+    The `grouping_strategy` parameter controls how files are grouped:
+
+    - 'rootname' (default): Files with the same base name are grouped together.
+    - 'none': Each file is its own group. No grouping is performed.
 
     ```pycon
     >>> build_file_groups('')
@@ -157,6 +176,7 @@ def build_file_groups(filenames_string: str) -> dict[str, FileGroup]:
     }
     ```
 
+    When using 'rootname' grouping:
     If one file group has a label, then all file groups must have a
     label, otherwise this function raises a `MetadataError`.
 
@@ -168,35 +188,55 @@ def build_file_groups(filenames_string: str) -> dict[str, FileGroup]:
     If no labels are given, defaults to using "Page 1" to "Page N"
     as the labels."""
 
+    if grouping_strategy not in ('rootname', 'none'):
+        raise ValueError(f'Invalid grouping_strategy: {grouping_strategy}')
+
     file_groups: dict[str, FileGroup] = {}
     if filenames_string.strip() == '':
         return file_groups
-    for filename in filenames_string.split(';'):
-        filename, label = parse_label(filename)
-        filename, usage = parse_usage_tag(filename)
-        root, ext = splitext(basename(filename))
-        if root not in file_groups:
-            file_groups[root] = FileGroup(rootname=root, label=label)
-        file_group = file_groups[root]
-        if label is not None:
-            if file_group.label is not None:
-                if file_group.label != label:
-                    raise MetadataError(f'Multiple files with rootname "{root}" have differing labels')
-            else:
-                file_group.label = label
 
-        file_groups[root].files.append(FileSpec(name=filename, usage=usage))
+    if grouping_strategy == 'none':
+        # Each file is its own group, identified by the filename
+        for idx, filename in enumerate(filenames_string.split(';'), 1):
+            filename, label = parse_label(filename)
+            filename, usage = parse_usage_tag(filename)
+            root, ext = splitext(basename(filename))
+            # Use the full filename as the key to ensure uniqueness
+            group_key = filename
+            file_groups[group_key] = FileGroup(
+                rootname=filename,
+                label=label or f'Page {idx}',
+                files=[FileSpec(name=filename, usage=usage)]
+            )
+    else:
+        for filename in filenames_string.split(';'):
+            filename, label = parse_label(filename)
+            filename, usage = parse_usage_tag(filename)
+            root, ext = splitext(basename(filename))
+            if root not in file_groups:
+                file_groups[root] = FileGroup(rootname=root, label=label)
+            file_group = file_groups[root]
+            if label is not None:
+                if file_group.label is not None:
+                    if file_group.label != label:
+                        raise MetadataError(f'Multiple files with rootname "{root}" have differing labels')
+                else:
+                    file_group.label = label
 
+            file_groups[root].files.append(FileSpec(name=filename, usage=usage))
+
+        labels = [g.label for g in file_groups.values()]
+        if any(label is not None for label in labels) and not all(label is not None for label in labels):
+            raise MetadataError('If any file group has a label, all file groups must have a label')
+        elif all(label is None for label in labels):
+            # no explicit labels, default to "Page 1" to "Page N"
+            logger.info('No explicit page labels given, using default "Page 1" to "Page N"')
+            for i, group in enumerate(file_groups.values(), 1):
+                group.label = f'Page {i}'
+                labels[i - 1] = group.label
+
+    logger.debug(f'Found {len(file_groups)} file group(s) using "{grouping_strategy}" grouping strategy')
     labels = [g.label for g in file_groups.values()]
-    if any(label is not None for label in labels) and not all(label is not None for label in labels):
-        raise MetadataError('If any file group has a label, all file groups must have a label')
-    elif all(label is None for label in labels):
-        # no explicit labels, default to "Page 1" to "Page N"
-        logger.info('No explicit page labels given, using default "Page 1" to "Page N"')
-        for i, group in enumerate(file_groups.values(), 1):
-            group.label = f'Page {i}'
-            labels[i - 1] = group.label
-    logger.debug(f'Found {len(file_groups)} unique file basename(s)')
     logger.debug(f'File group labels: {labels}')
     return file_groups
 
@@ -235,7 +275,10 @@ class Row(Generic[ModelType]):
         self.number = row_number
         self.data = data
         self.identifier_column = identifier_column
-        self._file_groups = build_file_groups(self.data.get('FILES', ''))
+        self._file_groups = build_file_groups(
+            self.data.get('FILES', ''),
+            grouping_strategy=spreadsheet.file_grouping_strategy
+        )
         self._filenames = list(chain(*[group.filenames for group in self._file_groups.values()]))
 
     def __getitem__(self, item):
@@ -325,10 +368,11 @@ class MetadataSpreadsheet(Generic[ModelType]):
     Iterable sequence of rows from the metadata CSV file of an import job.
     """
 
-    def __init__(self, metadata_filename: Path | str, model_class: Type[ModelType]):
+    def __init__(self, metadata_filename: Path | str, model_class: Type[ModelType], file_grouping_strategy: str = 'rootname'):
         self.metadata_filename = metadata_filename
         self.metadata_file = None
         self.model_class = model_class
+        self.file_grouping_strategy = file_grouping_strategy
 
         try:
             self.metadata_file = open(metadata_filename, 'r')

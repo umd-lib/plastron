@@ -162,6 +162,19 @@ def configure_cli(subparsers):
         action='store'
     )
     parser.add_argument(
+        '--group-by',
+        help=(
+            'method for grouping related files into file groups; '
+            '"rootname" (default) groups files by shared base name, '
+            '"label" groups files by assigned label, '
+            '"none" treats each file as a separate group'
+        ),
+        choices=['rootname', 'none'],
+        default='rootname',
+        dest='file_grouping_strategy',
+        action='store'
+    )
+    parser.add_argument(
         '--publish',
         help='automatically publish all items in this import',
         action='store_true',
@@ -222,6 +235,7 @@ class Command(BaseCommand):
                         member_of=args.member_of,
                         container=args.container,
                         binaries_location=str(batch.root_dir),
+                        file_grouping_strategy=args.file_grouping_strategy,
                     ))
                     with job.metadata_file.open(mode='w') as fh:
                         write_import_csv(batch, fh)
@@ -245,6 +259,7 @@ class Command(BaseCommand):
                         member_of=args.member_of,
                         container=args.container,
                         binaries_location=args.binaries_location,
+                        file_grouping_strategy=args.file_grouping_strategy,
                     ),
                 )
 

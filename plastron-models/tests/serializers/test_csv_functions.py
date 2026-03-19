@@ -6,7 +6,20 @@ from plastron.rdfmapping.descriptors import DataProperty, ObjectProperty
 from plastron.rdfmapping.embed import EmbeddedObject
 from plastron.rdfmapping.resources import RDFResource
 from plastron.serializers.csv import join_values, flatten_headers, unflatten, flatten, ensure_text_mode, \
-    ensure_binary_mode, ColumnHeader
+    ensure_binary_mode, ColumnHeader, not_empty
+
+
+@pytest.mark.parametrize(
+    ('value', 'expected'),
+    [
+        (None, False),
+        ('', False),
+        (' ', True),
+        ('foo', True),
+    ]
+)
+def test_not_empty(value, expected):
+    assert not_empty(value) == expected
 
 
 class Subject(RDFResource):
@@ -49,8 +62,7 @@ def test_flatten_headers(header_map):
 
 def test_flatten_multiple_languages(multilingual_item, header_map):
     expected_values = {
-        ColumnHeader(label='Title'): [Literal('The Trial')],
-        ColumnHeader(label='Title', language='de'): [Literal('Der Prozeß', lang='de')],
+        ColumnHeader(label='Title'): ['The Trial', '[@de]Der Prozeß'],
     }
     columns = flatten(multilingual_item, header_map)
     for key, value in expected_values.items():

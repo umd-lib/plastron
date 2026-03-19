@@ -1,6 +1,4 @@
-# Serializers
-
-## CSV Serializer
+# CSV Serializer
 
 The mapping from RDF description objects to tabular (e.g., CSV) data is 
 defined by a *header map*:
@@ -93,3 +91,62 @@ We expect this CSV serialization:
 Title,Identifier,Author Name,Author Website,URI,INDEX
 Good Omens,0060853980|978-0060853983,Neil Gaiman;Terry Pratchett,https://neilgaiman.com;https://terrypratchett.com,http://example.com/item,creator[0]=#gaiman;creator[1]=#pratchett
 ```
+
+## Multiple Values
+
+Multiple values for the same non-embedded field are separated by a pipe 
+character ("|"). Values for different embedded objects of the same field 
+(e.g., multiple authors) are separated by a semicolon (";").
+
+These can be mixed, if there are multiple embedded objects and at least 
+one has multiple values for the same field.
+
+## Multiple Languages
+
+The deserializer supports two formats for specifying a language tag for 
+certain values:
+
+1. [Language-specific columns](#language-specific-columns)
+2. [Value-level language tags](#value-level-language-tags)
+
+The serializer, however, only supports writing value-level language tags, 
+in order to ensure export-to-import round trip capability.
+
+### Language-specific columns
+
+The language code is appended to the column header like this:
+
+```
+Title [de]
+```
+
+Only values with that language tag appear in that column. This can lead to 
+a variable number of columns for each field, depending on the number of 
+distinct language tags for that field's values.
+
+This format is only supported by the `import` command; the `export` 
+command always uses the value-level langauge tags.
+
+### Value-level language tags
+
+The language code is prepended to the actual data value like this:
+
+```
+[@de]Der Prozeß
+```
+
+This format allow mixing of languages in a single column:
+
+```
+[@de]Der Prozeß|[@en]The Trial
+```
+
+And you can combine tagged and untagged values:
+
+```
+The Trial|[@de]Der Prozeß
+```
+
+This format is closer to the RDF data model, where the language is an 
+attribute of the value, and thus provides a more direct representation of 
+the underlying data structure.

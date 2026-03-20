@@ -56,6 +56,28 @@ optional arguments:
   -h, --help  show this help message and exit
 ```
 
+### Attach (attach)
+
+```text
+$ plastron attach --help
+usage: plastron attach [-h] [--binary-file BINARY_FILE] [--mime-type MIME_TYPE] [--slug SLUG] [--usage {preservation,ocr,metadata}] URI|PATH
+
+Attach a binary to a resource in the repository
+
+positional arguments:
+  URI|PATH              URI or repository path of the resource to attach the BINARY_FILE to
+
+options:
+  -h, --help            show this help message and exit
+  --binary-file BINARY_FILE
+                        local path to the binary file
+  --mime-type MIME_TYPE
+                        use this MIME type instead of auto-detecting based on the BINARY_FILE
+  --slug SLUG           use this as the resource slug instead of a randomly generated string
+  --usage {preservation,ocr,metadata}
+                        the purpose of this binary
+```
+
 ### Create (create)
 
 ```text

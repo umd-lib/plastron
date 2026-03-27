@@ -1,8 +1,10 @@
 import dataclasses
 import re
 from argparse import Namespace
+from collections.abc import Generator
 from contextlib import contextmanager
 from dataclasses import dataclass
+from functools import cached_property
 from importlib.metadata import version
 from string import Formatter
 from typing import Any, Optional
@@ -11,6 +13,7 @@ import pysolr
 
 from plastron.client import Endpoint, Client
 from plastron.client.auth import get_authenticator
+from plastron.client.proxied import ProxiedClient
 from plastron.handles import HandleServiceClient
 from plastron.messaging.broker import Broker, ServerTuple, HeartbeatTuple
 from plastron.models.fedora import FedoraResource
@@ -30,110 +33,97 @@ def get_uuid_from_uri(uri: str) -> Optional[str]:
 class PlastronContext:
     config: dict[str, Any] = None
     args: Namespace = None
-    _repo: Repository = None
-    _endpoint: Endpoint = None
-    _client: Client = None
-    _broker: Broker = None
-    _solr: pysolr.Solr = None
-    _handle_client: HandleServiceClient = None
 
     @property
     def version(self):
         return version('plastron-repo')
 
-    @property
+    @cached_property
     def endpoint(self) -> Endpoint:
-        if self._endpoint is None:
-            repo_config = self.config.get('REPOSITORY', {})
-            try:
-                self._endpoint = Endpoint(
-                    url=repo_config['REST_ENDPOINT'],
-                    default_path=repo_config.get('RELPATH', '/'),
-                )
-            except KeyError as e:
-                raise RuntimeError(f"Missing configuration key {e} in section 'REPOSITORY'")
+        repo_config = self.config.get('REPOSITORY', {})
+        try:
+            return Endpoint(
+                url=repo_config['REST_ENDPOINT'],
+                default_path=repo_config.get('RELPATH', '/'),
+            )
+        except KeyError as e:
+            raise RuntimeError(f"Missing configuration key {e} in section 'REPOSITORY'")
 
-        return self._endpoint
-
-    @property
+    @cached_property
     def client(self) -> Client:
-        if self._client is None:
-            repo_config = self.config.get('REPOSITORY', {})
-            try:
-                # TODO: respect the batch mode flag when getting the authenticator
-                self._client = Client(
+        delegated_user = self.args.delegated_user if hasattr(self.args, 'delegated_user') else None
+        repo_config = self.config.get('REPOSITORY', {})
+        authenticator = get_authenticator(repo_config)
+        try:
+            if 'ORIGIN' in repo_config:
+                return ProxiedClient(
                     endpoint=self.endpoint,
-                    auth=get_authenticator(repo_config),
+                    origin_endpoint=Endpoint(url=repo_config['ORIGIN']),
+                    auth=authenticator,
                     ua_string=f'plastron/{self.version}',
-                    on_behalf_of=self.args.delegated_user,
+                    on_behalf_of=delegated_user,
                 )
-            except KeyError as e:
-                raise RuntimeError(f"Missing configuration key {e} in section 'REPOSITORY'")
+            else:
+                return Client(
+                    endpoint=self.endpoint,
+                    auth=authenticator,
+                    ua_string=f'plastron/{self.version}',
+                    on_behalf_of=delegated_user,
+                )
+        except KeyError as e:
+            raise RuntimeError(f"Missing configuration key {e} in section 'REPOSITORY'")
 
-        return self._client
-
-    @property
+    @cached_property
     def repo(self) -> Repository:
-        if self._repo is None:
-            self._repo = Repository(client=self.client)
-        return self._repo
+        return Repository(client=self.client)
 
     @contextmanager
-    def repo_configuration(self, delegated_user: str = None, ua_string: str = None) -> 'PlastronContext':
+    def repo_configuration(self, delegated_user: str = None, ua_string: str = None) -> Generator['PlastronContext']:
         if self.args is not None:
             args = Namespace(**{**self.args.__dict__, 'delegated_user': delegated_user, 'ua_string': ua_string})
         else:
             args = Namespace(delegated_user=delegated_user, ua_string=ua_string)
         yield dataclasses.replace(self, args=args)
 
-    @property
+    @cached_property
     def broker(self) -> Broker:
-        if self._broker is None:
-            broker_config = self.config.get('MESSAGE_BROKER', {})
-            heartbeat_intervals = broker_config.get('HEARTBEAT')
-            if heartbeat_intervals is not None:
-                heartbeat = HeartbeatTuple.from_dict(heartbeat_intervals)
-            else:
-                heartbeat = None
-            try:
-                self._broker = Broker(
-                    server=ServerTuple.from_string(broker_config['SERVER']),
-                    message_store_dir=broker_config['MESSAGE_STORE_DIR'],
-                    destinations=broker_config['DESTINATIONS'],
-                    heartbeat=heartbeat,
-                )
-            except KeyError as e:
-                raise RuntimeError(f"Missing configuration key {e} in section 'MESSAGE_BROKER'")
+        broker_config = self.config.get('MESSAGE_BROKER', {})
+        heartbeat_intervals = broker_config.get('HEARTBEAT')
+        if heartbeat_intervals is not None:
+            heartbeat = HeartbeatTuple.from_dict(heartbeat_intervals)
+        else:
+            heartbeat = None
+        try:
+            return Broker(
+                server=ServerTuple.from_string(broker_config['SERVER']),
+                message_store_dir=broker_config['MESSAGE_STORE_DIR'],
+                destinations=broker_config['DESTINATIONS'],
+                heartbeat=heartbeat,
+            )
+        except KeyError as e:
+            raise RuntimeError(f"Missing configuration key {e} in section 'MESSAGE_BROKER'")
 
-        return self._broker
-
-    @property
+    @cached_property
     def solr(self) -> pysolr.Solr:
-        if self._solr is None:
-            solr_config = self.config.get('SOLR', {})
-            try:
-                self._solr = pysolr.Solr(solr_config['URL'], always_commit=True, timeout=10)
-            except KeyError as e:
-                raise RuntimeError(f"Missing configuration key {e} in section 'SOLR'")
+        solr_config = self.config.get('SOLR', {})
+        try:
+            return pysolr.Solr(solr_config['URL'], always_commit=True, timeout=10)
+        except KeyError as e:
+            raise RuntimeError(f"Missing configuration key {e} in section 'SOLR'")
 
-        return self._solr
-
-    @property
+    @cached_property
     def handle_client(self) -> HandleServiceClient:
-        if self._handle_client is None:
-            # try to instantiate a handle client
-            config = self.config.get('PUBLICATION_WORKFLOW', {})
-            try:
-                self._handle_client = HandleServiceClient(
-                    endpoint_url=config['HANDLE_ENDPOINT'],
-                    jwt_token=config['HANDLE_JWT_TOKEN'],
-                    default_prefix=config['HANDLE_PREFIX'],
-                    default_repo=config['HANDLE_REPO'],
-                )
-            except KeyError as e:
-                raise RuntimeError(f"Missing configuration key {e} in section 'PUBLICATION_WORKFLOW'")
-
-        return self._handle_client
+        # try to instantiate a handle client
+        config = self.config.get('PUBLICATION_WORKFLOW', {})
+        try:
+            return HandleServiceClient(
+                endpoint_url=config['HANDLE_ENDPOINT'],
+                jwt_token=config['HANDLE_JWT_TOKEN'],
+                default_prefix=config['HANDLE_PREFIX'],
+                default_repo=config['HANDLE_REPO'],
+            )
+        except KeyError as e:
+            raise RuntimeError(f"Missing configuration key {e} in section 'PUBLICATION_WORKFLOW'")
 
     def get_public_url(self, resource: RepositoryResource) -> str:
         """Given a `RepositoryResource`, use the configuration value `PUBLICATION_WORKFLOW.PUBLIC_URL_PATTERN`

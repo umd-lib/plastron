@@ -16,6 +16,8 @@ from plastron.repo.aggregation import AggregationResource
 
 logger = logging.getLogger(__name__)
 
+DEFAULT_BINARY_MIME_TYPE = 'application/octet-stream'
+
 
 class WebAnnotationBearingResource(ContainerResource):
     """A container that has an annotations container, containing Web Annotations."""
@@ -67,13 +69,19 @@ class PCDMFileBearingResource(ContainerResource):
         return self
 
     def create_file(
-            self,
-            source: BinarySource,
-            slug: Optional[str] = None,
-            rdf_types: Optional[set] = None,
+        self,
+        source: BinarySource,
+        slug: str = None,
+        rdf_types: set = None,
+        mime_type: str = None,
     ) -> BinaryResource:
         """Create a single file from the given source as a `pcdm:fileOf` this resource.
-        If no slug is provided, one is generated using `random_slug()`."""
+        If no slug is provided, one is generated using `random_slug()`. Any values provided
+        in the `rdf_types` set are added to the file's metadata. If a `mime_type` is provided,
+        it overrides the MIME type guessed from the file `source`. If no `mime_type` is
+        provided, and the MIME type cannot be guessed, falls back to the value of
+        `DEFAULT_BINARY_MIME_TYPE`."""
+
         if slug is None:
             slug = random_slug()
 
@@ -83,10 +91,10 @@ class PCDMFileBearingResource(ContainerResource):
 
         parent = self.describe(PCDMObject)
         title = basename(source.filename)
-        logger.info(f'Creating file {source.filename} ({source.mimetype()}) for {parent} as "{title}"')
+        logger.info(f'Creating file {source.filename} ({source.mimetype()}) for "{parent.title}" with title "{title}"')
         # first create the binary with its data
         headers = {
-            'Content-Type': source.mimetype() or 'application/octet-stream',
+            'Content-Type': mime_type or source.mimetype() or DEFAULT_BINARY_MIME_TYPE,
             'Digest': source.digest(),
             'Content-Disposition': f'attachment; filename="{source.filename}"',
         }

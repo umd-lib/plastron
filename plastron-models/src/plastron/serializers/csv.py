@@ -182,10 +182,8 @@ def language_tagged_str(literal: Literal) -> str:
     ```
     """
     if literal.language:
-        # return f'[@{literal.language}]{literal.value}'
-        return f'[@{literal.language}]{str(literal)}'
+        return f'[@{literal.language}]{literal}'
     else:
-        # return literal.value
         return str(literal)
 
 

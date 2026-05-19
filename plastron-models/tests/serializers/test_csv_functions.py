@@ -1,12 +1,22 @@
 import pytest
-from rdflib import Literal, URIRef
-
-from plastron.namespaces import rdfs, owl, dcterms
+from plastron.models.umd import Item
 from plastron.rdfmapping.descriptors import DataProperty, ObjectProperty
 from plastron.rdfmapping.embed import EmbeddedObject
 from plastron.rdfmapping.resources import RDFResource
-from plastron.serializers.csv import join_values, flatten_headers, unflatten, flatten, ensure_text_mode, \
-    ensure_binary_mode, ColumnHeader, not_empty
+from plastron.serializers.csv import (
+    ColumnHeader,
+    ensure_binary_mode,
+    ensure_text_mode,
+    flatten,
+    flatten_basic_property,
+    flatten_headers,
+    join_values,
+    not_empty,
+    unflatten,
+)
+from rdflib import Literal, URIRef
+
+from plastron.namespaces import dcterms, owl, rdfs, umdtype
 
 
 @pytest.mark.parametrize(
@@ -67,6 +77,18 @@ def test_flatten_multiple_languages(multilingual_item, header_map):
     columns = flatten(multilingual_item, header_map)
     for key, value in expected_values.items():
         assert columns[key] == value
+
+def test_flatten_handle_property():
+    """Test that handle properties serialize correctly."""
+    item = Item(handle=Literal('hdl:1903.1/1234', datatype=umdtype.handle))
+    result = flatten_basic_property(item, 'handle')
+    assert result == ['hdl:1903.1/1234']
+
+def test_flatten_accession_number_property():
+    """Test that accession_number properties serialize correctly."""
+    item = Item(accession_number=Literal('2008-51', datatype=umdtype.accessionNumber))
+    result = flatten_basic_property(item, 'accession_number')
+    assert result == ['2008-51']
 
 
 def test_unflatten(header_map):

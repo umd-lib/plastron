@@ -5,19 +5,19 @@ from collections.abc import Iterable, Mapping
 from contextlib import contextmanager
 from itertools import zip_longest
 from pathlib import Path
-from typing import TextIO, TypeVar, IO, NamedTuple
-
-from rdflib import Literal, URIRef
-from urlobject import URLObject
+from typing import IO, NamedTuple, TextIO, TypeVar
 
 from plastron.files import FileSpec
-from plastron.models import ContentModeledResource
 from plastron.models.fedora import FedoraResource
-from plastron.namespaces import umdaccess
 from plastron.rdfmapping.descriptors import DataProperty, ObjectProperty
 from plastron.rdfmapping.embed import EmbeddedObject
 from plastron.rdfmapping.properties import RDFDataProperty, RDFObjectProperty
 from plastron.rdfmapping.resources import RDFResource, RDFResourceBase
+from rdflib import Literal, URIRef
+from urlobject import URLObject
+
+from plastron.models import ContentModeledResource
+from plastron.namespaces import umdaccess
 
 
 def not_empty(value: str) -> bool:
@@ -182,9 +182,9 @@ def language_tagged_str(literal: Literal) -> str:
     ```
     """
     if literal.language:
-        return f'[@{literal.language}]{literal.value}'
+        return f'[@{literal.language}]{literal}'
     else:
-        return literal.value
+        return str(literal)
 
 
 def flatten(

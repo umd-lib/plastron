@@ -1,6 +1,6 @@
 [project]
 name = "plastron"
-dynamic = ["version", "dependencies", "optional-dependencies"]
+dynamic = ["version"]
 authors = [
     { name='University of Maryland Libraries', email='lib-ssdr@umd.edu' },
     { name='Josh Westgard', email='westgard@umd.edu' },
@@ -12,6 +12,32 @@ authors = [
 ]
 readme = "README.md"
 requires-python = ">= 3.10"
+dependencies = [
+    "plastron-client",
+    "plastron-jobs",
+    "plastron-messaging",
+    "plastron-models",
+    "plastron-rdf",
+    "plastron-repo",
+    "plastron-utils",
+]
+
+[project.optional-dependencies]
+cli = [ "plastron-cli" ]
+stomp = [ "plastron-stomp" ]
+web = [ "plastron-web" ]
+test = [
+    "plastron-cli[test]",
+    "plastron-client[test]",
+    "plastron-jobs[test]",
+    "plastron-messaging[test]",
+    "plastron-models[test]",
+    "plastron-rdf[test]",
+    "plastron-repo[test]",
+    "plastron-stomp[test]",
+    "plastron-utils[test]",
+    "plastron-web[test]",
+]
 
 [build-system]
 requires = ["setuptools>=66.1.0"]
@@ -23,12 +49,21 @@ packages = []
 
 [tool.setuptools.dynamic]
 version = { "file" = "VERSION" }
-dependencies = { "file" = "dependencies.txt" }
 
-[tool.setuptools.dynamic.optional-dependencies]
-cli = { "file" = "dependencies-cli.txt" }
-stomp = { "file" = "dependencies-stomp.txt" }
-web = { "file" = "dependencies-web.txt" }
+[tool.uv.sources]
+plastron-cli = { workspace = true }
+plastron-client = { workspace = true }
+plastron-jobs = { workspace = true }
+plastron-messaging = { workspace = true }
+plastron-models = { workspace = true }
+plastron-rdf = { workspace = true }
+plastron-repo = { workspace = true }
+plastron-stomp = { workspace = true }
+plastron-utils = { workspace = true }
+plastron-web = { workspace = true }
+
+[tool.uv.workspace]
+members = ["plastron-*"]
 
 [tool.pytest.ini_options]
 # these warnings are coming from third-party code

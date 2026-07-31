@@ -35,3 +35,8 @@ web = { "file" = "dependencies-web.txt" }
 filterwarnings = [
    'ignore:ConjunctiveGraph is deprecated:DeprecationWarning',
 ]
+
+[tool.ruff.lint]
+# for now, using the pre-0.16 default ruleset in ruff
+# see https://astral.sh/blog/ruff-v0.16.0#better-default-rule-set
+select = ["E4", "E7", "E9", "F"]

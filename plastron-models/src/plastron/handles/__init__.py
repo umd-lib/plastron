@@ -54,7 +54,7 @@ class HandleInfo:
 
 
 class HandleServiceClient:
-    def __init__(self, endpoint_url: str, jwt_token: str, default_prefix: str = None, default_repo: str = None):
+    def __init__(self, endpoint_url: str, jwt_token: str, default_prefix: str | None = None, default_repo: str | None = None):
         self.endpoint_url = endpoint_url
         self.default_prefix = default_prefix
         self.default_repo = default_repo
@@ -75,7 +75,7 @@ class HandleServiceClient:
 
         return HandleInfo(**parse_result(response.json()))
 
-    def find_handle(self, repo_id: str, repo: str = None) -> HandleInfo:
+    def find_handle(self, repo_id: str, repo: str | None = None) -> HandleInfo:
         url = self.endpoint_url + '/handles/exists'
         response = self.session.get(
             url=url,
@@ -89,7 +89,7 @@ class HandleServiceClient:
 
         return HandleInfo(**parse_result(response.json()))
 
-    def create_handle(self, repo_id: str, url: str, prefix: str = None, repo: str = None) -> HandleInfo:
+    def create_handle(self, repo_id: str, url: str, prefix: str | None = None, repo: str | None = None) -> HandleInfo:
         request = {
             'prefix': prefix or self.default_prefix,
             'repo': repo or self.default_repo,

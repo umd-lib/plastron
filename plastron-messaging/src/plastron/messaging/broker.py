@@ -117,7 +117,7 @@ class Destination:
         logger.debug(f'Message headers: {message.headers}')
         self.broker.connection.send(destination=self.name, headers=message.headers, body=message.body)
 
-    def subscribe(self, id: str, ack: str = 'auto', headers: dict = None, **kwargs):
+    def subscribe(self, id: str, ack: str = 'auto', headers: dict | None = None, **kwargs):
         self.broker.connection.subscribe(destination=self.name, id=id, ack=ack, headers=headers, **kwargs)
         logger.info(f"Subscribed to {self.name}")
         logger.debug(f"id={id} ack={ack} headers={headers} {kwargs}")

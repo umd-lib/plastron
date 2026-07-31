@@ -11,7 +11,7 @@ from plastron.repo.publish import PublishableResource
 
 
 class JobRunner:
-    def __init__(self, job, callback: Callable = None):
+    def __init__(self, job, callback: Callable | None = None):
         self.job = job
         self.callback = callback
         self.result = None

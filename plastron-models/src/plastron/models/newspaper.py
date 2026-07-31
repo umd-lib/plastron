@@ -1,3 +1,5 @@
+from collections.abc import Iterator
+
 from lxml.etree import XMLSyntaxError, parse
 
 from plastron.handles import HandleBearingResource
@@ -114,9 +116,9 @@ class Page(PCDMObject):
         self.ocr_file = ocr_file
         self.ocr = ALTOResource(tree, master.resolution)
 
-    def textblocks(self):
+    def textblocks(self) -> Iterator[TextblockOnPage]:
         if self.ocr is None:
-            raise StopIteration()
+            return
         # extract text blocks from ALTO XML for this page
         for textblock in self.ocr.textblocks():
             yield TextblockOnPage.from_textblock(textblock, page=self, scale=self.ocr.scale, ocr_file=self.ocr_file)

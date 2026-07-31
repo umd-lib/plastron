@@ -34,7 +34,7 @@ MODEL_MAP = {
 def detect_resource_class(
     graph: Graph,
     subject: str | URIRef,
-    fallback: type[ContentModeledResource] = None,
+    fallback: type[ContentModeledResource] | None = None,
 ) -> type[ContentModeledResource]:
     types = set(graph.objects(URIRef(subject), rdf.type))
 

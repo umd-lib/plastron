@@ -56,7 +56,7 @@ class Batch:
 
         key_column = get_flagged_column(self.mapping, 'key')
         if key_column is not None:
-            self.length = len(set([line[key_column] for line in self.rows]))
+            self.length = len({line[key_column] for line in self.rows})
         else:
             self.length = len(self.rows)
 
@@ -75,7 +75,7 @@ class Batch:
             for key in keys:
                 # add an item for each unique key
                 sub_lines = [line for line in lines if line[key_column] == key]
-                attrs = {column: get_column_value(sub_lines[0], column, mapping) for column in mapping.keys()}
+                attrs = {column: get_column_value(sub_lines[0], column, mapping) for column in mapping}
                 item = cls(**attrs)
                 item.path = key
                 item.ordered = False
@@ -131,7 +131,7 @@ class Batch:
                 if dirname is not None:
                     members = {}
                     for entry in os.scandir(os.path.join(self.file_path, dirname)):
-                        base, ext = os.path.splitext(entry.name)
+                        base, _ext = os.path.splitext(entry.name)
                         if base not in members:
                             members[base] = []
                         members[base].append(entry)
@@ -163,7 +163,7 @@ class Batch:
             # each line is its own (implicit) subject
             # for an Item resource
             for line in lines:
-                attrs = {column: get_column_value(line, column, mapping) for column in mapping.keys()}
+                attrs = {column: get_column_value(line, column, mapping) for column in mapping}
                 item = cls(**attrs)
                 yield item
 

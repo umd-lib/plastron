@@ -75,11 +75,11 @@ class MockHandleClient:
     def get_info(self, prefix: str, suffix: str) -> HandleInfo:
         return self.GET_HANDLE_LOOKUP.get(f'{prefix}/{suffix}', HandleInfo(exists=False))
 
-    def find_handle(self, repo_id: str, _repo: str = None) -> HandleInfo:
+    def find_handle(self, repo_id: str, _repo: str | None = None) -> HandleInfo:
         return self.FIND_HANDLE_LOOKUP.get(repo_id, HandleInfo(exists=False))
 
     @staticmethod
-    def create_handle(repo_id: str, url: str, prefix: str = None, _repo: str = None) -> HandleInfo:
+    def create_handle(repo_id: str, url: str, prefix: str | None = None, _repo: str | None = None) -> HandleInfo:
         if repo_id.endswith('NO_HANDLE'):
             raise HandleServerError('no handle')
         return HandleInfo(exists=True, prefix=prefix, suffix=str(randint(1000, 10000)), url=url)

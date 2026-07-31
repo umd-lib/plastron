@@ -53,7 +53,7 @@ class Command(BaseCommand):
         )
 
 
-def attach(ctx, location: str, binary_filename: str, slug: str = None, mime_type: str = None, usage: str = None):
+def attach(ctx, location: str, binary_filename: str, slug: str | None = None, mime_type: str | None = None, usage: str | None = None):
     repo: Repository = ctx.obj.repo
     try:
         resource = repo.get_resource(location, PCDMFileBearingResource).read()

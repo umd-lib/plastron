@@ -293,7 +293,7 @@ def unflatten(
     row_data: Mapping[str, str],
     resource_class: type[RDFResourceBase],
     header_map: Mapping[str, str | dict],
-    index: Mapping[str, Mapping[int, str]] = None,
+    index: Mapping[str, Mapping[int, str]] | None = None,
 ) -> dict[str, list[Literal | URIRef | EmbeddedObject]]:
     """Transform a mapping of column headers to values (such as would be returned by a
     `csv.DictReader`) into a dictionary of parameters that can be passed to the constructor
@@ -355,9 +355,8 @@ def get_literal(column_header: ColumnHeader, descriptor: DataProperty, input_val
 def ensure_text_mode(file: IO):
     if 'b' in file.mode:
         # re-open in text mode
-        fh = open(file.fileno(), mode=file.mode.replace('b', ''), closefd=False)
-        yield fh
-        fh.close()
+        with open(file.fileno(), mode=file.mode.replace('b', ''), closefd=False) as fh:
+            yield fh
     else:
         # file is already in text mode
         yield file
@@ -367,9 +366,8 @@ def ensure_text_mode(file: IO):
 def ensure_binary_mode(file: IO):
     if 'b' not in file.mode:
         # re-open in binary mode
-        fh = open(file.fileno(), mode=file.mode + 'b', closefd=False)
-        yield fh
-        fh.close()
+        with open(file.fileno(), mode=file.mode + 'b', closefd=False) as fh:
+            yield fh
     else:
         # file is already in binary mode
         yield file
@@ -413,7 +411,7 @@ class CSVSerializer:
         'URI', 'PUBLIC URI', 'CREATED', 'MODIFIED', 'INDEX', 'FILES', 'ITEM_FILES', 'PUBLISH', 'HIDDEN'
     ]
 
-    def __init__(self, directory: str | Path = None):
+    def __init__(self, directory: str | Path | None = None):
         self.directory = Path(directory) if directory is not None else Path.cwd()
         """Destination directory for the CSV file(s)"""
 
@@ -433,9 +431,9 @@ class CSVSerializer:
     def write(
         self,
         resource: T,
-        files: Iterable[FileSpec] = None,
-        item_files: Iterable[FileSpec] = None,
-        public_url: str = None,
+        files: Iterable[FileSpec] | None = None,
+        item_files: Iterable[FileSpec] | None = None,
+        public_url: str | None = None,
     ) -> dict[str, str]:
         """
         Serializes the given resource as a CSV row using the `flatten()` function. The resulting row is
@@ -458,7 +456,7 @@ class CSVSerializer:
         sheet = self.sheets[resource_class]
 
         columns = flatten(resource, resource_class.HEADER_MAP)
-        for header in columns.keys():
+        for header in columns:
             if header.language is not None:
                 sheet.extra_headers[header.label].add(str(header))
 

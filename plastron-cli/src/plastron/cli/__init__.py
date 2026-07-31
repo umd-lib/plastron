@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 import importlib.metadata
 import logging
 import logging.config
@@ -6,7 +5,7 @@ import os
 import sys
 from argparse import ArgumentParser, FileType, Namespace
 from collections.abc import Iterable
-from datetime import datetime
+from datetime import datetime, timezone
 from importlib import import_module
 from pkgutil import iter_modules
 
@@ -24,7 +23,7 @@ from plastron.utils import (
 )
 
 logger = logging.getLogger(__name__)
-now = datetime.utcnow().strftime('%Y%m%d%H%M%S')
+now = datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')
 version = importlib.metadata.version('plastron-cli')
 
 
@@ -185,7 +184,7 @@ def print_header(args):
         title = '|     PLASTRON     |'
         bar = '+' + '=' * (len(title) - 2) + '+'
         spacer = '|' + ' ' * (len(title) - 2) + '|'
-        print('\n'.join(['', bar, spacer, title, spacer, bar, '']), file=sys.stderr)
+        print(f'\n{bar}\n{spacer}\n{title}\n{spacer}\n{bar}\n', file=sys.stderr)
 
 
 def print_footer(args):

@@ -36,7 +36,7 @@ class ValidationFailed(Exception):
 def update(
         resource: RepositoryResource,
         sparql_update: str,
-        model_class: type[RDFResourceBase] = None,
+        model_class: type[RDFResourceBase] | None = None,
         dry_run: bool = False,
 ) -> dict[str, str]:
     """Update a single resource using a SPARQL Update Query."""

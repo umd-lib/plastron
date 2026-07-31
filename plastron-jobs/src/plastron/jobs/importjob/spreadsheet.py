@@ -207,7 +207,7 @@ def build_file_groups(filenames_string: str, grouping_strategy: str = 'rootname'
         for filename in filenames_string.split(';'):
             filename, label = parse_label(filename)
             filename, usage = parse_usage_tag(filename)
-            root, ext = splitext(basename(filename))
+            root, _ext = splitext(basename(filename))
             if root not in file_groups:
                 file_groups[root] = FileGroup(rootname=root, label=label)
             file_group = file_groups[root]
@@ -429,8 +429,8 @@ class MetadataSpreadsheet(Generic[ModelType]):
 
     def rows(
             self,
-            limit: int = None,
-            percentage: int = None,
+            limit: int | None = None,
+            percentage: int | None = None,
             completed: Bucket = None,
     ) -> Iterator[Row[ModelType] | InvalidRow]:
         """Iterator over the rows in this spreadsheet.

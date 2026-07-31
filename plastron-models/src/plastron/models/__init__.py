@@ -1,5 +1,3 @@
-from typing import Dict, Type
-
 from importlib_metadata import entry_points
 from rdflib import URIRef
 

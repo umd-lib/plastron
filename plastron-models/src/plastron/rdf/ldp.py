@@ -1,5 +1,5 @@
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from uuid import uuid4
 
 from rdflib import Graph, URIRef
@@ -78,7 +78,7 @@ class Resource(rdf.Resource):
 
                 self.created = True
                 # TODO: get this from the response headers
-                self.creation_timestamp = datetime.now()
+                self.creation_timestamp = datetime.now(timezone.utc)
                 # TODO: get the fedora:parent
                 self.container_path = container_path or client.endpoint.relpath
                 self.logger.info(f"Created {self}")

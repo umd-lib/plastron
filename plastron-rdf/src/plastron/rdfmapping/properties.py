@@ -23,8 +23,8 @@ class RDFProperty:
             predicate: URIRef,
             required: bool = False,
             repeatable: bool = False,
-            values_from: Container = None,
-            validate: Callable[[Any], bool] = None,
+            values_from: Container | None = None,
+            validate: Callable[[Any], bool] | None = None,
     ):
         self.resource = resource
         self.attr_name = attr_name
@@ -136,8 +136,8 @@ class RDFDataProperty(RDFProperty):
             predicate: URIRef,
             required: bool = False,
             repeatable: bool = False,
-            values_from: Container = None,
-            validate: Callable[[Any], bool] = None,
+            values_from: Container | None = None,
+            validate: Callable[[Any], bool] | None = None,
             datatype: URIRef = None,
     ):
         super().__init__(resource, attr_name, predicate, required, repeatable, values_from, validate)
@@ -195,9 +195,9 @@ class RDFObjectProperty(RDFProperty):
             predicate: URIRef,
             required: bool = False,
             repeatable: bool = False,
-            values_from: Container = None,
-            validate: Callable[[Any], bool] = None,
-            object_class: type[T] = None,
+            values_from: Container | None = None,
+            validate: Callable[[Any], bool] | None = None,
+            object_class: type[T] | None = None,
             embedded: bool = False,
     ):
         super().__init__(resource, attr_name, predicate, required, repeatable, values_from, validate)
@@ -261,7 +261,7 @@ class RDFObjectProperty(RDFProperty):
         if not is_valid_result:
             return is_valid_result
         # all values must be URIRefs
-        if not all(isinstance(v, URIRef) or isinstance(v, BNode) for v in self.values):
+        if not all(isinstance(v, (URIRef, BNode)) for v in self.values):
             return ValidationFailure(self, 'all values must be URIs or BNodes')
         return ValidationSuccess(self)
 

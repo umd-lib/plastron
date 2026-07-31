@@ -37,8 +37,8 @@ def test_alto_line(alto):
 def test_alto_words(alto):
     block = alto.block('P1_TB00006')
     line = next(block.lines())
-    assert set(str(w) for w in line.words()) == {'VARSITY', 'BASKETERS'}
+    assert {str(w) for w in line.words()} == {'VARSITY', 'BASKETERS'}
 
 
 def test_alto_all_words(alto):
-    assert set(str(w) for w in alto.words()) == {'Vol.', 'VI', 'VARSITY', 'BASKETERS'}
+    assert {str(w) for w in alto.words()} == {'Vol.', 'VI', 'VARSITY', 'BASKETERS'}

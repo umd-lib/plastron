@@ -245,10 +245,10 @@ def get_article_data(article_path) -> Iterator[dict[str, Any]]:
     article_root = article_tree.getroot()
     for article in article_root.findall(METS.div + '[@TYPE="article"]'):
         article_title = article.get('LABEL')
-        page_numbers = sorted(list(set(
+        page_numbers = sorted({
             int(area.get('FILEID').replace('ocrFile', ''))
             for area in article.findall(METS.area)
-        )))
+        })
         yield {
             'Title': article_title,
             'First page': page_numbers[0],

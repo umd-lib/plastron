@@ -4,7 +4,7 @@ import re
 from collections import Counter
 from collections.abc import Generator, Iterator
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from email.utils import parsedate
 from os.path import basename, splitext
 from pathlib import Path
@@ -63,8 +63,8 @@ def compress_bag(bag, dest, root_dirname=''):
 
 def gather_page_files(
     resource: AggregationResource,
-    mime_type: str = None,
-    binaries_dir: str = None,
+    mime_type: str | None = None,
+    binaries_dir: str | None = None,
 ) -> Iterator[FileSpec]:
     """Returns an iterator of `FileSpec` objects representing each file for
     each page in the given `resource`."""
@@ -83,9 +83,9 @@ def gather_page_files(
 
 def gather_files(
     resource: PCDMFileBearingResource,
-    label: str = None,
-    mime_type: str = None,
-    binaries_dir: str = None,
+    label: str | None = None,
+    mime_type: str | None = None,
+    binaries_dir: str | None = None,
 ) -> Iterator[FileSpec]:
     """Returns an iterator of `FileSpec` objects representing each file of
     the given `resource`."""
@@ -106,10 +106,10 @@ def gather_files(
 
 class Stopwatch:
     def __init__(self):
-        self._start = datetime.now().timestamp()
+        self._start = datetime.now(timezone.utc).timestamp()
 
     def now(self) -> dict[str, float]:
-        now = datetime.now().timestamp()
+        now = datetime.now(timezone.utc).timestamp()
         return {
             'started': self._start,
             'now': now,
@@ -150,7 +150,7 @@ class ExportJob(Job):
             # all items that evaluate to true
             self.mime_type_filter = None
 
-    def get_page_files(self, resource: PCDMObjectResource, item_dir: str = None) -> tuple[list[FileSpec], FileSize]:
+    def get_page_files(self, resource: PCDMObjectResource, item_dir: str | None = None) -> tuple[list[FileSpec], FileSize]:
         if not self.export_binaries:
             return [], FileSize(0)
 
@@ -162,7 +162,7 @@ class ExportJob(Job):
 
         return files, total_size
 
-    def get_item_files(self, resource: PCDMObjectResource, item_dir: str = None) -> tuple[list[FileSpec], FileSize]:
+    def get_item_files(self, resource: PCDMObjectResource, item_dir: str | None = None) -> tuple[list[FileSpec], FileSize]:
         if not self.export_binaries:
             return [], FileSize(0)
 
@@ -231,8 +231,8 @@ class ExportJob(Job):
                 if hasattr(obj, 'identifier'):
                     item_dir = str(obj.identifier.value or item_dir)
 
-                page_files, page_files_size = self.get_page_files(resource, item_dir=item_dir)
-                item_files, item_files_size = self.get_item_files(resource, item_dir=item_dir)
+                page_files, _page_files_size = self.get_page_files(resource, item_dir=item_dir)
+                item_files, _item_files_size = self.get_item_files(resource, item_dir=item_dir)
                 serializer.write(
                     obj,
                     files=page_files,
@@ -298,14 +298,14 @@ class ExportJob(Job):
             ssh_client = get_ssh_client(sftp_uri, key_filename=self.key)
             try:
                 sftp_client = SFTPClient.from_transport(ssh_client.get_transport())
-                root, ext = splitext(basename(sftp_uri.path))
+                root, _ext = splitext(basename(sftp_uri.path))
                 destination = sftp_client.open(sftp_uri.path, mode='w')
             except SSHException as e:
                 raise RuntimeError(str(e)) from e
         else:
             # send to a local file
             zip_filename = self.output_dest
-            root, ext = splitext(basename(zip_filename))
+            root, _ext = splitext(basename(zip_filename))
             destination = zip_filename
 
         # write out a single ZIP file of the whole bag

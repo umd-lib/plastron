@@ -147,9 +147,7 @@ class RDFResourceBase:
     def is_valid(self) -> bool:
         if not all(p.is_valid for p in self.rdf_properties()):
             return False
-        if not all(test(self) for test in self.validators):
-            return False
-        return True
+        return all(test(self) for test in self.validators)
 
     def validate(self) -> ValidationResultsDict:
         results = ValidationResultsDict({name: getattr(self, name).is_valid for name in self.rdf_property_names})

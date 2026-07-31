@@ -130,8 +130,8 @@ class Command(BaseCommand):
 def find(
         start_resource: RepositoryResource,
         matcher: Callable[[Iterable], bool],
-        traverse: list[URIRef] = None,
-        properties: list[tuple] = None
+        traverse: list[URIRef] | None = None,
+        properties: list[tuple] | None = None
 ) -> Iterator[RepositoryResource]:
     if traverse is None:
         traverse = []

@@ -96,7 +96,7 @@ def get_source(binary_column_value: str) -> BinarySource | None:
     implementation cannot be determined.
     """
     source: BinarySource | None = None
-    if binary_column_value.startswith("http:") or binary_column_value.startswith("https:"):
+    if binary_column_value.startswith(("http:", "https:")):
         source = HTTPFileSource(binary_column_value)
     elif binary_column_value is not None:
         source = LocalFileSource(binary_column_value)

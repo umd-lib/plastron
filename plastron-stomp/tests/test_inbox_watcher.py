@@ -38,9 +38,8 @@ def inbox_watcher(inbox_dirname, mock_command_listener):
 
 
 def create_test_file(inbox_dirname):
-    temp_file = open(os.path.join(inbox_dirname, 'test_new_file'), 'w')
-    temp_file.write("test:test")
-    temp_file.close()
+    with open(os.path.join(inbox_dirname, 'test_new_file'), 'w') as temp_file:
+        temp_file.write("test:test")
 
 
 def wait_until_called(mock_method, interval=0.1, timeout=5):

@@ -36,9 +36,9 @@ class Client:
         self,
         endpoint: Endpoint,
         auth: AuthBase = None,
-        server_cert: str = None,
-        ua_string: str = None,
-        on_behalf_of: str = None,
+        server_cert: str | None = None,
+        ua_string: str | None = None,
+        on_behalf_of: str | None = None,
         load_binaries: bool = True,
         session: Session = None,
     ):
@@ -217,10 +217,10 @@ class Client:
 
     def create(
             self,
-            path: str = None,
-            url: str = None,
-            container_path: str = None,
-            slug: str = None,
+            path: str | None = None,
+            url: str | None = None,
+            container_path: str | None = None,
+            slug: str | None = None,
             **kwargs,
     ) -> ResourceURI:
         if url is not None:
@@ -286,7 +286,7 @@ class Client:
         logger.info(f'Created {resource}')
         return resource
 
-    def create_all(self, container_path: str, resources: list[Any], name_function: Callable = None):
+    def create_all(self, container_path: str, resources: list[Any], name_function: Callable | None = None):
         # ensure the container exists
         if len(resources) > 0 and not self.path_exists(container_path):
             self.create(path=container_path)

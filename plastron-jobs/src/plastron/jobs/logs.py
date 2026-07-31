@@ -77,7 +77,7 @@ class ItemLog(AppendableSequence):
             with self.filename.open(mode='r', buffering=1) as fh:
                 reader = csv.DictReader(fh)
                 # check the validity of the map file data
-                if not reader.fieldnames == self.fieldnames:
+                if reader.fieldnames != self.fieldnames:
                     logger.warning(
                         f'Fieldnames in {self.filename} do not match expected fieldnames; '
                         f'expected: {self.fieldnames}; found: {reader.fieldnames}'

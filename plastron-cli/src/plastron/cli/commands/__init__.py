@@ -37,7 +37,7 @@ def get_command_class(command_name: str):
         # with the "import" keyword
         module_name += 'command'
     try:
-        command_module = import_module('.'.join([__package__, module_name]))
+        command_module = import_module(f'{__package__}.{module_name}')
     except ModuleNotFoundError as e:
         raise RuntimeError(f'Unable to load a command with the name {command_name}') from e
     command_class = command_module.Command

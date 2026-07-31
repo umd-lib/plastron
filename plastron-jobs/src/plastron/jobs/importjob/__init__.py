@@ -3,11 +3,11 @@ import os
 from collections import Counter
 from collections.abc import Generator, Iterable
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 from pathlib import Path
 from shutil import copyfileobj
-from typing import IO, Any, Optional
+from typing import IO, Any
 
 from bs4 import BeautifulSoup
 from rdflib import URIRef
@@ -122,7 +122,7 @@ class ImportRun:
         return self._failed_items
 
     def progress_message(self, n: int, **kwargs) -> dict[str, Any]:
-        now = datetime.now().timestamp()
+        now = datetime.now(timezone.utc).timestamp()
         return {
             'time': {
                 'started': self.start_time,
@@ -141,10 +141,10 @@ class ImportRun:
     def run(
             self,
             context: PlastronContext,
-            limit: int = None,
-            percentage: int = None,
+            limit: int | None = None,
+            percentage: int | None = None,
             validate_only: bool = False,
-            import_file: IO = None,
+            import_file: IO | None = None,
             publish: bool = False,
     ) -> Generator[dict[str, Any], None, dict[str, Any]]:
         """Execute this import run. Returns a generator that yields a dictionary of
@@ -171,7 +171,7 @@ class ImportRun:
         self.timestamp = datetimestamp()
         self.dir = self.job.dir / self.timestamp
         self.dir.mkdir(parents=True, exist_ok=True)
-        self.start_time = datetime.now().timestamp()
+        self.start_time = datetime.now(timezone.utc).timestamp()
 
         if percentage:
             logger.info(f'Loading {percentage}% of the total items')
@@ -348,7 +348,7 @@ class ImportJob(Job):
     run_class = ImportRun
     config_class = ImportConfig
 
-    def __init__(self, job_id: str, job_dir: Path, ssh_private_key: str = None):
+    def __init__(self, job_id: str, job_dir: Path, ssh_private_key: str | None = None):
         super().__init__(job_id=job_id, job_dir=job_dir)
 
         self._model_class = None
@@ -393,10 +393,10 @@ class ImportJob(Job):
     def run(
             self,
             context: PlastronContext,
-            limit: int = None,
-            percentage: int = None,
+            limit: int | None = None,
+            percentage: int | None = None,
             validate_only: bool = False,
-            import_file: IO = None,
+            import_file: IO | None = None,
             publish: bool = False,
     ) -> Generator[dict[str, Any], None, dict[str, Any]]:
         run = self.new_run()
@@ -452,7 +452,7 @@ class ImportJob(Job):
                 location=os.path.join(base_location, path),
                 ssh_options={'key_filename': self.ssh_private_key}
             )
-        elif base_location.startswith('http:') or base_location.startswith('https:'):
+        elif base_location.startswith(('http:', 'https:')):
             base_uri = base_location if base_location.endswith('/') else base_location + '/'
             return HTTPFileSource(base_uri + path)
         elif base_location.startswith('zip+sftp:'):
@@ -477,7 +477,7 @@ class ImportRow:
             context: PlastronContext,
             row: Row,
             validate_only: bool = False,
-            publish: bool = None,
+            publish: bool | None = None,
     ):
         self.job = job
         self.row = row

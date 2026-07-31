@@ -2,7 +2,7 @@ import logging.config
 import os
 import re
 from argparse import ArgumentTypeError, Namespace
-from datetime import datetime
+from datetime import datetime, timezone
 from importlib import import_module
 from time import sleep
 
@@ -16,7 +16,7 @@ from plastron.jobs import ItemLog
 from plastron.repo import DataReadError
 
 logger = logging.getLogger(__name__)
-now = datetime.utcnow().strftime('%Y%m%d%H%M%S')
+now = datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')
 
 
 def configure_cli(subparsers):
@@ -184,7 +184,7 @@ class Command(BaseCommand):
                 row = {'number': n + 1,
                        'path': item.path,
                        'timestamp': getattr(
-                           item, 'creation_timestamp', str(datetime.utcnow())
+                           item, 'creation_timestamp', str(datetime.now(timezone.utc))
                        ),
                        'title': getattr(item, 'title', 'N/A'),
                        'uri': getattr(item, 'uri', 'N/A')
@@ -269,9 +269,9 @@ def load_item(client: Client, batch_item, args, extra=None):
                 txn_client.rollback()
                 logger.warning('Transaction rolled back. Continuing load.')
 
-            except KeyboardInterrupt as e:
+            except KeyboardInterrupt:
                 logger.error("Load interrupted")
-                raise e
+                raise
     else:
         try:
             load_item_internal(client, item, args, extra)
@@ -279,9 +279,9 @@ def load_item(client: Client, batch_item, args, extra=None):
         except (ClientError, FileNotFoundError) as e:
             logger.error(f"Item creation failed: {e}")
             logger.warning('Continuing load.')
-        except KeyboardInterrupt as e:
+        except KeyboardInterrupt:
             logger.error("Load interrupted")
-            raise e
+            raise
 
 
 class BatchConfig:

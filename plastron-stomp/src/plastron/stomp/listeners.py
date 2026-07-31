@@ -24,7 +24,7 @@ version = importlib.metadata.version('plastron-stomp')
 
 
 class CommandListener(ConnectionListener):
-    def __init__(self, context: PlastronContext, after_connected: Callable = None, after_disconnected: Callable = None):
+    def __init__(self, context: PlastronContext, after_connected: Callable | None = None, after_disconnected: Callable | None = None):
         self.context = context
         self.broker = context.broker
         self.inbox = MessageBox(os.path.join(self.broker.message_store_dir, 'inbox'), PlastronCommandMessage)

@@ -239,14 +239,12 @@ class Resource(metaclass=Meta):
             for v in prop.values:
                 # recursively expand embedded objects
                 if hasattr(v, 'embedded_objects'):
-                    for vo in v.embedded_objects():
-                        yield vo
+                    yield from v.embedded_objects()
                 yield v
 
     def linked_objects(self):
         for prop in [prop for prop in self.object_properties() if not prop.is_embedded]:
-            for v in [v for v in prop.values if hasattr(v, 'uri')]:
-                yield v
+            yield from [v for v in prop.values if hasattr(v, 'uri')]
 
     def graph(self, nsm=None):
         subject = URIRef(self.uri)

@@ -1,4 +1,4 @@
-import pytest as pytest
+import pytest
 from rdflib import Literal, URIRef
 
 from plastron.models.poster import Poster

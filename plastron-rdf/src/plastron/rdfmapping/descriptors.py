@@ -19,8 +19,8 @@ class Property:
             predicate: URIRef,
             required: bool = False,
             repeatable: bool = False,
-            values_from: Container = None,
-            validate: Callable[[Any], bool] = None,
+            values_from: Container | None = None,
+            validate: Callable[[Any], bool] | None = None,
     ):
         self.predicate = predicate
         self.required = required
@@ -65,9 +65,9 @@ class ObjectProperty(Property):
             predicate: URIRef,
             required: bool = False,
             repeatable: bool = False,
-            values_from: Container = None,
-            validate: Callable[[Any], bool] = None,
-            cls: type | str = None,
+            values_from: Container | None = None,
+            validate: Callable[[Any], bool] | None = None,
+            cls: type | str | None = None,
             embed: bool = False,
     ):
         super().__init__(predicate, required, repeatable, values_from, validate)
@@ -104,8 +104,8 @@ class DataProperty(Property):
             predicate: URIRef,
             required: bool = False,
             repeatable: bool = False,
-            values_from: Container = None,
-            validate: Callable[[Any], bool] = None,
+            values_from: Container | None = None,
+            validate: Callable[[Any], bool] | None = None,
             datatype: URIRef = None,
     ):
         super().__init__(predicate, required, repeatable, values_from, validate)

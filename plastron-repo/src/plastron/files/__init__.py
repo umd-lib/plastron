@@ -79,7 +79,7 @@ class BinaryResource(RepositoryResource):
 
         yield BytesIO(response.content)
 
-    def update_binary(self, source: 'BinarySource', mime_type: str = None):
+    def update_binary(self, source: 'BinarySource', mime_type: str | None = None):
         try:
             headers = {
                 'Content-Type': mime_type or source.mimetype() or 'application/octet-stream',
@@ -226,7 +226,7 @@ class StringSource(BinarySource):
     `application/octet-stream` if there is no `filename` or the call to `guess_type()`
     fails.
     """
-    def __init__(self, content: str, filename: str = '<str>', mimetype: str = None):
+    def __init__(self, content: str, filename: str = '<str>', mimetype: str | None = None):
         self._content = content
         self.filename = filename
         if mimetype is None:
@@ -261,7 +261,7 @@ class LocalFileSource(BinarySource):
     A file on the local file system. If no `mimetype` is specified, attempts
     to guess based on the `localpath`.
     """
-    def __init__(self, localpath: str, mimetype: str = None, filename=None):
+    def __init__(self, localpath: str, mimetype: str | None = None, filename=None):
         if mimetype is None:
             mimetype = guess_type(localpath)[0]
         self._mimetype = mimetype
@@ -355,7 +355,7 @@ class RepositoryFileSource(HTTPFileSource):
 
 class RemoteFileSource(BinarySource):
     """A binary retrievable over SFTP."""
-    def __init__(self, location: str, mimetype: str = None, ssh_options: Mapping[str, Any] = None):
+    def __init__(self, location: str, mimetype: str | None = None, ssh_options: Mapping[str, Any] | None = None):
         """
         :param location: the SFTP URI to the binary source, e.g., `sftp://user@example.com/path/to/file`
         :param mimetype: MIME type of the file. If not given, will attempt to detect by calling
@@ -401,7 +401,7 @@ class RemoteFileSource(BinarySource):
     def ssh_exec(self, cmd) -> str:
         """Execute `cmd` over SSH, and return the first line of the remote STDOUT. Trailing
         newline is removed."""
-        (stdin, stdout, stderr) = self.ssh().exec_command(cmd)
+        (_stdin, stdout, _stderr) = self.ssh().exec_command(cmd)
         return stdout.readline().rstrip('\n')
 
     def open(self):
@@ -551,7 +551,7 @@ class FileGroup:
     files: list[FileSpec] = field(default_factory=list)
 
     def __str__(self):
-        extensions = list(map(lambda f: str(f).replace(self.rootname, ''), self.files))
+        extensions = [str(f).replace(self.rootname, '') for f in self.files]
         return f'{self.rootname}{{{",".join(extensions)}}}'
 
     @property

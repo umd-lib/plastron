@@ -39,7 +39,7 @@ class Command(BaseCommand):
         return replace(ctx, location=args.location, binary_filename=args.binary_file, mime_type=args.mime_type)
 
 
-def replace(ctx, location: str, binary_filename: str, mime_type: str = None):
+def replace(ctx, location: str, binary_filename: str, mime_type: str | None = None):
     repo: Repository = ctx.obj.repo
     try:
         resource = repo.get_resource(location, BinaryResource).read()

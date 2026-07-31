@@ -1,7 +1,6 @@
 """Useful namespaces for use with `rdflib` code."""
 
 import sys
-from typing import Optional
 
 from rdflib import Graph, Namespace
 from rdflib.namespace import NamespaceManager

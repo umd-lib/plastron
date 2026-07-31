@@ -186,8 +186,7 @@ class OCRResource:
         this OCR resource."""
         for block in self.blocks:
             for line in block.lines():
-                for word in line.words():
-                    yield word
+                yield from line.words()
 
 
 class RegionBase:

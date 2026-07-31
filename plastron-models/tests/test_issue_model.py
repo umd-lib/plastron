@@ -19,7 +19,7 @@ def test_issue_valid_with_only_required_fields():
     issue.volume = '1'
     issue.issue = '1'
     issue.edition = '1'
-    issue.rights = list(UMD_RIGHTS_STATEMENTS.keys())[0]
+    issue.rights = next(iter(UMD_RIGHTS_STATEMENTS.keys()))
 
     assert issue.is_valid
 

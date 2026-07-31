@@ -45,7 +45,7 @@ def test_model_with_multiple_presentation_sets(model_class):
     assert len(model.presentation_set) == 2
 
     expected = sorted([URIRef('http://vocab.lib.umd.edu/set#bar'), URIRef('http://vocab.lib.umd.edu/set#foo')])
-    assert sorted(list(model.presentation_set.values)) == expected
+    assert sorted(model.presentation_set.values) == expected
 
 
 @pytest.mark.parametrize("model_class", [Item, Letter, Poster, Issue])

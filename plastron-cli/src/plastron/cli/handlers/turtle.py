@@ -69,13 +69,13 @@ class Batch:
             self.master_graph = Graph().parse(f, format="turtle")
 
         # get subject URIs that are http: or https: URIs
-        self.subjects = sorted(set([uri for uri in self.master_graph.subjects() if
-                                    str(uri).startswith('http:') or str(uri).startswith('https:')]))
+        self.subjects = sorted({uri for uri in self.master_graph.subjects() if
+                                    str(uri).startswith('http:') or str(uri).startswith('https:')})
 
         # get the master list of authority objects
         # keyed by the urn:uuid:... URI from the master graph
-        authority_subjects = set([uri for uri in self.master_graph.subjects()
-                                  if str(uri).startswith('urn:uuid:')])
+        authority_subjects = {uri for uri in self.master_graph.subjects()
+                                  if str(uri).startswith('urn:uuid:')}
         self.authorities = {str(s): create_authority(self.master_graph, s)
                             for s in authority_subjects}
 
@@ -143,7 +143,7 @@ class BatchItem:
             file_path = self.batch.all_files[filename][0]
 
             normalized = filename.replace('_', '-')
-            basename, ext = os.path.splitext(normalized)
+            basename, _ext = os.path.splitext(normalized)
             base_parts = basename.split('-')
 
             # handle files with no sequence id

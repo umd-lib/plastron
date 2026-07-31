@@ -1,6 +1,6 @@
 import logging
 from argparse import FileType, Namespace
-from datetime import datetime
+from datetime import datetime, timezone
 
 from plastron.cli import get_uris
 from plastron.cli.commands import BaseCommand
@@ -88,7 +88,7 @@ class Command(BaseCommand):
                             completed_log.append({
                                 'uri': resource.url,
                                 'title': str(title),
-                                'timestamp': datetime.now().isoformat('T'),
+                                'timestamp': datetime.now(timezone.utc).isoformat('T'),
                             })
                 except RepositoryError as e:
                     if isinstance(e.__cause__, ClientError) and e.__cause__.status_code in (404, 410):

@@ -10,7 +10,7 @@ from plastron.repo.pcdm import PCDMObjectResource
 
 
 class MockRepo(Repository):
-    def create(self, resource_class: type[ResourceType] = None, **kwargs) -> ResourceType:
+    def create(self, resource_class: type[ResourceType] | None = None, **kwargs) -> ResourceType:
         return resource_class(repo=self, path=str(uuid4()))
 
 

@@ -1,6 +1,6 @@
 import logging
 from argparse import FileType, Namespace
-from datetime import datetime
+from datetime import datetime, timezone
 
 from lxml import etree
 
@@ -14,7 +14,7 @@ from plastron.repo.pcdm import PCDMPageResource
 from plastron.repo.utils import context
 
 logger = logging.getLogger(__name__)
-now = datetime.utcnow().strftime('%Y%m%d%H%M%S')
+now = datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')
 
 
 def configure_cli(subparsers):
@@ -86,7 +86,7 @@ class Command(BaseCommand):
                 extracted_text_file = page_resource.get_file(rdf_type=pcdmuse.ExtractedText)
                 if extracted_text_file is None:
                     logger.error(f'Resource {page_resource.url} has no OCR file; skipping')
-                    skipped.append({'uri': uri, 'timestamp': str(datetime.utcnow())})
+                    skipped.append({'uri': uri, 'timestamp': str(datetime.now(timezone.utc))})
                     continue
 
                 # TODO: currently assuming all extracted text files are ALTO

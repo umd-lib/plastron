@@ -22,7 +22,7 @@ DEFAULT_BINARY_MIME_TYPE = 'application/octet-stream'
 class WebAnnotationBearingResource(ContainerResource):
     """A container that has an annotations container, containing Web Annotations."""
 
-    def __init__(self, repo: Repository, path: str = None):
+    def __init__(self, repo: Repository, path: str | None = None):
         super().__init__(repo, path)
         self.annotations_container = self.get_resource('a', ContainerResource)
         self.annotation_urls: set[URLObject] = set()
@@ -35,7 +35,7 @@ class WebAnnotationBearingResource(ContainerResource):
                 self.annotation_urls.add(URLObject(annotation_uri))
         return self
 
-    def create_annotation(self, description: Annotation, slug: str = None) -> ContainerResource:
+    def create_annotation(self, description: Annotation, slug: str | None = None) -> ContainerResource:
         if slug is None:
             slug = random_slug()
 
@@ -56,7 +56,7 @@ class WebAnnotationBearingResource(ContainerResource):
 class PCDMFileBearingResource(ContainerResource):
     """A container that has files, related by the pcdm:hasFile/pcdm:fileOf predicates."""
 
-    def __init__(self, repo: Repository, path: str = None):
+    def __init__(self, repo: Repository, path: str | None = None):
         super().__init__(repo, path)
         self.files_container = self.get_resource('f', ContainerResource)
         self.file_urls: set[URLObject] = set()
@@ -71,9 +71,9 @@ class PCDMFileBearingResource(ContainerResource):
     def create_file(
         self,
         source: BinarySource,
-        slug: str = None,
-        rdf_types: set = None,
-        mime_type: str = None,
+        slug: str | None = None,
+        rdf_types: set | None = None,
+        mime_type: str | None = None,
     ) -> BinaryResource:
         """Create a single file from the given source as a `pcdm:fileOf` this resource.
         If no slug is provided, one is generated using `random_slug()`. Any values provided
@@ -156,7 +156,7 @@ class PCDMFileBearingResource(ContainerResource):
 
 class PCDMObjectResource(PCDMFileBearingResource, AggregationResource):
     """A PCDM Object resource"""
-    def __init__(self, repo: Repository, path: str = None):
+    def __init__(self, repo: Repository, path: str | None = None):
         super().__init__(repo, path)
         self.members_container = self.get_resource('m', ContainerResource)
         self.member_urls: set[URLObject] = set()
@@ -170,7 +170,7 @@ class PCDMObjectResource(PCDMFileBearingResource, AggregationResource):
     def get_members(self) -> list['PCDMObjectResource']:
         return [self.repo[url:PCDMObjectResource] for url in self.member_urls]
 
-    def create_page(self, number: int, file_group: FileGroup, slug: str = None) -> 'PCDMPageResource':
+    def create_page(self, number: int, file_group: FileGroup, slug: str | None = None) -> 'PCDMPageResource':
         """Create a page with the given number, as a pcdm:memberOf
         this resource. Files to attach are specified in the file_group.
         If no slug is provided, one is generated using random_slug()."""

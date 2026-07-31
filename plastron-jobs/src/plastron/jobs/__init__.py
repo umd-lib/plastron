@@ -4,7 +4,7 @@ import re
 import urllib.parse
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Optional, Type, TypeVar
+from typing import Any, TypeVar
 
 import yaml
 
@@ -102,7 +102,7 @@ class Jobs:
     def __init__(self, directory: Path | str):
         self.dir = Path(directory)
 
-    def create_job(self, job_class: type[J], job_id: str = None, config: C = None) -> J:
+    def create_job(self, job_class: type[J], job_id: str | None = None, config: C = None) -> J:
         if config is None:
             if job_id is None:
                 raise RuntimeError('Must specify either a job_id or config')

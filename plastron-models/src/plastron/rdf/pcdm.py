@@ -172,10 +172,7 @@ FILE_CLASS_FOR = {
 
 def get_file_object(path, source=None):
     extension = path[path.rfind('.'):]
-    if extension in FILE_CLASS_FOR:
-        cls = FILE_CLASS_FOR[extension]
-    else:
-        cls = File
+    cls = FILE_CLASS_FOR.get(extension, File)
     if source is None:
         source = LocalFileSource(path)
     f = cls.from_source(source)

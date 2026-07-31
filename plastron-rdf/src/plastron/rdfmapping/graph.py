@@ -1,5 +1,5 @@
 import pathlib
-from typing import Optional, IO, TextIO, BinaryIO, Any
+from typing import IO, Any, BinaryIO, TextIO
 
 from rdflib import Graph, URIRef
 from rdflib.parser import InputSource
@@ -40,14 +40,12 @@ class TrackChangesGraph(Graph):
 
     def parse(
         self,
-        source: Optional[
-            IO[bytes] | TextIO | InputSource | str | bytes | pathlib.PurePath
-        ] = None,
-        publicID: Optional[str] = None,  # noqa: N803
-        format: Optional[str] = None,
-        location: Optional[str] = None,
-        file: Optional[BinaryIO | TextIO] = None,
-        data: Optional[str | bytes] = None,
+        source: IO[bytes] | TextIO | InputSource | str | bytes | pathlib.PurePath | None = None,
+        publicID: str | None = None,
+        format: str | None = None,
+        location: str | None = None,
+        file: BinaryIO | TextIO | None = None,
+        data: str | bytes | None = None,
         **args: Any,
     ) -> 'TrackChangesGraph':
         """Parses the graph normally, and then saves a copy of the original."""

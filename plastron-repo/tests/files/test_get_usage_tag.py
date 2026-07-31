@@ -2,7 +2,7 @@ import pytest
 
 from plastron.files import get_usage_tag
 from plastron.models.pcdm import PCDMFile
-from plastron.namespaces import pcdmuse, fabio, dcmitype
+from plastron.namespaces import dcmitype, fabio, pcdmuse
 
 
 @pytest.mark.parametrize(

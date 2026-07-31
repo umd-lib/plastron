@@ -1,10 +1,10 @@
 from unittest.mock import MagicMock
 
 import pytest
-from plastron.jobs.importjob.spreadsheet import InvalidRow
 from rdflib import Literal
 
 from plastron.jobs.importjob import MetadataSpreadsheet
+from plastron.jobs.importjob.spreadsheet import InvalidRow
 from plastron.models.umd import Item
 from plastron.namespaces import umdtype
 from plastron.repo import Repository

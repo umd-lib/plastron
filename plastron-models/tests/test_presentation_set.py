@@ -1,11 +1,11 @@
-from plastron.models.umd import Item
+import pytest
+from rdflib import Graph, URIRef
+
 from plastron.models.letter import Letter
 from plastron.models.newspaper import Issue
 from plastron.models.poster import Poster
+from plastron.models.umd import Item
 from plastron.namespaces import ore
-from rdflib import Graph, URIRef
-
-import pytest
 
 base_uri = 'http://example.com/xyz'
 

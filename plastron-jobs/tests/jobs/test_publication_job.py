@@ -1,11 +1,11 @@
-from typing import Callable
+from collections.abc import Callable
 from unittest.mock import MagicMock
 
 import pytest
 
 from plastron.context import PlastronContext
 from plastron.handles import HandleInfo
-from plastron.jobs.publicationjob import PublicationJob, PublicationAction
+from plastron.jobs.publicationjob import PublicationAction, PublicationJob
 from plastron.repo import Repository, RepositoryError
 from plastron.repo.publish import PublishableResource
 

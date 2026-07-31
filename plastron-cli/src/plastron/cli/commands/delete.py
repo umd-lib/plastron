@@ -3,13 +3,13 @@ from argparse import FileType, Namespace
 from datetime import datetime
 
 from plastron.cli import get_uris
-from plastron.repo.utils import context
 from plastron.cli.commands import BaseCommand
 from plastron.client import ClientError
+from plastron.jobs import ItemLog
 from plastron.models.pcdm import PCDMObject
 from plastron.repo import RepositoryError
+from plastron.repo.utils import context
 from plastron.utils import parse_predicate_list
-from plastron.jobs import ItemLog
 
 logger = logging.getLogger(__name__)
 

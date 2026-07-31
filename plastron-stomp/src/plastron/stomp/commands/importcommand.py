@@ -1,7 +1,8 @@
 import io
 import logging
 from argparse import ArgumentTypeError
-from typing import Any, Generator, Optional
+from collections.abc import Generator
+from typing import Any
 
 from rdflib import URIRef
 
@@ -14,7 +15,7 @@ from plastron.utils import datetimestamp, strtobool, uri_or_curie
 logger = logging.getLogger(__name__)
 
 
-def get_access_uri(access) -> Optional[URIRef]:
+def get_access_uri(access) -> URIRef | None:
     if access is None:
         return None
     try:

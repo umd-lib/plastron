@@ -1,10 +1,15 @@
-from typing import Callable, Any, Iterable, TypeVar, Type, Iterator, Container
+from collections.abc import Callable, Container, Iterable, Iterator
+from typing import Any, TypeVar
 
 from rdflib import Literal, URIRef
-from rdflib.term import Identifier, BNode
+from rdflib.term import BNode, Identifier
 
 from plastron.rdfmapping.embed import EmbeddedObject
-from plastron.rdfmapping.validation import ValidationResult, ValidationFailure, ValidationSuccess
+from plastron.rdfmapping.validation import (
+    ValidationFailure,
+    ValidationResult,
+    ValidationSuccess,
+)
 
 T = TypeVar('T')
 
@@ -192,7 +197,7 @@ class RDFObjectProperty(RDFProperty):
             repeatable: bool = False,
             values_from: Container = None,
             validate: Callable[[Any], bool] = None,
-            object_class: Type[T] = None,
+            object_class: type[T] = None,
             embedded: bool = False,
     ):
         super().__init__(resource, attr_name, predicate, required, repeatable, values_from, validate)

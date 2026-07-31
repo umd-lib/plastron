@@ -1,9 +1,9 @@
 import logging
 
-from plastron.stomp.handlers import AsynchronousResponseHandler
+from watchdog.events import FileCreatedEvent, FileSystemEventHandler
 from watchdog.observers import Observer
-from watchdog.events import FileSystemEventHandler, FileCreatedEvent
 
+from plastron.stomp.handlers import AsynchronousResponseHandler
 
 logger = logging.getLogger(__name__)
 

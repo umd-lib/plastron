@@ -1,14 +1,13 @@
 import logging
-from collections.abc import Mapping
+from collections.abc import ItemsView, Mapping
 from os.path import abspath, dirname
 from pathlib import Path
-from typing import ItemsView
 from urllib.error import HTTPError, URLError
 
 from rdflib import Graph
-from rdflib.term import URIRef, Literal
+from rdflib.term import Literal, URIRef
 
-from plastron.namespaces import rdfs, dcterms, rdf, owl
+from plastron.namespaces import dcterms, owl, rdf, rdfs
 from plastron.rdfmapping.descriptors import DataProperty, ObjectProperty
 from plastron.rdfmapping.graph import TrackChangesGraph
 from plastron.rdfmapping.resources import RDFResource
@@ -149,8 +148,7 @@ class Vocabulary(Mapping):
         for _, term in self.items():
             if o in term[p]:
                 return term
-        else:
-            raise KeyError(f'{p} {o}')
+        raise KeyError(f'{p} {o}')
 
 
 class VocabularyTerm(RDFResource):

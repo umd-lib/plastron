@@ -1,8 +1,8 @@
 from plastron.models import ContentModeledResource
-from plastron.models.pcdm import PCDMObject, PCDMFile
-from plastron.namespaces import fabio, pcdm, dcterms
+from plastron.models.pcdm import PCDMFile, PCDMObject
+from plastron.namespaces import dcterms, fabio, pcdm
 from plastron.rdfmapping.decorators import rdf_type
-from plastron.rdfmapping.descriptors import ObjectProperty, DataProperty
+from plastron.rdfmapping.descriptors import DataProperty, ObjectProperty
 
 
 class File(ContentModeledResource, PCDMFile):

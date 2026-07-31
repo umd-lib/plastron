@@ -1,8 +1,9 @@
 import logging
 from collections import defaultdict
+from collections.abc import Generator, ItemsView, Iterable, Mapping
 from dataclasses import dataclass
 from email.utils import parsedate_to_datetime
-from typing import Mapping, ItemsView, Type, Iterable, Any, Generator
+from typing import Any
 
 from pyparsing import ParseException
 from rdflib import URIRef
@@ -12,7 +13,7 @@ from plastron.jobs.logs import AppendableSequence, NullLog
 from plastron.namespaces import dcterms
 from plastron.rdfmapping.resources import RDFResourceBase
 from plastron.rdfmapping.validation import ValidationFailure
-from plastron.repo import RepositoryResource, Repository
+from plastron.repo import Repository, RepositoryResource
 from plastron.repo.utils import context
 
 logger = logging.getLogger(__name__)
@@ -35,7 +36,7 @@ class ValidationFailed(Exception):
 def update(
         resource: RepositoryResource,
         sparql_update: str,
-        model_class: Type[RDFResourceBase] = None,
+        model_class: type[RDFResourceBase] = None,
         dry_run: bool = False,
 ) -> dict[str, str]:
     """Update a single resource using a SPARQL Update Query."""
@@ -84,7 +85,7 @@ class UpdateJob:
     repo: Repository
     uris: Iterable[str]
     sparql_update: str
-    model_class: Type[RDFResourceBase]
+    model_class: type[RDFResourceBase]
     traverse: list[URIRef] = None
     completed: AppendableSequence = None
     dry_run: bool = False

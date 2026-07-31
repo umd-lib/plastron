@@ -2,7 +2,7 @@ import logging
 from argparse import Namespace
 
 from plastron.cli.commands import BaseCommand
-from plastron.files import LocalFileSource, USAGE_TAGS
+from plastron.files import USAGE_TAGS, LocalFileSource
 from plastron.repo import Repository, RepositoryError
 from plastron.repo.pcdm import PCDMFileBearingResource
 

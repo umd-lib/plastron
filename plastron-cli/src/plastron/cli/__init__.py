@@ -1,24 +1,27 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 import importlib.metadata
 import logging
 import logging.config
 import os
 import sys
-from argparse import ArgumentParser, FileType
-from argparse import Namespace
+from argparse import ArgumentParser, FileType, Namespace
+from collections.abc import Iterable
 from datetime import datetime
 from importlib import import_module
 from pkgutil import iter_modules
-from typing import Iterable
 
 import yaml
-from rdflib import URIRef, Literal
+from rdflib import Literal, URIRef
 from rdflib.util import from_n3
 
 from plastron.cli import commands
 from plastron.context import PlastronContext
-from plastron.utils import DEFAULT_LOGGING_OPTIONS, envsubst, check_python_version, uri_or_curie
+from plastron.utils import (
+    DEFAULT_LOGGING_OPTIONS,
+    check_python_version,
+    envsubst,
+    uri_or_curie,
+)
 
 logger = logging.getLogger(__name__)
 now = datetime.utcnow().strftime('%Y%m%d%H%M%S')
@@ -133,7 +136,7 @@ def main():
     log_dirname = repo_config.get('LOG_DIR')
     if not os.path.isdir(log_dirname):
         os.makedirs(log_dirname)
-    log_filename = 'plastron.{0}.{1}.log'.format(args.cmd_name, now)
+    log_filename = f'plastron.{args.cmd_name}.{now}.log'
     logfile = os.path.join(log_dirname, log_filename)
     logging_options['handlers']['file']['filename'] = logfile
 

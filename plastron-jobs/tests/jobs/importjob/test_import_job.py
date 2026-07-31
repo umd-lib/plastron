@@ -1,6 +1,6 @@
+from collections.abc import Generator
 from contextlib import nullcontext
 from pathlib import Path
-from typing import Generator
 from unittest.mock import MagicMock
 
 import pytest

@@ -1,10 +1,10 @@
 import sys
 
-from rdflib import Graph, URIRef, Literal
+from rdflib import Graph, Literal, URIRef
 
 import plastron.validation.rules
-from plastron.validation import ValidationError
 from plastron.namespaces import rdf
+from plastron.validation import ValidationError
 
 # alias the rdflib Namespace
 ns = rdf
@@ -99,8 +99,7 @@ class RDFObjectProperty(RDFProperty):
             for obj in self.values:
                 if obj.uri == item:
                     return obj
-            else:
-                raise IndexError(f'Cannot find object by URI {item}')
+            raise IndexError(f'Cannot find object by URI {item}')
         else:
             return super().__getitem__(item)
 

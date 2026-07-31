@@ -1,15 +1,22 @@
 import logging
+from collections.abc import Callable
 from http import HTTPStatus
 from pathlib import Path
-from typing import Optional, Any, Callable
+from typing import Any
 
 from rdflib import Graph
-from requests import Session, Response, ConnectionError
+from requests import ConnectionError, Response, Session
 from requests.auth import AuthBase
 
 from plastron.client.endpoint import Endpoint
-from plastron.client.utils import SessionHeaderAttribute, TypedText, OMIT_SERVER_MANAGED_TRIPLES, ResourceURI, \
-    serialize, build_sparql_update
+from plastron.client.utils import (
+    OMIT_SERVER_MANAGED_TRIPLES,
+    ResourceURI,
+    SessionHeaderAttribute,
+    TypedText,
+    build_sparql_update,
+    serialize,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -199,7 +206,7 @@ class Client:
                 to_create.insert(0, ancestor)
         return to_create
 
-    def get_location(self, response: Response) -> Optional[str]:
+    def get_location(self, response: Response) -> str | None:
         """Return the value of the `Location` HTTP header in `response`,
         or `None` if there is no such header."""
         try:

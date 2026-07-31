@@ -2,7 +2,6 @@ import csv
 import logging
 import sys
 from argparse import FileType, Namespace
-from typing import Optional
 
 from rdflib import URIRef
 
@@ -10,10 +9,10 @@ from plastron.cli.commands import BaseCommand
 from plastron.client import ClientError
 from plastron.files import BinarySource, HTTPFileSource, LocalFileSource
 from plastron.models.umd import Stub
-from plastron.utils import uri_or_curie
 from plastron.repo import ContainerResource
 from plastron.repo.pcdm import PCDMFileBearingResource
 from plastron.repo.utils import context
+from plastron.utils import uri_or_curie
 
 logger = logging.getLogger(__name__)
 
@@ -90,13 +89,13 @@ def configure_cli(subparsers):
     parser.set_defaults(cmd_name='stub')
 
 
-def get_source(binary_column_value: str) -> Optional[BinarySource]:
+def get_source(binary_column_value: str) -> BinarySource | None:
     """
     Returns the appropriate BinarySource implementation to use, based on the
     value in the binary column, or None if an appropriate BinarySource
     implementation cannot be determined.
     """
-    source: Optional[BinarySource] = None
+    source: BinarySource | None = None
     if binary_column_value.startswith("http:") or binary_column_value.startswith("https:"):
         source = HTTPFileSource(binary_column_value)
     elif binary_column_value is not None:

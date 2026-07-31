@@ -4,7 +4,7 @@ import csv
 import logging
 import os
 
-from plastron.models.newspaper import Reel, Page
+from plastron.models.newspaper import Page, Reel
 from plastron.rdf import pcdm
 
 

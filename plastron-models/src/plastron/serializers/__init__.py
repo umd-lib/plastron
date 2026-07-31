@@ -1,7 +1,7 @@
 """.. include:: ../../../docs/CSVSerializer.md"""
 import logging
 
-from rdflib import URIRef, Graph
+from rdflib import Graph, URIRef
 
 from plastron.models import ContentModeledResource
 from plastron.models.letter import Letter
@@ -41,8 +41,7 @@ def detect_resource_class(
     for rdf_type, cls in MODEL_MAP.items():
         if rdf_type in types:
             return cls
+    if fallback is not None:
+        return fallback
     else:
-        if fallback is not None:
-            return fallback
-        else:
-            raise RuntimeError(f'Unable to detect resource type for {subject}')
+        raise RuntimeError(f'Unable to detect resource type for {subject}')

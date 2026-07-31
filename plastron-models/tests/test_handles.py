@@ -1,10 +1,16 @@
-from http import HTTPStatus
 import json
+from http import HTTPStatus
+
 import httpretty
 import pytest
 from rdflib import Literal
 
-from plastron.handles import HandleBearingResource, HandleServerError, HandleServiceClient, HandleInfo
+from plastron.handles import (
+    HandleBearingResource,
+    HandleInfo,
+    HandleServerError,
+    HandleServiceClient,
+)
 from plastron.namespaces import umdtype
 
 

@@ -5,8 +5,8 @@ import pytest
 
 from plastron.context import PlastronContext
 from plastron.models import ContentModeledResource
-from plastron.rdfmapping.validation import ValidationResultsDict, ValidationFailure
-from plastron.repo import RepositoryResource, Repository, RepositoryError
+from plastron.rdfmapping.validation import ValidationFailure, ValidationResultsDict
+from plastron.repo import Repository, RepositoryError, RepositoryResource
 
 
 @pytest.fixture

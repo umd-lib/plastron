@@ -1,8 +1,9 @@
 import logging
 from collections import Counter
+from collections.abc import Generator, Mapping
 from dataclasses import dataclass
 from enum import Enum
-from typing import Generator, Any, Mapping
+from typing import Any
 
 from plastron.context import PlastronContext
 from plastron.jobs import Job

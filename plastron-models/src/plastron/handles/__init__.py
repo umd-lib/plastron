@@ -15,8 +15,7 @@ logger = logging.getLogger(__name__)
 
 
 def parse_handle_string(handle: str) -> list[str]:
-    if handle.startswith('hdl:'):
-        handle = handle[4:]
+    handle = handle.removeprefix('hdl:')
     try:
         return handle.split('/', 1)
     except ValueError as e:

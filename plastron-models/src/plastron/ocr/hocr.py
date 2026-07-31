@@ -1,12 +1,21 @@
 """[hOCR](https://kba.github.io/hocr-spec/1.2/) OCR classes"""
 
 import re
-from typing import Iterable
+from collections.abc import Iterable
 
 # noinspection PyProtectedMember
-from lxml.etree import _ElementTree, _Element
+from lxml.etree import _Element, _ElementTree
 
-from plastron.ocr.core import XYWH, BBox, Scale, RegionBase, OCRResource, BlockRegion, LineRegion, WordRegion
+from plastron.ocr.core import (
+    XYWH,
+    BBox,
+    BlockRegion,
+    LineRegion,
+    OCRResource,
+    RegionBase,
+    Scale,
+    WordRegion,
+)
 
 XMLNS = {'html': 'http://www.w3.org/1999/xhtml'}
 

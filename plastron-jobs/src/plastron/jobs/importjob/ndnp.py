@@ -2,15 +2,17 @@
 
 import logging
 import sys
+from collections.abc import Iterator
 from csv import DictWriter
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Iterator, Optional
+from typing import Any
 
 from lxml import etree
 
 # noinspection PyProtectedMember
 from lxml.etree import QName, XMLSyntaxError, _Element, _ElementTree
+
 from plastron.files import FileSpec
 from plastron.repo import DataReadError
 
@@ -101,21 +103,21 @@ class NDNPIssue:
         """Get the issue title as a string."""
         return self.mets_doc.getroot().get('LABEL')
 
-    def _get_detail_number(self, type_attr: str) -> Optional[str]:
+    def _get_detail_number(self, type_attr: str) -> str | None:
         try:
             return self.mets_doc.find(f'.//MODS:detail[@type="{type_attr}"]/MODS:number', namespaces=xmlns).text
         except AttributeError:
             return None
 
-    def get_volume(self) -> Optional[str]:
+    def get_volume(self) -> str | None:
         """Get the issue's volume number as a string, or `None` if it cannot be found."""
         return self._get_detail_number('volume')
 
-    def get_issue(self) -> Optional[str]:
+    def get_issue(self) -> str | None:
         """Get the issue's issue number as a string, or `None` if it cannot be found."""
         return self._get_detail_number('issue')
 
-    def get_edition(self) -> Optional[str]:
+    def get_edition(self) -> str | None:
         """Get the issue's edition number as a string, or `None` if it cannot be found."""
         return self._get_detail_number('edition')
 

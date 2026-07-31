@@ -1,12 +1,13 @@
 import json
 import logging
-from typing import Generator, Any
+from collections.abc import Generator
+from typing import Any
 
 from plastron.context import PlastronContext
 from plastron.jobs.updatejob import UpdateJob
 from plastron.messaging.messages import PlastronCommandMessage
 from plastron.models import get_model_from_name
-from plastron.utils import strtobool, parse_predicate_list
+from plastron.utils import parse_predicate_list, strtobool
 
 logger = logging.getLogger(__name__)
 

@@ -1,16 +1,16 @@
 import logging
 from argparse import Namespace
+
 from bs4 import BeautifulSoup
 from rdflib import URIRef
 
 from plastron.cli import get_uris
-from plastron.repo.utils import context
 from plastron.cli.commands import BaseCommand
 from plastron.models.annotations import FullTextAnnotation, TextualBody
 from plastron.namespaces import sc
 from plastron.rdfmapping.embed import embedded
 from plastron.repo.pcdm import PCDMPageResource
-
+from plastron.repo.utils import context
 
 logger = logging.getLogger(__name__)
 

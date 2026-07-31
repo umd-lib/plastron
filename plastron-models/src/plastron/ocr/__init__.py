@@ -1,6 +1,8 @@
 from lxml import etree
 from lxml.etree import XMLSyntaxError
 from PIL import Image, UnidentifiedImageError
+
+from plastron.files import BinaryResource
 from plastron.ocr.alto import ALTOResource
 from plastron.ocr.core import (
     ImageFileError,
@@ -10,7 +12,6 @@ from plastron.ocr.core import (
 )
 from plastron.ocr.hocr import HOCRResource
 from plastron.repo import RepositoryError
-from plastron.files import BinaryResource
 
 
 class ImageWithOCR:

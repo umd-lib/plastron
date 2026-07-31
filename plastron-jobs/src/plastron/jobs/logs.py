@@ -2,8 +2,8 @@ import collections.abc
 import csv
 import logging
 from abc import ABC
+from collections.abc import Sequence
 from pathlib import Path
-from typing import Sequence
 
 logger = logging.getLogger(__name__)
 
@@ -28,7 +28,6 @@ class NullLog(AppendableSequence):
 
     def append(self, _value):
         """This class just discards the given value"""
-        pass
 
 
 class ItemLog(AppendableSequence):

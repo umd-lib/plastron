@@ -1,8 +1,12 @@
 import pytest
 from rdflib import URIRef
 
-from plastron.rdfmapping.descriptors import Property, ObjectProperty, DataProperty
-from plastron.rdfmapping.properties import RDFProperty, RDFObjectProperty, RDFDataProperty
+from plastron.rdfmapping.descriptors import DataProperty, ObjectProperty, Property
+from plastron.rdfmapping.properties import (
+    RDFDataProperty,
+    RDFObjectProperty,
+    RDFProperty,
+)
 
 
 class MockResource:

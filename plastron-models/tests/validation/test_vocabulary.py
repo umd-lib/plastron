@@ -1,10 +1,10 @@
 from unittest.mock import MagicMock
 
 import pytest
-from rdflib import Graph, URIRef, Literal
+from rdflib import Graph, Literal, URIRef
 
 import plastron.validation.vocabularies
-from plastron.namespaces import rdfs, dcterms, rdf, owl
+from plastron.namespaces import dcterms, owl, rdf, rdfs
 from plastron.validation.vocabularies import Vocabulary, VocabularyTerm
 
 

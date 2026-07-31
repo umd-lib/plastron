@@ -4,16 +4,17 @@ import logging
 import re
 import urllib
 import zipfile
+from collections.abc import Mapping
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from http import HTTPStatus
 from io import BytesIO
 from mimetypes import guess_type
 from os.path import basename, isfile, splitext
-from typing import Mapping, Any, Protocol
+from typing import Any, Protocol
 from urllib.parse import urlsplit
 
-from paramiko import SFTPClient, SSHClient, AutoAddPolicy, SSHException
+from paramiko import AutoAddPolicy, SFTPClient, SSHClient, SSHException
 from paramiko.config import SSH_PORT
 from rdflib import URIRef
 from requests import Response, Session
@@ -21,8 +22,8 @@ from requests import Response, Session
 from plastron.client import ClientError
 from plastron.models.fedora import FedoraBinary, FixityCheck, FixityDetails
 from plastron.models.pcdm import PCDMFile
-from plastron.namespaces import pcdmuse, fabio
-from plastron.repo import RepositoryResource, RepositoryError
+from plastron.namespaces import fabio, pcdmuse
+from plastron.repo import RepositoryError, RepositoryResource
 
 logger = logging.getLogger(__name__)
 
@@ -44,8 +45,7 @@ def get_usage_tag(file_obj: PCDMFile) -> str | None:
         # all the types for the file, use this tag
         if types <= file_types:
             return tag
-    else:
-        return None
+    return None
 
 
 def parse_usage_tag(filename: str) -> tuple[str, str | None]:
@@ -162,12 +162,10 @@ class DoesHTTPRequest(Protocol):
 
 class BinarySourceError(Exception):
     """General class for errors with binary sources."""
-    pass
 
 
 class BinarySourceNotFoundError(BinarySourceError):
     """Raised when a binary source cannot be found."""
-    pass
 
 
 class BinarySource:
@@ -342,7 +340,6 @@ class HTTPFileSource(BinarySource):
 
     def close(self):
         """This method does nothing (there is no special cleanup for HTTP requests)."""
-        pass
 
     def exists(self) -> bool:
         """Returns `True` if a `HEAD` request to `uri` is successful."""
@@ -412,7 +409,7 @@ class RemoteFileSource(BinarySource):
         try:
             self._file = self.sftp().open(self.sftp_uri.path, mode='rb')
             return self._file
-        except IOError as e:
+        except OSError as e:
             raise BinarySourceNotFoundError(str(e)) from e
 
     def mimetype(self) -> str:

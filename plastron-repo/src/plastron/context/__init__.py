@@ -11,18 +11,18 @@ from typing import Any, Optional
 
 import pysolr
 
-from plastron.client import Endpoint, Client
+from plastron.client import Client, Endpoint
 from plastron.client.auth import get_authenticator
 from plastron.client.proxied import ProxiedClient
 from plastron.handles import HandleServiceClient
-from plastron.messaging.broker import Broker, ServerTuple, HeartbeatTuple
+from plastron.messaging.broker import Broker, HeartbeatTuple, ServerTuple
 from plastron.models.fedora import FedoraResource
-from plastron.repo import Repository, RepositoryResource, RepositoryError
+from plastron.repo import Repository, RepositoryError, RepositoryResource
 
 UUID_REGEX = re.compile(r'([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})', re.IGNORECASE)
 
 
-def get_uuid_from_uri(uri: str) -> Optional[str]:
+def get_uuid_from_uri(uri: str) -> str | None:
     if m := UUID_REGEX.search(uri):
         return m[1]
     else:

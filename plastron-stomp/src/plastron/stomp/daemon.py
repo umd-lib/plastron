@@ -2,10 +2,11 @@ import logging
 import os
 import sys
 from threading import Event, Thread
-from typing import TextIO, Any
+from typing import Any, TextIO
 
 import click
 import yaml
+
 from stomp.listener import HeartbeatListener
 
 from plastron.context import PlastronContext

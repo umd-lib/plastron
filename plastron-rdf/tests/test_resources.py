@@ -1,5 +1,6 @@
-from plastron.rdfmapping.resources import RDFResource
 from rdflib import URIRef
+
+from plastron.rdfmapping.resources import RDFResource
 
 
 def test_add_properties():

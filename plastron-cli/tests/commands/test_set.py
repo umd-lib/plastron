@@ -2,12 +2,12 @@ import logging
 from unittest.mock import MagicMock
 
 import pytest
-from rdflib import URIRef, Literal
+from rdflib import Literal, URIRef
 
 from plastron.cli.commands.set import get_new_values, set_fields
 from plastron.models.umd import Item
 from plastron.rdfmapping.resources import RDFResource
-from plastron.repo import RepositoryResource, Repository
+from plastron.repo import Repository, RepositoryResource
 
 
 @pytest.mark.parametrize(

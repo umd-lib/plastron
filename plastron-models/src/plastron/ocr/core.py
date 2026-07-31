@@ -1,4 +1,5 @@
-from typing import NamedTuple, Iterator, TypeVar, Optional, Iterable
+from collections.abc import Iterable, Iterator
+from typing import NamedTuple, TypeVar
 
 # noinspection PyProtectedMember
 from lxml.etree import _Element
@@ -153,7 +154,7 @@ class OCRResource:
         for node in self.get_block_nodes():
             yield self.get_block(node)
 
-    def block(self, identifier: str) -> Optional[B]:
+    def block(self, identifier: str) -> B | None:
         """Retrieve an individual block by identifier."""
         try:
             return self.get_block(self.get_block_node(identifier))
@@ -290,7 +291,6 @@ class WordRegion(RegionBase):
 
 class OCRError(Exception):
     """OCR-related error"""
-    pass
 
 
 class OCRFileError(OCRError):

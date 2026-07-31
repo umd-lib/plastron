@@ -1,15 +1,15 @@
 import logging
+from collections.abc import Iterator
 from os.path import basename
-from typing import Optional, Iterator
 
 from rdflib import Literal, URIRef
 from urlobject import URLObject
 
 from plastron.client.utils import random_slug
-from plastron.files import BinarySource, FileGroup, BinaryResource
+from plastron.files import BinaryResource, BinarySource, FileGroup
 from plastron.models.annotations import Annotation
 from plastron.models.ldp import LDPContainer
-from plastron.models.pcdm import PCDMObject, PCDMFile
+from plastron.models.pcdm import PCDMFile, PCDMObject
 from plastron.models.umd import Page
 from plastron.repo import ContainerResource, Repository
 from plastron.repo.aggregation import AggregationResource
@@ -122,7 +122,7 @@ class PCDMFileBearingResource(ContainerResource):
         logger.debug(f'Created file: {file_resource.url} {title}')
         return file_resource
 
-    def get_files(self, rdf_type: Optional[URIRef] = None, mime_type: Optional[str] = None) -> list[BinaryResource]:
+    def get_files(self, rdf_type: URIRef | None = None, mime_type: str | None = None) -> list[BinaryResource]:
         """Return a list of BinaryResource objects that match either the
         given RDF type or MIME type. If neither is given, includes all files
         for this resource."""
@@ -144,7 +144,7 @@ class PCDMFileBearingResource(ContainerResource):
         )
         return matched_resources
 
-    def get_file(self, rdf_type: Optional[URIRef] = None, mime_type: Optional[str] = None) -> Optional[BinaryResource]:
+    def get_file(self, rdf_type: URIRef | None = None, mime_type: str | None = None) -> BinaryResource | None:
         """Return the BinaryResource for the first file of this resource
         matching the given criteria, or None if no such file is found."""
         files = self.read().get_files(rdf_type=rdf_type, mime_type=mime_type)

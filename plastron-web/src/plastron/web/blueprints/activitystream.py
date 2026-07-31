@@ -63,7 +63,7 @@ class Activity:
                     self._publish = True
                     self._force_hidden = True
                 else:
-                    raise ValidationError(f'Invalid Activity type: {str(o)}')
+                    raise ValidationError(f'Invalid Activity type: {o!s}')
         if not self.publish and not self.unpublish:
             raise ValidationError('Invalid JSON-LD provided: Type not specified.')
         if not self.objects:

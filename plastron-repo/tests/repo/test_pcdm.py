@@ -1,17 +1,16 @@
-from typing import Type
 from unittest.mock import MagicMock
 from uuid import uuid4
 
 import pytest
 
 from plastron.client import Client, Endpoint
-from plastron.files import StringSource, FileSpec, FileGroup
+from plastron.files import FileGroup, FileSpec, StringSource
 from plastron.repo import Repository, ResourceType
 from plastron.repo.pcdm import PCDMObjectResource
 
 
 class MockRepo(Repository):
-    def create(self, resource_class: Type[ResourceType] = None, **kwargs) -> ResourceType:
+    def create(self, resource_class: type[ResourceType] = None, **kwargs) -> ResourceType:
         return resource_class(repo=self, path=str(uuid4()))
 
 

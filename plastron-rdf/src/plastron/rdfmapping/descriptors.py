@@ -1,9 +1,14 @@
-from typing import Any, Callable, Container
+from collections.abc import Callable, Container
+from typing import Any
 
-from rdflib import URIRef, Literal
+from rdflib import Literal, URIRef
 
 from plastron.rdfmapping.embed import EmbeddedObject
-from plastron.rdfmapping.properties import RDFDataProperty, RDFObjectProperty, RDFProperty
+from plastron.rdfmapping.properties import (
+    RDFDataProperty,
+    RDFObjectProperty,
+    RDFProperty,
+)
 
 OBJECT_CLASSES = {}
 

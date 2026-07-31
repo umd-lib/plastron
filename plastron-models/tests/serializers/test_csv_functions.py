@@ -1,5 +1,8 @@
 import pytest
+from rdflib import Literal, URIRef
+
 from plastron.models.umd import Item
+from plastron.namespaces import dcterms, owl, rdfs, umdtype
 from plastron.rdfmapping.descriptors import DataProperty, ObjectProperty
 from plastron.rdfmapping.embed import EmbeddedObject
 from plastron.rdfmapping.resources import RDFResource
@@ -14,9 +17,6 @@ from plastron.serializers.csv import (
     not_empty,
     unflatten,
 )
-from rdflib import Literal, URIRef
-
-from plastron.namespaces import dcterms, owl, rdfs, umdtype
 
 
 @pytest.mark.parametrize(
@@ -118,7 +118,7 @@ def test_unflatten_flatten(header_map):
     columns = flatten(obj, header_map)
     output_row = {k: join_values(v) for k, v in columns.items()}
 
-    for key in row.keys():
+    for key in row:
         assert output_row[ColumnHeader(label=key)] == row[key]
 
 

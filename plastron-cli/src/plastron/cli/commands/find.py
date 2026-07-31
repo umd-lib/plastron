@@ -1,6 +1,6 @@
 import logging
 from argparse import Namespace
-from typing import Callable, Iterable, Iterator
+from collections.abc import Callable, Iterable, Iterator
 
 from rdflib import Literal, URIRef
 

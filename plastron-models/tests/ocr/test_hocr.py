@@ -2,8 +2,8 @@ import pytest
 from lxml import etree
 
 from plastron.ocr import HOCRResource
-from plastron.ocr.core import BBox, XYWH, Scale
-from plastron.ocr.hocr import Word, ContentArea
+from plastron.ocr.core import XYWH, BBox, Scale
+from plastron.ocr.hocr import ContentArea, Word
 
 
 def test_hocr(datadir):

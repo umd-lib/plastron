@@ -1,6 +1,6 @@
 import logging
 from pathlib import Path
-from typing import NamedTuple, Optional
+from typing import NamedTuple
 
 from stomp import Connection11
 from stomp.exception import StompException
@@ -38,8 +38,8 @@ class Broker:
         self,
         server: ServerTuple,
         message_store_dir: Path | str,
-        destinations: Optional[dict[str, str]] = None,
-        public_uri_template: Optional[str] = None,
+        destinations: dict[str, str] | None = None,
+        public_uri_template: str | None = None,
         heartbeat: HeartbeatTuple = None,
     ):
         self.server = server

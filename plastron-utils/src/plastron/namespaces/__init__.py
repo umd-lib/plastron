@@ -3,7 +3,7 @@
 import sys
 from typing import Optional
 
-from rdflib import Namespace, Graph
+from rdflib import Graph, Namespace
 from rdflib.namespace import NamespaceManager
 
 acl = Namespace('http://www.w3.org/ns/auth/acl#')
@@ -121,7 +121,7 @@ xsd = Namespace('http://www.w3.org/2001/XMLSchema#')
 """[XML Schema Datatypes](https://www.w3.org/TR/xmlschema-2/#built-in-datatypes)"""
 
 
-def get_manager(graph: Optional[Graph] = None) -> NamespaceManager:
+def get_manager(graph: Graph | None = None) -> NamespaceManager:
     """Scan this module's attributes for `Namespace` objects, and bind them
     to a prefix corresponding to their attribute name defined above."""
     if graph is None:

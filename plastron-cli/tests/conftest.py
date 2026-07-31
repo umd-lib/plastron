@@ -1,14 +1,14 @@
 import re
-from typing import Callable
+from collections.abc import Callable
 from uuid import uuid4
 
 import pytest
 from httpretty import httpretty
 from rdflib import Graph
 
-from plastron.context import PlastronContext
-from plastron.client import Endpoint, Client
+from plastron.client import Client, Endpoint
 from plastron.client.auth import get_authenticator
+from plastron.context import PlastronContext
 from plastron.repo import Repository
 
 

@@ -2,24 +2,25 @@ import csv
 import logging
 import re
 from collections import defaultdict
-from collections.abc import Container, Sized
+from collections.abc import Container, Iterator, Mapping, Sized
 from dataclasses import dataclass
 from itertools import chain
 from os.path import basename, splitext
 from pathlib import Path
 from typing import (
     Generic,
-    Iterator,
-    Mapping,
     NamedTuple,
-    Optional,
     Protocol,
-    Type,
     TypeVar,
 )
 from uuid import uuid4
 
+from rdflib import URIRef
+from rdflib.util import from_n3
+
 from plastron.files import FileGroup, FileSpec, parse_label, parse_usage_tag
+from plastron.models import ContentModeledResource
+from plastron.namespaces import get_manager
 from plastron.rdfmapping.descriptors import DataProperty, Property
 from plastron.rdfmapping.embed import EmbeddedObject
 from plastron.rdfmapping.resources import RDFResourceBase, RDFResourceType
@@ -31,11 +32,6 @@ from plastron.serializers.csv import (
     unflatten,
 )
 from plastron.utils import strtobool
-from rdflib import URIRef
-from rdflib.util import from_n3
-
-from plastron.models import ContentModeledResource
-from plastron.namespaces import get_manager
 
 nsm = get_manager()
 logger = logging.getLogger(__name__)
@@ -46,8 +42,8 @@ class ColumnSpec:
     attrs: str
     header: str
     prop: Property
-    lang_code: Optional[str] = None
-    datatype: Optional[URIRef] = None
+    lang_code: str | None = None
+    datatype: URIRef | None = None
 
 
 class MetadataError(Exception):
@@ -136,7 +132,7 @@ def build_fields(fieldnames, model_class) -> dict[str, list[ColumnSpec]]:
     return fields
 
 
-def get_final_prop(model_class: Type[RDFResourceType], attrs: list[str]) -> Property:
+def get_final_prop(model_class: type[RDFResourceType], attrs: list[str]) -> Property:
     next_attr_name = attrs.pop(0)
     next_attr = getattr(model_class, next_attr_name)
     if not attrs:
@@ -367,7 +363,7 @@ class MetadataSpreadsheet(Generic[ModelType]):
     Iterable sequence of rows from the metadata CSV file of an import job.
     """
 
-    def __init__(self, metadata_filename: Path | str, model_class: Type[ModelType], file_grouping_strategy: str = 'rootname'):
+    def __init__(self, metadata_filename: Path | str, model_class: type[ModelType], file_grouping_strategy: str = 'rootname'):
         self.metadata_filename = metadata_filename
         self.metadata_file = None
         self.model_class = model_class
@@ -461,7 +457,7 @@ class MetadataSpreadsheet(Generic[ModelType]):
                 logger.info('No items remaining to load')
                 self.subset_to_load = []
             else:
-                target_count = int(((percentage / 100) * self.total))
+                target_count = int((percentage / 100) * self.total)
                 logger.info(f'Attempting to load {target_count} items ({percentage}% of {self.total})')
                 if len(identifiers) > target_count:
                     # evenly space the items to load among the remaining items

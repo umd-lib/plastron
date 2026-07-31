@@ -1,5 +1,6 @@
 import logging
-from typing import Optional, Type, Iterable, Iterator, TypeVar
+from collections.abc import Iterable, Iterator
+from typing import TypeVar
 
 from rdflib import URIRef
 from urlobject import URLObject
@@ -19,13 +20,13 @@ class AggregationResource(ContainerResource):
     """An [ORE Aggregation](http://openarchives.org/ore/1.0/datamodel#Aggregation) resource"""
     def __init__(self, repo: Repository, path: str = None):
         super().__init__(repo, path)
-        self.proxies_container: Optional[ContainerResource] = None
+        self.proxies_container: ContainerResource | None = None
 
     def get_proxies(self) -> 'ProxyIterator[T]':
         """Iterates over the ordered proxies of this resource, and returns the proxies."""
         return ProxyIterator(self)
 
-    def get_sequence(self, resource_type: Type[T] = None) -> 'ProxiedResourceIterator[T]':
+    def get_sequence(self, resource_type: type[T] = None) -> 'ProxiedResourceIterator[T]':
         """Iterates over the ordered proxies of this resource, and returns
         the URLs of the proxied resources. If a `resource_type` is given,
         returns full objects of that type instead."""
@@ -110,7 +111,7 @@ class ProxiedResourceIterator(ProxyIterator[T]):
     constructor, it instead returns an instance of that class. The provided class
     must be a subclass of `RepositoryResource`."""
 
-    def __init__(self, resource: AggregationResource, resource_type: Type[T] = None):
+    def __init__(self, resource: AggregationResource, resource_type: type[T] = None):
         super().__init__(resource)
         self.resource_type = resource_type
         """Resource class to use to instantiate the proxied objects; if `None`, returns just the URL"""

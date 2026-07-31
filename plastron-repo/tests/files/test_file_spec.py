@@ -1,6 +1,6 @@
 import pytest
 
-from plastron.files import StringSource, FileSpec
+from plastron.files import FileSpec, StringSource
 
 OCTET_STREAM_SOURCE = StringSource(content='', mimetype='application/octet-stream')
 HTML_SOURCE = StringSource(content='', mimetype='text/html')

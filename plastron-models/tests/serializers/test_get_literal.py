@@ -1,5 +1,5 @@
 import pytest
-from rdflib import URIRef, Literal
+from rdflib import Literal, URIRef
 
 from plastron.namespaces import xsd
 from plastron.rdfmapping.descriptors import DataProperty

@@ -1,6 +1,6 @@
 import pytest
 
-from plastron.client import Endpoint, Client
+from plastron.client import Client, Endpoint
 from plastron.client.auth import get_authenticator
 
 

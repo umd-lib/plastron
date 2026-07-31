@@ -1,10 +1,11 @@
 from argparse import Namespace
 from unittest.mock import MagicMock
 
-from plastron.context import PlastronContext
-from plastron.client import Client
-from plastron.cli.commands.update import Command
 from pytest import raises
+
+from plastron.cli.commands.update import Command
+from plastron.client import Client
+from plastron.context import PlastronContext
 
 
 def test_validate_requires_model():

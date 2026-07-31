@@ -5,13 +5,18 @@ from urllib.error import HTTPError
 import httpretty
 import pytest
 from httpretty import GET
-from rdflib import URIRef, Literal
+from rdflib import Literal, URIRef
 
 from plastron.namespaces import rdfs
 from plastron.rdfmapping.descriptors import DataProperty
 from plastron.rdfmapping.resources import RDFResourceBase
-from plastron.validation.rules import is_edtf_formatted, is_handle, is_valid_iso639_code, is_iso_8601_date
-from plastron.validation.vocabularies import get_vocabulary_graph, Vocabulary
+from plastron.validation.rules import (
+    is_edtf_formatted,
+    is_handle,
+    is_iso_8601_date,
+    is_valid_iso639_code,
+)
+from plastron.validation.vocabularies import Vocabulary, get_vocabulary_graph
 
 
 @pytest.mark.parametrize(

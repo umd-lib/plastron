@@ -1,4 +1,5 @@
 import pytest
+
 from plastron.jobs.importjob.ndnp import NDNPBatch, get_issue_data, write_import_csv
 from plastron.repo import DataReadError
 

@@ -1,10 +1,10 @@
 import json
-from unittest.mock import MagicMock, ANY
+from unittest.mock import ANY, MagicMock
 
 import pytest
 
 from plastron.context import PlastronContext
-from plastron.handles import HandleServiceClient, HandleInfo
+from plastron.handles import HandleInfo, HandleServiceClient
 from plastron.repo import Repository
 from plastron.repo.publish import PublishableResource
 

@@ -1,12 +1,17 @@
 from concurrent.futures import Future
 from typing import cast
-from unittest.mock import Mock, MagicMock
+from unittest.mock import MagicMock, Mock
 
 import pytest
 from stomp.exception import StompException
 
 from plastron.messaging.broker import Destination
-from plastron.messaging.messages import MessageBox, PlastronCommandMessage, PlastronErrorMessage, PlastronMessage
+from plastron.messaging.messages import (
+    MessageBox,
+    PlastronCommandMessage,
+    PlastronErrorMessage,
+    PlastronMessage,
+)
 from plastron.stomp.handlers import AsynchronousResponseHandler
 from plastron.stomp.listeners import CommandListener
 

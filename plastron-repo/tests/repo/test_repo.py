@@ -1,6 +1,6 @@
 import pytest
 
-from plastron.repo import Repository, RepositoryResource, ContainerResource, Tombstone
+from plastron.repo import ContainerResource, Repository, RepositoryResource, Tombstone
 
 
 @pytest.fixture

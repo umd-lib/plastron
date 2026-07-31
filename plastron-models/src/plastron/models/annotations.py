@@ -1,8 +1,8 @@
-from rdflib import RDF, URIRef, Literal
+from rdflib import RDF, Literal, URIRef
 
 from plastron.namespaces import dcterms, oa, prov, sc
 from plastron.rdfmapping.decorators import rdf_type
-from plastron.rdfmapping.descriptors import ObjectProperty, DataProperty
+from plastron.rdfmapping.descriptors import DataProperty, ObjectProperty
 from plastron.rdfmapping.embed import embedded
 from plastron.rdfmapping.resources import RDFResource
 

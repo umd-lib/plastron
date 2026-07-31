@@ -1,27 +1,44 @@
 import logging
 import os
 from collections import Counter
+from collections.abc import Generator, Iterable
 from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
 from shutil import copyfileobj
-from typing import Optional, Any, IO, Generator, Iterable
+from typing import IO, Any, Optional
 
 from bs4 import BeautifulSoup
 from rdflib import URIRef
 
 from plastron.client import ClientError
 from plastron.context import PlastronContext
-from plastron.files import BinarySource, ZipFileSource, RemoteFileSource, HTTPFileSource, LocalFileSource
+from plastron.files import (
+    BinarySource,
+    HTTPFileSource,
+    LocalFileSource,
+    RemoteFileSource,
+    ZipFileSource,
+)
 from plastron.handles import HandleInfo
-from plastron.jobs import JobError, JobConfig, Job, ItemLog
-from plastron.jobs.importjob.spreadsheet import MetadataSpreadsheet, InvalidRow, Row, MetadataError
-from plastron.models import get_model_from_name, ModelClassNotFoundError
+from plastron.jobs import ItemLog, Job, JobConfig, JobError
+from plastron.jobs.importjob.spreadsheet import (
+    InvalidRow,
+    MetadataError,
+    MetadataSpreadsheet,
+    Row,
+)
+from plastron.models import ModelClassNotFoundError, get_model_from_name
 from plastron.models.annotations import FullTextAnnotation, TextualBody
 from plastron.namespaces import sc
-from plastron.rdfmapping.validation import ValidationResultsDict, ValidationResult, ValidationSuccess, ValidationFailure
-from plastron.repo import RepositoryError, ContainerResource
+from plastron.rdfmapping.validation import (
+    ValidationFailure,
+    ValidationResult,
+    ValidationResultsDict,
+    ValidationSuccess,
+)
+from plastron.repo import ContainerResource, RepositoryError
 from plastron.repo.pcdm import PCDMObjectResource
 from plastron.repo.publish import PublishableResource
 from plastron.utils import datetimestamp
@@ -40,12 +57,12 @@ class ImportedItemStatus(Enum):
 
 @dataclass
 class ImportConfig(JobConfig):
-    model: Optional[str] = None
-    access: Optional[str] = None
-    member_of: Optional[str] = None
-    container: Optional[str] = None
-    binaries_location: Optional[str] = None
-    extract_text_types: Optional[str] = None
+    model: str | None = None
+    access: str | None = None
+    member_of: str | None = None
+    container: str | None = None
+    binaries_location: str | None = None
+    extract_text_types: str | None = None
     file_grouping_strategy: str = 'rootname'
 
 
@@ -393,14 +410,14 @@ class ImportJob(Job):
         )
 
     @property
-    def access(self) -> Optional[URIRef]:
+    def access(self) -> URIRef | None:
         if self.config.access is not None:
             return URIRef(self.config.access)
         else:
             return None
 
     @property
-    def member_of(self) -> Optional[URIRef]:
+    def member_of(self) -> URIRef | None:
         if self.config.member_of is not None:
             return URIRef(self.config.member_of)
         else:

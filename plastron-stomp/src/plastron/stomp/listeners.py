@@ -1,14 +1,20 @@
 import importlib.metadata
 import logging
 import os
+from collections.abc import Callable, Generator, Iterator
 from concurrent.futures import ThreadPoolExecutor
-from typing import Any, Callable, Generator, Iterator
+from typing import Any
 
 from stomp.listener import ConnectionListener
 
 from plastron.context import PlastronContext
 from plastron.messaging.broker import Destination
-from plastron.messaging.messages import MessageBox, PlastronCommandMessage, PlastronMessage, PlastronResponseMessage
+from plastron.messaging.messages import (
+    MessageBox,
+    PlastronCommandMessage,
+    PlastronMessage,
+    PlastronResponseMessage,
+)
 from plastron.stomp.commands import get_command_module, get_module_name
 from plastron.stomp.handlers import AsynchronousResponseHandler
 from plastron.stomp.inbox_watcher import InboxWatcher

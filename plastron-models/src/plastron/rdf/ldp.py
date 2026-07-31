@@ -98,7 +98,7 @@ class Resource(rdf.Resource):
     def create_fragments(self):
         for obj in self.embedded_objects():
             obj.uuid = uuid4()
-            obj.uri = URIRef('{0}#{1}'.format(self.uri, obj.uuid))
+            obj.uri = URIRef(f'{self.uri}#{obj.uuid}')
             obj.created = True
 
     def patch(self, client, sparql_update):
@@ -161,7 +161,6 @@ class RdfSource(Resource):
     """Class representing a Linked Data Platform RDF Source (LDP-RS)
     An LDPR whose state is fully represented in RDF, corresponding to an RDF
     graph. See also the term RDF Source from [rdf11-concepts]."""
-    pass
 
 
 class NonRdfSource(Resource):
@@ -182,14 +181,12 @@ class Container(RdfSource):
     requests for creation, modification, and/or enumeration of its linked
     members and documents, and that conforms to the simple lifecycle patterns
     and conventions in section 5. Linked Data Platform Containers."""
-    pass
 
 
 class BasicContainer(Container):
     """Class representing a Linked Data Platform Basic Container (LDP-BC)
     An LDPC that defines a simple link to its contained documents (information
     resources) [WEBARCH]."""
-    pass
 
 
 class DirectContainer(Container):
@@ -197,7 +194,6 @@ class DirectContainer(Container):
     An LDPC that adds the concept of membership, allowing the flexibility of
     choosing what form its membership triples take, and allows members to be any
     resources [WEBARCH], not only documents."""
-    pass
 
 
 class IndirectContainer(Container):
@@ -205,4 +201,3 @@ class IndirectContainer(Container):
     An LDPC similar to a LDP-DC that is also capable of having members whose
     URIs are based on the content of its contained documents rather than the
     URIs assigned to those documents."""
-    pass

@@ -2,7 +2,7 @@ from unittest.mock import MagicMock
 
 import httpretty
 import pytest
-from rdflib import Graph, URIRef, Literal
+from rdflib import Graph, Literal, URIRef
 
 import plastron.validation
 from plastron.namespaces import rdfs

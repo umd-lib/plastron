@@ -1,8 +1,8 @@
 import pytest
 from lxml import etree
 
-from plastron.ocr.core import XYWH, BBox
 from plastron.ocr.alto import ALTOResource
+from plastron.ocr.core import XYWH, BBox
 
 
 @pytest.fixture

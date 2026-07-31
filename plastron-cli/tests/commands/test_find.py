@@ -4,8 +4,8 @@ import httpretty
 import pytest
 from rdflib import Graph, Literal
 
-from plastron.cli.commands.find import find, Command
-from plastron.namespaces import rdf, pcdm, dcterms, ldp
+from plastron.cli.commands.find import Command, find
+from plastron.namespaces import dcterms, ldp, pcdm, rdf
 
 
 @pytest.mark.parametrize(

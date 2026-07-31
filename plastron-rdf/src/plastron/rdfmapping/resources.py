@@ -1,11 +1,17 @@
 from collections import defaultdict
-from copy import deepcopy, copy
-from typing import Optional, Any, Type, TypeVar, Callable
+from collections.abc import Callable
+from copy import copy, deepcopy
+from typing import Any, TypeVar
 from uuid import uuid4
 
 from rdflib import Graph, URIRef
 
-from plastron.rdfmapping.descriptors import ObjectProperty, Property, DataProperty, OBJECT_CLASSES
+from plastron.rdfmapping.descriptors import (
+    OBJECT_CLASSES,
+    DataProperty,
+    ObjectProperty,
+    Property,
+)
 from plastron.rdfmapping.graph import TrackChangesGraph, copy_triples
 from plastron.rdfmapping.properties import RDFProperty
 from plastron.rdfmapping.validation import ValidationResultsDict
@@ -72,8 +78,8 @@ class RDFResourceBase:
 
     def get_fragment_resource(
             self,
-            object_class: Type['RDFResourceBase'],
-            fragment_id: Optional[str] = None,
+            object_class: type['RDFResourceBase'],
+            fragment_id: str | None = None,
     ) -> 'RDFResourceBase':
         """
         Embedded (i.e., "fragment") resources share a graph with their parent resource. They
@@ -151,7 +157,7 @@ class RDFResourceBase:
             results['_' + test.__name__] = test(self)
         return results
 
-    def redescribe(self, model: Type['RDFResourceType']) -> 'RDFResourceType':
+    def redescribe(self, model: type['RDFResourceType']) -> 'RDFResourceType':
         return model(uri=self.uri, graph=self.graph)
 
 

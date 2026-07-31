@@ -2,7 +2,7 @@ from rdflib import Graph, Literal, URIRef
 
 from plastron.models.authorities import Agent
 from plastron.models.umd import Item
-from plastron.namespaces import dcterms, umdtype, rdfs
+from plastron.namespaces import dcterms, rdfs, umdtype
 from plastron.rdfmapping.embed import embedded
 
 

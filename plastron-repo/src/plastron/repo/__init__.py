@@ -1,18 +1,19 @@
 import logging
 import os.path
+from collections.abc import Iterator
 from contextlib import contextmanager
 from http import HTTPStatus
-from typing import Optional, Type, TypeVar, Iterator, Union
+from math import inf
+from typing import Optional, Type, TypeVar, Union
 from uuid import uuid4
 
 import yaml
-from math import inf
-from rdflib import URIRef, Namespace
+from rdflib import Namespace, URIRef
 from requests import Response
 from requests.auth import AuthBase
 from urlobject import URLObject
 
-from plastron.client import Client, Endpoint, ClientError
+from plastron.client import Client, ClientError, Endpoint
 from plastron.client.auth import get_authenticator
 from plastron.client.transactions import transaction
 from plastron.rdfmapping.graph import TrackChangesGraph
@@ -63,7 +64,7 @@ class Repository:
     def client(self):
         return self._txn_client or self._client
 
-    def get_resource(self, path: str, resource_class: Type[ResourceType] = None) -> ResourceType:
+    def get_resource(self, path: str, resource_class: type[ResourceType] = None) -> ResourceType:
         """Get an object representing a resource at a particular path with this repository.
 
         By default, returns an object of type `RepositoryResource`, but you may pass a different
@@ -132,7 +133,7 @@ class Repository:
             # a transaction
             self._txn_client = None
 
-    def create(self, resource_class: Type[ResourceType] = None, **kwargs) -> ResourceType:
+    def create(self, resource_class: type[ResourceType] = None, **kwargs) -> ResourceType:
         resource_uri = self.client.create(**kwargs)
         return self.get_resource(resource_uri.uri, resource_class=resource_class).read()
 
@@ -143,8 +144,8 @@ class RepositoryResource:
     def __init__(self, repo: Repository, path: str = None):
         self.repo = repo
         self.path = path
-        self._types: Optional[set[URLObject]] = None
-        self._description_url: Optional[URLObject] = None
+        self._types: set[URLObject] | None = None
+        self._description_url: URLObject | None = None
         self._graph: TrackChangesGraph = TrackChangesGraph()
         self._headers = None
 
@@ -153,21 +154,21 @@ class RepositoryResource:
 
     T = TypeVar('T', bound='RepositoryResource')
 
-    def convert_to(self, cls: Type[T]) -> T:
+    def convert_to(self, cls: type[T]) -> T:
         try:
             return cls(repo=self.repo, path=self.path)
         except TypeError as e:
             raise RepositoryError(f'Unable to convert {self.__class__.__name__} to {cls.__name__}: {e}')
 
     @property
-    def url(self) -> Optional[URLObject]:
+    def url(self) -> URLObject | None:
         if self.path is not None:
             return self.repo.endpoint.url.with_path(os.path.join(self.repo.endpoint.url.path, self.path.lstrip('/')))
         else:
             return None
 
     @property
-    def description_url(self) -> Optional[URLObject]:
+    def description_url(self) -> URLObject | None:
         return self._description_url
 
     @property
@@ -213,7 +214,7 @@ class RepositoryResource:
         description.uri = URIRef(self.url)
         self._graph = description.graph
 
-    def get_resource(self, path: str, resource_class: Type[ResourceType]) -> ResourceType:
+    def get_resource(self, path: str, resource_class: type[ResourceType]) -> ResourceType:
         url = self.url.add_path(path)
         return self.repo[url:resource_class]
 
@@ -299,11 +300,11 @@ class Tombstone:
         self._resource = resource
 
     @property
-    def url(self) -> Optional[URLObject]:
+    def url(self) -> URLObject | None:
         return self._resource.url
 
     @property
-    def path(self) -> Optional[str]:
+    def path(self) -> str | None:
         return self._resource.path
 
 
@@ -312,7 +313,7 @@ class ContainerResource(RepositoryResource):
 
     def create_child(
             self,
-            resource_class: Type[ResourceType] = RepositoryResource,
+            resource_class: type[ResourceType] = RepositoryResource,
             description: RDFResourceType = None,
             **kwargs,
     ) -> ResourceType:

@@ -1,4 +1,5 @@
 import pytest
+
 from plastron.files import LocalFileSource, RemoteFileSource, ZipFileSource
 from plastron.jobs.importjob import ImportJob
 from plastron.jobs.importjob.spreadsheet import (
@@ -7,7 +8,6 @@ from plastron.jobs.importjob.spreadsheet import (
     build_file_groups,
 )
 from plastron.models.umd import Item
-
 from plastron.namespaces import umdtype
 
 

@@ -1,5 +1,5 @@
 import plastron.validation.rules
-from plastron.namespaces import edm, geo, rdfs, owl
+from plastron.namespaces import edm, geo, owl, rdfs
 from plastron.rdf import ldp, rdf
 
 

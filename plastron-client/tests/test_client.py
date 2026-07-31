@@ -5,13 +5,13 @@ from pathlib import Path
 from unittest.mock import MagicMock
 
 import pytest
-from requests import Session, Request
+from requests import Request, Session
 from requests.exceptions import ConnectionError
 from requests_jwtauth import HTTPBearerAuth
 
-from plastron.client import Endpoint, Client, ClientError
+from plastron.client import Client, ClientError, Endpoint
 from plastron.client.auth import ClientCertAuth
-from plastron.client.utils import random_slug, ResourceURI
+from plastron.client.utils import ResourceURI, random_slug
 
 
 @pytest.fixture()

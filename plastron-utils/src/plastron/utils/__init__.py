@@ -3,8 +3,9 @@ import os
 import platform
 import re
 from argparse import ArgumentTypeError
+from collections.abc import Mapping
 from datetime import datetime
-from typing import Mapping, Optional
+from typing import Optional
 
 from rdflib import URIRef
 from rdflib.term import Node
@@ -169,7 +170,7 @@ def uri_or_curie(arg: str) -> URIRef:
     return term
 
 
-def parse_predicate_list(string: str, delimiter: str = ',') -> Optional[list[Node]]:
+def parse_predicate_list(string: str, delimiter: str = ',') -> list[Node] | None:
     if string is None:
         return None
     manager = namespaces.get_manager()

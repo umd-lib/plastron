@@ -1,18 +1,19 @@
 import logging.config
 import os
 import re
-import yaml
 from argparse import ArgumentTypeError, Namespace
 from datetime import datetime
 from importlib import import_module
 from time import sleep
 
-from plastron.client import Client, ClientError
-from plastron.cli.commands import BaseCommand
-from plastron.client.transactions import transaction
-from plastron.repo import DataReadError
+import yaml
+
 from plastron.cli import ConfigError
+from plastron.cli.commands import BaseCommand
+from plastron.client import Client, ClientError
+from plastron.client.transactions import transaction
 from plastron.jobs import ItemLog
+from plastron.repo import DataReadError
 
 logger = logging.getLogger(__name__)
 now = datetime.utcnow().strftime('%Y%m%d%H%M%S')
@@ -104,7 +105,7 @@ class Command(BaseCommand):
         logger.info("Initializing data handler")
         module_name = batch_config.handler
         handler = import_module('plastron.cli.handlers.' + module_name)
-        logger.info('Loaded "{0}" handler'.format(module_name))
+        logger.info(f'Loaded "{module_name}" handler')
 
         # "--no-binaries" implies "--no-annotations"
         if not args.load_binaries:
@@ -141,7 +142,7 @@ class Command(BaseCommand):
                 ignored = []
 
             skipfile = os.path.join(
-                batch_config.log_dir, 'skipped.load.{0}.csv'.format(now)
+                batch_config.log_dir, f'skipped.load.{now}.csv'
             )
             skipped = ItemLog(skipfile, fieldnames, 'path')
 
@@ -196,7 +197,7 @@ class Command(BaseCommand):
                     skipped.writerow(row)
 
                 if args.wait:
-                    logger.info("Pausing {0} seconds".format(args.wait))
+                    logger.info(f"Pausing {args.wait} seconds")
                     sleep(int(args.wait))
 
 
@@ -264,7 +265,7 @@ def load_item(client: Client, batch_item, args, extra=None):
                 # attempt to roll back the current transaction
                 # failures here will be caught by the main loop's exception handler
                 # and should trigger a system exit
-                logger.error("Item creation failed: {0}".format(e))
+                logger.error(f"Item creation failed: {e}")
                 txn_client.rollback()
                 logger.warning('Transaction rolled back. Continuing load.')
 
@@ -276,7 +277,7 @@ def load_item(client: Client, batch_item, args, extra=None):
             load_item_internal(client, item, args, extra)
             return True
         except (ClientError, FileNotFoundError) as e:
-            logger.error("Item creation failed: {0}".format(e))
+            logger.error(f"Item creation failed: {e}")
             logger.warning('Continuing load.')
         except KeyboardInterrupt as e:
             logger.error("Load interrupted")

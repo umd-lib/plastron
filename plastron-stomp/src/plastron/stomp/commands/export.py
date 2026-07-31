@@ -1,5 +1,6 @@
 import logging
-from typing import Generator, Any
+from collections.abc import Generator
+from typing import Any
 
 from plastron.context import PlastronContext
 from plastron.jobs.exportjob import ExportJob

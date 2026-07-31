@@ -6,12 +6,12 @@ import os
 import yaml
 from rdflib import Graph
 
-from plastron.repo import DataReadError
 from plastron.cli import ConfigError
 from plastron.namespaces import dcterms
 from plastron.rdf import pcdm, rdf
 from plastron.rdf.authority import create_authority
-from plastron.rdf.pcdm import get_file_object, Page
+from plastron.rdf.pcdm import Page, get_file_object
+from plastron.repo import DataReadError
 
 logger = logging.getLogger(__name__)
 
@@ -39,7 +39,7 @@ class Batch:
         # check for an existing file index
         file_index = os.path.join(config.data_dir, 'file_index.yml')
         if os.path.isfile(file_index):
-            self.logger.info('Found file index in {0}'.format(file_index))
+            self.logger.info(f'Found file index in {file_index}')
             with open(file_index, 'r') as index:
                 self.all_files = yaml.safe_load(index)
         else:
@@ -56,8 +56,8 @@ class Batch:
                     else:
                         self.all_files[f].append(os.path.join(root, f))
 
-            self.logger.info("Found {0} files with {1} unique filenames"
-                             .format(file_count, len(self.all_files)))
+            self.logger.info(f"Found {file_count} files with {len(self.all_files)} unique filenames"
+                             )
 
             # save index to file
             with open(file_index, 'w') as index:
@@ -65,7 +65,7 @@ class Batch:
 
         with open(config.batch_file, 'r') as f:
             self.logger.info(
-                'Parsing the master metadata graph in {0}'.format(config.batch_file))
+                f'Parsing the master metadata graph in {config.batch_file}')
             self.master_graph = Graph().parse(f, format="turtle")
 
         # get subject URIs that are http: or https: URIs
@@ -81,7 +81,7 @@ class Batch:
 
         self.length = len(self.subjects)
         self.count = 0
-        self.logger.info("Batch contains {0} items.".format(self.length))
+        self.logger.info(f"Batch contains {self.length} items.")
 
     def __iter__(self):
         return self
@@ -136,9 +136,9 @@ class BatchItem:
             filename = str(o)
             # ensure exactly one path that is mapped from the basename
             if filename not in self.batch.all_files:
-                raise DataReadError('File {0} not found'.format(filename))
+                raise DataReadError(f'File {filename} not found')
             elif len(self.batch.all_files[filename]) > 1:
-                raise DataReadError('Filename {0} is not unique'.format(filename))
+                raise DataReadError(f'Filename {filename} is not unique')
 
             file_path = self.batch.all_files[filename][0]
 
@@ -158,7 +158,7 @@ class BatchItem:
                     parts[page_no].append(file_path)
             else:
                 logger.warning(
-                    'Filename {0} does not match a known pattern'.format(filename))
+                    f'Filename {filename} does not match a known pattern')
 
         # remove the dcterms:hasPart triples
         item.unmapped_triples = [(s, p, o) for (s, p, o) in item.unmapped_triples if p != dcterms.hasPart]

@@ -1,14 +1,20 @@
 from http import HTTPStatus
 from pathlib import Path
-from unittest.mock import MagicMock
 from tempfile import TemporaryFile
+from unittest.mock import MagicMock
 from uuid import uuid4
 from zipfile import ZipFile
 
 import httpretty
 import pytest
 
-from plastron.files import HTTPFileSource, LocalFileSource, RemoteFileSource, ZipFileSource, StringSource
+from plastron.files import (
+    HTTPFileSource,
+    LocalFileSource,
+    RemoteFileSource,
+    StringSource,
+    ZipFileSource,
+)
 from plastron.namespaces import pcdmuse
 
 
@@ -52,10 +58,9 @@ def test_nonexistent_local_file_source():
 
 def test_nonexistent_zip_file_source():
     # create an empty zip file
-    with TemporaryFile() as tmp_file:
-        with ZipFile(tmp_file, mode='w') as zip_file:
-            f = ZipFileSource(zip_file, 'foo.jpg')
-            assert not f.exists()
+    with TemporaryFile() as tmp_file, ZipFile(tmp_file, mode='w') as zip_file:
+        f = ZipFileSource(zip_file, 'foo.jpg')
+        assert not f.exists()
 
 
 @httpretty.activate

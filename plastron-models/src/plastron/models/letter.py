@@ -2,13 +2,30 @@ from rdflib import URIRef
 
 from plastron.handles import HandleBearingResource
 from plastron.models import ContentModeledResource
-from plastron.models.authorities import UMD_TERMS_OF_USE_STATEMENTS, UMD_PRESENTATION_SETS
+from plastron.models.authorities import (
+    UMD_PRESENTATION_SETS,
+    UMD_TERMS_OF_USE_STATEMENTS,
+)
 from plastron.models.fedora import FedoraResource
-from plastron.models.pcdm import PCDMObject
 from plastron.models.page import Page
-from plastron.namespaces import bibo, dc, dcmitype, dcterms, edm, geo, rel, skos, ore, owl, umd, schema, pcdm
+from plastron.models.pcdm import PCDMObject
+from plastron.namespaces import (
+    bibo,
+    dc,
+    dcmitype,
+    dcterms,
+    edm,
+    geo,
+    ore,
+    owl,
+    pcdm,
+    rel,
+    schema,
+    skos,
+    umd,
+)
 from plastron.rdfmapping.decorators import rdf_type
-from plastron.rdfmapping.descriptors import ObjectProperty, DataProperty
+from plastron.rdfmapping.descriptors import DataProperty, ObjectProperty
 from plastron.rdfmapping.resources import RDFResource
 from plastron.validation.rules import is_edtf_formatted
 from plastron.validation.vocabularies import ControlledVocabularyProperty

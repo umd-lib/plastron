@@ -4,13 +4,13 @@ import os
 from collections import OrderedDict
 
 import yaml
-from plastron.cli import ConfigError
-from plastron.files import LocalFileSource, RemoteFileSource
-from plastron.rdf import pcdm, rdf
 from rdflib import Literal, URIRef
 from rdflib.util import from_n3
 
 from plastron import namespaces
+from plastron.cli import ConfigError
+from plastron.files import LocalFileSource, RemoteFileSource
+from plastron.rdf import pcdm, rdf
 
 nsm = namespaces.get_manager()
 

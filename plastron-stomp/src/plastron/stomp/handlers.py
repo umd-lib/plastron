@@ -5,7 +5,7 @@ import traceback
 from stomp.exception import StompException
 
 from plastron.messaging.broker import Destination
-from plastron.messaging.messages import PlastronErrorMessage, PlastronCommandMessage
+from plastron.messaging.messages import PlastronCommandMessage, PlastronErrorMessage
 
 logger = logging.getLogger(__name__)
 

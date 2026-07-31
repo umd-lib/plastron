@@ -1,6 +1,6 @@
 import logging
 import re
-from argparse import Namespace, FileType
+from argparse import FileType, Namespace
 from collections.abc import Iterable
 
 from plastron.cli import get_uris

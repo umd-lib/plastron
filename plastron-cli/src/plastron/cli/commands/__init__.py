@@ -1,5 +1,6 @@
+from collections.abc import Generator
 from importlib import import_module
-from typing import Generator, Any
+from typing import Any
 
 from plastron.context import PlastronContext
 
@@ -39,7 +40,7 @@ def get_command_class(command_name: str):
         command_module = import_module('.'.join([__package__, module_name]))
     except ModuleNotFoundError as e:
         raise RuntimeError(f'Unable to load a command with the name {command_name}') from e
-    command_class = getattr(command_module, 'Command')
+    command_class = command_module.Command
     if command_class is None:
         raise RuntimeError(f'Command class not found in module {command_module}')
 

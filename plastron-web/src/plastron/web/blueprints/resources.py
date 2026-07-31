@@ -1,13 +1,18 @@
 import logging
 
-from flask import Blueprint, request, current_app
+from flask import Blueprint, current_app, request
 from pyparsing import ParseException
 from rdflib.plugins.sparql import prepareUpdate
-from werkzeug.exceptions import BadRequest, UnsupportedMediaType, NotFound, InternalServerError
+from werkzeug.exceptions import (
+    BadRequest,
+    InternalServerError,
+    NotFound,
+    UnsupportedMediaType,
+)
 
+from plastron.models import ModelClassNotFoundError, get_model_from_name
+from plastron.repo import RepositoryError, RepositoryResource
 from plastron.web.flask_problem import ProblemDetailError
-from plastron.models import get_model_from_name, ModelClassNotFoundError
-from plastron.repo import RepositoryResource, RepositoryError
 
 logger = logging.getLogger(__name__)
 blueprint = Blueprint('resource', __name__)

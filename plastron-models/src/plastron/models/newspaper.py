@@ -1,13 +1,30 @@
-from lxml.etree import parse, XMLSyntaxError
+from lxml.etree import XMLSyntaxError, parse
 
 from plastron.handles import HandleBearingResource
 from plastron.models import ContentModeledResource
 from plastron.models.annotations import TextblockOnPage
-from plastron.models.authorities import UMD_TERMS_OF_USE_STATEMENTS, UMD_PRESENTATION_SETS, UMD_RIGHTS_STATEMENTS, Agent
+from plastron.models.authorities import (
+    UMD_PRESENTATION_SETS,
+    UMD_RIGHTS_STATEMENTS,
+    UMD_TERMS_OF_USE_STATEMENTS,
+    Agent,
+)
 from plastron.models.fedora import FedoraResource
-from plastron.models.page import Page, File
-from plastron.models.pcdm import PCDMObject, PCDMFile
-from plastron.namespaces import bibo, carriers, dc, dcterms, fabio, ndnp, ore, pcdm, pcdmuse, schema, umd
+from plastron.models.page import File, Page
+from plastron.models.pcdm import PCDMFile, PCDMObject
+from plastron.namespaces import (
+    bibo,
+    carriers,
+    dc,
+    dcterms,
+    fabio,
+    ndnp,
+    ore,
+    pcdm,
+    pcdmuse,
+    schema,
+    umd,
+)
 from plastron.ocr.alto import ALTOResource
 from plastron.rdfmapping.decorators import rdf_type
 from plastron.rdfmapping.descriptors import DataProperty, ObjectProperty
@@ -55,13 +72,11 @@ class Issue(ContentModeledResource, PCDMObject, HandleBearingResource, FedoraRes
 @rdf_type(fabio.Metadata)
 class IssueMetadata(PCDMObject):
     """Additional metadata about an issue"""
-    pass
 
 
 @rdf_type(fabio.MetadataDocument)
 class MetadataFile(PCDMFile):
     """A binary file containing metadata in non-RDF formats (METS, MODS, etc.)"""
-    pass
 
 
 @rdf_type(ndnp.Page)
@@ -90,9 +105,9 @@ class Page(PCDMObject):
             with ocr_file.source as stream:
                 tree = parse(stream)
         except OSError:
-            raise RuntimeError("Unable to read {0}".format(ocr_file.filename))
+            raise RuntimeError(f"Unable to read {ocr_file.filename}")
         except XMLSyntaxError:
-            raise RuntimeError("Unable to parse {0} as XML".format(ocr_file.filename))
+            raise RuntimeError(f"Unable to parse {ocr_file.filename} as XML")
 
         # read in resolution from issue METS data
         master = next(self.files_for('master'))

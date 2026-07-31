@@ -4,8 +4,8 @@ import time
 from contextlib import contextmanager
 from unittest.mock import patch
 
-from plastron.stomp.inbox_watcher import InboxWatcher
 from plastron.messaging.messages import MessageBox, PlastronMessage
+from plastron.stomp.inbox_watcher import InboxWatcher
 
 
 def test_new_file_in_inbox():

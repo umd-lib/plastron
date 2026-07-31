@@ -1,6 +1,7 @@
 import logging
 import time
-from typing import Generator, Any
+from collections.abc import Generator
+from typing import Any
 
 from plastron.messaging.messages import PlastronCommandMessage
 from plastron.repo import Repository

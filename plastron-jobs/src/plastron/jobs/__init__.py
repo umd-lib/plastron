@@ -77,7 +77,7 @@ class Job:
     def new_run(self):
         return self.run_class(self)
 
-    def get_run(self, timestamp: Optional[str] = None):
+    def get_run(self, timestamp: str | None = None):
         if timestamp is None:
             # get the latest run
             return self.latest_run()
@@ -102,7 +102,7 @@ class Jobs:
     def __init__(self, directory: Path | str):
         self.dir = Path(directory)
 
-    def create_job(self, job_class: Type[J], job_id: str = None, config: C = None) -> J:
+    def create_job(self, job_class: type[J], job_id: str = None, config: C = None) -> J:
         if config is None:
             if job_id is None:
                 raise RuntimeError('Must specify either a job_id or config')
@@ -122,7 +122,7 @@ class Jobs:
         logger.info(f'Created job with id {config.job_id}')
         return job_class(job_id=config.job_id, job_dir=job_dir).load_config()
 
-    def get_job(self, job_class: Type[J], job_id: str) -> J:
+    def get_job(self, job_class: type[J], job_id: str) -> J:
         safe_id = urllib.parse.quote(job_id, safe='')
         job_dir = self.dir / safe_id
         if not job_dir.exists():

@@ -2,6 +2,7 @@ import logging
 import os
 import re
 from collections import Counter
+from collections.abc import Generator, Iterator
 from dataclasses import dataclass
 from datetime import datetime
 from email.utils import parsedate
@@ -9,7 +10,7 @@ from os.path import basename, splitext
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from time import mktime
-from typing import Any, Generator, Iterator, Optional
+from typing import Any
 from urllib.parse import urlsplit
 from zipfile import ZipFile
 
@@ -19,13 +20,17 @@ from requests import ConnectionError
 
 from plastron.client import ClientError
 from plastron.context import PlastronContext
-from plastron.files import get_ssh_client, FileSpec, get_usage_tag
+from plastron.files import FileSpec, get_ssh_client, get_usage_tag
 from plastron.jobs import Job
 from plastron.models.pcdm import PCDMFile, PCDMObject
 from plastron.models.umd import Item
 from plastron.repo import DataReadError
 from plastron.repo.aggregation import AggregationResource
-from plastron.repo.pcdm import PCDMFileBearingResource, PCDMObjectResource, PCDMPageResource
+from plastron.repo.pcdm import (
+    PCDMFileBearingResource,
+    PCDMObjectResource,
+    PCDMPageResource,
+)
 from plastron.serializers import SERIALIZER_CLASSES, detect_resource_class
 from plastron.serializers.csv import EmptyItemListError
 
@@ -34,7 +39,7 @@ UUID_REGEX = re.compile(r'([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a
 logger = logging.getLogger(__name__)
 
 
-def format_size(size: int, decimal_places: Optional[int] = None):
+def format_size(size: int, decimal_places: int | None = None):
     for unit in ('B', 'KB', 'MB', 'GB', 'TB'):
         if size < 1024:
             break
@@ -250,8 +255,7 @@ class ExportJob(Job):
                         binary_filename = binaries_dir / str(file.filename)
                         with open(binary_filename, mode='wb') as binary:
                             with file_resource.open() as stream:
-                                for chunk in stream:
-                                    binary.write(chunk)
+                                binary.writelines(stream)
 
                         # update the atime and mtime of the file to reflect the time of the
                         # HTTP request and the resource's last-modified time in the repo

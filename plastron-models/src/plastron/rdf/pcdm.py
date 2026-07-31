@@ -1,8 +1,8 @@
 from PIL import Image
-from plastron.files import LocalFileSource, RepositoryFileSource
-from plastron.rdf import ldp, ore, rdf
 
+from plastron.files import LocalFileSource, RepositoryFileSource
 from plastron.namespaces import dcterms, ebucore, fabio, pcdm, pcdmuse, premis
+from plastron.rdf import ldp, ore, rdf
 
 # alias the rdflib Namespace
 ns = pcdm
@@ -125,8 +125,8 @@ class File(ldp.NonRdfSource):
                         with Image.open(stream) as img:
                             self.width = img.width
                             self.height = img.height
-                except IOError as e:
-                    self.logger.warn(f'Cannot read image file: {e}')
+                except OSError as e:
+                    self.logger.warning(f'Cannot read image file: {e}')
 
         return super().update(client, recursive=recursive)
 
@@ -160,7 +160,6 @@ class Collection(Object):
 @rdf.rdf_class(fabio.Page)
 class Page(Object):
     """One page of an item-level resource"""
-    pass
 
 
 FILE_CLASS_FOR = {

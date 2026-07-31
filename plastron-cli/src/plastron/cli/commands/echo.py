@@ -4,7 +4,6 @@ from argparse import Namespace
 
 from plastron.cli.commands import BaseCommand
 
-
 logger = logging.getLogger(__name__)
 
 

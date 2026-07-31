@@ -5,13 +5,13 @@ from datetime import datetime
 from lxml import etree
 
 from plastron.cli import get_uris
-from plastron.repo.utils import context
 from plastron.cli.commands import BaseCommand
+from plastron.jobs import ItemLog
 from plastron.models.annotations import TextblockOnPage
 from plastron.namespaces import pcdmuse
 from plastron.ocr.alto import ALTOResource
 from plastron.repo.pcdm import PCDMPageResource
-from plastron.jobs import ItemLog
+from plastron.repo.utils import context
 
 logger = logging.getLogger(__name__)
 now = datetime.utcnow().strftime('%Y%m%d%H%M%S')

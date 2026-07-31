@@ -7,14 +7,14 @@ from pathlib import Path
 
 import yaml
 from flask import Flask, url_for
-from werkzeug.exceptions import NotFound, HTTPException
+from werkzeug.exceptions import HTTPException, NotFound
 
-from plastron.web.flask_problem import problem_detail_response
 from plastron.context import PlastronContext
-from plastron.jobs import JobError, JobConfigError, JobNotFoundError, Jobs
+from plastron.jobs import JobConfigError, JobError, JobNotFoundError, Jobs
 from plastron.jobs.importjob import ImportJob
 from plastron.utils import envsubst
 from plastron.web.blueprints import activitystream_blueprint, resources_blueprint
+from plastron.web.flask_problem import problem_detail_response
 
 __version__ = importlib.metadata.version('plastron-web')
 

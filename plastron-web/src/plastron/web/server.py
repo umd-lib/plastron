@@ -4,7 +4,7 @@ import click
 from dotenv import load_dotenv
 from waitress import serve
 
-from plastron.web import create_app, __version__
+from plastron.web import __version__, create_app
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)

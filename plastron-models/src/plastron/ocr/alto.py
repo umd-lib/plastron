@@ -1,11 +1,22 @@
 """[ALTO](https://www.loc.gov/standards/alto/) (Analyzed Layout and Text Object) OCR classes"""
 
-from typing import Union, Iterator
+from collections.abc import Iterator
+from typing import Union
 
 # noinspection PyProtectedMember
-from lxml.etree import _Element, _ElementTree, QName
+from lxml.etree import QName, _Element, _ElementTree
 
-from plastron.ocr.core import XYWH, BBox, Scale, RegionBase, OCRError, OCRResource, BlockRegion, LineRegion, WordRegion
+from plastron.ocr.core import (
+    XYWH,
+    BBox,
+    BlockRegion,
+    LineRegion,
+    OCRError,
+    OCRResource,
+    RegionBase,
+    Scale,
+    WordRegion,
+)
 
 XMLNS = {"alto": "http://www.loc.gov/standards/alto/ns-v2#"}
 

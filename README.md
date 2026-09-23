@@ -1,6 +1,6 @@
 # Plastron
 
-Tools for working with a Fedora 4 repository.
+Tools for working with a Fedora repository.
 
 ## Architecture
 
@@ -18,7 +18,7 @@ layers:
 
 ### High-Level APIs
 
-* **[plastron-models](plastron-models)**: Content models, CSV
+* **[plastron-models](plastron-models)**: Content models, handles, OCR, CSV
   serialization
 * **[plastron-repo](plastron-repo)**: Repository operations and structural
   models (LDP, PCDM, Web Annotations, etc.)
@@ -87,9 +87,22 @@ with the appropriate package name.
 
 ## Development
 
+### Using `uv`
+
+The development environment for this repository can be managed using [uv].
+Clone the repository, and run `uv sync`:
+
+```zsh
+git clone git@github.com:umd-lib/plastron.git
+cd plastron
+uv sync --all-extras
+```
+
+### Using `pyenv` and `pip`
+
 This repository includes a [.python-version](.python-version) file. If you are
 using a tool like [pyenv] to manage your Python versions, it will select
-an installed Python 3.8 for you.
+an installed Python for you.
 
 To install Plastron in [development mode], do the following:
 
@@ -116,7 +129,7 @@ This allows for in-place editing of Plastron's source code in the git
 repository (i.e., it is not locked away in a Python site-packages directory
 structure).
 
-### Testing
+## Testing
 
 Plastron uses the [pytest] test framework for its tests.
 
@@ -158,6 +171,8 @@ See the [LICENSE](LICENSE.md) file for license rights and
 limitations (Apache 2.0).
 
 [development mode]: https://packaging.python.org/tutorials/installing-packages/#installing-from-vcs
+[pipx]: https://pipx.pypa.io/stable/
+[uv]: https://docs.astral.sh/uv/
 [pytest]: https://pypi.org/project/pytest/
 [pyenv]: https://github.com/pyenv/pyenv
 [pdoc]: https://pdoc.dev/

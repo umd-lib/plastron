@@ -8,8 +8,8 @@ from plastron.utils import strtobool
 
 
 def unpublish(
-        context: PlastronContext,
-        message: PlastronCommandMessage,
+    context: PlastronContext,
+    message: PlastronCommandMessage,
 ) -> Generator[dict[str, Any], None, dict[str, Any]]:
     job = PublicationJob(
         context=context,

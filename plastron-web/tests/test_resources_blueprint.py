@@ -68,10 +68,7 @@ def test_update_missing_content_type(app_client_with_context):
 
 
 def test_update_wrong_content_type(app_client_with_context):
-    response = app_client_with_context.patch(
-        '/resources/foo',
-        headers={'Content-Type': 'text/plain'}
-    )
+    response = app_client_with_context.patch('/resources/foo', headers={'Content-Type': 'text/plain'})
     assert response.status_code == HTTPStatus.UNSUPPORTED_MEDIA_TYPE
 
 

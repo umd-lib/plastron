@@ -18,7 +18,7 @@ from plastron.ocr.core import (
     WordRegion,
 )
 
-XMLNS = {"alto": "http://www.loc.gov/standards/alto/ns-v2#"}
+XMLNS = {'alto': 'http://www.loc.gov/standards/alto/ns-v2#'}
 
 
 class ALTOResource(OCRResource):
@@ -36,12 +36,12 @@ class ALTOResource(OCRResource):
 
     def get_block_nodes(self):
         """Get the `<TextBlock>` descendant elements of this resource."""
-        return self.doc.xpath("//alto:TextBlock", namespaces=XMLNS)
+        return self.doc.xpath('//alto:TextBlock', namespaces=XMLNS)
 
     def get_block_node(self, identifier: str):
         """Get the `<TextBlock>` descendant element whose `@ID` matches
         the given `identifier`."""
-        return self.doc.xpath("//alto:TextBlock[@ID=$id]", id=identifier, namespaces=XMLNS)[0]
+        return self.doc.xpath('//alto:TextBlock[@ID=$id]', id=identifier, namespaces=XMLNS)[0]
 
     def get_block(self, node: _Element) -> 'TextBlock':
         """Get the `TextBlock` object wrapping the given `<TextBlock>` element."""
@@ -50,6 +50,7 @@ class ALTOResource(OCRResource):
 
 class ALTORegion(RegionBase):
     """Region within an `ALTOResource`"""
+
     def __init__(self, element: _Element, scale: Scale):
         self.element = element
         self.scale = scale

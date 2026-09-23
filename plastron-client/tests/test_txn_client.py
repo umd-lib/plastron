@@ -33,7 +33,7 @@ def txn_client(endpoint):
         # do nothing if it is not a URIRef
         ('bar', 'bar'),
         (Literal('bar'), Literal('bar')),
-    ]
+    ],
 )
 def test_remove_transaction_uri(txn_client, value, expected_uri):
     assert txn_client.remove_transaction_uri(value) == expected_uri
@@ -50,7 +50,7 @@ def test_remove_transaction_uri(txn_client, value, expected_uri):
         # do nothing if it is not a URIRef
         ('bar', 'bar'),
         (Literal('bar'), Literal('bar')),
-    ]
+    ],
 )
 def test_insert_transaction_uri(txn_client, value, expected_uri):
     assert txn_client.insert_transaction_uri(value) == expected_uri

@@ -128,12 +128,15 @@ class PCDMFileBearingResource(ContainerResource):
         for this resource."""
         matched_resources = []
         if rdf_type is not None or mime_type is not None:
+
             def matches(resource):
                 file = resource.describe(PCDMFile)
                 return rdf_type in file.rdf_type.values or Literal(mime_type) in file.mime_type.values
         else:
+
             def matches(_resource):
                 return True
+
         for file_url in self.read().file_urls:
             file_resource = self.repo[file_url:BinaryResource].read()
             if matches(file_resource):
@@ -156,6 +159,7 @@ class PCDMFileBearingResource(ContainerResource):
 
 class PCDMObjectResource(PCDMFileBearingResource, AggregationResource):
     """A PCDM Object resource"""
+
     def __init__(self, repo: Repository, path: str | None = None):
         super().__init__(repo, path)
         self.members_container = self.get_resource('m', ContainerResource)

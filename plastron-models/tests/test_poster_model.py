@@ -20,7 +20,7 @@ def test_poster_valid_with_only_required_fields():
     poster.language = 'en'
     poster.part_of = 'http://fedora.info/definitions/v4/repository#inaccessibleResource'
     poster.type = Literal('http://purl.org/dc/dcmitype/Image')
-    poster.format = "Test Poster Format"
+    poster.format = 'Test Poster Format'
     poster.locator = 'NZK120'
     poster.rights = 'http://rightsstatements.org/vocab/NoC-US/1.0/'
 
@@ -33,7 +33,7 @@ def test_poster_valid_with_only_required_fields():
         ([], True),
         ([Literal('single')], True),
         ([Literal('one'), Literal('two')], True),
-    ]
+    ],
 )
 def test_poster_subject_field_literals(subject_value, expected_validity):
     poster = Poster(subject=subject_value)
@@ -46,7 +46,7 @@ def test_poster_subject_field_literals(subject_value, expected_validity):
         ['foo'],
         [12345],
         [URIRef('http://example.com/foo')],
-    ]
+    ],
 )
 def test_poster_subject_field_non_literal_fails(value):
     with pytest.raises(TypeError):

@@ -26,7 +26,7 @@ from plastron.serializers.csv import (
         ('', False),
         (' ', True),
         ('foo', True),
-    ]
+    ],
 )
 def test_not_empty(value, expected):
     assert not_empty(value) == expected
@@ -55,7 +55,7 @@ class Thing(RDFResource):
         (['ab', 'cd'], 'ab|cd'),
         ([['w', 'x'], ['y', 'z']], 'w|x;y|z'),
         ([['x'], 'y', ['a', 'b']], 'x;y;a|b'),
-    ]
+    ],
 )
 def test_join_values(values, expected):
     assert join_values(values) == expected
@@ -78,11 +78,13 @@ def test_flatten_multiple_languages(multilingual_item, header_map):
     for key, value in expected_values.items():
         assert columns[key] == value
 
+
 def test_flatten_handle_property():
     """Test that handle properties serialize correctly."""
     item = Item(handle=Literal('hdl:1903.1/1234', datatype=umdtype.handle))
     result = flatten_basic_property(item, 'handle')
     assert result == ['hdl:1903.1/1234']
+
 
 def test_flatten_accession_number_property():
     """Test that accession_number properties serialize correctly."""

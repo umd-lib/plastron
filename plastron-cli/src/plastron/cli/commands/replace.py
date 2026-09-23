@@ -12,10 +12,7 @@ logger = logging.getLogger(__name__)
 
 
 def configure_cli(subparsers):
-    parser = subparsers.add_parser(
-        name='replace',
-        description='Replace a binary resource in the repository'
-    )
+    parser = subparsers.add_parser(name='replace', description='Replace a binary resource in the repository')
     parser.add_argument(
         '--binary-file',
         help='local path to the binary file',

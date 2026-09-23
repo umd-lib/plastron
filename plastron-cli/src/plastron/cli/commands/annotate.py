@@ -17,13 +17,9 @@ logger = logging.getLogger(__name__)
 
 def configure_cli(subparsers):
     parser = subparsers.add_parser(
-        name='annotate',
-        description='Annotate resources with the text content of their HTML files'
+        name='annotate', description='Annotate resources with the text content of their HTML files'
     )
-    parser.add_argument(
-        'uris', nargs='*',
-        help='URIs of repository objects to process'
-    )
+    parser.add_argument('uris', nargs='*', help='URIs of repository objects to process')
     parser.set_defaults(cmd_name='annotate')
 
 
@@ -41,11 +37,8 @@ class Command(BaseCommand):
                     annotation = FullTextAnnotation(
                         motivation=sc.painting,
                         derived_from=URIRef(file_resource.url),
-                        body=embedded(TextualBody)(
-                            value=text,
-                            content_type='text/plain'
-                        ),
-                        target=URIRef(obj.url)
+                        body=embedded(TextualBody)(value=text, content_type='text/plain'),
+                        target=URIRef(obj.url),
                     )
 
                     obj.create_annotation(description=annotation)

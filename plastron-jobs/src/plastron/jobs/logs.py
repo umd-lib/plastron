@@ -10,6 +10,7 @@ logger = logging.getLogger(__name__)
 
 class AppendableSequence(collections.abc.Sequence, ABC):
     """Abstract base class for appendable sequences"""
+
     def append(self, _value):
         raise NotImplementedError
 
@@ -17,6 +18,7 @@ class AppendableSequence(collections.abc.Sequence, ABC):
 class NullLog(AppendableSequence):
     """Stub replacement for `ItemLog` that simply discards logged items
     and returns `False` for any containment checks."""
+
     def __len__(self) -> int:
         return 0
 
@@ -38,6 +40,7 @@ class ItemLog(AppendableSequence):
     `ItemLog` objects are iterable, and support direct indexing to a row
     by key.
     """
+
     def __init__(self, filename: str | Path, fieldnames: Sequence[str], keyfield: str, header: bool = True):
         self.filename: Path = Path(filename)
         self.fieldnames: Sequence[str] = fieldnames

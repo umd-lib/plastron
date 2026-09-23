@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 def percentile(n):
     p = int(n)
     if not p > 0 and p < 100:
-        raise ArgumentTypeError("Percent param must be 1-99")
+        raise ArgumentTypeError('Percent param must be 1-99')
     return p
 
 
@@ -54,23 +54,14 @@ def parse_model_header_map(model_class):
 
 
 def configure_cli(subparsers):
-    parser = subparsers.add_parser(
-        name='import',
-        description='Import data to the repository'
+    parser = subparsers.add_parser(name='import', description='Import data to the repository')
+    parser.add_argument('-m', '--model', help='data model to use', action='store')
+    parser.add_argument(
+        '-l', '--limit', help='limit the number of rows to read from the import file', type=int, action='store'
     )
     parser.add_argument(
-        '-m', '--model',
-        help='data model to use',
-        action='store'
-    )
-    parser.add_argument(
-        '-l', '--limit',
-        help='limit the number of rows to read from the import file',
-        type=int,
-        action='store'
-    )
-    parser.add_argument(
-        '-%', '--percent',
+        '-%',
+        '--percent',
         help=(
             'select an evenly spaced subset of items to import; '
             'the size of this set will be as close as possible '
@@ -78,20 +69,16 @@ def configure_cli(subparsers):
         ),
         type=percentile,
         dest='percentage',
-        action='store'
+        action='store',
     )
-    parser.add_argument(
-        '--validate-only',
-        help='only validate, do not do the actual import',
-        action='store_true'
-    )
+    parser.add_argument('--validate-only', help='only validate, do not do the actual import', action='store_true')
     parser.add_argument(
         '--make-template',
         help='create a CSV template for the given model',
         dest='template_file',
         metavar='FILENAME',
         type=FileType('w'),
-        action='store'
+        action='store',
     )
     parser.add_argument(
         '--convert-from',
@@ -100,7 +87,8 @@ def configure_cli(subparsers):
         action='store',
     )
     parser.add_argument(
-        '--convert-option', '-o',
+        '--convert-option',
+        '-o',
         help='set a parameter to used by the --convert-from pre-processor; repeatable',
         dest='convert_params',
         nargs=2,
@@ -112,13 +100,10 @@ def configure_cli(subparsers):
         help='URI or CURIE of the access class to apply to new items',
         type=uri_or_curie,
         metavar='URI|CURIE',
-        action='store'
+        action='store',
     )
     parser.add_argument(
-        '--member-of',
-        help='URI of the object that new items are PCDM members of',
-        metavar='URI',
-        action='store'
+        '--member-of', help='URI of the object that new items are PCDM members of', metavar='URI', action='store'
     )
     parser.add_argument(
         '--binaries-location',
@@ -129,36 +114,27 @@ def configure_cli(subparsers):
             'form "zip+sftp://<user>@<host>/<path to zipfile>"'
         ),
         metavar='LOCATION',
-        action='store'
+        action='store',
     )
     parser.add_argument(
         '--container',
-        help=(
-            'parent container for new items; defaults to the RELPATH '
-            'in the repo configuration file'
-        ),
+        help=('parent container for new items; defaults to the RELPATH in the repo configuration file'),
         metavar='PATH',
-        action='store'
+        action='store',
     )
     parser.add_argument(
-        '--job-id',
-        help='unique identifier for this job; defaults to "import-{timestamp}"',
-        action='store'
+        '--job-id', help='unique identifier for this job; defaults to "import-{timestamp}"', action='store'
     )
     parser.add_argument(
-        '--resume',
-        help='resume a job that has been started; requires --job-id {id} to be present',
-        action='store_true'
+        '--resume', help='resume a job that has been started; requires --job-id {id} to be present', action='store_true'
     )
     parser.add_argument(
-        '--extract-text-from', '-x',
-        help=(
-            'extract text from binaries of the given MIME types, '
-            'and add as annotations'
-        ),
+        '--extract-text-from',
+        '-x',
+        help=('extract text from binaries of the given MIME types, and add as annotations'),
         dest='extract_text_types',
         metavar='MIME_TYPES',
-        action='store'
+        action='store',
     )
     parser.add_argument(
         '--group-by',
@@ -170,7 +146,7 @@ def configure_cli(subparsers):
         choices=['rootname', 'none'],
         default='rootname',
         dest='file_grouping_strategy',
-        action='store'
+        action='store',
     )
     parser.add_argument(
         '--publish',
@@ -178,17 +154,18 @@ def configure_cli(subparsers):
         action='store_true',
     )
     parser.add_argument(
-        'import_file', nargs='?',
+        'import_file',
+        nargs='?',
         help='name of the file to import from',
         type=FileType('r', encoding='utf-8-sig'),
-        action='store'
+        action='store',
     )
     parser.set_defaults(cmd_name='import')
 
 
 def create_job_id() -> str:
     # TODO: generate a more unique id? add in user and hostname?
-    return f"import-{datetimestamp()}"
+    return f'import-{datetimestamp()}'
 
 
 class Command(BaseCommand):
@@ -226,15 +203,18 @@ class Command(BaseCommand):
                     params = dict(args.convert_params or [])
                     batch = NDNPBatch(**params)
                     logger.info(f'Converting NDNP batch at {batch.batch_file} to import job {args.job_id}')
-                    job = jobs.create_job(job_class=ImportJob, config=ImportConfig(
-                        job_id=args.job_id,
-                        model='Issue',
-                        access=args.access,
-                        member_of=args.member_of,
-                        container=args.container,
-                        binaries_location=str(batch.root_dir),
-                        file_grouping_strategy=args.file_grouping_strategy,
-                    ))
+                    job = jobs.create_job(
+                        job_class=ImportJob,
+                        config=ImportConfig(
+                            job_id=args.job_id,
+                            model='Issue',
+                            access=args.access,
+                            member_of=args.member_of,
+                            container=args.container,
+                            binaries_location=str(batch.root_dir),
+                            file_grouping_strategy=args.file_grouping_strategy,
+                        ),
+                    )
                     with job.metadata_file.open(mode='w') as fh:
                         write_import_csv(batch, fh)
                 else:
@@ -262,14 +242,16 @@ class Command(BaseCommand):
                 )
 
         logger.debug(f'Running job {job.id}')
-        self.run(job.run(
-            context=self.context,
-            import_file=args.import_file,
-            limit=args.limit,
-            percentage=args.percentage,
-            validate_only=args.validate_only,
-            publish=args.publish,
-        ))
+        self.run(
+            job.run(
+                context=self.context,
+                import_file=args.import_file,
+                limit=args.limit,
+                percentage=args.percentage,
+                validate_only=args.validate_only,
+                publish=args.publish,
+            )
+        )
 
         for key, value in self.result['count'].items():
-            logger.info(f"{key.title().replace('_', ' ')}: {value}")
+            logger.info(f'{key.title().replace("_", " ")}: {value}')

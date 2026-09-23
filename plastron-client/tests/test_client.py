@@ -26,7 +26,7 @@ def repo_base_config():
         'REST_ENDPOINT': 'http://base-host.com:8080/rest',
         'RELPATH': '/pcdm',
         'LOG_DIR': '/logs',
-        'AUTH_TOKEN': 'abcd-1234'
+        'AUTH_TOKEN': 'abcd-1234',
     }
 
 

@@ -22,6 +22,7 @@ def test_new_file_in_inbox():
 
                 mock_method.assert_called_once()
 
+
 # Utility methods
 
 
@@ -39,12 +40,12 @@ def inbox_watcher(inbox_dirname, mock_command_listener):
 
 def create_test_file(inbox_dirname):
     with open(os.path.join(inbox_dirname, 'test_new_file'), 'w') as temp_file:
-        temp_file.write("test:test")
+        temp_file.write('test:test')
 
 
 def wait_until_called(mock_method, interval=0.1, timeout=5):
-    '''Polls at the given interval until either the mock_method is called
-       or the timeout occurs.'''
+    """Polls at the given interval until either the mock_method is called
+    or the timeout occurs."""
     # Inspired by https://stackoverflow.com/a/36040926
     start = time.time()
     while not mock_method.called and time.time() - start < timeout:

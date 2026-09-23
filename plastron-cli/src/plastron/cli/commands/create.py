@@ -15,24 +15,20 @@ manager = get_manager()
 
 
 def configure_cli(subparsers):
-    parser = subparsers.add_parser(
-        name='create',
-        description='Create a resource in the repository'
-    )
+    parser = subparsers.add_parser(name='create', description='Create a resource in the repository')
     parser.add_argument(
-        '-D', '--data-property',
-        help=(
-            'an RDF data property to set on the newly created resource; '
-            'VALUE is treated as a Literal; repeatable'
-        ),
+        '-D',
+        '--data-property',
+        help=('an RDF data property to set on the newly created resource; VALUE is treated as a Literal; repeatable'),
         action='append',
         nargs=2,
         dest='data_properties',
         metavar=('PREDICATE', 'VALUE'),
-        default=[]
+        default=[],
     )
     parser.add_argument(
-        '-O', '--object-property',
+        '-O',
+        '--object-property',
         help=(
             'an RDF object property to set on the newly created resource; '
             'VALUE is treated as a CURIE or URIRef; repeatable'
@@ -41,10 +37,11 @@ def configure_cli(subparsers):
         nargs=2,
         dest='object_properties',
         metavar=('PREDICATE', 'VALUE'),
-        default=[]
+        default=[],
     )
     parser.add_argument(
-        '-T', '--rdf-type',
+        '-T',
+        '--rdf-type',
         help=(
             'RDF type to add to the newly created resource; equivalent to '
             '"-O rdf:type TYPE"; TYPE is treated as a CURIE or URIRef; '
@@ -53,22 +50,17 @@ def configure_cli(subparsers):
         action='append',
         dest='types',
         metavar='TYPE',
-        default=[]
+        default=[],
     )
     parser.add_argument(
         '--collection',
         help='shortcut for "-T pcdm:collection -D dcterms:title NAME"',
         metavar='NAME',
         action='store',
-        dest='collection_name'
+        dest='collection_name',
     )
     container_or_path = parser.add_mutually_exclusive_group(required=True)
-    container_or_path.add_argument(
-        'path',
-        nargs='?',
-        help='path to the new resource',
-        action='store'
-    )
+    container_or_path.add_argument('path', nargs='?', help='path to the new resource', action='store')
     container_or_path.add_argument(
         '--container',
         help=(
@@ -76,7 +68,7 @@ def configure_cli(subparsers):
             'resource with a repository-generated identifier'
         ),
         metavar='PATH',
-        action='store'
+        action='store',
     )
     parser.set_defaults(cmd_name='create')
 
@@ -85,7 +77,7 @@ class Command(BaseCommand):
     def __call__(self, args: Namespace):
         properties: list[tuple[URIRef, Literal | URIRef]] = [
             *(parse_data_property(p, o) for p, o in args.data_properties),
-            *(parse_object_property(p, o) for p, o in args.object_properties)
+            *(parse_object_property(p, o) for p, o in args.object_properties),
         ]
 
         if args.collection_name is not None:

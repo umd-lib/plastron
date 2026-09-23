@@ -9,48 +9,29 @@ logger = logging.getLogger(__name__)
 
 
 def configure_cli(subparsers):
-    parser = subparsers.add_parser(
-        name='export',
-        description='Export resources from the repository as a BagIt bag'
-    )
+    parser = subparsers.add_parser(name='export', description='Export resources from the repository as a BagIt bag')
     parser.add_argument(
-        '-o', '--output-dest',
+        '-o',
+        '--output-dest',
         help='Where to send the export. Can be a local filename or an SFTP URI',
         required=True,
-        action='store'
+        action='store',
     )
+    parser.add_argument('--key', help='SSH private key file to use for SFTP connections', action='store')
     parser.add_argument(
-        '--key',
-        help='SSH private key file to use for SFTP connections',
-        action='store'
-    )
-    parser.add_argument(
-        '-f', '--format',
+        '-f',
+        '--format',
         help='Format for exported metadata',
         action='store',
         choices=SERIALIZER_CLASSES.keys(),
-        required=True
+        required=True,
     )
+    parser.add_argument('--uri-template', help='Public URI template', action='store')
     parser.add_argument(
-        '--uri-template',
-        help='Public URI template',
-        action='store'
+        '-B', '--export-binaries', help='Export binaries in addition to the metadata', action='store_true'
     )
-    parser.add_argument(
-        '-B', '--export-binaries',
-        help='Export binaries in addition to the metadata',
-        action='store_true'
-    )
-    parser.add_argument(
-        '--binary-types',
-        help='Include only binaries with a MIME type from this list',
-        action='store'
-    )
-    parser.add_argument(
-        'uris',
-        nargs='*',
-        help='URIs of repository objects to export'
-    )
+    parser.add_argument('--binary-types', help='Include only binaries with a MIME type from this list', action='store')
+    parser.add_argument('uris', nargs='*', help='URIs of repository objects to export')
     parser.set_defaults(cmd_name='export')
 
 

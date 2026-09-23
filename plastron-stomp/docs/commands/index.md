@@ -33,7 +33,10 @@ from typing import Any, Dict, Generator
 from plastron.context import PlastronContext
 from plastron.stomp.messages import PlastronCommandMessage
 
-def count_up(context: PlastronContext, message: PlastronCommandMessage) -> Generator[Dict[str, Any], None, Dict[str, Any]]:
+
+def count_up(
+    context: PlastronContext, message: PlastronCommandMessage
+) -> Generator[Dict[str, Any], None, Dict[str, Any]]:
     target = int(message.args.get('target', 10))
     step = context.config['COMMANDS']['COUNT_UP']['STEP_SIZE']
     # count from 1 to target, inclusive
@@ -41,8 +44,8 @@ def count_up(context: PlastronContext, message: PlastronCommandMessage) -> Gener
         # progress message
         yield {'target': target, 'current': n}
     return {
-      'type': 'count_up_done',
-      'message': f'Counted up to {target} by {step}!',
+        'type': 'count_up_done',
+        'message': f'Counted up to {target} by {step}!',
     }
 ```
 

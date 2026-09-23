@@ -18,6 +18,7 @@ T = TypeVar('T', bound='RepositoryResource')
 
 class AggregationResource(ContainerResource):
     """An [ORE Aggregation](http://openarchives.org/ore/1.0/datamodel#Aggregation) resource"""
+
     def __init__(self, repo: Repository, path: str | None = None):
         super().__init__(repo, path)
         self.proxies_container: ContainerResource | None = None
@@ -52,10 +53,12 @@ class AggregationResource(ContainerResource):
         proxy_sequence = []
         obj = self.describe(PCDMObject)
         for item in descriptions:
-            proxy_sequence.append(self.create_proxy(
-                proxy_for=item,
-                title=item.title.value,
-            ))
+            proxy_sequence.append(
+                self.create_proxy(
+                    proxy_for=item,
+                    title=item.title.value,
+                )
+            )
 
         if len(proxy_sequence) > 0:
             obj.first = URIRef(proxy_sequence[0].url)

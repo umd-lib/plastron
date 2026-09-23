@@ -22,7 +22,7 @@ def test_cannot_resume_without_job_id(plastron_context):
         for _ in command(args):
             pass
 
-    assert "Resuming a job requires a job id" in str(excinfo.value)
+    assert 'Resuming a job requires a job id' in str(excinfo.value)
 
 
 def test_cannot_resume_without_job_directory(plastron_context):
@@ -38,7 +38,7 @@ def test_cannot_resume_without_job_directory(plastron_context):
         for _ in command(args):
             pass
 
-    assert "does not exist" in str(excinfo.value)
+    assert 'does not exist' in str(excinfo.value)
 
 
 def test_cannot_resume_without_config_file(plastron_context):
@@ -61,7 +61,7 @@ def test_cannot_resume_without_config_file(plastron_context):
             for _ in command(args):
                 pass
 
-        assert "config.yml is missing" in str(excinfo.value)
+        assert 'config.yml is missing' in str(excinfo.value)
 
 
 def test_model_is_required_unless_resuming(plastron_context):
@@ -75,7 +75,7 @@ def test_model_is_required_unless_resuming(plastron_context):
         for _ in command(args):
             pass
 
-    assert "A model is required unless resuming an existing job" in str(excinfo.value)
+    assert 'A model is required unless resuming an existing job' in str(excinfo.value)
 
 
 def test_import_file_is_required_unless_resuming(datadir, plastron_context):
@@ -89,7 +89,7 @@ def test_import_file_is_required_unless_resuming(datadir, plastron_context):
         for _ in command(args):
             pass
 
-    assert "An import file is required unless resuming an existing job" in str(excinfo.value)
+    assert 'An import file is required unless resuming an existing job' in str(excinfo.value)
 
 
 def test_container_is_required_unless_resuming(datadir, plastron_context):
@@ -103,7 +103,7 @@ def test_container_is_required_unless_resuming(datadir, plastron_context):
         for _ in command(args):
             pass
 
-    assert "A container is required unless resuming an existing job" in str(excinfo.value)
+    assert 'A container is required unless resuming an existing job' in str(excinfo.value)
 
 
 @pytest.mark.parametrize(
@@ -112,48 +112,115 @@ def test_container_is_required_unless_resuming(datadir, plastron_context):
         (
             'Item',
             [
-                'Object Type', 'Identifier', 'Rights Statement', 'Title',
-                'Format', 'Archival Collection', 'Presentation Set', 'Date',
-                'Description', 'Alternate Title', 'Creator', 'Creator URI',
-                'Contributor', 'Contributor URI', 'Publisher', 'Publisher URI',
-                'Audience', 'Audience URI', 'Location', 'Extent', 'Subject',
-                'Language', 'Rights Holder', 'Terms of Use', 'Copyright Notice',
-                'Collection Information', 'Accession Number', 'Handle', 'FILES',
-                'ITEM_FILES'
-            ]
+                'Object Type',
+                'Identifier',
+                'Rights Statement',
+                'Title',
+                'Format',
+                'Archival Collection',
+                'Presentation Set',
+                'Date',
+                'Description',
+                'Alternate Title',
+                'Creator',
+                'Creator URI',
+                'Contributor',
+                'Contributor URI',
+                'Publisher',
+                'Publisher URI',
+                'Audience',
+                'Audience URI',
+                'Location',
+                'Extent',
+                'Subject',
+                'Language',
+                'Rights Holder',
+                'Terms of Use',
+                'Copyright Notice',
+                'Collection Information',
+                'Accession Number',
+                'Handle',
+                'FILES',
+                'ITEM_FILES',
+            ],
         ),
         (
             'Letter',
             [
-                'Title', 'Rights Holder', 'Extent', 'Bibliographic Citation',
-                'Description', 'Language', 'Date', 'Resource Type', 'Rights',
-                'Terms of Use', 'Copyright Notice', 'Subject', 'Location',
-                'Longitude', 'Latitude', 'Archival Collection', 'Handle/Link',
-                'Identifier', 'Recipient', 'Author', 'Handle',
-                'Presentation Set', 'FILES', 'ITEM_FILES'
-            ]
+                'Title',
+                'Rights Holder',
+                'Extent',
+                'Bibliographic Citation',
+                'Description',
+                'Language',
+                'Date',
+                'Resource Type',
+                'Rights',
+                'Terms of Use',
+                'Copyright Notice',
+                'Subject',
+                'Location',
+                'Longitude',
+                'Latitude',
+                'Archival Collection',
+                'Handle/Link',
+                'Identifier',
+                'Recipient',
+                'Author',
+                'Handle',
+                'Presentation Set',
+                'FILES',
+                'ITEM_FILES',
+            ],
         ),
         (
             'Poster',
             [
-                'Title', 'Alternate Title', 'Publisher', 'Collection',
-                'Format', 'Resource Type', 'Date', 'Language', 'Description',
-                'Extent', 'Issue', 'Identifier/Call Number', 'Location',
-                'Longitude', 'Latitude', 'Subject', 'Rights', 'Terms of Use',
-                'Copyright Notice', 'Identifier', 'Handle', 'Presentation Set',
-                'FILES', 'ITEM_FILES'
-            ]
+                'Title',
+                'Alternate Title',
+                'Publisher',
+                'Collection',
+                'Format',
+                'Resource Type',
+                'Date',
+                'Language',
+                'Description',
+                'Extent',
+                'Issue',
+                'Identifier/Call Number',
+                'Location',
+                'Longitude',
+                'Latitude',
+                'Subject',
+                'Rights',
+                'Terms of Use',
+                'Copyright Notice',
+                'Identifier',
+                'Handle',
+                'Presentation Set',
+                'FILES',
+                'ITEM_FILES',
+            ],
         ),
         (
             'Issue',
             [
-                'Title', 'Date', 'Volume', 'Issue', 'Edition', 'Handle',
-                'Presentation Set', 'Copyright Notice', 'Terms of Use',
-                'Rights Statement', 'Rights Holder', 'FILES', 'ITEM_FILES',
-            ]
+                'Title',
+                'Date',
+                'Volume',
+                'Issue',
+                'Edition',
+                'Handle',
+                'Presentation Set',
+                'Copyright Notice',
+                'Terms of Use',
+                'Rights Statement',
+                'Rights Holder',
+                'FILES',
+                'ITEM_FILES',
+            ],
         ),
-
-    ]
+    ],
 )
 def test_make_template(plastron_context, model_name, expected_header_fields):
     template_file = tempfile.NamedTemporaryFile(delete=False)
@@ -191,9 +258,9 @@ def create_args(**kwargs):
         'resume': False,
         'model': 'Item',
         'access': None,
-        'member_of': "test",
-        'container': "test_container",
-        'binaries_location': "test_binaries_location",
+        'member_of': 'test',
+        'container': 'test_container',
+        'binaries_location': 'test_binaries_location',
         'template_file': None,
         'import_file': StringIO('Title,Identifier\nfoobar,123'),
         'percentage': None,

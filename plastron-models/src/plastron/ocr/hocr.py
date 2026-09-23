@@ -22,6 +22,7 @@ XMLNS = {'html': 'http://www.w3.org/1999/xhtml'}
 
 class HOCRResource(OCRResource):
     """hOCR OCR HTML resource"""
+
     def __init__(self, doc: _ElementTree, image_resolution: tuple[int, int]):
         self.doc = doc
         capabilities_element = self.doc.xpath('//html:meta[@name="ocr-capabilities"]', namespaces=XMLNS)[0]
@@ -44,6 +45,7 @@ class HOCRResource(OCRResource):
 
 class HOCRRegion(RegionBase):
     """Region within an `HOCRResource`."""
+
     def __init__(self, element: _Element, scale: Scale):
         self.element = element
         self.scale = scale

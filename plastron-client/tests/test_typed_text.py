@@ -9,7 +9,7 @@ from plastron.client.utils import TypedText
         ('text/plain', 'foobar', True, 6),
         ('application/xml', '<x>123</x>', True, 10),
         ('text/plain', '', False, 0),
-    ]
+    ],
 )
 def test_typed_text(media_type, value, expected_bool, expected_len):
     text = TypedText(media_type, value)

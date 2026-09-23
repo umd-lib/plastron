@@ -88,7 +88,7 @@ def setup_remote_file_source_mock(remote_file_source, local_file: Path):
     mock.open.return_value = local_file.open('rb')
     # Need to mock __exit__ (following code in BinarySource.__exit__) because
     # "wraps" doesn't handle magic methods
-    mock.__exit__.side_effect = (lambda _arg1, _arg2, _arg3: mock.close())
+    mock.__exit__.side_effect = lambda _arg1, _arg2, _arg3: mock.close()
 
     return mock
 
@@ -122,7 +122,7 @@ def test_zip_file_source_exists_closes_remote_file_source_when_file_does_not_exi
     [
         (StringSource('', mimetype='image/tiff'), {pcdmuse.PreservationMasterFile}),
         (StringSource('', mimetype='text/plain'), set()),
-    ]
+    ],
 )
 def test_rdf_types(source, expected_rdf_types):
     assert source.rdf_types == expected_rdf_types

@@ -37,7 +37,7 @@ def graph_response(graph: Graph, media_type: str = 'text/turtle') -> httpretty.R
         ('http://vocab.lib.umd.edu/rightsStatement#', 8, 'InC', 'INVALID'),
         ('http://vocab.lib.umd.edu/collection#', 1376, '0001-GDOC', 'INVALID'),
         ('http://purl.org/dc/dcmitype/', 12, 'Image', 'INVALID'),
-    ]
+    ],
 )
 def test_vocabulary(vocab_uri, term_count, valid_term, invalid_term):
     vocab = Vocabulary(vocab_uri)

@@ -21,12 +21,7 @@ def get_authenticator(config: Mapping[str, Any]) -> AuthBase | None:
         return HTTPBearerAuth(token=config['AUTH_TOKEN'])
     elif 'JWT_SECRET' in config:
         return JWTSecretAuth(
-            secret=config['JWT_SECRET'],
-            claims={
-                'sub': 'plastron',
-                'iss': 'plastron',
-                'role': 'fedoraAdmin'
-            }
+            secret=config['JWT_SECRET'], claims={'sub': 'plastron', 'iss': 'plastron', 'role': 'fedoraAdmin'}
         )
     elif 'CLIENT_CERT' in config and 'CLIENT_KEY' in config:
         return ClientCertAuth(

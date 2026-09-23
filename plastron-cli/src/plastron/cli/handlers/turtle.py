@@ -1,4 +1,4 @@
-""" A handler for loading sequenced assets from binaries & turtle metadata. """
+"""A handler for loading sequenced assets from binaries & turtle metadata."""
 
 import logging
 import os
@@ -20,11 +20,10 @@ logger = logging.getLogger(__name__)
 # BATCH CLASS (FOR PAGED BINARIES PLUS RDF METADATA)
 # ============================================================================
 
+
 class Batch:
     def __init__(self, repo, config):
-        self.logger = logging.getLogger(
-            __name__ + '.' + self.__class__.__name__
-        )
+        self.logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
 
         self.collection = pcdm.Collection.from_repository(repo, config.collection_uri)
 
@@ -56,32 +55,33 @@ class Batch:
                     else:
                         self.all_files[f].append(os.path.join(root, f))
 
-            self.logger.info(f"Found {file_count} files with {len(self.all_files)} unique filenames"
-                             )
+            self.logger.info(f'Found {file_count} files with {len(self.all_files)} unique filenames')
 
             # save index to file
             with open(file_index, 'w') as index:
                 yaml.dump(self.all_files, index, default_flow_style=False)
 
         with open(config.batch_file, 'r') as f:
-            self.logger.info(
-                f'Parsing the master metadata graph in {config.batch_file}')
-            self.master_graph = Graph().parse(f, format="turtle")
+            self.logger.info(f'Parsing the master metadata graph in {config.batch_file}')
+            self.master_graph = Graph().parse(f, format='turtle')
 
         # get subject URIs that are http: or https: URIs
-        self.subjects = sorted({uri for uri in self.master_graph.subjects() if
-                                    str(uri).startswith('http:') or str(uri).startswith('https:')})
+        self.subjects = sorted(
+            {
+                uri
+                for uri in self.master_graph.subjects()
+                if str(uri).startswith('http:') or str(uri).startswith('https:')
+            }
+        )
 
         # get the master list of authority objects
         # keyed by the urn:uuid:... URI from the master graph
-        authority_subjects = {uri for uri in self.master_graph.subjects()
-                                  if str(uri).startswith('urn:uuid:')}
-        self.authorities = {str(s): create_authority(self.master_graph, s)
-                            for s in authority_subjects}
+        authority_subjects = {uri for uri in self.master_graph.subjects() if str(uri).startswith('urn:uuid:')}
+        self.authorities = {str(s): create_authority(self.master_graph, s) for s in authority_subjects}
 
         self.length = len(self.subjects)
         self.count = 0
-        self.logger.info(f"Batch contains {self.length} items.")
+        self.logger.info(f'Batch contains {self.length} items.')
 
     def __iter__(self):
         return self
@@ -105,7 +105,7 @@ class BatchItem:
     def read_data(self):
         item_graph = Graph()
         add_props = []
-        for (s, p, o) in self.batch.master_graph.triples((self.subject, None, None)):
+        for s, p, o in self.batch.master_graph.triples((self.subject, None, None)):
             item_graph.add((s, p, o))
             if str(o) in self.batch.authorities:
                 # create an RDFObjectProperty for the triples with an
@@ -132,7 +132,7 @@ class BatchItem:
         parts = {}
 
         # Parse each filename in hasPart and allocate to correct location in item entry
-        for (s, p, o) in [(s, p, o) for (s, p, o) in item.unmapped_triples if p == dcterms.hasPart]:
+        for s, p, o in [(s, p, o) for (s, p, o) in item.unmapped_triples if p == dcterms.hasPart]:
             filename = str(o)
             # ensure exactly one path that is mapped from the basename
             if filename not in self.batch.all_files:
@@ -157,8 +157,7 @@ class BatchItem:
                 else:
                     parts[page_no].append(file_path)
             else:
-                logger.warning(
-                    f'Filename {filename} does not match a known pattern')
+                logger.warning(f'Filename {filename} does not match a known pattern')
 
         # remove the dcterms:hasPart triples
         item.unmapped_triples = [(s, p, o) for (s, p, o) in item.unmapped_triples if p != dcterms.hasPart]
@@ -167,8 +166,8 @@ class BatchItem:
             item.add_file(get_file_object(path))
 
         # renumber the parts from 1
-        for (n, key) in enumerate(sorted(parts.keys()), 1):
-            page = Page(number=str(n), title=f"{item.title}, Page {n}")
+        for n, key in enumerate(sorted(parts.keys()), 1):
+            page = Page(number=str(n), title=f'{item.title}, Page {n}')
             for path in parts[key]:
                 page.add_file(get_file_object(path))
             item.add_member(page)

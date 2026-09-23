@@ -18,15 +18,17 @@ from plastron.repo import DataReadError
 
 logger = logging.getLogger(__name__)
 
-ISSUE_FIELDNAMES = ['Title',
-                    'Date',
-                    'Volume',
-                    'Issue',
-                    'Edition',
-                    'Rights Statement',
-                    'Presentation Set',
-                    'FILES',
-                    'ITEM_FILES']
+ISSUE_FIELDNAMES = [
+    'Title',
+    'Date',
+    'Volume',
+    'Issue',
+    'Edition',
+    'Rights Statement',
+    'Presentation Set',
+    'FILES',
+    'ITEM_FILES',
+]
 
 
 class XMLNS:
@@ -44,6 +46,7 @@ class XMLNS:
 
     ```
     """
+
     def __init__(self, uri: str):
         self.uri = uri
         """Namespace URI"""
@@ -124,6 +127,7 @@ class NDNPIssue:
 
 class NDNPBatch:
     """Class representing a batch of newspaper issues in NDNP format."""
+
     root_dir: Path
     """Root directory of the NDNP package"""
     batch_file: Path
@@ -135,11 +139,13 @@ class NDNPBatch:
     """Rights Statement URI for this batch. Defaults to `http://vocab.lib.umd.edu/rightsStatement#InC-NC`
     if not provided from the convert-options parameter from the command line."""
 
-    def __init__(self,
-                 dir: str | Path,
-                 batch_file: str = 'batch.xml',
-                 rights: str = 'http://vocab.lib.umd.edu/rightsStatement#InC-NC',
-                 presentation_set: str = ''):
+    def __init__(
+        self,
+        dir: str | Path,
+        batch_file: str = 'batch.xml',
+        rights: str = 'http://vocab.lib.umd.edu/rightsStatement#InC-NC',
+        presentation_set: str = '',
+    ):
         self.root_dir = Path(dir)
         self.presentation_set = presentation_set
         self.rights = rights
@@ -195,14 +201,8 @@ def get_issue_data(issue: NDNPIssue) -> dict[str, str]:
 
     # get item-level files: METS metadata for the issue and for the articles
     item_files = [
-        FileSpec(
-            name=str(issue.mets_path.relative_to(issue.batch.root_dir)),
-            usage='metadata'
-        ),
-        FileSpec(
-            name=str(issue.article_mets_path.relative_to(issue.batch.root_dir)),
-            usage='metadata'
-        ),
+        FileSpec(name=str(issue.mets_path.relative_to(issue.batch.root_dir)), usage='metadata'),
+        FileSpec(name=str(issue.article_mets_path.relative_to(issue.batch.root_dir)), usage='metadata'),
     ]
     # get pages and page-level files
     files = []
@@ -238,17 +238,14 @@ def get_article_data(article_path) -> Iterator[dict[str, Any]]:
     try:
         article_tree = etree.parse(article_path)
     except OSError:
-        raise DataReadError(f"Unable to read {article_path}")
+        raise DataReadError(f'Unable to read {article_path}')
     except XMLSyntaxError:
-        raise DataReadError(f"Unable to parse {article_path} as XML")
+        raise DataReadError(f'Unable to parse {article_path} as XML')
 
     article_root = article_tree.getroot()
     for article in article_root.findall(METS.div + '[@TYPE="article"]'):
         article_title = article.get('LABEL')
-        page_numbers = sorted({
-            int(area.get('FILEID').replace('ocrFile', ''))
-            for area in article.findall(METS.area)
-        })
+        page_numbers = sorted({int(area.get('FILEID').replace('ocrFile', '')) for area in article.findall(METS.area)})
         yield {
             'Title': article_title,
             'First page': page_numbers[0],

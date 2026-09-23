@@ -10,10 +10,9 @@ def test_update(stomp_client):
         'PlastronJobId': 'test-update',
         'PlastronCommand': 'update',
     }
-    body = json.dumps({
-        'uris': [os.environ['URI']],
-        'sparql_update': 'INSERT DATA { <> <http://purl.org/dc/terms/title> "Moonpig" }'
-    })
+    body = json.dumps(
+        {'uris': [os.environ['URI']], 'sparql_update': 'INSERT DATA { <> <http://purl.org/dc/terms/title> "Moonpig" }'}
+    )
     stomp_client.connect()
     stomp_client.send('/queue/plastron.jobs', headers=headers, body=body)
 

@@ -33,11 +33,11 @@ class PublishableResource(RepositoryResource):
         return get_publication_status(self.describe(RDFResource))
 
     def publish(
-            self,
-            handle_client: HandleServiceClient,
-            public_url: str,
-            force_hidden: bool = False,
-            force_visible: bool = False,
+        self,
+        handle_client: HandleServiceClient,
+        public_url: str,
+        force_hidden: bool = False,
+        force_visible: bool = False,
     ) -> HandleInfo:
         obj = self.describe(HandleBearingResource)
 

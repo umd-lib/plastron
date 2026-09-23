@@ -15,45 +15,25 @@ from plastron import namespaces
 DEFAULT_LOGGING_OPTIONS = {
     'version': 1,
     'formatters': {
-        'full': {
-            'format': '%(levelname)s|%(asctime)s|%(threadName)s|%(name)s|%(message)s'
-        },
-        'messageonly': {
-            'format': '%(message)s'
-        }
+        'full': {'format': '%(levelname)s|%(asctime)s|%(threadName)s|%(name)s|%(message)s'},
+        'messageonly': {'format': '%(message)s'},
     },
     'handlers': {
         'console': {
             'class': 'logging.StreamHandler',
             'level': 'INFO',
             'formatter': 'messageonly',
-            'stream': 'ext://sys.stderr'
+            'stream': 'ext://sys.stderr',
         },
-        'file': {
-            'class': 'logging.FileHandler',
-            'level': 'DEBUG',
-            'formatter': 'full'
-        }
+        'file': {'class': 'logging.FileHandler', 'level': 'DEBUG', 'formatter': 'full'},
     },
     'loggers': {
-        '__main__': {
-            'level': 'DEBUG',
-            'handlers': ['console', 'file'],
-            'propagate': False
-        },
-        'plastron': {
-            'level': 'DEBUG',
-            'handlers': ['console', 'file'],
-            'propagate': False
-        },
+        '__main__': {'level': 'DEBUG', 'handlers': ['console', 'file'], 'propagate': False},
+        'plastron': {'level': 'DEBUG', 'handlers': ['console', 'file'], 'propagate': False},
         # suppress logging output from paramiko by default
-        'paramiko': {
-            'propagate': False
-        }
+        'paramiko': {'propagate': False},
     },
-    'root': {
-        'level': 'DEBUG'
-    }
+    'root': {'level': 'DEBUG'},
 }
 logger = logging.getLogger(__name__)
 
@@ -148,7 +128,7 @@ def strtobool(val: str) -> int:
     elif val in ('n', 'no', 'f', 'false', 'off', '0'):
         return 0
     else:
-        raise ValueError(f"invalid truth value {val!r}")
+        raise ValueError(f'invalid truth value {val!r}')
 
 
 def uri_or_curie(arg: str) -> URIRef:
@@ -163,7 +143,7 @@ def uri_or_curie(arg: str) -> URIRef:
     try:
         term = from_n3(arg, nsm=namespaces.get_manager())
     except KeyError:
-        raise ArgumentTypeError(f'"{arg[:arg.index(":") + 1]}" is not a known prefix')
+        raise ArgumentTypeError(f'"{arg[: arg.index(":") + 1]}" is not a known prefix')
     if not isinstance(term, URIRef):
         raise ArgumentTypeError(f'"{arg}" must be a URI or CURIE')
     return term

@@ -24,7 +24,12 @@ version = importlib.metadata.version('plastron-stomp')
 
 
 class CommandListener(ConnectionListener):
-    def __init__(self, context: PlastronContext, after_connected: Callable | None = None, after_disconnected: Callable | None = None):
+    def __init__(
+        self,
+        context: PlastronContext,
+        after_connected: Callable | None = None,
+        after_disconnected: Callable | None = None,
+    ):
         self.context = context
         self.broker = context.broker
         self.inbox = MessageBox(os.path.join(self.broker.message_store_dir, 'inbox'), PlastronCommandMessage)
@@ -43,7 +48,7 @@ class CommandListener(ConnectionListener):
 
         # first attempt to send anything in the outbox
         for message in self.outbox:
-            logger.info(f"Found response message for job {message.job_id} in outbox")
+            logger.info(f'Found response message for job {message.job_id} in outbox')
             # send the job completed message
             self.broker['JOB_STATUS'].send(message)
             logger.info(f'Sent response message for job {message.job_id}')
@@ -137,7 +142,8 @@ class MessageProcessor:
                         job_id=message.job_id,
                         status_url=message.status_url,
                         body=status,
-                    ))
+                    )
+                )
 
         logger.info(f'Job {message.job_id} complete')
 

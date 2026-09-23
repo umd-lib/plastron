@@ -40,12 +40,7 @@ class Object(ore.Aggregation):
     # recursively create an object and components and that don't yet exist
     def create(self, client, container_path=None, slug=None, headers=None, recursive=True, **kwargs):
         super().create(
-            client=client,
-            container_path=container_path,
-            slug=slug,
-            headers=headers,
-            recursive=recursive,
-            **kwargs
+            client=client, container_path=container_path, slug=slug, headers=headers, recursive=recursive, **kwargs
         )
         if recursive:
             client.create_members(self)
@@ -100,11 +95,13 @@ class File(ldp.NonRdfSource):
 
         if headers is None:
             headers = {}
-        headers.update({
-            'Content-Type': self.source.mimetype(),
-            'Digest': self.source.digest(),
-            'Content-Disposition': f'attachment; filename="{self.source.filename}"'
-        })
+        headers.update(
+            {
+                'Content-Type': self.source.mimetype(),
+                'Digest': self.source.digest(),
+                'Content-Disposition': f'attachment; filename="{self.source.filename}"',
+            }
+        )
 
         with self.source as stream:
             super().create(client, container_path=container_path, slug=slug, headers=headers, data=stream, **kwargs)
@@ -171,7 +168,7 @@ FILE_CLASS_FOR = {
 
 
 def get_file_object(path, source=None):
-    extension = path[path.rfind('.'):]
+    extension = path[path.rfind('.') :]
     cls = FILE_CLASS_FOR.get(extension, File)
     if source is None:
         source = LocalFileSource(path)

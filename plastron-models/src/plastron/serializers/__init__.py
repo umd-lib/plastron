@@ -1,4 +1,5 @@
 """.. include:: ../../../docs/CSVSerializer.md"""
+
 import logging
 
 from rdflib import Graph, URIRef
@@ -19,16 +20,10 @@ SERIALIZER_CLASSES = {
     'turtle': TurtleSerializer,
     'ttl': TurtleSerializer,
     'text/csv': CSVSerializer,
-    'csv': CSVSerializer
+    'csv': CSVSerializer,
 }
 
-MODEL_MAP = {
-    umd.Issue: Issue,
-    umd.Item: Item,
-    bibo.Image: Poster,
-    bibo.Issue: Issue,
-    bibo.Letter: Letter
-}
+MODEL_MAP = {umd.Issue: Issue, umd.Item: Item, bibo.Image: Poster, bibo.Issue: Issue, bibo.Letter: Letter}
 
 
 def detect_resource_class(

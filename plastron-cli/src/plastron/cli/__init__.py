@@ -33,11 +33,11 @@ def load_commands(subparsers):
     command_modules = {}
     for finder, name, ispkg in iter_modules(commands.__path__):
         module_name = name
-        if module_name == "importcommand":
+        if module_name == 'importcommand':
             # Special case handling for "importcommand", because "import" is
             # a Python reserved word that is not usable as a module name,
             # while we want "import" to be the Plastron command
-            name = "import"
+            name = 'import'
 
         module = import_module(commands.__name__ + '.' + module_name)
         if hasattr(module, 'configure_cli'):
@@ -60,50 +60,28 @@ def get_uris(args: Namespace) -> Iterable[str]:
 def main():
     """Parse args and handle options."""
 
-    parser = ArgumentParser(
-        prog='plastron',
-        description='Batch operation tool for Fedora 4.'
-    )
+    parser = ArgumentParser(prog='plastron', description='Batch operation tool for Fedora 4.')
     parser.set_defaults(cmd_name=None)
 
     common_required = parser.add_mutually_exclusive_group(required=True)
     common_required.add_argument(
-        '-c', '--config',
-        help='Path to configuration file.',
-        action='store',
-        dest='config_file',
-        type=FileType('r')
+        '-c', '--config', help='Path to configuration file.', action='store', dest='config_file', type=FileType('r')
     )
-    common_required.add_argument(
-        '-V', '--version',
-        help='Print version and exit.',
-        action='version',
-        version=version
+    common_required.add_argument('-V', '--version', help='Print version and exit.', action='version', version=version)
+
+    parser.add_argument('-v', '--verbose', help='increase the verbosity of the status output', action='store_true')
+    parser.add_argument('-q', '--quiet', help='decrease the verbosity of the status output', action='store_true')
+    parser.add_argument(
+        '--on-behalf-of', help='delegate repository operations to this username', dest='delegated_user', action='store'
     )
 
     parser.add_argument(
-        '-v', '--verbose',
-        help='increase the verbosity of the status output',
-        action='store_true'
-    )
-    parser.add_argument(
-        '-q', '--quiet',
-        help='decrease the verbosity of the status output',
-        action='store_true'
-    )
-    parser.add_argument(
-        '--on-behalf-of',
-        help='delegate repository operations to this username',
-        dest='delegated_user',
-        action='store'
-    )
-
-    parser.add_argument(
-        '--batch-mode', '-b',
+        '--batch-mode',
+        '-b',
         help='specifies the use of batch user for interaction with fcrepo',
         dest='batch_mode',
         action='store',
-        default=False
+        default=False,
     )
 
     subparsers = parser.add_subparsers(title='commands')
@@ -193,7 +171,7 @@ def print_footer(args):
         print('\nScript complete. Goodbye!\n', file=sys.stderr)
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()
 
 

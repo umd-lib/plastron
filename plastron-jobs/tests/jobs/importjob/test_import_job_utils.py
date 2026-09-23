@@ -11,14 +11,7 @@ from plastron.models.umd import Item
 from plastron.namespaces import umdtype
 
 
-@pytest.mark.parametrize(
-    ('value', 'expected_count'),
-    [
-        ('', 0),
-        ('foo.jpg;foo.png', 1),
-        ('foo.jpg;bar.jpg', 2)
-    ]
-)
+@pytest.mark.parametrize(('value', 'expected_count'), [('', 0), ('foo.jpg;foo.png', 1), ('foo.jpg;bar.jpg', 2)])
 def test_build_file_groups(value, expected_count):
     assert len(build_file_groups(value)) == expected_count
 
@@ -30,7 +23,7 @@ def test_build_file_groups(value, expected_count):
         ('Page 1:foo.jpg;p 1:foo.png', 'Multiple files with rootname "foo" have differing labels'),
         # missing labels
         ('Page 1:foo.jpg;bar.jpg', 'If any file group has a label, all file groups must have a label'),
-    ]
+    ],
 )
 def test_build_file_groups_errors(value, error_message):
     with pytest.raises(MetadataError) as e:
@@ -48,7 +41,7 @@ def test_build_file_groups_errors(value, error_message):
         ('Page 1:foo.jpg;foo.png', 1, {'foo': 'Page 1'}),
         # default labels
         ('foo.jpg;foo.png;bar.jpg;bar.png;baz.jpg', 3, {'foo': 'Page 1', 'bar': 'Page 2', 'baz': 'Page 3'}),
-    ]
+    ],
 )
 def test_build_file_groups_labeled(value, expected_count, expected_labels):
     groups = build_file_groups(value)
@@ -69,7 +62,7 @@ def test_build_file_groups_labeled(value, expected_count, expected_labels):
         ),
         ('Page 1:<Preservation>foo.tif;<OCR>foo.xml', 1, {'foo': {'foo.tif': 'Preservation', 'foo.xml': 'OCR'}}),
         ('<ocr>0004.xml;<ocr>0004.hocr', 1, {'0004': {'0004.xml': 'ocr', '0004.hocr': 'ocr'}}),
-    ]
+    ],
 )
 def test_build_file_groups_with_usage(value, expected_count, expected_usages):
     groups = build_file_groups(value)
@@ -95,8 +88,8 @@ def test_build_fields_without_default_datatype():
         ('zip:foo.zip', 'bar.jpg', ZipFileSource),
         ('sftp://user@example.com/foo', 'bar.jpg', RemoteFileSource),
         ('zip+sftp://user@example.com/foo.zip', 'bar.jpg', ZipFileSource),
-        ('/foo', 'bar', LocalFileSource)
-    ]
+        ('/foo', 'bar', LocalFileSource),
+    ],
 )
 def test_get_source(datadir, base_location, path, expected_class):
     job = ImportJob(job_id='foo', job_dir=datadir)
@@ -188,4 +181,3 @@ def test_build_file_groups_invalid_strategy():
         build_file_groups('foo.jpg', grouping_strategy='invalid')
 
     assert 'Invalid grouping_strategy' in str(e.value)
-

@@ -137,6 +137,7 @@ def flatten_headers(header_map: dict[str, str | dict], prefix: str = '') -> dict
 
 class ColumnHeader(NamedTuple):
     """A column header with an optional language."""
+
     label: str
     """Column header"""
     language: str = None
@@ -244,11 +245,7 @@ def get_column_headers(headers: Iterable[str], base_header: str) -> list[ColumnH
     []
     ```
     """
-    return [
-        ColumnHeader.from_string(h)
-        for h in headers
-        if h == base_header or re.match(base_header + r' \[.*]$', h)
-    ]
+    return [ColumnHeader.from_string(h) for h in headers if h == base_header or re.match(base_header + r' \[.*]$', h)]
 
 
 def get_embedded_params(row: Mapping[str, str], header_labels: Iterable[str]) -> list[dict[str, str]]:
@@ -307,11 +304,13 @@ def unflatten(
             for n, sub_row in enumerate(get_embedded_params(row_data, header_labels=header.values())):
                 embedded_params = unflatten(sub_row, descriptor.object_class, header, index)
                 if any(embedded_params.values()):
-                    params[attr].append(EmbeddedObject(
-                        cls=descriptor.object_class,
-                        fragment_id=index.get(attr, {}).get(n, None),
-                        **embedded_params,
-                    ))
+                    params[attr].append(
+                        EmbeddedObject(
+                            cls=descriptor.object_class,
+                            fragment_id=index.get(attr, {}).get(n, None),
+                            **embedded_params,
+                        )
+                    )
         else:
             for column_header in get_column_headers(row_data.keys(), header):
                 values = filter(not_empty, split_escaped(row_data.get(str(column_header)), separator='|'))
@@ -339,7 +338,7 @@ def get_literal(column_header: ColumnHeader, descriptor: DataProperty, input_val
     m = re.match(r'^\[@(\w+)]', input_value)
     if m:
         language = m[1]
-        value = input_value[len(language) + 3:]
+        value = input_value[len(language) + 3 :]
     else:
         language = column_header.language
         value = input_value
@@ -407,9 +406,7 @@ T = TypeVar('T', ContentModeledResource, RDFResource)
 class CSVSerializer:
     """Serializer that encodes metadata records with a defined content model as CSV files."""
 
-    SYSTEM_HEADERS = [
-        'URI', 'PUBLIC URI', 'CREATED', 'MODIFIED', 'INDEX', 'FILES', 'ITEM_FILES', 'PUBLISH', 'HIDDEN'
-    ]
+    SYSTEM_HEADERS = ['URI', 'PUBLIC URI', 'CREATED', 'MODIFIED', 'INDEX', 'FILES', 'ITEM_FILES', 'PUBLISH', 'HIDDEN']
 
     def __init__(self, directory: str | Path | None = None):
         self.directory = Path(directory) if directory is not None else Path.cwd()
@@ -480,15 +477,12 @@ class CSVSerializer:
 
         return row
 
-    LANGUAGE_NAMES = {
-        'ja': 'Japanese',
-        'ja-latn': 'Japanese (Romanized)'
-    }
+    LANGUAGE_NAMES = {'ja': 'Japanese', 'ja-latn': 'Japanese (Romanized)'}
     LANGUAGE_CODES = {name: code for code, name in LANGUAGE_NAMES.items()}
 
     DATATYPE_NAMES = {
         URIRef('http://id.loc.gov/datatypes/edtf'): 'EDTF',
-        URIRef('http://www.w3.org/2001/XMLSchema#date'): 'Date'
+        URIRef('http://www.w3.org/2001/XMLSchema#date'): 'Date',
     }
     DATATYPE_URIS = {name: uri for uri, name in DATATYPE_NAMES.items()}
 

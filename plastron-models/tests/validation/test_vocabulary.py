@@ -64,7 +64,7 @@ def test_vocabulary_term(monkeypatch, vocabulary_graph):
         ('http://example.com/things#', None, 'ThingsVocabularyTerm'),
         ('http://example.com/things/', None, 'ThingsVocabularyTerm'),
         ('http://example.com/things#', 'NewClassName', 'NewClassName'),
-    ]
+    ],
 )
 def test_vocabulary_term_from_vocab(vocab_uri, name_param, expected_name):
     vocabulary = Vocabulary(vocab_uri)

@@ -21,13 +21,15 @@ def configure_cli(subparsers):
         description='Set property values on objects',
     )
     parser.add_argument(
-        '-m', '--model',
+        '-m',
+        '--model',
         dest='model_name',
         required=True,
         help='name of the model class of the objects',
     )
     parser.add_argument(
-        '-F', '--field',
+        '-F',
+        '--field',
         action='append',
         nargs=2,
         dest='fields_to_set',

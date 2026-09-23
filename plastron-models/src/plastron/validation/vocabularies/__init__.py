@@ -98,6 +98,7 @@ class Vocabulary(Mapping):
     `Vocabulary` objects can also be used in the `values_from` attribute of RDF
     property mapping fields.
     """
+
     def __init__(self, uri: URIRef | str):
         self.uri = URIRef(uri)
 
@@ -200,10 +201,7 @@ def get_vocabulary_graph(vocab_uri: URIRef) -> Graph:
     # first check locally available vocabularies
     if vocab_uri in VOCABULARIES:
         try:
-            graph.parse(
-                location=str(VOCABULARIES_DIR / VOCABULARIES[vocab_uri]),
-                format='turtle'
-            )
+            graph.parse(location=str(VOCABULARIES_DIR / VOCABULARIES[vocab_uri]), format='turtle')
             return graph
         except FileNotFoundError as e:
             logger.warning(f'Local version of {vocab_uri} not found: {e}')
@@ -238,6 +236,7 @@ class ControlledVocabularyProperty(ObjectProperty):
     )
     ```
     """
+
     def __init__(self, predicate: URIRef, vocab: Vocabulary, **kwargs):
         super().__init__(
             predicate,

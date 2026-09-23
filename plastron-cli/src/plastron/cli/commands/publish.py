@@ -27,10 +27,7 @@ def configure_cli(subparsers):
         help='remove the "Hidden" state from these objects',
     )
     parser.add_argument(
-        '-f', '--uris-file',
-        action='store',
-        type=FileType(),
-        help='file containing URIs of objects to publish'
+        '-f', '--uris-file', action='store', type=FileType(), help='file containing URIs of objects to publish'
     )
     parser.add_argument(
         'uris',

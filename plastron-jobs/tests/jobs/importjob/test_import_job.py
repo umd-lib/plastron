@@ -32,7 +32,7 @@ def jobs(jobs_dir) -> Jobs:
         ('foo/bar', 'foo%2Fbar'),
         # URI as job ID
         ('http://localhost:3000/import-jobs/17', 'http%3A%2F%2Flocalhost%3A3000%2Fimport-jobs%2F17'),
-    ]
+    ],
 )
 def test_safe_job_id(jobs, job_id, safe_id):
     job = jobs.create_job(ImportJob, job_id=job_id)
@@ -45,7 +45,7 @@ def test_safe_job_id(jobs, job_id, safe_id):
     [
         ('no-config', 'is missing'),
         ('empty-config', 'is empty'),
-    ]
+    ],
 )
 def test_job_config_errors(jobs, job_id, expected_message):
     with pytest.raises(JobConfigError) as exc_info:
@@ -173,15 +173,16 @@ def test_import_job_validation_fails_for_job_with_files_column_and_file_missing(
     mock_context = MagicMock(spec=PlastronContext, repo=mock_repo)
 
     import_job = jobs.create_job(
-        ImportJob,
-        config=ImportConfig(job_id='456', model='Item', binaries_location=binaries_location)
+        ImportJob, config=ImportConfig(job_id='456', model='Item', binaries_location=binaries_location)
     )
     runner = JobRunner()
-    result = runner.run(import_job.run(
-        context=mock_context,
-        validate_only=True,
-        import_file=(datadir / 'item_with_file_in_item_files_column.csv').open(),
-    ))
+    result = runner.run(
+        import_job.run(
+            context=mock_context,
+            validate_only=True,
+            import_file=(datadir / 'item_with_file_in_item_files_column.csv').open(),
+        )
+    )
     assert result['type'] == 'validate_failed'
 
 
@@ -196,11 +197,13 @@ def test_import_job_validation_fails_for_job_with_files_and_no_binaries_location
 
     import_job = jobs.create_job(ImportJob, config=ImportConfig(job_id='456', model='Item'))
     runner = JobRunner()
-    result = runner.run(import_job.run(
-        context=mock_context,
-        validate_only=True,
-        import_file=(datadir / 'item_with_file_in_item_files_column.csv').open(),
-    ))
+    result = runner.run(
+        import_job.run(
+            context=mock_context,
+            validate_only=True,
+            import_file=(datadir / 'item_with_file_in_item_files_column.csv').open(),
+        )
+    )
     assert result['type'] == 'validate_failed'
 
 
@@ -219,15 +222,16 @@ def test_import_job_validation_succeeds_for_job_with_files_column_and_file_exist
     mock_context = MagicMock(spec=PlastronContext, repo=mock_repo)
 
     import_job = jobs.create_job(
-        ImportJob,
-        config=ImportConfig(job_id='456', model='Item', binaries_location=str(binaries_location))
+        ImportJob, config=ImportConfig(job_id='456', model='Item', binaries_location=str(binaries_location))
     )
     runner = JobRunner()
-    result = runner.run(import_job.run(
-        context=mock_context,
-        validate_only=True,
-        import_file=(datadir / 'item_with_file_in_item_files_column.csv').open(),
-    ))
+    result = runner.run(
+        import_job.run(
+            context=mock_context,
+            validate_only=True,
+            import_file=(datadir / 'item_with_file_in_item_files_column.csv').open(),
+        )
+    )
     assert result['type'] == 'validate_success'
 
 
@@ -242,9 +246,11 @@ def test_import_job_validation_passes_for_job_with_files_column_and_no_files_spe
 
     import_job = jobs.create_job(ImportJob, config=ImportConfig(job_id='456', model='Item'))
     runner = JobRunner()
-    result = runner.run(import_job.run(
-        context=mock_context,
-        validate_only=True,
-        import_file=(datadir / 'item_with_empty_item_files_column.csv').open(),
-    ))
+    result = runner.run(
+        import_job.run(
+            context=mock_context,
+            validate_only=True,
+            import_file=(datadir / 'item_with_empty_item_files_column.csv').open(),
+        )
+    )
     assert result['type'] == 'validate_success'

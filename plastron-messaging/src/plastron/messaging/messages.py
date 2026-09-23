@@ -9,6 +9,7 @@ class MessageHeader:
     """
     Descriptor to map a STOMP message header name to a Python attribute.
     """
+
     def __init__(self, header_name: str):
         self.header_name = header_name
 

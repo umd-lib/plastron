@@ -34,7 +34,7 @@ class JobRunner:
         (PublicationAction.PUBLISH, True, 'publish_incomplete', 1, 1),
         (PublicationAction.UNPUBLISH, True, 'unpublish_incomplete', 1, 1),
         ('bad_action', True, 'error', 0, 2),
-    ]
+    ],
 )
 def test_publication_job(action, with_errors, expected_status, expected_done, expected_errors):
     mock_resource = MagicMock(spec=PublishableResource)
@@ -60,7 +60,7 @@ def test_publication_job(action, with_errors, expected_status, expected_done, ex
         uris=[
             'http://fcrepo-local:8080/fcrepo/rest/foo',
             'http://fcrepo-local:8080/fcrepo/rest/bar',
-        ]
+        ],
     )
 
     def check_status(status):

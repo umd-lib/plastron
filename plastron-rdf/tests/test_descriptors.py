@@ -25,7 +25,7 @@ class Foo(MockResource):
         ('title', Property),
         ('subject', ObjectProperty),
         ('identifier', DataProperty),
-    ]
+    ],
 )
 def test_owner_get(prop_name, prop_type):
     prop = getattr(Foo, prop_name)
@@ -42,7 +42,7 @@ def test_owner_get(prop_name, prop_type):
         ('title', RDFProperty),
         ('subject', RDFObjectProperty),
         ('identifier', RDFDataProperty),
-    ]
+    ],
 )
 def test_instance_get(prop_name, prop_type):
     instance = Foo()

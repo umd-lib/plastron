@@ -42,10 +42,11 @@ def single_file_group(string_source):
 @pytest.fixture
 def multiple_files_group(string_source):
     return FileGroup(
-        rootname='foo', files=[
+        rootname='foo',
+        files=[
             FileSpec(name='foo.txt', source=string_source),
             FileSpec(name='foo.asc', source=string_source),
-        ]
+        ],
     )
 
 

@@ -96,12 +96,7 @@ class Broker:
     def send(self, destination, headers=None, body='', **kwargs):
         if headers is None:
             headers = {}
-        self.connection.send(
-            destination=destination,
-            headers=headers,
-            body=body,
-            **kwargs
-        )
+        self.connection.send(destination=destination, headers=headers, body=body, **kwargs)
 
 
 class Destination:
@@ -119,5 +114,5 @@ class Destination:
 
     def subscribe(self, id: str, ack: str = 'auto', headers: dict | None = None, **kwargs):
         self.broker.connection.subscribe(destination=self.name, id=id, ack=ack, headers=headers, **kwargs)
-        logger.info(f"Subscribed to {self.name}")
-        logger.debug(f"id={id} ack={ack} headers={headers} {kwargs}")
+        logger.info(f'Subscribed to {self.name}')
+        logger.debug(f'id={id} ack={ack} headers={headers} {kwargs}')

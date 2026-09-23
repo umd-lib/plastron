@@ -10,12 +10,12 @@ logger = logging.getLogger(__name__)
 
 
 def echo(
-        _repo: Repository,
-        _config: dict[str, Any],
-        message: PlastronCommandMessage,
+    _repo: Repository,
+    _config: dict[str, Any],
+    message: PlastronCommandMessage,
 ) -> Generator[Any, None, dict[str, Any]]:
     message_body = message.body.encode('utf-8').decode('utf-8-sig')
-    echo_delay = int(message.args.get('echo-delay', "0"))
+    echo_delay = int(message.args.get('echo-delay', '0'))
     if echo_delay:
         time.sleep(echo_delay)
 

@@ -12,6 +12,7 @@ class EmbeddedObject:
     """Wrapper object to delay instantiation of inline-specified objects
     that should be embedded in their parent instance (i.e., share a graph
     object)."""
+
     def __init__(self, cls: type[T], fragment_id: str | None = None, **kwargs):
         self.cls: type[T] = cls
         """Model class to use for the embedded object"""
@@ -56,6 +57,8 @@ def embedded(cls: type[T]) -> Callable[..., EmbeddedObject]:
     )
     ```
     """
+
     def _embedded(**kwargs):
         return EmbeddedObject(cls, **kwargs)
+
     return _embedded

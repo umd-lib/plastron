@@ -69,7 +69,7 @@ def register_responses(responses, uri):
             },
             pytest.raises(RepositoryError),
         ),
-    ]
+    ],
 )
 @httpretty.activate
 def test_delete_command(plastron_context, register_transaction, path, responses, expectation):

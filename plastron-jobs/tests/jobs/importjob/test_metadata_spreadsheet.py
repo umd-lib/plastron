@@ -21,7 +21,7 @@ def test_no_binaries(datadir):
         ('has_files.csv',),
         ('has_item_files.csv',),
         ('has_files_and_item_files.csv',),
-    ]
+    ],
 )
 def test_has_binaries(filename, datadir):
     metadata = MetadataSpreadsheet(datadir / filename, Item)
@@ -48,8 +48,8 @@ def test_cannot_mix_language_and_datatype(datadir):
     ('filename', 'expected_reason'),
     [
         ('missing_some_file_groups.csv', 'If any file group has a label, all file groups must have a label'),
-        ('inconsistent_file_groups.csv', 'Multiple files with rootname "ntl-010543-0001" have differing labels')
-    ]
+        ('inconsistent_file_groups.csv', 'Multiple files with rootname "ntl-010543-0001" have differing labels'),
+    ],
 )
 def test_file_group_errors(filename, expected_reason, datadir):
     metadata = MetadataSpreadsheet(datadir / filename, Item)

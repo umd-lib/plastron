@@ -35,6 +35,7 @@ def is_iterable(value: Any) -> bool:
 
 class RDFResourceBase:
     """Base class for RDF description classes."""
+
     rdf_property_names: set = set()
     default_values: dict[Any, set] = defaultdict(set)
     validators: list[Callable[['RDFResourceBase'], bool]] = []
@@ -77,9 +78,9 @@ class RDFResourceBase:
         self.add_properties(**kwargs)
 
     def get_fragment_resource(
-            self,
-            object_class: type['RDFResourceBase'],
-            fragment_id: str | None = None,
+        self,
+        object_class: type['RDFResourceBase'],
+        fragment_id: str | None = None,
     ) -> 'RDFResourceBase':
         """
         Embedded (i.e., "fragment") resources share a graph with their parent resource. They

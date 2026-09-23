@@ -124,11 +124,7 @@ class ImportRun:
     def progress_message(self, n: int, **kwargs) -> dict[str, Any]:
         now = datetime.now(timezone.utc).timestamp()
         return {
-            'time': {
-                'started': self.start_time,
-                'now': now,
-                'elapsed': now - self.start_time
-            },
+            'time': {'started': self.start_time, 'now': now, 'elapsed': now - self.start_time},
             'count': self.count,
             'state': self.state,
             'progress': int(n / self.count['total_items'] * 100),
@@ -139,13 +135,13 @@ class ImportRun:
         return self.run(*args, **kwargs)
 
     def run(
-            self,
-            context: PlastronContext,
-            limit: int | None = None,
-            percentage: int | None = None,
-            validate_only: bool = False,
-            import_file: IO | None = None,
-            publish: bool = False,
+        self,
+        context: PlastronContext,
+        limit: int | None = None,
+        percentage: int | None = None,
+        validate_only: bool = False,
+        import_file: IO | None = None,
+        publish: bool = False,
     ) -> Generator[dict[str, Any], None, dict[str, Any]]:
         """Execute this import run. Returns a generator that yields a dictionary of
         current status after each item. The generator also returns a final status
@@ -248,7 +244,7 @@ class ImportRun:
                 self.drop_invalid(
                     item=import_row.item,
                     line_reference=row.line_reference,
-                    reason=f'Validation failures: {"; ".join(reasons)}'
+                    reason=f'Validation failures: {"; ".join(reasons)}',
                 )
                 yield self.progress_message(n)
                 continue
@@ -306,16 +302,16 @@ class ImportRun:
         :param reason: cause of the failure; usually the message from the underlying exception
         :return:
         """
-        logger.warning(
-            f'Dropping failed {line_reference} from import job "{self.job}" run {self.timestamp}: {reason}'
+        logger.warning(f'Dropping failed {line_reference} from import job "{self.job}" run {self.timestamp}: {reason}')
+        self.failed_items.append(
+            {
+                'id': getattr(item, 'identifier', line_reference),
+                'timestamp': datetimestamp(digits_only=False),
+                'title': getattr(item, 'title', ''),
+                'uri': get_loggable_uri(item),
+                'reason': reason,
+            }
         )
-        self.failed_items.append({
-            'id': getattr(item, 'identifier', line_reference),
-            'timestamp': datetimestamp(digits_only=False),
-            'title': getattr(item, 'title', ''),
-            'uri': get_loggable_uri(item),
-            'reason': reason
-        })
 
     def drop_invalid(self, item, line_reference, reason=''):
         """
@@ -329,13 +325,15 @@ class ImportRun:
         logger.warning(
             f'Dropping invalid row {line_reference} from import job "{self.job}" run {self.timestamp}: {reason}'
         )
-        self.invalid_items.append({
-            'id': getattr(item, 'identifier', line_reference),
-            'timestamp': datetimestamp(digits_only=False),
-            'title': getattr(item, 'title', ''),
-            'uri': get_loggable_uri(item),
-            'reason': reason
-        })
+        self.invalid_items.append(
+            {
+                'id': getattr(item, 'identifier', line_reference),
+                'timestamp': datetimestamp(digits_only=False),
+                'title': getattr(item, 'title', ''),
+                'uri': get_loggable_uri(item),
+                'reason': reason,
+            }
+        )
 
     def complete(self, row: 'ImportRow', status: ImportedItemStatus):
         """
@@ -368,36 +366,38 @@ class ImportJob(Job):
     def store_metadata_file(self, input_file: IO):
         with self.metadata_file.open(mode='w') as file:
             copyfileobj(input_file, file)
-            logger.debug(f"Copied input file {getattr(input_file, 'name', '<>')} to {file.name}")
+            logger.debug(f'Copied input file {getattr(input_file, "name", "<>")} to {file.name}')
 
     def complete(self, row: 'ImportRow', status: ImportedItemStatus):
         # write to the completed item log
-        self.completed_log.append({
-            'id': row.identifier,
-            'timestamp': datetimestamp(digits_only=False),
-            'title': getattr(row.item, 'title', ''),
-            'uri': getattr(row.item, 'uri', ''),
-            'status': status.value
-        })
+        self.completed_log.append(
+            {
+                'id': row.identifier,
+                'timestamp': datetimestamp(digits_only=False),
+                'title': getattr(row.item, 'title', ''),
+                'uri': getattr(row.item, 'uri', ''),
+                'status': status.value,
+            }
+        )
 
     def get_metadata(self) -> MetadataSpreadsheet:
         try:
             return MetadataSpreadsheet(
                 metadata_filename=self.metadata_file,
                 model_class=self.model_class,
-                file_grouping_strategy=self.config.file_grouping_strategy
+                file_grouping_strategy=self.config.file_grouping_strategy,
             )
         except MetadataError as e:
             raise JobError(job=self) from e
 
     def run(
-            self,
-            context: PlastronContext,
-            limit: int | None = None,
-            percentage: int | None = None,
-            validate_only: bool = False,
-            import_file: IO | None = None,
-            publish: bool = False,
+        self,
+        context: PlastronContext,
+        limit: int | None = None,
+        percentage: int | None = None,
+        validate_only: bool = False,
+        import_file: IO | None = None,
+        publish: bool = False,
     ) -> Generator[dict[str, Any], None, dict[str, Any]]:
         run = self.new_run()
         return run(
@@ -449,17 +449,14 @@ class ImportJob(Job):
             return ZipFileSource(base_location[4:], path)
         elif base_location.startswith('sftp:'):
             return RemoteFileSource(
-                location=os.path.join(base_location, path),
-                ssh_options={'key_filename': self.ssh_private_key}
+                location=os.path.join(base_location, path), ssh_options={'key_filename': self.ssh_private_key}
             )
         elif base_location.startswith(('http:', 'https:')):
             base_uri = base_location if base_location.endswith('/') else base_location + '/'
             return HTTPFileSource(base_uri + path)
         elif base_location.startswith('zip+sftp:'):
             return ZipFileSource(
-                zip_file=base_location[4:],
-                path=path,
-                ssh_options={'key_filename': self.ssh_private_key}
+                zip_file=base_location[4:], path=path, ssh_options={'key_filename': self.ssh_private_key}
             )
         else:
             # with no URI prefix, assume a local file path
@@ -472,12 +469,12 @@ class PublishableObjectResource(PCDMObjectResource, PublishableResource):
 
 class ImportRow:
     def __init__(
-            self,
-            job: ImportJob,
-            context: PlastronContext,
-            row: Row,
-            validate_only: bool = False,
-            publish: bool | None = None,
+        self,
+        job: ImportJob,
+        context: PlastronContext,
+        row: Row,
+        validate_only: bool = False,
+        publish: bool | None = None,
     ):
         self.job = job
         self.row = row
@@ -517,8 +514,7 @@ class ImportRow:
         """Check that a file exists in the job's binaries location for each
         file name given."""
         missing_files = [
-            name for name in filenames
-            if not self.job.get_source(self.job.config.binaries_location, name).exists()
+            name for name in filenames if not self.job.get_source(self.job.config.binaries_location, name).exists()
         ]
         if len(missing_files) == 0:
             return ValidationSuccess(
@@ -543,7 +539,9 @@ class ImportRow:
             # construct the SPARQL Update query if there are any deletions or insertions
             # then do a PATCH update of an existing item
             try:
-                resource: PublishableObjectResource = self.context.repo[self.item.uri:PublishableObjectResource].read()
+                resource: PublishableObjectResource = self.context.repo[
+                    self.item.uri : PublishableObjectResource
+                ].read()
                 resource.attach_description(self.item)
                 resource.update()
                 # publish this resource, if requested
@@ -583,9 +581,9 @@ class ImportRow:
         if self.job.extract_text_types is not None:
             annotate_from_files(self.item, self.job.extract_text_types)
 
-        logger.debug(f"Creating resources in container: {self.job.config.container}")
+        logger.debug(f'Creating resources in container: {self.job.config.container}')
         logger.debug(f'Repo: {self.context.repo}')
-        container: ContainerResource = self.context.repo[self.job.config.container:ContainerResource]
+        container: ContainerResource = self.context.repo[self.job.config.container : ContainerResource]
 
         try:
             with self.context.repo.transaction():
@@ -635,7 +633,7 @@ def annotate_from_files(item, mime_types):
                 target=member,
                 body=TextualBody(value=text, content_type='text/plain'),
                 motivation=sc.painting,
-                derived_from=file
+                derived_from=file,
             )
             # don't embed full resources
             annotation.props['target'].is_embedded = False

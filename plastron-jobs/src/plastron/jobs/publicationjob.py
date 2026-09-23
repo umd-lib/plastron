@@ -86,7 +86,7 @@ class PublicationJob(Job):
                 'count': count,
                 'result': result,
                 'state': 'publish_in_progress',
-                'progress': int(n / count['total'] * 100)
+                'progress': int(n / count['total'] * 100),
             }
 
         state = PublicationAction.get_final_state(self.action, count)

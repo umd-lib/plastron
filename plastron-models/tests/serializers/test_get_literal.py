@@ -33,7 +33,7 @@ from plastron.serializers.csv import ColumnHeader, get_literal
             '[@de]der Hund',
             Literal('der Hund', datatype=None, lang='de'),
         ),
-    ]
+    ],
 )
 def test_get_literal(descriptor, column_header, value, expected_literal):
     assert get_literal(column_header, descriptor, value) == expected_literal

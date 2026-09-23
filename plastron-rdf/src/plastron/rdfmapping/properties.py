@@ -16,15 +16,16 @@ T = TypeVar('T')
 
 class RDFProperty:
     """An RDF property"""
+
     def __init__(
-            self,
-            resource,
-            attr_name: str,
-            predicate: URIRef,
-            required: bool = False,
-            repeatable: bool = False,
-            values_from: Container | None = None,
-            validate: Callable[[Any], bool] | None = None,
+        self,
+        resource,
+        attr_name: str,
+        predicate: URIRef,
+        required: bool = False,
+        repeatable: bool = False,
+        values_from: Container | None = None,
+        validate: Callable[[Any], bool] | None = None,
     ):
         self.resource = resource
         self.attr_name = attr_name
@@ -129,16 +130,17 @@ class RDFProperty:
 
 class RDFDataProperty(RDFProperty):
     """An RDF property whose values are always RDF literals"""
+
     def __init__(
-            self,
-            resource,
-            attr_name: str,
-            predicate: URIRef,
-            required: bool = False,
-            repeatable: bool = False,
-            values_from: Container | None = None,
-            validate: Callable[[Any], bool] | None = None,
-            datatype: URIRef = None,
+        self,
+        resource,
+        attr_name: str,
+        predicate: URIRef,
+        required: bool = False,
+        repeatable: bool = False,
+        values_from: Container | None = None,
+        validate: Callable[[Any], bool] | None = None,
+        datatype: URIRef = None,
     ):
         super().__init__(resource, attr_name, predicate, required, repeatable, values_from, validate)
         self.datatype: URIRef = datatype
@@ -188,17 +190,18 @@ class RDFDataProperty(RDFProperty):
 
 class RDFObjectProperty(RDFProperty):
     """An RDF property whose values are always URIRefs or RDF blank nodes"""
+
     def __init__(
-            self,
-            resource,
-            attr_name: str,
-            predicate: URIRef,
-            required: bool = False,
-            repeatable: bool = False,
-            values_from: Container | None = None,
-            validate: Callable[[Any], bool] | None = None,
-            object_class: type[T] | None = None,
-            embedded: bool = False,
+        self,
+        resource,
+        attr_name: str,
+        predicate: URIRef,
+        required: bool = False,
+        repeatable: bool = False,
+        values_from: Container | None = None,
+        validate: Callable[[Any], bool] | None = None,
+        object_class: type[T] | None = None,
+        embedded: bool = False,
     ):
         super().__init__(resource, attr_name, predicate, required, repeatable, values_from, validate)
         self.object_class = object_class

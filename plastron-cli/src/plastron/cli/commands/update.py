@@ -11,58 +11,38 @@ logger = logging.getLogger(__name__)
 
 
 def configure_cli(subparsers):
-    parser = subparsers.add_parser(
-        name='update',
-        description='Update objects in the repository'
-    )
+    parser = subparsers.add_parser(name='update', description='Update objects in the repository')
     parser.add_argument(
-        '-u', '--update-file',
+        '-u',
+        '--update-file',
         help='Path to SPARQL Update file to apply',
         type=FileType(mode='r'),
         action='store',
-        required=True
+        required=True,
     )
     parser.add_argument(
-        '-R', '--recursive',
-        help='Update additional objects found by traversing the given predicate(s)',
-        action='store'
+        '-R', '--recursive', help='Update additional objects found by traversing the given predicate(s)', action='store'
     )
     parser.add_argument(
-        '-d', '--dry-run',
-        help='Simulate an update without modifying the repository',
-        action='store_true'
+        '-d', '--dry-run', help='Simulate an update without modifying the repository', action='store_true'
     )
     parser.add_argument(
-        '--no-transactions', '--no-txn',
+        '--no-transactions',
+        '--no-txn',
         help='run the update without using transactions',
         action='store_false',
-        dest='use_transactions'
+        dest='use_transactions',
     )
+    parser.add_argument('--validate', help='validate before updating', action='store_true', dest='validate')
     parser.add_argument(
-        '--validate',
-        help='validate before updating',
-        action='store_true',
-        dest='validate'
-    )
-    parser.add_argument(
-        '-m', '--model',
+        '-m',
+        '--model',
         help='The model class to use for validation (Item, Issue, Poster, or Letter)',
         action='store',
     )
-    parser.add_argument(
-        '--completed',
-        help='file recording the URIs of updated resources',
-        action='store'
-    )
-    parser.add_argument(
-        '-f', '--file',
-        help='File containing a list of URIs to update',
-        action='store'
-    )
-    parser.add_argument(
-        'uris', nargs='*',
-        help='URIs of repository objects to update'
-    )
+    parser.add_argument('--completed', help='file recording the URIs of updated resources', action='store')
+    parser.add_argument('-f', '--file', help='File containing a list of URIs to update', action='store')
+    parser.add_argument('uris', nargs='*', help='URIs of repository objects to update')
     parser.set_defaults(cmd_name='update')
 
 
@@ -71,7 +51,7 @@ class Command(BaseCommand):
         self.context.client.test_connection()
 
         if args.validate and args.model is None:
-            raise RuntimeError("Model must be provided when performing validation")
+            raise RuntimeError('Model must be provided when performing validation')
 
         # Retrieve the model to use for validation
         model_class = get_model_from_name(args.model) if args.model else None
@@ -96,7 +76,7 @@ class Command(BaseCommand):
                     file_uris = [line.strip() for line in f if line.strip()]
                 uris = uris | set(file_uris)
             except FileNotFoundError:
-                raise RuntimeError(f"File {args.file} not found")
+                raise RuntimeError(f'File {args.file} not found')
 
         if args.uris:
             uris = uris | set(args.uris)

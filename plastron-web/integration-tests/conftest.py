@@ -9,11 +9,11 @@ def inbox_url():
 @pytest.fixture
 def jsonld_context():
     return [
-        "https://www.w3.org/ns/activitystreams",
+        'https://www.w3.org/ns/activitystreams',
         {
-            "umdact": "http://vocab.lib.umd.edu/activity#",
-            "Publish": "umdact:Publish",
-            "PublishHidden": "umdact:PublishHidden",
-            "Unpublish": "umdact:Unpublish"
-        }
+            'umdact': 'http://vocab.lib.umd.edu/activity#',
+            'Publish': 'umdact:Publish',
+            'PublishHidden': 'umdact:PublishHidden',
+            'Unpublish': 'umdact:Unpublish',
+        },
     ]

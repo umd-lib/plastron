@@ -13,7 +13,7 @@ from plastron.namespaces import dcmitype, fabio, pcdmuse
         (PCDMFile(rdf_type=fabio.MetadataFile), 'metadata'),
         (PCDMFile(), None),
         (PCDMFile(rdf_type=dcmitype.NotARealType), None),
-    ]
+    ],
 )
 def test_get_usage_tag(file_obj, expected_tag):
     assert get_usage_tag(file_obj) == expected_tag

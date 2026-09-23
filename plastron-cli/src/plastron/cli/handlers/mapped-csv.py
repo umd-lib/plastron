@@ -237,7 +237,7 @@ def set_value(item, column, conf, line):
 def get_flagged_column(mapping, flag):
     cols = [col for col in mapping if flag in mapping[col] and mapping[col][flag]]
     if len(cols) > 1:
-        raise ConfigError(f"Only one {flag} column per mapping level is allowed")
+        raise ConfigError(f'Only one {flag} column per mapping level is allowed')
     elif len(cols) == 1:
         return cols[0]
     else:

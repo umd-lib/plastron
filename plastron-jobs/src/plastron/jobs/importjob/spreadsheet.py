@@ -53,6 +53,7 @@ class MetadataError(Exception):
 class LineReference(NamedTuple):
     """Filename-line number pairing. Stringifies to `{filename}:{line number}`
     (e.g., `job-0123/import.csv:29`)"""
+
     filename: str
     line_number: int
 
@@ -80,13 +81,15 @@ def build_fields(fieldnames, model_class) -> dict[str, list[ColumnSpec]]:
             # if the language label isn't a name in the LANGUAGE_CODES table,
             # assume that it is itself a language code
             lang_code = CSVSerializer.LANGUAGE_CODES.get(language_label, language_label)
-            fields[attrs].append(ColumnSpec(
-                attrs=attrs,
-                header=header,
-                prop=get_final_prop(model_class, attrs.split('.')),
-                lang_code=lang_code,
-                datatype=None,
-            ))
+            fields[attrs].append(
+                ColumnSpec(
+                    attrs=attrs,
+                    header=header,
+                    prop=get_final_prop(model_class, attrs.split('.')),
+                    lang_code=lang_code,
+                    datatype=None,
+                )
+            )
         elif '{' in header:
             # this field has a datatype
             # header format is "Header Label {Datatype Label}"
@@ -104,13 +107,15 @@ def build_fields(fieldnames, model_class) -> dict[str, list[ColumnSpec]]:
             except KeyError as e:
                 raise DataReadError(f'Unknown datatype "{datatype_label}" in "{header}" in import file.') from e
 
-            fields[attrs].append(ColumnSpec(
-                attrs=attrs,
-                header=header,
-                prop=get_final_prop(model_class, attrs.split('.')),
-                lang_code=None,
-                datatype=datatype_uri,
-            ))
+            fields[attrs].append(
+                ColumnSpec(
+                    attrs=attrs,
+                    header=header,
+                    prop=get_final_prop(model_class, attrs.split('.')),
+                    lang_code=None,
+                    datatype=datatype_uri,
+                )
+            )
         else:
             # no language tag or datatype
             if header not in property_attrs:
@@ -122,13 +127,15 @@ def build_fields(fieldnames, model_class) -> dict[str, list[ColumnSpec]]:
                 datatype_uri = prop.datatype
             else:
                 datatype_uri = None
-            fields[attrs].append(ColumnSpec(
-                attrs=attrs,
-                header=header,
-                prop=prop,
-                lang_code=None,
-                datatype=datatype_uri,
-            ))
+            fields[attrs].append(
+                ColumnSpec(
+                    attrs=attrs,
+                    header=header,
+                    prop=prop,
+                    lang_code=None,
+                    datatype=datatype_uri,
+                )
+            )
     return fields
 
 
@@ -199,9 +206,7 @@ def build_file_groups(filenames_string: str, grouping_strategy: str = 'rootname'
             # Use the full filename as the key to ensure uniqueness
             group_key = filename
             file_groups[group_key] = FileGroup(
-                rootname=filename,
-                label=label or f'Page {idx}',
-                files=[FileSpec(name=filename, usage=usage)]
+                rootname=filename, label=label or f'Page {idx}', files=[FileSpec(name=filename, usage=usage)]
             )
     else:
         for filename in filenames_string.split(';'):
@@ -258,12 +263,12 @@ ModelType = TypeVar('ModelType', bound=ContentModeledResource)
 
 class Row(Generic[ModelType]):
     def __init__(
-            self,
-            spreadsheet: 'MetadataSpreadsheet[ModelType]',
-            line_reference: LineReference,
-            row_number: int,
-            data: Mapping[str, str],
-            identifier_column: str,
+        self,
+        spreadsheet: 'MetadataSpreadsheet[ModelType]',
+        line_reference: LineReference,
+        row_number: int,
+        data: Mapping[str, str],
+        identifier_column: str,
     ):
         self.spreadsheet = spreadsheet
         self.line_reference = line_reference
@@ -271,8 +276,7 @@ class Row(Generic[ModelType]):
         self.data = data
         self.identifier_column = identifier_column
         self._file_groups = build_file_groups(
-            self.data.get('FILES', ''),
-            grouping_strategy=spreadsheet.file_grouping_strategy
+            self.data.get('FILES', ''), grouping_strategy=spreadsheet.file_grouping_strategy
         )
         self._filenames = list(chain(*[group.filenames for group in self._file_groups.values()]))
 
@@ -363,7 +367,9 @@ class MetadataSpreadsheet(Generic[ModelType]):
     Iterable sequence of rows from the metadata CSV file of an import job.
     """
 
-    def __init__(self, metadata_filename: Path | str, model_class: type[ModelType], file_grouping_strategy: str = 'rootname'):
+    def __init__(
+        self, metadata_filename: Path | str, model_class: type[ModelType], file_grouping_strategy: str = 'rootname'
+    ):
         self.metadata_filename = metadata_filename
         self.metadata_file = None
         self.model_class = model_class
@@ -420,18 +426,16 @@ class MetadataSpreadsheet(Generic[ModelType]):
 
     def _handle_invalid_row(self, line_reference: LineReference, reason: str) -> InvalidRow:
         self.errors += 1
-        self.validation_reports.append({
-            'line': line_reference,
-            'is_valid': False,
-            'error': f'Line {line_reference}: {reason}'
-        })
+        self.validation_reports.append(
+            {'line': line_reference, 'is_valid': False, 'error': f'Line {line_reference}: {reason}'}
+        )
         return InvalidRow(line_reference=line_reference, reason=reason)
 
     def rows(
-            self,
-            limit: int | None = None,
-            percentage: int | None = None,
-            completed: Bucket = None,
+        self,
+        limit: int | None = None,
+        percentage: int | None = None,
+        completed: Bucket = None,
     ) -> Iterator[Row[ModelType] | InvalidRow]:
         """Iterator over the rows in this spreadsheet.
 
@@ -448,9 +452,7 @@ class MetadataSpreadsheet(Generic[ModelType]):
             if not self.metadata_file.seekable():
                 raise RuntimeError('Cannot execute a percentage load using a non-seekable file')
             identifier_column = self.model_class.HEADER_MAP['identifier']
-            identifiers = [
-                row[identifier_column] for row in self.csv_file if row[identifier_column] not in completed
-            ]
+            identifiers = [row[identifier_column] for row in self.csv_file if row[identifier_column] not in completed]
             self._rewind_csv_file()
 
             if len(identifiers) == 0:

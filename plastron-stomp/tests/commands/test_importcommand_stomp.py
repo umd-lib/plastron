@@ -30,7 +30,7 @@ def mock_repo():
                 'PlastronArg-dry-run': 'False',
                 'PlastronArg-no-transactions': 'True',
                 'PlastronArg-validate-only': 'False',
-                'PlastronArg-publish': 'False'
+                'PlastronArg-publish': 'False',
             },
             # expected args
             {
@@ -50,7 +50,7 @@ def mock_repo():
                 'PlastronArg-dry-run': 'False',
                 'PlastronArg-no-transactions': 'True',
                 'PlastronArg-validate-only': 'True',
-                'PlastronArg-publish': 'True'
+                'PlastronArg-publish': 'True',
             },
             # expected args
             {
@@ -64,7 +64,7 @@ def mock_repo():
         ),
     ],
 )
-@patch.object(Jobs, "create_job")
+@patch.object(Jobs, 'create_job')
 def test_publish(create_job, headers, expected_args):
     # Mock the job object and its run method
     mock_job = MagicMock()
@@ -73,9 +73,7 @@ def test_publish(create_job, headers, expected_args):
 
     message = PlastronCommandMessage(headers=headers, body=message_body)
     mock_context = MagicMock(
-        spec=PlastronContext,
-        repo=mock_repo,
-        config={'COMMANDS': {'IMPORT': {'JOBS_DIR': 'some_jobs_dir'}}}
+        spec=PlastronContext, repo=mock_repo, config={'COMMANDS': {'IMPORT': {'JOBS_DIR': 'some_jobs_dir'}}}
     )
 
     # Call the importcommand function with the mock repo, config, and message

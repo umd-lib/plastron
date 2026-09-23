@@ -19,12 +19,7 @@ def message_body():
 @pytest.fixture
 def repo_base_config():
     """Required parameters for Repository configuration"""
-    return {
-        'REST_ENDPOINT': 'http://localhost:9999',
-        'RELPATH': '/pcdm',
-        'LOG_DIR': '/logs',
-        'AUTH_TOKEN': 'foobar'
-    }
+    return {'REST_ENDPOINT': 'http://localhost:9999', 'RELPATH': '/pcdm', 'LOG_DIR': '/logs', 'AUTH_TOKEN': 'foobar'}
 
 
 @pytest.fixture
@@ -55,7 +50,7 @@ def mock_repo(client):
                 'PlastronCommand': 'update',
                 'PlastronArg-dry-run': 'True',
                 'PlastronArg-validate': 'False',
-                'PlastronArg-no-transactions': 'False'
+                'PlastronArg-no-transactions': 'False',
             },
             # expected args
             {
@@ -76,7 +71,7 @@ def mock_repo(client):
                 'PlastronArg-dry-run': 'False',
                 'PlastronArg-validate': 'True',
                 'PlastronArg-model': 'Item',
-                'PlastronArg-no-transactions': 'False'
+                'PlastronArg-no-transactions': 'False',
             },
             # expected_args
             {
@@ -96,7 +91,7 @@ def mock_repo(client):
                 'PlastronCommand': 'update',
                 'PlastronArg-dry-run': 'False',
                 'PlastronArg-validate': 'False',
-                'PlastronArg-no-transactions': 'True'
+                'PlastronArg-no-transactions': 'True',
             },
             # expected_args
             {
@@ -140,9 +135,9 @@ def test_validate_requires_model(mock_repo, message_body):
         'PlastronCommand': 'update',
         'PlastronArg-dry-run': 'False',
         'PlastronArg-validate': 'True',
-        'PlastronArg-no-transactions': 'True'
+        'PlastronArg-no-transactions': 'True',
     }
     message = PlastronCommandMessage(headers=headers, body=message_body)
     with raises(RuntimeError) as exc_info:
         parse_message(message)
-    assert exc_info.value.args[0] == "Model must be provided when performing validation"
+    assert exc_info.value.args[0] == 'Model must be provided when performing validation'

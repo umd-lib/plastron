@@ -20,71 +20,50 @@ now = datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')
 
 
 def configure_cli(subparsers):
-    parser = subparsers.add_parser(
-        name='load',
-        description='Load a batch into the repository'
-    )
+    parser = subparsers.add_parser(name='load', description='Load a batch into the repository')
     required = parser.add_argument_group('required arguments')
-    required.add_argument(
-        '-b', '--batch',
-        help='path to batch configuration file',
-        action='store',
-        required=True
-    )
-    parser.add_argument(
-        '-d', '--dry-run',
-        help='iterate over the batch without POSTing',
-        action='store_true'
-    )
+    required.add_argument('-b', '--batch', help='path to batch configuration file', action='store', required=True)
+    parser.add_argument('-d', '--dry-run', help='iterate over the batch without POSTing', action='store_true')
     # useful for testing when file loading is too slow
     parser.add_argument(
-        '-n', '--no-binaries',
-        help='iterate without uploading binaries',
-        action='store_false',
-        dest='load_binaries'
+        '-n', '--no-binaries', help='iterate without uploading binaries', action='store_false', dest='load_binaries'
     )
     parser.add_argument(
-        '-l', '--limit',
+        '-l',
+        '--limit',
         help='limit the load to a specified number of top-level objects',
         action='store',
         type=int,
-        default=None
+        default=None,
     )
     # load an evenly-spaced percentage of the total batch
     parser.add_argument(
-        '-%', '--percent',
+        '-%',
+        '--percent',
         help='load specified percentage of total items',
         action='store',
         type=percentage,
-        default=None
+        default=None,
     )
     parser.add_argument(
         '--no-annotations',
         help='iterate without loading annotations (e.g. OCR)',
         action='store_false',
-        dest='create_annotations'
+        dest='create_annotations',
     )
     parser.add_argument(
-        '--no-transactions', '--no-txn',
+        '--no-transactions',
+        '--no-txn',
         help='run the load without using transactions',
         action='store_false',
-        dest='use_transactions'
+        dest='use_transactions',
     )
-    parser.add_argument(
-        '--ignore', '-i',
-        help='file listing items to ignore',
-        action='store'
-    )
-    parser.add_argument(
-        '--wait', '-w',
-        help='wait n seconds between items',
-        action='store'
-    )
+    parser.add_argument('--ignore', '-i', help='file listing items to ignore', action='store')
+    parser.add_argument('--wait', '-w', help='wait n seconds between items', action='store')
     parser.set_defaults(cmd_name='load')
 
 
 class Command(BaseCommand):
-
     def __call__(self, args: Namespace):
         # Load batch configuration
         try:
@@ -102,14 +81,14 @@ class Command(BaseCommand):
         self.context.client.load_binaries = args.load_binaries
 
         # Define the data_handler function for the data being loaded
-        logger.info("Initializing data handler")
+        logger.info('Initializing data handler')
         module_name = batch_config.handler
         handler = import_module('plastron.cli.handlers.' + module_name)
         logger.info(f'Loaded "{module_name}" handler')
 
         # "--no-binaries" implies "--no-annotations"
         if not args.load_binaries:
-            logger.info("Setting --no-binaries implies --no-annotations")
+            logger.info('Setting --no-binaries implies --no-annotations')
             args.create_annotations = False
 
         try:
@@ -127,23 +106,21 @@ class Command(BaseCommand):
             try:
                 completed = ItemLog(batch_config.mapfile, fieldnames, 'path')
             except Exception as e:
-                logger.error(f"Non-standard map file specified: {e}")
+                logger.error(f'Non-standard map file specified: {e}')
                 raise RuntimeError()
 
-            logger.info(f"Found {len(completed)} completed items")
+            logger.info(f'Found {len(completed)} completed items')
 
             if args.ignore is not None:
                 try:
                     ignored = ItemLog(args.ignore, fieldnames, 'path')
                 except Exception as e:
-                    logger.error(f"Non-standard ignore file specified: {e}")
+                    logger.error(f'Non-standard ignore file specified: {e}')
                     raise RuntimeError()
             else:
                 ignored = []
 
-            skipfile = os.path.join(
-                batch_config.log_dir, f'skipped.load.{now}.csv'
-            )
+            skipfile = os.path.join(batch_config.log_dir, f'skipped.load.{now}.csv')
             skipped = ItemLog(skipfile, fieldnames, 'path')
 
             load_set = get_load_set(batch, args.percent)
@@ -153,42 +130,37 @@ class Command(BaseCommand):
                 is_loaded = False
 
                 if n not in load_set:
-                    logger.info(f"Loading {args.percent}, skipping item {n}")
+                    logger.info(f'Loading {args.percent}, skipping item {n}')
                     continue
 
                 # handle load limit parameter
                 if args.limit is not None and n >= args.limit:
-                    logger.info(f"Stopping after {args.limit} item(s)")
+                    logger.info(f'Stopping after {args.limit} item(s)')
                     break
                 elif item.path in completed:
                     continue
                 elif item.path in ignored:
-                    logger.debug(f"Ignoring {item.path}")
+                    logger.debug(f'Ignoring {item.path}')
                     continue
 
-                logger.info(f"Processing item {n + 1}/{batch.length}...")
+                logger.info(f'Processing item {n + 1}/{batch.length}...')
 
                 try:
-                    logger.info(f"Loading item {n + 1}")
-                    is_loaded = load_item(
-                        self.context.client, item, args, extra=batch_config.extra
-                    )
+                    logger.info(f'Loading item {n + 1}')
+                    is_loaded = load_item(self.context.client, item, args, extra=batch_config.extra)
                 except ClientError:
-                    logger.error(
-                        "Unable to commit or rollback transaction, aborting"
-                    )
+                    logger.error('Unable to commit or rollback transaction, aborting')
                     raise RuntimeError()
                 except DataReadError as e:
-                    logger.error(f"Skipping item {n + 1}: {e}")
+                    logger.error(f'Skipping item {n + 1}: {e}')
 
-                row = {'number': n + 1,
-                       'path': item.path,
-                       'timestamp': getattr(
-                           item, 'creation_timestamp', str(datetime.now(timezone.utc))
-                       ),
-                       'title': getattr(item, 'title', 'N/A'),
-                       'uri': getattr(item, 'uri', 'N/A')
-                       }
+                row = {
+                    'number': n + 1,
+                    'path': item.path,
+                    'timestamp': getattr(item, 'creation_timestamp', str(datetime.now(timezone.utc))),
+                    'title': getattr(item, 'title', 'N/A'),
+                    'uri': getattr(item, 'uri', 'N/A'),
+                }
 
                 # write item details to relevant summary CSV
                 if is_loaded:
@@ -197,7 +169,7 @@ class Command(BaseCommand):
                     skipped.writerow(row)
 
                 if args.wait:
-                    logger.info(f"Pausing {args.wait} seconds")
+                    logger.info(f'Pausing {args.wait} seconds')
                     sleep(int(args.wait))
 
 
@@ -207,9 +179,9 @@ def get_load_set(batch, percent=None):
         percent = 100
     indexes = list(range(0, batch.length, int(100 / percent)))
     if percent < 100:
-        logger.info(f"Items to load: {', '.join(indexes)}")
+        logger.info(f'Items to load: {", ".join(indexes)}')
     else:
-        logger.info("Loading all items")
+        logger.info('Loading all items')
     return set(indexes)
 
 
@@ -217,7 +189,7 @@ def get_load_set(batch, percent=None):
 def percentage(n):
     p = int(n)
     if not p > 0 and p < 100:
-        raise ArgumentTypeError("Percent param must be 1-99")
+        raise ArgumentTypeError('Percent param must be 1-99')
     return p
 
 
@@ -232,7 +204,7 @@ def load_item_internal(client: Client, item, args, extra=None):
         elif re.search(r'\.(rdf|xml)$', extra):
             rdf_format = 'xml'
         else:
-            raise ConfigError("Unrecognized extra triples file format")
+            raise ConfigError('Unrecognized extra triples file format')
         item.add_extra_properties(extra, rdf_format)
 
     logger.info('Updating item and components')
@@ -265,22 +237,22 @@ def load_item(client: Client, batch_item, args, extra=None):
                 # attempt to roll back the current transaction
                 # failures here will be caught by the main loop's exception handler
                 # and should trigger a system exit
-                logger.error(f"Item creation failed: {e}")
+                logger.error(f'Item creation failed: {e}')
                 txn_client.rollback()
                 logger.warning('Transaction rolled back. Continuing load.')
 
             except KeyboardInterrupt:
-                logger.error("Load interrupted")
+                logger.error('Load interrupted')
                 raise
     else:
         try:
             load_item_internal(client, item, args, extra)
             return True
         except (ClientError, FileNotFoundError) as e:
-            logger.error(f"Item creation failed: {e}")
+            logger.error(f'Item creation failed: {e}')
             logger.warning('Continuing load.')
         except KeyboardInterrupt:
-            logger.error("Load interrupted")
+            logger.error('Load interrupted')
             raise
 
 

@@ -8,7 +8,7 @@ from plastron.serializers.csv import ColumnHeader
     [
         ('Foo', None, 'Foo'),
         ('Bar', 'en', 'Bar [en]'),
-    ]
+    ],
 )
 def test_column_header(label, language, expected_string):
     header = ColumnHeader(label=label, language=language)
@@ -22,7 +22,7 @@ def test_column_header(label, language, expected_string):
     [
         ('Foo', 'Foo', None),
         ('Bar [en]', 'Bar', 'en'),
-    ]
+    ],
 )
 def test_column_header_from_string(input_string, label, language):
     header = ColumnHeader.from_string(input_string)

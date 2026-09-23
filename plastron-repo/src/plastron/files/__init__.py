@@ -65,6 +65,7 @@ def parse_label(filename: str) -> tuple[str, str | None]:
 
 class BinaryResource(RepositoryResource):
     """An [LDP Non-RDF Source](https://www.w3.org/TR/ldp/#ldpnr) resource."""
+
     @property
     def size(self) -> int:
         """Size of the resource in bytes, as reported by the HTTP `Content-Length` header."""
@@ -94,7 +95,7 @@ class BinaryResource(RepositoryResource):
                     data=stream,
                     headers=headers,
                 )
-        except (ClientError | BinarySourceError) as e:
+        except ClientError | BinarySourceError as e:
             raise RepositoryError(f'Unable to update {self.url}: {e}') from e
 
         if not response.ok:
@@ -142,10 +143,7 @@ def get_ssh_client(sftp_uri: str | urllib.parse.SplitResult, **kwargs) -> SSHCli
     ssh_client.set_missing_host_key_policy(AutoAddPolicy)
     try:
         ssh_client.connect(
-            hostname=sftp_uri.hostname,
-            username=sftp_uri.username,
-            port=sftp_uri.port or SSH_PORT,
-            **kwargs
+            hostname=sftp_uri.hostname, username=sftp_uri.username, port=sftp_uri.port or SSH_PORT, **kwargs
         )
         return ssh_client
     except SSHException as e:
@@ -156,8 +154,8 @@ class DoesHTTPRequest(Protocol):
     """[Structural subtype](https://docs.python.org/3/library/typing.html#typing.Protocol)
     for HTTP client-like objects with a `request()` method that takes (at minimum) a `method`
     and `uri` argument, and returns a `requests.Response` object."""
-    def request(self, method: str, uri: str, **kwargs) -> Response:
-        ...
+
+    def request(self, method: str, uri: str, **kwargs) -> Response: ...
 
 
 class BinarySourceError(Exception):
@@ -172,6 +170,7 @@ class BinarySource:
     """
     Base class for reading binary content from arbitrary locations.
     """
+
     filename: str
 
     def __enter__(self):
@@ -226,6 +225,7 @@ class StringSource(BinarySource):
     `application/octet-stream` if there is no `filename` or the call to `guess_type()`
     fails.
     """
+
     def __init__(self, content: str, filename: str = '<str>', mimetype: str | None = None):
         self._content = content
         self.filename = filename
@@ -261,6 +261,7 @@ class LocalFileSource(BinarySource):
     A file on the local file system. If no `mimetype` is specified, attempts
     to guess based on the `localpath`.
     """
+
     def __init__(self, localpath: str, mimetype: str | None = None, filename=None):
         if mimetype is None:
             mimetype = guess_type(localpath)[0]
@@ -298,6 +299,7 @@ class LocalFileSource(BinarySource):
 class HTTPFileSource(BinarySource):
     """A binary retrievable over HTTP at the given URI. Any additional keyword arguments
     are stored and added to all `requests.request()` calls."""
+
     def __init__(self, uri, **kwargs):
         self.uri = uri
         """URI of the remote resource."""
@@ -348,6 +350,7 @@ class HTTPFileSource(BinarySource):
 
 class RepositoryFileSource(HTTPFileSource):
     """A binary stored in a repository."""
+
     def __init__(self, uri: str, client: DoesHTTPRequest, **kwargs):
         super().__init__(uri, **kwargs)
         self._client = client
@@ -355,6 +358,7 @@ class RepositoryFileSource(HTTPFileSource):
 
 class RemoteFileSource(BinarySource):
     """A binary retrievable over SFTP."""
+
     def __init__(self, location: str, mimetype: str | None = None, ssh_options: Mapping[str, Any] | None = None):
         """
         :param location: the SFTP URI to the binary source, e.g., `sftp://user@example.com/path/to/file`
@@ -431,6 +435,7 @@ class ZipFileSource(BinarySource):
     """
     A binary contained in a ZIP file.
     """
+
     def __init__(self, zip_file, path, mimetype=None, ssh_options=None):
         """
         :param zip_file: ZIP file. This may be a zipfile.ZipFile object,

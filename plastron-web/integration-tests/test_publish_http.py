@@ -9,13 +9,9 @@ def test_publish_http(jsonld_context, inbox_url):
     target_uri = os.environ['URI']
     response = requests.post(
         url=inbox_url,
-        json={
-            '@context': jsonld_context,
-            "type": "Publish",
-            "object": [target_uri]
-        },
+        json={'@context': jsonld_context, 'type': 'Publish', 'object': [target_uri]},
         headers={
             'Content-Type': 'application/json',
-        }
+        },
     )
     assert response.ok

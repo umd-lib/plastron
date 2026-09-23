@@ -19,10 +19,12 @@ def test_add_properties():
 def test_add_properties_list():
     resource = RDFResource()
     assert len(resource.rdf_type) == 0
-    resource.add_properties(rdf_type=[
-        URIRef('http://purl.org/dc/dcmitype/Text'),
-        URIRef('http://purl.org/dc/dcmitype/Image'),
-    ])
+    resource.add_properties(
+        rdf_type=[
+            URIRef('http://purl.org/dc/dcmitype/Text'),
+            URIRef('http://purl.org/dc/dcmitype/Image'),
+        ]
+    )
     assert len(resource.rdf_type) == 2
     assert set(resource.rdf_type.values) == {
         URIRef('http://purl.org/dc/dcmitype/Text'),
@@ -43,10 +45,12 @@ def test_set_properties():
 def test_set_properties_list():
     resource = RDFResource()
     assert len(resource.rdf_type) == 0
-    resource.set_properties(rdf_type=[
-        URIRef('http://purl.org/dc/dcmitype/Text'),
-        URIRef('http://purl.org/dc/dcmitype/Image'),
-    ])
+    resource.set_properties(
+        rdf_type=[
+            URIRef('http://purl.org/dc/dcmitype/Text'),
+            URIRef('http://purl.org/dc/dcmitype/Image'),
+        ]
+    )
     assert len(resource.rdf_type) == 2
     assert set(resource.rdf_type.values) == {
         URIRef('http://purl.org/dc/dcmitype/Text'),

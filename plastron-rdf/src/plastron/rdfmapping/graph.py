@@ -33,6 +33,7 @@ def new_triple(old_uri: URIRef, new_uri: URIRef, s: Node, p: Node, o: Node) -> t
 
 class TrackChangesGraph(Graph):
     """An RDF graph that tracks inserts and deletes."""
+
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.original = Graph()

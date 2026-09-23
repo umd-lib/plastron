@@ -19,36 +19,21 @@ now = datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')
 
 def configure_cli(subparsers):
     parser = subparsers.add_parser(
-        name='extractocr',
-        description='Create annotations from OCR data stored in the repository'
+        name='extractocr', description='Create annotations from OCR data stored in the repository'
     )
+    parser.add_argument('--ignore', '-i', help='file listing items to ignore', action='store')
     parser.add_argument(
-        '--ignore', '-i',
-        help='file listing items to ignore',
-        action='store'
-    )
-    parser.add_argument(
-        '--no-transactions', '--no-txn',
+        '--no-transactions',
+        '--no-txn',
         help='run the annotation process without using transactions',
         action='store_false',
-        dest='use_transactions'
+        dest='use_transactions',
     )
+    parser.add_argument('--completed', help='file recording the URIs of processed resources', action='store')
     parser.add_argument(
-        '--completed',
-        help='file recording the URIs of processed resources',
-        action='store'
+        '-f', '--file', dest='uris_file', type=FileType(mode='r'), help='File containing a list of URIs', action='store'
     )
-    parser.add_argument(
-        '-f', '--file',
-        dest='uris_file',
-        type=FileType(mode='r'),
-        help='File containing a list of URIs',
-        action='store'
-    )
-    parser.add_argument(
-        'uris', nargs='*',
-        help='Repository URIs'
-    )
+    parser.add_argument('uris', nargs='*', help='Repository URIs')
     parser.set_defaults(cmd_name='extractocr')
 
 

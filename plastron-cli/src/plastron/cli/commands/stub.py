@@ -18,15 +18,12 @@ logger = logging.getLogger(__name__)
 
 
 def configure_cli(subparsers):
-    parser = subparsers.add_parser(
-        name='stub',
-        description='create stub resources with just an identifier and binary'
-    )
+    parser = subparsers.add_parser(name='stub', description='create stub resources with just an identifier and binary')
     parser.add_argument(
         '--identifier-column',
         help='column in the source CSV file with a unique identifier for each item',
         required=True,
-        action='store'
+        action='store',
     )
     parser.add_argument(
         '--binary-column',
@@ -37,54 +34,39 @@ def configure_cli(subparsers):
             'Relative file paths are relative to where the command is run.'
         ),
         required=True,
-        action='store'
+        action='store',
     )
     parser.add_argument(
         '--rename-binary-column',
-        help=(
-            'Renames the binary column in the CSV output to '
-            'the provided name.'
-        ),
-        action='store'
+        help=('Renames the binary column in the CSV output to the provided name.'),
+        action='store',
     )
+    parser.add_argument('--member-of', help='URI of the object that new items are PCDM members of', action='store')
     parser.add_argument(
-        '--member-of',
-        help='URI of the object that new items are PCDM members of',
-        action='store'
-    )
-    parser.add_argument(
-        '--access',
-        help='URI or CURIE of the access class to apply to new items',
-        type=uri_or_curie,
-        action='store'
+        '--access', help='URI or CURIE of the access class to apply to new items', type=uri_or_curie, action='store'
     )
     parser.add_argument(
         '--container',
-        help=(
-            'parent container for new items; defaults to the RELPATH '
-            'in the repo configuration file'
-        ),
+        help=('parent container for new items; defaults to the RELPATH in the repo configuration file'),
         dest='container_path',
-        action='store'
+        action='store',
     )
     parser.add_argument(
-        '-o', '--output-file',
+        '-o',
+        '--output-file',
         help=(
             'destination for a copy of the source CSV file '
             'with the binary-column value replaced with the '
             'newly created repository URI for the binary; '
             'defaults to STDOUT if not given'
         ),
-        action='store'
+        action='store',
     )
     parser.add_argument(
         'source_file',
-        help=(
-            'name of the CSV file to create stubs from; '
-            'use "-" to read from STDIN'
-        ),
+        help=('name of the CSV file to create stubs from; use "-" to read from STDIN'),
         type=FileType('r', encoding='utf-8-sig'),
-        action='store'
+        action='store',
     )
     parser.set_defaults(cmd_name='stub')
 
@@ -96,7 +78,7 @@ def get_source(binary_column_value: str) -> BinarySource | None:
     implementation cannot be determined.
     """
     source: BinarySource | None = None
-    if binary_column_value.startswith(("http:", "https:")):
+    if binary_column_value.startswith(('http:', 'https:')):
         source = HTTPFileSource(binary_column_value)
     elif binary_column_value is not None:
         source = LocalFileSource(binary_column_value)
@@ -155,10 +137,7 @@ class Command(BaseCommand):
                 try:
                     access_types = [args.access] if args.access is not None else []
 
-                    resource = container_resource.create_child(
-                        resource_class=PCDMFileBearingResource,
-                        description=item
-                    )
+                    resource = container_resource.create_child(resource_class=PCDMFileBearingResource, description=item)
                     resource.create_file(source, rdf_types=access_types)
 
                     row[args.binary_column] = resource.url

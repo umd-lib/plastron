@@ -10,15 +10,12 @@ from plastron.rdf import pcdm
 
 class Batch:
     def __init__(self, repo, config):
-        self.logger = logging.getLogger(
-            __name__ + '.' + self.__class__.__name__
-        )
+        self.logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
         self.repo = repo
         self.collection = pcdm.Collection.from_repository(repo, config.collection_uri)
 
         with os.scandir(config.batch_file) as files:
-            self.files = [entry.path for entry in files if
-                          entry.name.endswith('.csv')]
+            self.files = [entry.path for entry in files if entry.name.endswith('.csv')]
 
         self.length = len(self.files)
         self.num = 0

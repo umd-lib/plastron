@@ -20,19 +20,18 @@ def configure_cli(subparsers):
         description='Run a fixity check on objects in the repository',
     )
     parser.add_argument(
-        '-f', '--uris-file',
-        action='store',
-        type=FileType(),
-        help='file containing URIs of objects to fixity check'
+        '-f', '--uris-file', action='store', type=FileType(), help='file containing URIs of objects to fixity check'
     )
     parser.add_argument(
-        '--format', '-t',
+        '--format',
+        '-t',
         choices=['csv', 'jsonl'],
         default='csv',
         help='output format of results; default is "csv"',
     )
     parser.add_argument(
-        'uris', nargs='*',
+        'uris',
+        nargs='*',
         metavar='URI',
         help='URIs of objects to fixity check',
     )

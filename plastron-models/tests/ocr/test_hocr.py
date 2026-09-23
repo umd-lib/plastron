@@ -30,7 +30,7 @@ def test_hocr(datadir):
         ('<span class="ocrx_word" id="word_8" title="bbox 1366 1634 1472 1675"><b><i>Trail</i></b></span>', 'Trail'),
         ('<span class="ocrx_word" id="word_8" title="bbox 1366 1634 1472 1675"><b>Trail</b>head</span>', 'Trailhead'),
         ('<span class="ocrx_word" id="word_8" title="bbox 1366 1634 1472 1675"></span>', ''),
-    ]
+    ],
 )
 def test_hocr_word_with_child_elements(xml, expected_content):
     word_element = etree.fromstring(xml)

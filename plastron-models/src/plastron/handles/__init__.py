@@ -19,9 +19,7 @@ def parse_handle_string(handle: str) -> list[str]:
     try:
         return handle.split('/', 1)
     except ValueError as e:
-        raise HandleError(
-            'Handle must be a string in the form "{prefix}/{suffix}" or "hdl:{prefix}/{suffix}'
-        ) from e
+        raise HandleError('Handle must be a string in the form "{prefix}/{suffix}" or "hdl:{prefix}/{suffix}') from e
 
 
 def parse_result(result: dict[str, Any]) -> dict[str, Any]:
@@ -54,7 +52,9 @@ class HandleInfo:
 
 
 class HandleServiceClient:
-    def __init__(self, endpoint_url: str, jwt_token: str, default_prefix: str | None = None, default_repo: str | None = None):
+    def __init__(
+        self, endpoint_url: str, jwt_token: str, default_prefix: str | None = None, default_repo: str | None = None
+    ):
         self.endpoint_url = endpoint_url
         self.default_prefix = default_prefix
         self.default_repo = default_repo
@@ -135,6 +135,7 @@ class HandleBearingResource(RDFResource):
     """This class be used by itself for instances where the handle field is the only
     one needed, or it can be used as a mix-in to other full models to give them a handle
     field."""
+
     handle = DataProperty(dcterms.identifier, datatype=umdtype.handle, validate=is_handle)
 
     @property

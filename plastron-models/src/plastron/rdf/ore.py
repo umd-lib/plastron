@@ -42,11 +42,7 @@ class Aggregation(ldp.Resource):
     def append_proxy(self, proxy_for, title=None):
         if title is None:
             title = f'Proxy for {proxy_for} in {self}'
-        return self.append(Proxy(
-            title=title,
-            proxy_for=proxy_for,
-            proxy_in=self
-        ))
+        return self.append(Proxy(title=title, proxy_for=proxy_for, proxy_in=self))
 
     def load_proxies(self, client: Client):
         """
@@ -67,12 +63,7 @@ class Aggregation(ldp.Resource):
 
     def create(self, client: Client, container_path=None, slug=None, headers=None, recursive=True, **kwargs):
         super().create(
-            client=client,
-            container_path=container_path,
-            slug=slug,
-            headers=headers,
-            recursive=recursive,
-            **kwargs
+            client=client, container_path=container_path, slug=slug, headers=headers, recursive=recursive, **kwargs
         )
         if recursive:
             client.create_proxies(self)
@@ -84,6 +75,7 @@ class AggregationIterator:
     specified, then before each resource is returned, its metadata is
     retrieved from that repository.
     """
+
     def __init__(self, aggregation: Aggregation, client: Client = None):
         self.aggregation = aggregation
         self.repository = client

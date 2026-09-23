@@ -243,9 +243,7 @@ class TransactionClient(Client):
             logger.info(f'Committed transaction {self.tx}')
             return response
         else:
-            raise TransactionError(
-                f'Failed to commit transaction {self.tx}: {response.status_code} {response.reason}'
-            )
+            raise TransactionError(f'Failed to commit transaction {self.tx}: {response.status_code} {response.reason}')
 
     def rollback(self):
         """Rolls back the transaction. Raises a `TransactionError` if the transaction is

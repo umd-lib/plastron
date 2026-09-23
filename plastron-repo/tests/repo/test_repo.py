@@ -19,7 +19,7 @@ def test_repo_from_url():
         ('http://localhost:8080/fcrepo/rest/foo', None, '/foo', RepositoryResource),
         ('/foo', None, '/foo', RepositoryResource),
         ('/foo', ContainerResource, '/foo', ContainerResource),
-    ]
+    ],
 )
 def test_get_resource(repository, input_path, input_class, expected_path, expected_class):
     resource = repository.get_resource(path=input_path, resource_class=input_class)
@@ -33,7 +33,7 @@ def test_get_resource(repository, input_path, input_class, expected_path, expect
         ('http://localhost:8080/fcrepo/rest/foo', '/foo', RepositoryResource),
         ('/foo', '/foo', RepositoryResource),
         (slice('/foo', ContainerResource), '/foo', ContainerResource),
-    ]
+    ],
 )
 def test_get_item(repository, input_value, expected_path, expected_class):
     resource = repository[input_value]

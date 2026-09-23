@@ -22,7 +22,7 @@ def get_mock_context(obj):
     return MagicMock(
         spec=PlastronContext,
         repo=mock_repo,
-        get_public_url=lambda uri: uri.replace('fcrepo-local:8080/fcrepo/rest', 'digital-local')
+        get_public_url=lambda uri: uri.replace('fcrepo-local:8080/fcrepo/rest', 'digital-local'),
     )
 
 

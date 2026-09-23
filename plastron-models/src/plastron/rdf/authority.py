@@ -13,18 +13,13 @@ def create_authority(graph, subject):
 @rdf.data_property('label', rdfs.label)
 @rdf.object_property('same_as', owl.sameAs)
 class LabeledThing(ldp.Resource):
-    VALIDATION_RULESET = {
-        'label': {
-            'required': True
-        },
-        'same_as': {}
-    }
+    VALIDATION_RULESET = {'label': {'required': True}, 'same_as': {}}
 
     def validate(self, parent_prop, result):
-        '''
+        """
         Validates this object based on its internal ruleset, populating
         the provided result object with the result of the validation.
-        '''
+        """
         ruleset = self.VALIDATION_RULESET
         for field, rules in ruleset.items():
             for rule_name, arg in rules.items():

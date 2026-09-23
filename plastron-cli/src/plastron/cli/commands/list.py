@@ -9,21 +9,10 @@ logger = logging.getLogger(__name__)
 
 
 def configure_cli(subparsers):
-    parser = subparsers.add_parser(
-        name='list',
-        aliases=['ls'],
-        description='List objects in the repository'
-    )
+    parser = subparsers.add_parser(name='list', aliases=['ls'], description='List objects in the repository')
     # long mode to print more than just the URIs (name modeled after ls -l)
-    parser.add_argument(
-        '-l', '--long',
-        help='Display additional information besides the URI',
-        action='store_true'
-    )
-    parser.add_argument(
-        'uris', nargs='*',
-        help='URIs of repository objects to list'
-    )
+    parser.add_argument('-l', '--long', help='Display additional information besides the URI', action='store_true')
+    parser.add_argument('uris', nargs='*', help='URIs of repository objects to list')
     parser.set_defaults(cmd_name='list')
 
 

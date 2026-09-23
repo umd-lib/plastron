@@ -18,13 +18,11 @@ def configure_cli(subparsers):
         description='Fix the order of pages in an object, using the page titles as a guide',
     )
     parser.add_argument(
-        '-f', '--uris-file',
-        action='store',
-        type=FileType(),
-        help='file containing URIs of objects to fix'
+        '-f', '--uris-file', action='store', type=FileType(), help='file containing URIs of objects to fix'
     )
     parser.add_argument(
-        '-n', '--dry-run',
+        '-n',
+        '--dry-run',
         action='store_true',
         help='dry run; do not actually modify the pages',
     )

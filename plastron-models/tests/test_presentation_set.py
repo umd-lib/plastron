@@ -10,37 +10,29 @@ from plastron.namespaces import ore
 base_uri = 'http://example.com/xyz'
 
 
-@pytest.mark.parametrize("model_class", [Item, Letter, Poster, Issue])
+@pytest.mark.parametrize('model_class', [Item, Letter, Poster, Issue])
 def test_model_with_single_presentation_set(model_class):
-    model = create_model_with_presentation_set(
-        model_class, base_uri, ['foo']
-    )
+    model = create_model_with_presentation_set(model_class, base_uri, ['foo'])
 
     assert len(model.presentation_set) == 1
     assert model.presentation_set.value == URIRef('http://vocab.lib.umd.edu/set#foo')
 
 
-@pytest.mark.parametrize("model_class", [Item, Letter, Poster, Issue])
+@pytest.mark.parametrize('model_class', [Item, Letter, Poster, Issue])
 def test_model_validation_with_valid_presentation_set(model_class):
-    model = create_model_with_presentation_set(
-        model_class, base_uri, ['test']
-    )
+    model = create_model_with_presentation_set(model_class, base_uri, ['test'])
     assert model.presentation_set.is_valid
 
 
-@pytest.mark.parametrize("model_class", [Item, Letter, Poster, Issue])
+@pytest.mark.parametrize('model_class', [Item, Letter, Poster, Issue])
 def test_model_validation_with_invalid_presentation_set(model_class):
-    model = create_model_with_presentation_set(
-        model_class, base_uri, ['not_valid']
-    )
+    model = create_model_with_presentation_set(model_class, base_uri, ['not_valid'])
     assert not model.presentation_set.is_valid
 
 
-@pytest.mark.parametrize("model_class", [Item, Letter, Poster, Issue])
+@pytest.mark.parametrize('model_class', [Item, Letter, Poster, Issue])
 def test_model_with_multiple_presentation_sets(model_class):
-    model = create_model_with_presentation_set(
-        model_class, base_uri, ['foo', 'bar']
-    )
+    model = create_model_with_presentation_set(model_class, base_uri, ['foo', 'bar'])
 
     assert len(model.presentation_set) == 2
 
@@ -48,7 +40,7 @@ def test_model_with_multiple_presentation_sets(model_class):
     assert sorted(model.presentation_set.values) == expected
 
 
-@pytest.mark.parametrize("model_class", [Item, Letter, Poster, Issue])
+@pytest.mark.parametrize('model_class', [Item, Letter, Poster, Issue])
 def test_single_presentation_set_can_be_set_on_model(model_class):
     model = model_class(uri=base_uri)
     model.presentation_set = URIRef('http://vocab.lib.umd.edu/set#foobar')
@@ -57,7 +49,7 @@ def test_single_presentation_set_can_be_set_on_model(model_class):
     assert expected in model.graph
 
 
-@pytest.mark.parametrize("model_class", [Item, Letter, Poster, Issue])
+@pytest.mark.parametrize('model_class', [Item, Letter, Poster, Issue])
 def test_multiple_presentation_sets_can_be_set_on_model(model_class):
     base_uri_ref = URIRef(base_uri)
 
@@ -67,7 +59,7 @@ def test_multiple_presentation_sets_can_be_set_on_model(model_class):
 
     expected = [
         (base_uri_ref, ore.isAggregatedBy, URIRef('http://vocab.lib.umd.edu/set#foobar')),
-        (base_uri_ref, ore.isAggregatedBy, URIRef('http://vocab.lib.umd.edu/set#barbaz'))
+        (base_uri_ref, ore.isAggregatedBy, URIRef('http://vocab.lib.umd.edu/set#barbaz')),
     ]
 
     for e in expected:
@@ -75,6 +67,7 @@ def test_multiple_presentation_sets_can_be_set_on_model(model_class):
 
 
 # Helper Functions
+
 
 def create_presentation_set_turtle_format(set_names):
     preamble = '@prefix ore: <http://www.openarchives.org/ore/terms/> .'

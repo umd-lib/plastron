@@ -37,6 +37,7 @@ from plastron.validation.vocabularies import ControlledVocabularyProperty
 @rdf_type(bibo.Issue, umd.Newspaper)
 class Issue(ContentModeledResource, PCDMObject, HandleBearingResource, FedoraResource):
     """Newspaper issue"""
+
     model_name = 'Issue'
     is_top_level = True
 
@@ -84,6 +85,7 @@ class MetadataFile(PCDMFile):
 @rdf_type(ndnp.Page)
 class Page(PCDMObject):
     """Newspaper page"""
+
     issue = ObjectProperty(pcdm.memberOf, cls=Issue)
     number = DataProperty(ndnp.number)
     frame = DataProperty(ndnp.sequence)
@@ -107,9 +109,9 @@ class Page(PCDMObject):
             with ocr_file.source as stream:
                 tree = parse(stream)
         except OSError:
-            raise RuntimeError(f"Unable to read {ocr_file.filename}")
+            raise RuntimeError(f'Unable to read {ocr_file.filename}')
         except XMLSyntaxError:
-            raise RuntimeError(f"Unable to parse {ocr_file.filename} as XML")
+            raise RuntimeError(f'Unable to parse {ocr_file.filename} as XML')
 
         # read in resolution from issue METS data
         master = next(self.files_for('master'))
@@ -154,6 +156,7 @@ class File(PCDMFile):
 @rdf_type(bibo.Article)
 class Article(PCDMObject):
     """Newspaper article"""
+
     issue = ObjectProperty(pcdm.memberOf, cls=Issue)
     start_page = DataProperty(bibo.pageStart)
     end_page = DataProperty(bibo.pageEnd)
@@ -162,6 +165,7 @@ class Article(PCDMObject):
 @rdf_type(carriers.hd)
 class Reel(PCDMObject):
     """NDNP reel is an ordered sequence of frames"""
+
     id = DataProperty(dcterms.identifier)
 
     def __init__(self, **kwargs):

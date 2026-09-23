@@ -30,15 +30,17 @@ repo = Repository.from_url(
 # repo with settings from a configuration dictionary
 from plastron.repo import Repository
 
-repo = Repository.from_config({
-    'REST_ENDPOINT': 'http://localhost:8080/fcrepo/rest',
-    'RELPATH': '/',
-    'REPO_EXTERNAL_URL': 'http://fcrepo-local/fcrepo/rest',
-    'SERVER_CERT': 'path/to/cert.pem',
-    # authentication section
-    'FEDORA_USER': 'username',
-    'FEDORA_PASSWORD': 'password',
-})
+repo = Repository.from_config(
+    {
+        'REST_ENDPOINT': 'http://localhost:8080/fcrepo/rest',
+        'RELPATH': '/',
+        'REPO_EXTERNAL_URL': 'http://fcrepo-local/fcrepo/rest',
+        'SERVER_CERT': 'path/to/cert.pem',
+        # authentication section
+        'FEDORA_USER': 'username',
+        'FEDORA_PASSWORD': 'password',
+    }
+)
 ```
 
 ```python

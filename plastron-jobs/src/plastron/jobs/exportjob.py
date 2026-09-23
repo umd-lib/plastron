@@ -110,11 +110,7 @@ class Stopwatch:
 
     def now(self) -> dict[str, float]:
         now = datetime.now(timezone.utc).timestamp()
-        return {
-            'started': self._start,
-            'now': now,
-            'elapsed': now - self._start
-        }
+        return {'started': self._start, 'now': now, 'elapsed': now - self._start}
 
 
 class FileSize:
@@ -150,7 +146,9 @@ class ExportJob(Job):
             # all items that evaluate to true
             self.mime_type_filter = None
 
-    def get_page_files(self, resource: PCDMObjectResource, item_dir: str | None = None) -> tuple[list[FileSpec], FileSize]:
+    def get_page_files(
+        self, resource: PCDMObjectResource, item_dir: str | None = None
+    ) -> tuple[list[FileSpec], FileSize]:
         if not self.export_binaries:
             return [], FileSize(0)
 
@@ -162,7 +160,9 @@ class ExportJob(Job):
 
         return files, total_size
 
-    def get_item_files(self, resource: PCDMObjectResource, item_dir: str | None = None) -> tuple[list[FileSpec], FileSize]:
+    def get_item_files(
+        self, resource: PCDMObjectResource, item_dir: str | None = None
+    ) -> tuple[list[FileSpec], FileSize]:
         if not self.export_binaries:
             return [], FileSize(0)
 
@@ -284,7 +284,7 @@ class ExportJob(Job):
         try:
             serializer.finish()
         except EmptyItemListError:
-            logger.error("No items could be exported; skipping writing file")
+            logger.error('No items could be exported; skipping writing file')
 
         logger.info(f'Exported {count["exported"]} of {count["total"]} items')
 

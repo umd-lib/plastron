@@ -14,6 +14,7 @@ def rdf_class(*types):
     def add_types(cls):
         cls.rdf_types.update(types)
         return cls
+
     return add_types
 
 
@@ -123,6 +124,7 @@ def data_property(name, uri, datatype=None):
     def add_property(cls):
         cls.add_data_property(name, uri, datatype)
         return cls
+
     return add_property
 
 
@@ -130,6 +132,7 @@ def object_property(name, uri, embed=False, obj_class=None):
     def add_property(cls):
         cls.add_object_property(name, uri, embed, obj_class)
         return cls
+
     return add_property
 
 
@@ -142,11 +145,7 @@ class Resource(metaclass=Meta):
     @classmethod
     def add_data_property(cls, name, uri, datatype=None):
         type_name = f'{cls.__name__}.{name}'
-        prop_type = type(type_name, (RDFDataProperty,), {
-            'name': name,
-            'uri': uri,
-            'datatype': datatype
-        })
+        prop_type = type(type_name, (RDFDataProperty,), {'name': name, 'uri': uri, 'datatype': datatype})
         cls.name_to_prop[name] = prop_type
         cls.uri_to_prop[uri, datatype] = prop_type
         cls.prop_types.append(prop_type)
@@ -154,12 +153,9 @@ class Resource(metaclass=Meta):
     @classmethod
     def add_object_property(cls, name, uri, embed=False, obj_class=None):
         type_name = f'{cls.__name__}.{name}'
-        prop_type = type(type_name, (RDFObjectProperty,), {
-            'name': name,
-            'uri': uri,
-            'is_embedded': embed,
-            'obj_class': obj_class
-        })
+        prop_type = type(
+            type_name, (RDFObjectProperty,), {'name': name, 'uri': uri, 'is_embedded': embed, 'obj_class': obj_class}
+        )
         cls.name_to_prop[name] = prop_type
         # object properties never have datatypes
         cls.uri_to_prop[uri, None] = prop_type
@@ -183,7 +179,7 @@ class Resource(metaclass=Meta):
             setattr(self, key, value)
 
     def read(self, graph):
-        for (s, p, o) in graph.triples((self.uri, None, None)):
+        for s, p, o in graph.triples((self.uri, None, None)):
             datatype = o.datatype if isinstance(o, Literal) else None
             if (p, datatype) in self.uri_to_prop:
                 prop_type = self.uri_to_prop[p, datatype]
@@ -210,7 +206,7 @@ class Resource(metaclass=Meta):
         if name in self.name_to_prop:
             return self.props[name]
         else:
-            raise AttributeError(f"No predicate mapped to {name}")
+            raise AttributeError(f'No predicate mapped to {name}')
 
     def __setattr__(self, name, value):
         if name in self.name_to_prop:
@@ -227,12 +223,10 @@ class Resource(metaclass=Meta):
         return [prop for prop in self.props.values()]
 
     def data_properties(self):
-        return [prop for prop in self.props.values() if isinstance(prop,
-                                                                   RDFDataProperty)]
+        return [prop for prop in self.props.values() if isinstance(prop, RDFDataProperty)]
 
     def object_properties(self):
-        return [prop for prop in self.props.values() if isinstance(prop,
-                                                                   RDFObjectProperty)]
+        return [prop for prop in self.props.values() if isinstance(prop, RDFObjectProperty)]
 
     def embedded_objects(self):
         for prop in [prop for prop in self.object_properties() if prop.is_embedded]:
@@ -251,7 +245,7 @@ class Resource(metaclass=Meta):
         graph = Graph(namespace_manager=nsm)
 
         for prop in self.properties():
-            for (s, p, o) in prop.triples(self.uri):
+            for s, p, o in prop.triples(self.uri):
                 graph.add((s, p, o))
 
         # add graphs for all objects that should be embedded in the graph
@@ -263,7 +257,7 @@ class Resource(metaclass=Meta):
 
         # any triples that were loaded from the source graph but that aren't
         # mapped to specific Python attributes
-        for (s, p, o) in self.unmapped_triples:
+        for s, p, o in self.unmapped_triples:
             graph.add((subject, p, o))
 
         return graph

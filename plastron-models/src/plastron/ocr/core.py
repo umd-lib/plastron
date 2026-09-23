@@ -19,6 +19,7 @@ class XYWH(NamedTuple):
 
     ```
     """
+
     x: int
     """X-axis coordinate of the top-left corner of the region"""
     y: int
@@ -61,6 +62,7 @@ class BBox(NamedTuple):
 
     ```
     """
+
     x1: int
     """X-axis coordinate of the top-left corner of the region"""
     y1: int
@@ -98,6 +100,7 @@ class Scale(NamedTuple):
     * `mm10` (1/10 of a millimeter)
     * `pixel`
     """
+
     x: float
     """Horizontal scaling factor"""
     y: float
@@ -145,6 +148,7 @@ class OCRResource:
     * `get_block_node()`
     * `get_block()`
     """
+
     def __iter__(self) -> Iterator[B]:
         return self.blocks
 
@@ -243,6 +247,7 @@ class BlockRegion(RegionBase):
 class LineRegion(RegionBase):
     """Base class for classes representing a single line in an OCR
     resource (e.g., ALTO `TextLine` or hOCR `ocr_line`)."""
+
     def __str__(self):
         return ' '.join(str(w) for w in self.words())
 
@@ -273,6 +278,7 @@ class LineRegion(RegionBase):
 class WordRegion(RegionBase):
     """Base class for classes representing a single word within the
     OCR resource."""
+
     def __str__(self):
         return self.content
 

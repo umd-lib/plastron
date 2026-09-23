@@ -70,7 +70,7 @@ def test_auth_factory_fedora_user(get_request):
     session = Session()
     session.auth = auth
     r = session.prepare_request(get_request)
-    basic_credentials = b64encode(f"{config['FEDORA_USER']}:{config['FEDORA_PASSWORD']}".encode()).decode()
+    basic_credentials = b64encode(f'{config["FEDORA_USER"]}:{config["FEDORA_PASSWORD"]}'.encode()).decode()
     assert r.headers['Authorization'] == f'Basic {basic_credentials}'
 
 

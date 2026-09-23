@@ -136,13 +136,12 @@ def mock_repo(endpoint):
             '456',
             'http://digital-local/bar',
         ),
-    ]
+    ],
 )
 def test_existing_handle(mock_repo, fcrepo_path, existing_handle, expected_suffix, expected_url):
     mock_client = MockHandleClient()  # resolver={existing_handle.hdl_uri: existing_handle})
     resource = PublishableResource(
-        repo=mock_repo(path=fcrepo_path, handle=existing_handle.hdl_uri),
-        path=fcrepo_path
+        repo=mock_repo(path=fcrepo_path, handle=existing_handle.hdl_uri), path=fcrepo_path
     ).read()
     handle = resource.publish(mock_client, expected_url)
     assert handle.suffix == expected_suffix

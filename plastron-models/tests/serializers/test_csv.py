@@ -38,7 +38,7 @@ from plastron.serializers.csv import unflatten
             ),
             {'PUBLISH': 'True', 'HIDDEN': 'True', 'Presentation Set': 'http://vocab.lib.umd.edu/set#test'},
         ),
-    ]
+    ],
 )
 def test_write(resource, expected_values):
     serializer = CSVSerializer()

@@ -34,10 +34,10 @@ class ValidationFailed(Exception):
 
 
 def update(
-        resource: RepositoryResource,
-        sparql_update: str,
-        model_class: type[RDFResourceBase] | None = None,
-        dry_run: bool = False,
+    resource: RepositoryResource,
+    sparql_update: str,
+    model_class: type[RDFResourceBase] | None = None,
+    dry_run: bool = False,
 ) -> dict[str, str]:
     """Update a single resource using a SPARQL Update Query."""
     if model_class is not None:
@@ -95,20 +95,11 @@ class UpdateJob:
         if self.completed is None:
             self.completed = NullLog()
 
-        logger.debug(
-            f'SPARQL Update query:\n'
-            f'====BEGIN====\n'
-            f'{self.sparql_update}\n'
-            f'=====END====='
-        )
+        logger.debug(f'SPARQL Update query:\n====BEGIN====\n{self.sparql_update}\n=====END=====')
         if self.dry_run:
             logger.info('Dry run enabled, no actual updates will take place')
 
-        stats = {
-            'updated': [],
-            'invalid': defaultdict(list),
-            'errors': defaultdict(list)
-        }
+        stats = {'updated': [], 'invalid': defaultdict(list), 'errors': defaultdict(list)}
         for uri in self.uris:
             with context(repo=self.repo, use_transactions=self.use_transactions, dry_run=self.dry_run):
                 for resource in self.repo[uri].walk(traverse=self.traverse):
@@ -138,10 +129,7 @@ class UpdateJob:
         else:
             state = 'update_incomplete'
 
-        return {
-            'type': state,
-            'stats': stats
-        }
+        return {'type': state, 'stats': stats}
 
 
 def get_title_string(graph, separator='; '):

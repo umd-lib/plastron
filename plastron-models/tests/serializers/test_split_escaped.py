@@ -13,7 +13,7 @@ from plastron.serializers.csv import split_escaped
         ('\\\\foo|bar|baz\\|flip;a;b\\;c', ';', ['\\foo|bar|baz|flip', 'a', 'b;c']),
         (None, '|', []),
         ('', '|', []),
-    ]
+    ],
 )
 def test_split_escaped(string, separator, expected):
     assert split_escaped(string, separator) == expected

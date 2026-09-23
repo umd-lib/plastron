@@ -100,7 +100,7 @@ def get_mock_context(obj, path):
         spec=PlastronContext,
         repo=mock_repo,
         handle_client=MockHandleClient(),
-        get_public_url=lambda res: res.url.replace('fcrepo-local:8080/fcrepo/rest', 'digital-local')
+        get_public_url=lambda res: res.url.replace('fcrepo-local:8080/fcrepo/rest', 'digital-local'),
     )
 
 

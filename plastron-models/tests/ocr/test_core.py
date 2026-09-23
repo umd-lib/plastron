@@ -26,7 +26,7 @@ def test_bbox_to_xywh():
     [
         (XYWH(x=10, y=25, w=100, h=20), '10,25,100,20'),
         (BBox(x1=50, y1=10, x2=400, y2=70), '50,10,400,70'),
-    ]
+    ],
 )
 def test_stringify(region, expected_string):
     assert str(region) == expected_string
@@ -41,7 +41,7 @@ def test_stringify(region, expected_string):
         ('inch1200', (400, 400), Scale(1 / 3, 1 / 3)),
         ('mm10', (508, 508), Scale(2.0, 2.0)),
         ('pixel', (300, 300), Scale(1, 1)),
-    ]
+    ],
 )
 def test_get_scale(unit, image_resolution, expected_scale):
     assert Scale.from_resolution(image_resolution, unit) == expected_scale

@@ -16,42 +16,31 @@ logger = logging.getLogger(__name__)
 
 def configure_cli(subparsers):
     parser = subparsers.add_parser(
-        name='delete',
-        aliases=['del', 'rm'],
-        description='Delete objects from the repository'
+        name='delete', aliases=['del', 'rm'], description='Delete objects from the repository'
     )
     parser.add_argument(
-        '-R', '--recursive',
-        help='Delete additional objects found by traversing the given predicate(s)',
-        action='store'
+        '-R', '--recursive', help='Delete additional objects found by traversing the given predicate(s)', action='store'
     )
     parser.add_argument(
-        '-d', '--dry-run',
-        help='Simulate a delete without modifying the repository',
-        action='store_true'
+        '-d', '--dry-run', help='Simulate a delete without modifying the repository', action='store_true'
     )
     parser.add_argument(
-        '--no-transactions', '--no-txn',
+        '--no-transactions',
+        '--no-txn',
         help='run the update without using transactions',
         action='store_false',
-        dest='use_transactions'
+        dest='use_transactions',
     )
+    parser.add_argument('--completed', help='file recording the URIs of deleted resources', action='store')
     parser.add_argument(
-        '--completed',
-        help='file recording the URIs of deleted resources',
-        action='store'
-    )
-    parser.add_argument(
-        '-f', '--file',
+        '-f',
+        '--file',
         dest='uris_file',
         type=FileType(mode='r'),
         help='File containing a list of URIs to delete',
-        action='store'
+        action='store',
     )
-    parser.add_argument(
-        'uris', nargs='*',
-        help='Repository URIs to be deleted.'
-    )
+    parser.add_argument('uris', nargs='*', help='Repository URIs to be deleted.')
     parser.set_defaults(cmd_name='delete')
 
 
@@ -85,11 +74,13 @@ class Command(BaseCommand):
                             continue
                         resource.delete()
                         if completed_log is not None:
-                            completed_log.append({
-                                'uri': resource.url,
-                                'title': str(title),
-                                'timestamp': datetime.now(timezone.utc).isoformat('T'),
-                            })
+                            completed_log.append(
+                                {
+                                    'uri': resource.url,
+                                    'title': str(title),
+                                    'timestamp': datetime.now(timezone.utc).isoformat('T'),
+                                }
+                            )
                 except RepositoryError as e:
                     if isinstance(e.__cause__, ClientError) and e.__cause__.status_code in (404, 410):
                         # not a problem to try and delete something that is not there

@@ -10,10 +10,7 @@ logger = logging.getLogger(__name__)
 
 
 def configure_cli(subparsers):
-    parser = subparsers.add_parser(
-        name='attach',
-        description='Attach a binary to a resource in the repository'
-    )
+    parser = subparsers.add_parser(name='attach', description='Attach a binary to a resource in the repository')
     parser.add_argument(
         '--binary-file',
         help='local path to the binary file',
@@ -53,7 +50,14 @@ class Command(BaseCommand):
         )
 
 
-def attach(ctx, location: str, binary_filename: str, slug: str | None = None, mime_type: str | None = None, usage: str | None = None):
+def attach(
+    ctx,
+    location: str,
+    binary_filename: str,
+    slug: str | None = None,
+    mime_type: str | None = None,
+    usage: str | None = None,
+):
     repo: Repository = ctx.obj.repo
     try:
         resource = repo.get_resource(location, PCDMFileBearingResource).read()

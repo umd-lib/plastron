@@ -312,10 +312,10 @@ class ContainerResource(RepositoryResource):
     """An [LDP Container](https://www.w3.org/TR/ldp/#ldpc) resource."""
 
     def create_child(
-            self,
-            resource_class: type[ResourceType] = RepositoryResource,
-            description: RDFResourceType = None,
-            **kwargs,
+        self,
+        resource_class: type[ResourceType] = RepositoryResource,
+        description: RDFResourceType = None,
+        **kwargs,
     ) -> ResourceType:
         if description is not None:
             # To create the resource and metadata at the same time (when the URI is not known),

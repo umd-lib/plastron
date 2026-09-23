@@ -27,7 +27,7 @@ def broker(server_address, shared_datadir) -> Broker:
             'JOB_STATUS': '/queue/plastron.jobs.status',
             'SYNCHRONOUS_JOBS': '/queue/plastron.jobs.synchronous',
             'REINDEXING': '/queue/reindex',
-        }
+        },
     )
 
 

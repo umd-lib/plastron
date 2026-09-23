@@ -25,8 +25,8 @@ def get_access_uri(access) -> URIRef | None:
 
 
 def importcommand(
-        context: PlastronContext,
-        message: PlastronCommandMessage,
+    context: PlastronContext,
+    message: PlastronCommandMessage,
 ) -> Generator[dict[str, Any], None, dict[str, Any]]:
     """
     Performs the import
@@ -62,7 +62,7 @@ def importcommand(
 
     if job_id is None:
         # TODO: generate a more unique id? add in user and hostname?
-        job_id = f"import-{datetimestamp()}"
+        job_id = f'import-{datetimestamp()}'
 
     config = context.config.get('COMMANDS', {}).get('IMPORT', {})
     jobs = Jobs(directory=config.get('JOBS_DIR', 'jobs'))

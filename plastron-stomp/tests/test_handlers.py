@@ -51,12 +51,13 @@ def mock_future_failure():
         future = MagicMock(spec=Future)
         future.exception.return_value = exception
         return future
+
     return _mock_future
 
 
 def test_successful_call_removes_inbox_and_outbox_entries(mock_listener, mock_future, incoming_message):
     job_id = incoming_message.job_id
-    result = PlastronMessage(headers={'PlastronJobId': job_id}, body="Success!")
+    result = PlastronMessage(headers={'PlastronJobId': job_id}, body='Success!')
     future = mock_future(result)
 
     # Handle the incoming message
@@ -107,7 +108,7 @@ def test_handler_preserves_response_on_exception(mock_listener, mock_future, inc
     mock_destination.send.side_effect = StompException
     mock_listener.broker['JOB_STATUS'] = mock_destination
 
-    result = PlastronMessage(headers={'PlastronJobId': job_id}, body="Success!")
+    result = PlastronMessage(headers={'PlastronJobId': job_id}, body='Success!')
     future = mock_future(result)
 
     # Handle the incoming message

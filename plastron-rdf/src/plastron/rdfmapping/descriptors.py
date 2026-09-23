@@ -15,12 +15,12 @@ OBJECT_CLASSES = {}
 
 class Property:
     def __init__(
-            self,
-            predicate: URIRef,
-            required: bool = False,
-            repeatable: bool = False,
-            values_from: Container | None = None,
-            validate: Callable[[Any], bool] | None = None,
+        self,
+        predicate: URIRef,
+        required: bool = False,
+        repeatable: bool = False,
+        values_from: Container | None = None,
+        validate: Callable[[Any], bool] | None = None,
     ):
         self.predicate = predicate
         self.required = required
@@ -61,14 +61,14 @@ class Property:
 
 class ObjectProperty(Property):
     def __init__(
-            self,
-            predicate: URIRef,
-            required: bool = False,
-            repeatable: bool = False,
-            values_from: Container | None = None,
-            validate: Callable[[Any], bool] | None = None,
-            cls: type | str | None = None,
-            embed: bool = False,
+        self,
+        predicate: URIRef,
+        required: bool = False,
+        repeatable: bool = False,
+        values_from: Container | None = None,
+        validate: Callable[[Any], bool] | None = None,
+        cls: type | str | None = None,
+        embed: bool = False,
     ):
         super().__init__(predicate, required, repeatable, values_from, validate)
         self.object_class = cls
@@ -100,13 +100,13 @@ class ObjectProperty(Property):
 
 class DataProperty(Property):
     def __init__(
-            self,
-            predicate: URIRef,
-            required: bool = False,
-            repeatable: bool = False,
-            values_from: Container | None = None,
-            validate: Callable[[Any], bool] | None = None,
-            datatype: URIRef = None,
+        self,
+        predicate: URIRef,
+        required: bool = False,
+        repeatable: bool = False,
+        values_from: Container | None = None,
+        validate: Callable[[Any], bool] | None = None,
+        datatype: URIRef = None,
     ):
         super().__init__(predicate, required, repeatable, values_from, validate)
         self.datatype = datatype

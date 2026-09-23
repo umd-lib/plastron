@@ -7,15 +7,9 @@ from plastron.cli.commands import BaseCommand
 
 def configure_cli(subparsers):
     parser = subparsers.add_parser(
-        name='verify',
-        description="Verify item URI's are indexed in Solr and display URI's that aren't"
+        name='verify', description="Verify item URI's are indexed in Solr and display URI's that aren't"
     )
-    parser.add_argument(
-        '-l', '--log',
-        help='completed log file from an import job',
-        action='store',
-        default=None
-    )
+    parser.add_argument('-l', '--log', help='completed log file from an import job', action='store', default=None)
 
     parser.set_defaults(cmd_name='verify')
 
@@ -28,10 +22,10 @@ class Command(BaseCommand):
                 reader = csv.DictReader(csvfile)
 
                 for item in reader:
-                    query = self.context.solr.search(f'id:\"{item["uri"]}\"')
+                    query = self.context.solr.search(f'id:"{item["uri"]}"')
 
                     if len(query) == 0:
-                        invalid_items.append(item["uri"])
+                        invalid_items.append(item['uri'])
         except OSError as e:
             raise RuntimeError(f'Unable to read {args.log}: {e}')
 
@@ -40,4 +34,4 @@ class Command(BaseCommand):
             for item in invalid_items:
                 print(item)
         else:
-            logging.info("All URIs in the mapfile are indexed!")
+            logging.info('All URIs in the mapfile are indexed!')

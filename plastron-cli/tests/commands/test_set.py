@@ -23,7 +23,7 @@ from plastron.repo import Repository, RepositoryResource
             {
                 'rdf_type': {URIRef('http://xmlns.com/foaf/0.1/Agent')},
                 'label': {Literal('foobar')},
-            }
+            },
         ),
         (
             RDFResource,
@@ -35,9 +35,9 @@ from plastron.repo import Repository, RepositoryResource
             {
                 'rdf_type': {URIRef('http://xmlns.com/foaf/0.1/Agent')},
                 'label': {Literal('foo'), Literal('bar')},
-            }
+            },
         ),
-    ]
+    ],
 )
 def test_get_new_values(model_class, fields_to_set, expected_values):
     assert get_new_values(model_class, fields_to_set) == expected_values
@@ -77,7 +77,6 @@ def test_get_new_values(model_class, fields_to_set, expected_values):
             False,
         ),
     ],
-
 )
 def test_set_fields(monkeypatch, caplog, fields_to_set, expected_log_message, should_update):
     caplog.set_level(logging.INFO)

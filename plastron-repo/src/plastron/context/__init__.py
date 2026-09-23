@@ -78,7 +78,9 @@ class PlastronContext:
         return Repository(client=self.client)
 
     @contextmanager
-    def repo_configuration(self, delegated_user: str | None = None, ua_string: str | None = None) -> Generator['PlastronContext']:
+    def repo_configuration(
+        self, delegated_user: str | None = None, ua_string: str | None = None
+    ) -> Generator['PlastronContext']:
         if self.args is not None:
             args = Namespace(**{**self.args.__dict__, 'delegated_user': delegated_user, 'ua_string': ua_string})
         else:

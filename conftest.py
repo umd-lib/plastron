@@ -28,7 +28,7 @@ def pytest_configure(config):
         URIRef('http://vocab.lib.umd.edu/form#'): 'form.ttl',
         URIRef('http://vocab.lib.umd.edu/rightsStatement#'): 'rightsStatement.ttl',
         URIRef('http://vocab.lib.umd.edu/set#'): 'set.ttl',
-        URIRef('http://vocab.lib.umd.edu/termsOfUse#'): 'termsOfUse.ttl'
+        URIRef('http://vocab.lib.umd.edu/termsOfUse#'): 'termsOfUse.ttl',
     }
 
 
@@ -38,4 +38,5 @@ def monkeypatch_request(monkeypatch):
         if isinstance(response, type):
             response = response()
         monkeypatch.setattr(requests.Session, 'request', lambda *args, **kwargs: response)
+
     return _monkeypatch_request

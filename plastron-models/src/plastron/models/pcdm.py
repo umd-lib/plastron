@@ -1,5 +1,5 @@
 from plastron.models.ore import AggregationMixin
-from plastron.namespaces import pcdm, dcterms, ebucore, premis, xsd
+from plastron.namespaces import dcterms, ebucore, pcdm, premis, xsd
 from plastron.rdfmapping.decorators import rdf_type
 from plastron.rdfmapping.descriptors import DataProperty, ObjectProperty
 from plastron.rdfmapping.resources import RDFResource

@@ -1,7 +1,7 @@
 import re
 
 import pytest
-from rdflib import Graph, URIRef, Literal
+from rdflib import Graph, Literal, URIRef
 
 from plastron.client.utils import build_sparql_update
 

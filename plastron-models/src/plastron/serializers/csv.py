@@ -7,17 +7,17 @@ from itertools import zip_longest
 from pathlib import Path
 from typing import IO, NamedTuple, TextIO, TypeVar
 
+from rdflib import Literal, URIRef
+from urlobject import URLObject
+
 from plastron.files import FileSpec
+from plastron.models import ContentModeledResource
 from plastron.models.fedora import FedoraResource
+from plastron.namespaces import umdaccess
 from plastron.rdfmapping.descriptors import DataProperty, ObjectProperty
 from plastron.rdfmapping.embed import EmbeddedObject
 from plastron.rdfmapping.properties import RDFDataProperty, RDFObjectProperty
 from plastron.rdfmapping.resources import RDFResource, RDFResourceBase
-from rdflib import Literal, URIRef
-from urlobject import URLObject
-
-from plastron.models import ContentModeledResource
-from plastron.namespaces import umdaccess
 
 
 def not_empty(value: str) -> bool:
@@ -137,6 +137,7 @@ def flatten_headers(header_map: dict[str, str | dict], prefix: str = '') -> dict
 
 class ColumnHeader(NamedTuple):
     """A column header with an optional language."""
+
     label: str
     """Column header"""
     language: str = None
@@ -244,11 +245,7 @@ def get_column_headers(headers: Iterable[str], base_header: str) -> list[ColumnH
     []
     ```
     """
-    return [
-        ColumnHeader.from_string(h)
-        for h in headers
-        if h == base_header or re.match(base_header + r' \[.*]$', h)
-    ]
+    return [ColumnHeader.from_string(h) for h in headers if h == base_header or re.match(base_header + r' \[.*]$', h)]
 
 
 def get_embedded_params(row: Mapping[str, str], header_labels: Iterable[str]) -> list[dict[str, str]]:
@@ -293,7 +290,7 @@ def unflatten(
     row_data: Mapping[str, str],
     resource_class: type[RDFResourceBase],
     header_map: Mapping[str, str | dict],
-    index: Mapping[str, Mapping[int, str]] = None,
+    index: Mapping[str, Mapping[int, str]] | None = None,
 ) -> dict[str, list[Literal | URIRef | EmbeddedObject]]:
     """Transform a mapping of column headers to values (such as would be returned by a
     `csv.DictReader`) into a dictionary of parameters that can be passed to the constructor
@@ -307,11 +304,13 @@ def unflatten(
             for n, sub_row in enumerate(get_embedded_params(row_data, header_labels=header.values())):
                 embedded_params = unflatten(sub_row, descriptor.object_class, header, index)
                 if any(embedded_params.values()):
-                    params[attr].append(EmbeddedObject(
-                        cls=descriptor.object_class,
-                        fragment_id=index.get(attr, {}).get(n, None),
-                        **embedded_params,
-                    ))
+                    params[attr].append(
+                        EmbeddedObject(
+                            cls=descriptor.object_class,
+                            fragment_id=index.get(attr, {}).get(n, None),
+                            **embedded_params,
+                        )
+                    )
         else:
             for column_header in get_column_headers(row_data.keys(), header):
                 values = filter(not_empty, split_escaped(row_data.get(str(column_header)), separator='|'))
@@ -339,7 +338,7 @@ def get_literal(column_header: ColumnHeader, descriptor: DataProperty, input_val
     m = re.match(r'^\[@(\w+)]', input_value)
     if m:
         language = m[1]
-        value = input_value[len(language) + 3:]
+        value = input_value[len(language) + 3 :]
     else:
         language = column_header.language
         value = input_value
@@ -355,9 +354,8 @@ def get_literal(column_header: ColumnHeader, descriptor: DataProperty, input_val
 def ensure_text_mode(file: IO):
     if 'b' in file.mode:
         # re-open in text mode
-        fh = open(file.fileno(), mode=file.mode.replace('b', ''), closefd=False)
-        yield fh
-        fh.close()
+        with open(file.fileno(), mode=file.mode.replace('b', ''), closefd=False) as fh:
+            yield fh
     else:
         # file is already in text mode
         yield file
@@ -367,9 +365,8 @@ def ensure_text_mode(file: IO):
 def ensure_binary_mode(file: IO):
     if 'b' not in file.mode:
         # re-open in binary mode
-        fh = open(file.fileno(), mode=file.mode + 'b', closefd=False)
-        yield fh
-        fh.close()
+        with open(file.fileno(), mode=file.mode + 'b', closefd=False) as fh:
+            yield fh
     else:
         # file is already in binary mode
         yield file
@@ -409,11 +406,9 @@ T = TypeVar('T', ContentModeledResource, RDFResource)
 class CSVSerializer:
     """Serializer that encodes metadata records with a defined content model as CSV files."""
 
-    SYSTEM_HEADERS = [
-        'URI', 'PUBLIC URI', 'CREATED', 'MODIFIED', 'INDEX', 'FILES', 'ITEM_FILES', 'PUBLISH', 'HIDDEN'
-    ]
+    SYSTEM_HEADERS = ['URI', 'PUBLIC URI', 'CREATED', 'MODIFIED', 'INDEX', 'FILES', 'ITEM_FILES', 'PUBLISH', 'HIDDEN']
 
-    def __init__(self, directory: str | Path = None):
+    def __init__(self, directory: str | Path | None = None):
         self.directory = Path(directory) if directory is not None else Path.cwd()
         """Destination directory for the CSV file(s)"""
 
@@ -433,9 +428,9 @@ class CSVSerializer:
     def write(
         self,
         resource: T,
-        files: Iterable[FileSpec] = None,
-        item_files: Iterable[FileSpec] = None,
-        public_url: str = None,
+        files: Iterable[FileSpec] | None = None,
+        item_files: Iterable[FileSpec] | None = None,
+        public_url: str | None = None,
     ) -> dict[str, str]:
         """
         Serializes the given resource as a CSV row using the `flatten()` function. The resulting row is
@@ -458,7 +453,7 @@ class CSVSerializer:
         sheet = self.sheets[resource_class]
 
         columns = flatten(resource, resource_class.HEADER_MAP)
-        for header in columns.keys():
+        for header in columns:
             if header.language is not None:
                 sheet.extra_headers[header.label].add(str(header))
 
@@ -482,15 +477,12 @@ class CSVSerializer:
 
         return row
 
-    LANGUAGE_NAMES = {
-        'ja': 'Japanese',
-        'ja-latn': 'Japanese (Romanized)'
-    }
+    LANGUAGE_NAMES = {'ja': 'Japanese', 'ja-latn': 'Japanese (Romanized)'}
     LANGUAGE_CODES = {name: code for code, name in LANGUAGE_NAMES.items()}
 
     DATATYPE_NAMES = {
         URIRef('http://id.loc.gov/datatypes/edtf'): 'EDTF',
-        URIRef('http://www.w3.org/2001/XMLSchema#date'): 'Date'
+        URIRef('http://www.w3.org/2001/XMLSchema#date'): 'Date',
     }
     DATATYPE_URIS = {name: uri for uri, name in DATATYPE_NAMES.items()}
 

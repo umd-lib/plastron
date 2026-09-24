@@ -7,7 +7,7 @@ from iso639.language import Language, LanguageNotFoundError
 def is_edtf_formatted(value):
     """an EDTF-formatted date"""
     # Allow blank values
-    if str(value).strip() == "":
+    if str(value).strip() == '':
         return True
     return is_valid_edtf(str(value))
 

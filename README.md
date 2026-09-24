@@ -129,12 +129,27 @@ This allows for in-place editing of Plastron's source code in the git
 repository (i.e., it is not locked away in a Python site-packages directory
 structure).
 
+### Code Formatting
+
+Plastron uses [ruff] for code linting and formatting.
+
+```zsh
+# run linting check
+uv run ruff check
+
+# preview formatting changes
+uv run ruff format --diff
+
+# do automatic formatting changes
+uv run ruff format
+```
+
 ## Testing
 
 Plastron uses the [pytest] test framework for its tests.
 
 ```bash
-pytest
+uv run pytest
 ```
 
 See the [testing documentation](docs/testing.md) for more
@@ -175,4 +190,5 @@ limitations (Apache 2.0).
 [uv]: https://docs.astral.sh/uv/
 [pytest]: https://pypi.org/project/pytest/
 [pyenv]: https://github.com/pyenv/pyenv
+[ruff]: https://docs.astral.sh/ruff/
 [pdoc]: https://pdoc.dev/

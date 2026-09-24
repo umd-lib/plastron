@@ -1,8 +1,9 @@
 import logging
 from collections import Counter
+from collections.abc import Generator, Mapping
 from dataclasses import dataclass
 from enum import Enum
-from typing import Generator, Any, Mapping
+from typing import Any
 
 from plastron.context import PlastronContext
 from plastron.jobs import Job
@@ -85,7 +86,7 @@ class PublicationJob(Job):
                 'count': count,
                 'result': result,
                 'state': 'publish_in_progress',
-                'progress': int(n / count['total'] * 100)
+                'progress': int(n / count['total'] * 100),
             }
 
         state = PublicationAction.get_final_state(self.action, count)

@@ -14,25 +14,25 @@ logger = logging.getLogger(__name__)
 
 
 def configure_cli(subparsers):
-    parser = subparsers.add_parser(
-        name='reindex',
-        description='Reindex objects in the repository'
-    )
+    parser = subparsers.add_parser(name='reindex', description='Reindex objects in the repository')
     parser.add_argument(
-        '-R', '--recursive',
+        '-R',
+        '--recursive',
         help='reindex additional objects found by traversing the given predicate(s)',
         action='store',
-        metavar='PREDICATES'
+        metavar='PREDICATES',
     )
     parser.add_argument(
-        '-i', '--index',
+        '-i',
+        '--index',
         help='configuration key for the index to target; defaults to "all"',
         action='store',
         metavar='KEY',
         default='all',
     )
     parser.add_argument(
-        'uris', nargs='*',
+        'uris',
+        nargs='*',
         help='URI of repository object to reindex',
         metavar='uri',
     )
@@ -46,8 +46,7 @@ class Command(BaseCommand):
             return all_routing_headers[index_key]
         except KeyError as e:
             raise RuntimeError(
-                f'"{e}" is not a recognized index routing name. '
-                f'Use one of: {", ".join(all_routing_headers.keys())}'
+                f'"{e}" is not a recognized index routing name. Use one of: {", ".join(all_routing_headers.keys())}'
             ) from e
 
     def __call__(self, args: Namespace):
@@ -65,28 +64,32 @@ class Command(BaseCommand):
                     logger.info(f'Reindexing {resource.url}')
                     if isinstance(resource, Tombstone):
                         logger.info(f'Resource {resource.url} has been removed, sending message to delete from indexes')
-                        indexing_queue.send(Message(
-                            headers={
-                                'CamelFcrepoEventName': 'delete',
-                                'CamelFcrepoUri': resource.url,
-                                'CamelFcrepoPath': resource.path,
-                                'CamelFcrepoUser': username,
-                                **routing_headers,
-                            },
-                            persistent='true',
-                        ))
+                        indexing_queue.send(
+                            Message(
+                                headers={
+                                    'CamelFcrepoEventName': 'delete',
+                                    'CamelFcrepoUri': resource.url,
+                                    'CamelFcrepoPath': resource.path,
+                                    'CamelFcrepoUser': username,
+                                    **routing_headers,
+                                },
+                                persistent='true',
+                            )
+                        )
                     else:
                         types = ','.join(resource.describe(RDFResource).rdf_type.values)
-                        reindexing_queue.send(Message(
-                            headers={
-                                'CamelFcrepoUri': resource.url,
-                                'CamelFcrepoPath': resource.path,
-                                'CamelFcrepoResourceType': types,
-                                'CamelFcrepoUser': username,
-                                **routing_headers,
-                            },
-                            persistent='true',
-                        ))
+                        reindexing_queue.send(
+                            Message(
+                                headers={
+                                    'CamelFcrepoUri': resource.url,
+                                    'CamelFcrepoPath': resource.path,
+                                    'CamelFcrepoResourceType': types,
+                                    'CamelFcrepoUser': username,
+                                    **routing_headers,
+                                },
+                                persistent='true',
+                            )
+                        )
 
             self.context.broker.disconnect()
         else:

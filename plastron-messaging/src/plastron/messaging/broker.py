@@ -1,6 +1,6 @@
 import logging
 from pathlib import Path
-from typing import NamedTuple, Optional
+from typing import NamedTuple
 
 from stomp import Connection11
 from stomp.exception import StompException
@@ -38,8 +38,8 @@ class Broker:
         self,
         server: ServerTuple,
         message_store_dir: Path | str,
-        destinations: Optional[dict[str, str]] = None,
-        public_uri_template: Optional[str] = None,
+        destinations: dict[str, str] | None = None,
+        public_uri_template: str | None = None,
         heartbeat: HeartbeatTuple = None,
     ):
         self.server = server
@@ -96,12 +96,7 @@ class Broker:
     def send(self, destination, headers=None, body='', **kwargs):
         if headers is None:
             headers = {}
-        self.connection.send(
-            destination=destination,
-            headers=headers,
-            body=body,
-            **kwargs
-        )
+        self.connection.send(destination=destination, headers=headers, body=body, **kwargs)
 
 
 class Destination:
@@ -117,7 +112,7 @@ class Destination:
         logger.debug(f'Message headers: {message.headers}')
         self.broker.connection.send(destination=self.name, headers=message.headers, body=message.body)
 
-    def subscribe(self, id: str, ack: str = 'auto', headers: dict = None, **kwargs):
+    def subscribe(self, id: str, ack: str = 'auto', headers: dict | None = None, **kwargs):
         self.broker.connection.subscribe(destination=self.name, id=id, ack=ack, headers=headers, **kwargs)
-        logger.info(f"Subscribed to {self.name}")
-        logger.debug(f"id={id} ack={ack} headers={headers} {kwargs}")
+        logger.info(f'Subscribed to {self.name}')
+        logger.debug(f'id={id} ack={ack} headers={headers} {kwargs}')

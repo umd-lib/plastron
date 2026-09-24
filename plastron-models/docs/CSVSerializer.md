@@ -50,15 +50,18 @@ from plastron.namespaces import dcterms, foaf
 from plastron.rdfmapping.descriptors import DataProperty, ObjectProperty
 from plastron.rdfmapping.resources import RDFResource
 
+
 class Person(RDFResource):
     name = DataProperty(foaf.name)
     homepage = ObjectProperty(foaf.homepage)
+
 
 class Book(RDFResource):
     title = DataProperty(dcterms.title)
     identifier = DataProperty(dcterms.identifier, repeatable=True)
     creator = ObjectProperty(dcterms.creator, repeatable=True, cls=Person)
-    
+
+
 header_map = {
     'title': 'Title',
     'identifier': 'Identifier',

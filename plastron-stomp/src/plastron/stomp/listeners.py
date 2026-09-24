@@ -1,14 +1,20 @@
 import importlib.metadata
 import logging
 import os
+from collections.abc import Callable, Generator, Iterator
 from concurrent.futures import ThreadPoolExecutor
-from typing import Any, Callable, Generator, Iterator
+from typing import Any
 
 from stomp.listener import ConnectionListener
 
 from plastron.context import PlastronContext
 from plastron.messaging.broker import Destination
-from plastron.messaging.messages import MessageBox, PlastronCommandMessage, PlastronMessage, PlastronResponseMessage
+from plastron.messaging.messages import (
+    MessageBox,
+    PlastronCommandMessage,
+    PlastronMessage,
+    PlastronResponseMessage,
+)
 from plastron.stomp.commands import get_command_module, get_module_name
 from plastron.stomp.handlers import AsynchronousResponseHandler
 from plastron.stomp.inbox_watcher import InboxWatcher
@@ -18,7 +24,12 @@ version = importlib.metadata.version('plastron-stomp')
 
 
 class CommandListener(ConnectionListener):
-    def __init__(self, context: PlastronContext, after_connected: Callable = None, after_disconnected: Callable = None):
+    def __init__(
+        self,
+        context: PlastronContext,
+        after_connected: Callable | None = None,
+        after_disconnected: Callable | None = None,
+    ):
         self.context = context
         self.broker = context.broker
         self.inbox = MessageBox(os.path.join(self.broker.message_store_dir, 'inbox'), PlastronCommandMessage)
@@ -37,7 +48,7 @@ class CommandListener(ConnectionListener):
 
         # first attempt to send anything in the outbox
         for message in self.outbox:
-            logger.info(f"Found response message for job {message.job_id} in outbox")
+            logger.info(f'Found response message for job {message.job_id} in outbox')
             # send the job completed message
             self.broker['JOB_STATUS'].send(message)
             logger.info(f'Sent response message for job {message.job_id}')
@@ -131,7 +142,8 @@ class MessageProcessor:
                         job_id=message.job_id,
                         status_url=message.status_url,
                         body=status,
-                    ))
+                    )
+                )
 
         logger.info(f'Job {message.job_id} complete')
 

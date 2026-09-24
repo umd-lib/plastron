@@ -1,27 +1,29 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 import importlib.metadata
 import logging
 import logging.config
 import os
 import sys
-from argparse import ArgumentParser, FileType
-from argparse import Namespace
-from datetime import datetime
+from argparse import ArgumentParser, FileType, Namespace
+from collections.abc import Iterable
+from datetime import datetime, timezone
 from importlib import import_module
 from pkgutil import iter_modules
-from typing import Iterable
 
 import yaml
-from rdflib import URIRef, Literal
+from rdflib import Literal, URIRef
 from rdflib.util import from_n3
 
 from plastron.cli import commands
 from plastron.context import PlastronContext
-from plastron.utils import DEFAULT_LOGGING_OPTIONS, envsubst, check_python_version, uri_or_curie
+from plastron.utils import (
+    DEFAULT_LOGGING_OPTIONS,
+    check_python_version,
+    envsubst,
+    uri_or_curie,
+)
 
 logger = logging.getLogger(__name__)
-now = datetime.utcnow().strftime('%Y%m%d%H%M%S')
+now = datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')
 version = importlib.metadata.version('plastron-cli')
 
 
@@ -31,11 +33,11 @@ def load_commands(subparsers):
     command_modules = {}
     for finder, name, ispkg in iter_modules(commands.__path__):
         module_name = name
-        if module_name == "importcommand":
+        if module_name == 'importcommand':
             # Special case handling for "importcommand", because "import" is
             # a Python reserved word that is not usable as a module name,
             # while we want "import" to be the Plastron command
-            name = "import"
+            name = 'import'
 
         module = import_module(commands.__name__ + '.' + module_name)
         if hasattr(module, 'configure_cli'):
@@ -58,50 +60,28 @@ def get_uris(args: Namespace) -> Iterable[str]:
 def main():
     """Parse args and handle options."""
 
-    parser = ArgumentParser(
-        prog='plastron',
-        description='Batch operation tool for Fedora 4.'
-    )
+    parser = ArgumentParser(prog='plastron', description='Batch operation tool for Fedora 4.')
     parser.set_defaults(cmd_name=None)
 
     common_required = parser.add_mutually_exclusive_group(required=True)
     common_required.add_argument(
-        '-c', '--config',
-        help='Path to configuration file.',
-        action='store',
-        dest='config_file',
-        type=FileType('r')
+        '-c', '--config', help='Path to configuration file.', action='store', dest='config_file', type=FileType('r')
     )
-    common_required.add_argument(
-        '-V', '--version',
-        help='Print version and exit.',
-        action='version',
-        version=version
+    common_required.add_argument('-V', '--version', help='Print version and exit.', action='version', version=version)
+
+    parser.add_argument('-v', '--verbose', help='increase the verbosity of the status output', action='store_true')
+    parser.add_argument('-q', '--quiet', help='decrease the verbosity of the status output', action='store_true')
+    parser.add_argument(
+        '--on-behalf-of', help='delegate repository operations to this username', dest='delegated_user', action='store'
     )
 
     parser.add_argument(
-        '-v', '--verbose',
-        help='increase the verbosity of the status output',
-        action='store_true'
-    )
-    parser.add_argument(
-        '-q', '--quiet',
-        help='decrease the verbosity of the status output',
-        action='store_true'
-    )
-    parser.add_argument(
-        '--on-behalf-of',
-        help='delegate repository operations to this username',
-        dest='delegated_user',
-        action='store'
-    )
-
-    parser.add_argument(
-        '--batch-mode', '-b',
+        '--batch-mode',
+        '-b',
         help='specifies the use of batch user for interaction with fcrepo',
         dest='batch_mode',
         action='store',
-        default=False
+        default=False,
     )
 
     subparsers = parser.add_subparsers(title='commands')
@@ -133,7 +113,7 @@ def main():
     log_dirname = repo_config.get('LOG_DIR')
     if not os.path.isdir(log_dirname):
         os.makedirs(log_dirname)
-    log_filename = 'plastron.{0}.{1}.log'.format(args.cmd_name, now)
+    log_filename = f'plastron.{args.cmd_name}.{now}.log'
     logfile = os.path.join(log_dirname, log_filename)
     logging_options['handlers']['file']['filename'] = logfile
 
@@ -182,7 +162,7 @@ def print_header(args):
         title = '|     PLASTRON     |'
         bar = '+' + '=' * (len(title) - 2) + '+'
         spacer = '|' + ' ' * (len(title) - 2) + '|'
-        print('\n'.join(['', bar, spacer, title, spacer, bar, '']), file=sys.stderr)
+        print(f'\n{bar}\n{spacer}\n{title}\n{spacer}\n{bar}\n', file=sys.stderr)
 
 
 def print_footer(args):
@@ -191,7 +171,7 @@ def print_footer(args):
         print('\nScript complete. Goodbye!\n', file=sys.stderr)
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()
 
 

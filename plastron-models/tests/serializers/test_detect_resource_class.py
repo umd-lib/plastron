@@ -19,7 +19,7 @@ from plastron.serializers import detect_resource_class
         ([bibo.Letter], Letter),
         ([bibo.Issue], Issue),
         ([bibo.Image], Poster),
-    ]
+    ],
 )
 def test_detect_resource_class(rdf_types, expected_class):
     graph = Graph()

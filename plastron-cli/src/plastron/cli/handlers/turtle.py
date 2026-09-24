@@ -1,4 +1,4 @@
-""" A handler for loading sequenced assets from binaries & turtle metadata. """
+"""A handler for loading sequenced assets from binaries & turtle metadata."""
 
 import logging
 import os
@@ -6,12 +6,12 @@ import os
 import yaml
 from rdflib import Graph
 
-from plastron.repo import DataReadError
 from plastron.cli import ConfigError
 from plastron.namespaces import dcterms
 from plastron.rdf import pcdm, rdf
 from plastron.rdf.authority import create_authority
-from plastron.rdf.pcdm import get_file_object, Page
+from plastron.rdf.pcdm import Page, get_file_object
+from plastron.repo import DataReadError
 
 logger = logging.getLogger(__name__)
 
@@ -20,11 +20,10 @@ logger = logging.getLogger(__name__)
 # BATCH CLASS (FOR PAGED BINARIES PLUS RDF METADATA)
 # ============================================================================
 
+
 class Batch:
     def __init__(self, repo, config):
-        self.logger = logging.getLogger(
-            __name__ + '.' + self.__class__.__name__
-        )
+        self.logger = logging.getLogger(__name__ + '.' + self.__class__.__name__)
 
         self.collection = pcdm.Collection.from_repository(repo, config.collection_uri)
 
@@ -39,7 +38,7 @@ class Batch:
         # check for an existing file index
         file_index = os.path.join(config.data_dir, 'file_index.yml')
         if os.path.isfile(file_index):
-            self.logger.info('Found file index in {0}'.format(file_index))
+            self.logger.info(f'Found file index in {file_index}')
             with open(file_index, 'r') as index:
                 self.all_files = yaml.safe_load(index)
         else:
@@ -56,32 +55,33 @@ class Batch:
                     else:
                         self.all_files[f].append(os.path.join(root, f))
 
-            self.logger.info("Found {0} files with {1} unique filenames"
-                             .format(file_count, len(self.all_files)))
+            self.logger.info(f'Found {file_count} files with {len(self.all_files)} unique filenames')
 
             # save index to file
             with open(file_index, 'w') as index:
                 yaml.dump(self.all_files, index, default_flow_style=False)
 
         with open(config.batch_file, 'r') as f:
-            self.logger.info(
-                'Parsing the master metadata graph in {0}'.format(config.batch_file))
-            self.master_graph = Graph().parse(f, format="turtle")
+            self.logger.info(f'Parsing the master metadata graph in {config.batch_file}')
+            self.master_graph = Graph().parse(f, format='turtle')
 
         # get subject URIs that are http: or https: URIs
-        self.subjects = sorted(set([uri for uri in self.master_graph.subjects() if
-                                    str(uri).startswith('http:') or str(uri).startswith('https:')]))
+        self.subjects = sorted(
+            {
+                uri
+                for uri in self.master_graph.subjects()
+                if str(uri).startswith('http:') or str(uri).startswith('https:')
+            }
+        )
 
         # get the master list of authority objects
         # keyed by the urn:uuid:... URI from the master graph
-        authority_subjects = set([uri for uri in self.master_graph.subjects()
-                                  if str(uri).startswith('urn:uuid:')])
-        self.authorities = {str(s): create_authority(self.master_graph, s)
-                            for s in authority_subjects}
+        authority_subjects = {uri for uri in self.master_graph.subjects() if str(uri).startswith('urn:uuid:')}
+        self.authorities = {str(s): create_authority(self.master_graph, s) for s in authority_subjects}
 
         self.length = len(self.subjects)
         self.count = 0
-        self.logger.info("Batch contains {0} items.".format(self.length))
+        self.logger.info(f'Batch contains {self.length} items.')
 
     def __iter__(self):
         return self
@@ -105,7 +105,7 @@ class BatchItem:
     def read_data(self):
         item_graph = Graph()
         add_props = []
-        for (s, p, o) in self.batch.master_graph.triples((self.subject, None, None)):
+        for s, p, o in self.batch.master_graph.triples((self.subject, None, None)):
             item_graph.add((s, p, o))
             if str(o) in self.batch.authorities:
                 # create an RDFObjectProperty for the triples with an
@@ -132,18 +132,18 @@ class BatchItem:
         parts = {}
 
         # Parse each filename in hasPart and allocate to correct location in item entry
-        for (s, p, o) in [(s, p, o) for (s, p, o) in item.unmapped_triples if p == dcterms.hasPart]:
+        for s, p, o in [(s, p, o) for (s, p, o) in item.unmapped_triples if p == dcterms.hasPart]:
             filename = str(o)
             # ensure exactly one path that is mapped from the basename
             if filename not in self.batch.all_files:
-                raise DataReadError('File {0} not found'.format(filename))
+                raise DataReadError(f'File {filename} not found')
             elif len(self.batch.all_files[filename]) > 1:
-                raise DataReadError('Filename {0} is not unique'.format(filename))
+                raise DataReadError(f'Filename {filename} is not unique')
 
             file_path = self.batch.all_files[filename][0]
 
             normalized = filename.replace('_', '-')
-            basename, ext = os.path.splitext(normalized)
+            basename, _ext = os.path.splitext(normalized)
             base_parts = basename.split('-')
 
             # handle files with no sequence id
@@ -157,8 +157,7 @@ class BatchItem:
                 else:
                     parts[page_no].append(file_path)
             else:
-                logger.warning(
-                    'Filename {0} does not match a known pattern'.format(filename))
+                logger.warning(f'Filename {filename} does not match a known pattern')
 
         # remove the dcterms:hasPart triples
         item.unmapped_triples = [(s, p, o) for (s, p, o) in item.unmapped_triples if p != dcterms.hasPart]
@@ -167,8 +166,8 @@ class BatchItem:
             item.add_file(get_file_object(path))
 
         # renumber the parts from 1
-        for (n, key) in enumerate(sorted(parts.keys()), 1):
-            page = Page(number=str(n), title=f"{item.title}, Page {n}")
+        for n, key in enumerate(sorted(parts.keys()), 1):
+            page = Page(number=str(n), title=f'{item.title}, Page {n}')
             for path in parts[key]:
                 page.add_file(get_file_object(path))
             item.add_member(page)

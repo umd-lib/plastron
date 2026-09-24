@@ -1,9 +1,7 @@
-from typing import Type, Dict
-
 from importlib_metadata import entry_points
 from rdflib import URIRef
 
-from plastron.rdfmapping.resources import RDFResourceBase, RDFResource
+from plastron.rdfmapping.resources import RDFResource, RDFResourceBase
 
 PLUGIN_GROUP = 'plastron.content_models'
 CONTENT_MODEL_CLASSES = entry_points(group=PLUGIN_GROUP)
@@ -22,17 +20,17 @@ class ModelClassNotFoundError(ModelClassError):
 class ContentModeledResource(RDFResourceBase):
     model_name: str
     is_top_level: bool = False
-    HEADER_MAP: Dict = None
+    HEADER_MAP: dict = None
 
 
-def get_model_from_name(model_name: str) -> Type[ContentModeledResource]:
+def get_model_from_name(model_name: str) -> type[ContentModeledResource]:
     try:
         return CONTENT_MODEL_CLASSES[model_name].load()
     except KeyError as e:
         raise ModelClassNotFoundError(model_name) from e
 
 
-def get_model_from_uri(rdf_type: URIRef) -> Type[ContentModeledResource]:
+def get_model_from_uri(rdf_type: URIRef) -> type[ContentModeledResource]:
     for plugin in CONTENT_MODEL_CLASSES:
         cls = plugin.load()
         if rdf_type in cls.default_values.get('rdf_type', set()):
@@ -40,7 +38,7 @@ def get_model_from_uri(rdf_type: URIRef) -> Type[ContentModeledResource]:
     raise ModelClassNotFoundError(str(rdf_type))
 
 
-def guess_model(resource: RDFResource) -> Type[ContentModeledResource]:
+def guess_model(resource: RDFResource) -> type[ContentModeledResource]:
     for plugin in CONTENT_MODEL_CLASSES:
         cls = plugin.load()
         if cls.default_values.get('rdf_type', set()) <= set(resource.rdf_type.values):

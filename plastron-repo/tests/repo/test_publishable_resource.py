@@ -4,7 +4,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from plastron.client import Endpoint, Client
+from plastron.client import Client, Endpoint
 from plastron.client.utils import TypedText
 from plastron.handles import HandleInfo, HandleServerError
 from plastron.namespaces import umdaccess
@@ -75,11 +75,11 @@ class MockHandleClient:
     def get_info(self, prefix: str, suffix: str) -> HandleInfo:
         return self.GET_HANDLE_LOOKUP.get(f'{prefix}/{suffix}', HandleInfo(exists=False))
 
-    def find_handle(self, repo_id: str, _repo: str = None) -> HandleInfo:
+    def find_handle(self, repo_id: str, _repo: str | None = None) -> HandleInfo:
         return self.FIND_HANDLE_LOOKUP.get(repo_id, HandleInfo(exists=False))
 
     @staticmethod
-    def create_handle(repo_id: str, url: str, prefix: str = None, _repo: str = None) -> HandleInfo:
+    def create_handle(repo_id: str, url: str, prefix: str | None = None, _repo: str | None = None) -> HandleInfo:
         if repo_id.endswith('NO_HANDLE'):
             raise HandleServerError('no handle')
         return HandleInfo(exists=True, prefix=prefix, suffix=str(randint(1000, 10000)), url=url)
@@ -136,13 +136,12 @@ def mock_repo(endpoint):
             '456',
             'http://digital-local/bar',
         ),
-    ]
+    ],
 )
 def test_existing_handle(mock_repo, fcrepo_path, existing_handle, expected_suffix, expected_url):
     mock_client = MockHandleClient()  # resolver={existing_handle.hdl_uri: existing_handle})
     resource = PublishableResource(
-        repo=mock_repo(path=fcrepo_path, handle=existing_handle.hdl_uri),
-        path=fcrepo_path
+        repo=mock_repo(path=fcrepo_path, handle=existing_handle.hdl_uri), path=fcrepo_path
     ).read()
     handle = resource.publish(mock_client, expected_url)
     assert handle.suffix == expected_suffix

@@ -1,18 +1,28 @@
 """[hOCR](https://kba.github.io/hocr-spec/1.2/) OCR classes"""
 
 import re
-from typing import Iterable
+from collections.abc import Iterable
 
 # noinspection PyProtectedMember
-from lxml.etree import _ElementTree, _Element
+from lxml.etree import _Element, _ElementTree
 
-from plastron.ocr.core import XYWH, BBox, Scale, RegionBase, OCRResource, BlockRegion, LineRegion, WordRegion
+from plastron.ocr.core import (
+    XYWH,
+    BBox,
+    BlockRegion,
+    LineRegion,
+    OCRResource,
+    RegionBase,
+    Scale,
+    WordRegion,
+)
 
 XMLNS = {'html': 'http://www.w3.org/1999/xhtml'}
 
 
 class HOCRResource(OCRResource):
     """hOCR OCR HTML resource"""
+
     def __init__(self, doc: _ElementTree, image_resolution: tuple[int, int]):
         self.doc = doc
         capabilities_element = self.doc.xpath('//html:meta[@name="ocr-capabilities"]', namespaces=XMLNS)[0]
@@ -35,6 +45,7 @@ class HOCRResource(OCRResource):
 
 class HOCRRegion(RegionBase):
     """Region within an `HOCRResource`."""
+
     def __init__(self, element: _Element, scale: Scale):
         self.element = element
         self.scale = scale

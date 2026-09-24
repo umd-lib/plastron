@@ -5,7 +5,7 @@ import traceback
 from stomp.exception import StompException
 
 from plastron.messaging.broker import Destination
-from plastron.messaging.messages import PlastronErrorMessage, PlastronCommandMessage
+from plastron.messaging.messages import PlastronCommandMessage, PlastronErrorMessage
 
 logger = logging.getLogger(__name__)
 
@@ -45,16 +45,18 @@ class AsynchronousResponseHandler:
             # if the command raised an exception, log it and return
             # an error response message
             traceback.print_exc()
-            logger.error(f"Job {self.message.job_id} failed: {e}")
+            logger.error(f'Job {self.message.job_id} failed: {e}')
             return PlastronErrorMessage(
                 job_id=self.message.job_id,
                 error=str(e),
                 status_url=self.message.status_url,
-                body=json.dumps({
-                    'state': f'{self.message.command}_error',
-                    # TODO: get the actual progress number? if possible?
-                    'progress': 0,
-                })
+                body=json.dumps(
+                    {
+                        'state': f'{self.message.command}_error',
+                        # TODO: get the actual progress number? if possible?
+                        'progress': 0,
+                    }
+                ),
             )
         else:
             # assume no errors, return the response

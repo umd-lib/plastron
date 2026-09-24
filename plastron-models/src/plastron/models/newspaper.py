@@ -1,13 +1,32 @@
-from lxml.etree import parse, XMLSyntaxError
+from collections.abc import Iterator
+
+from lxml.etree import XMLSyntaxError, parse
 
 from plastron.handles import HandleBearingResource
 from plastron.models import ContentModeledResource
 from plastron.models.annotations import TextblockOnPage
-from plastron.models.authorities import UMD_TERMS_OF_USE_STATEMENTS, UMD_PRESENTATION_SETS, UMD_RIGHTS_STATEMENTS, Agent
+from plastron.models.authorities import (
+    UMD_PRESENTATION_SETS,
+    UMD_RIGHTS_STATEMENTS,
+    UMD_TERMS_OF_USE_STATEMENTS,
+    Agent,
+)
 from plastron.models.fedora import FedoraResource
-from plastron.models.page import Page, File
-from plastron.models.pcdm import PCDMObject, PCDMFile
-from plastron.namespaces import bibo, carriers, dc, dcterms, fabio, ndnp, ore, pcdm, pcdmuse, schema, umd
+from plastron.models.page import File, Page
+from plastron.models.pcdm import PCDMFile, PCDMObject
+from plastron.namespaces import (
+    bibo,
+    carriers,
+    dc,
+    dcterms,
+    fabio,
+    ndnp,
+    ore,
+    pcdm,
+    pcdmuse,
+    schema,
+    umd,
+)
 from plastron.ocr.alto import ALTOResource
 from plastron.rdfmapping.decorators import rdf_type
 from plastron.rdfmapping.descriptors import DataProperty, ObjectProperty
@@ -18,6 +37,7 @@ from plastron.validation.vocabularies import ControlledVocabularyProperty
 @rdf_type(bibo.Issue, umd.Newspaper)
 class Issue(ContentModeledResource, PCDMObject, HandleBearingResource, FedoraResource):
     """Newspaper issue"""
+
     model_name = 'Issue'
     is_top_level = True
 
@@ -55,18 +75,17 @@ class Issue(ContentModeledResource, PCDMObject, HandleBearingResource, FedoraRes
 @rdf_type(fabio.Metadata)
 class IssueMetadata(PCDMObject):
     """Additional metadata about an issue"""
-    pass
 
 
 @rdf_type(fabio.MetadataDocument)
 class MetadataFile(PCDMFile):
     """A binary file containing metadata in non-RDF formats (METS, MODS, etc.)"""
-    pass
 
 
 @rdf_type(ndnp.Page)
 class Page(PCDMObject):
     """Newspaper page"""
+
     issue = ObjectProperty(pcdm.memberOf, cls=Issue)
     number = DataProperty(ndnp.number)
     frame = DataProperty(ndnp.sequence)
@@ -90,18 +109,18 @@ class Page(PCDMObject):
             with ocr_file.source as stream:
                 tree = parse(stream)
         except OSError:
-            raise RuntimeError("Unable to read {0}".format(ocr_file.filename))
+            raise RuntimeError(f'Unable to read {ocr_file.filename}')
         except XMLSyntaxError:
-            raise RuntimeError("Unable to parse {0} as XML".format(ocr_file.filename))
+            raise RuntimeError(f'Unable to parse {ocr_file.filename} as XML')
 
         # read in resolution from issue METS data
         master = next(self.files_for('master'))
         self.ocr_file = ocr_file
         self.ocr = ALTOResource(tree, master.resolution)
 
-    def textblocks(self):
+    def textblocks(self) -> Iterator[TextblockOnPage]:
         if self.ocr is None:
-            raise StopIteration()
+            return
         # extract text blocks from ALTO XML for this page
         for textblock in self.ocr.textblocks():
             yield TextblockOnPage.from_textblock(textblock, page=self, scale=self.ocr.scale, ocr_file=self.ocr_file)
@@ -137,6 +156,7 @@ class File(PCDMFile):
 @rdf_type(bibo.Article)
 class Article(PCDMObject):
     """Newspaper article"""
+
     issue = ObjectProperty(pcdm.memberOf, cls=Issue)
     start_page = DataProperty(bibo.pageStart)
     end_page = DataProperty(bibo.pageEnd)
@@ -145,6 +165,7 @@ class Article(PCDMObject):
 @rdf_type(carriers.hd)
 class Reel(PCDMObject):
     """NDNP reel is an ordered sequence of frames"""
+
     id = DataProperty(dcterms.identifier)
 
     def __init__(self, **kwargs):

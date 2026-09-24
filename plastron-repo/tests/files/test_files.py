@@ -1,14 +1,20 @@
 from http import HTTPStatus
 from pathlib import Path
-from unittest.mock import MagicMock
 from tempfile import TemporaryFile
+from unittest.mock import MagicMock
 from uuid import uuid4
 from zipfile import ZipFile
 
 import httpretty
 import pytest
 
-from plastron.files import HTTPFileSource, LocalFileSource, RemoteFileSource, ZipFileSource, StringSource
+from plastron.files import (
+    HTTPFileSource,
+    LocalFileSource,
+    RemoteFileSource,
+    StringSource,
+    ZipFileSource,
+)
 from plastron.namespaces import pcdmuse
 
 
@@ -52,10 +58,9 @@ def test_nonexistent_local_file_source():
 
 def test_nonexistent_zip_file_source():
     # create an empty zip file
-    with TemporaryFile() as tmp_file:
-        with ZipFile(tmp_file, mode='w') as zip_file:
-            f = ZipFileSource(zip_file, 'foo.jpg')
-            assert not f.exists()
+    with TemporaryFile() as tmp_file, ZipFile(tmp_file, mode='w') as zip_file:
+        f = ZipFileSource(zip_file, 'foo.jpg')
+        assert not f.exists()
 
 
 @httpretty.activate
@@ -83,7 +88,7 @@ def setup_remote_file_source_mock(remote_file_source, local_file: Path):
     mock.open.return_value = local_file.open('rb')
     # Need to mock __exit__ (following code in BinarySource.__exit__) because
     # "wraps" doesn't handle magic methods
-    mock.__exit__.side_effect = (lambda _arg1, _arg2, _arg3: mock.close())
+    mock.__exit__.side_effect = lambda _arg1, _arg2, _arg3: mock.close()
 
     return mock
 
@@ -117,7 +122,7 @@ def test_zip_file_source_exists_closes_remote_file_source_when_file_does_not_exi
     [
         (StringSource('', mimetype='image/tiff'), {pcdmuse.PreservationMasterFile}),
         (StringSource('', mimetype='text/plain'), set()),
-    ]
+    ],
 )
 def test_rdf_types(source, expected_rdf_types):
     assert source.rdf_types == expected_rdf_types

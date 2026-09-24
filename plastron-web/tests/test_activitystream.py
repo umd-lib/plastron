@@ -1,10 +1,10 @@
 import json
-from unittest.mock import MagicMock, ANY
+from unittest.mock import ANY, MagicMock
 
 import pytest
 
 from plastron.context import PlastronContext
-from plastron.handles import HandleServiceClient, HandleInfo
+from plastron.handles import HandleInfo, HandleServiceClient
 from plastron.repo import Repository
 from plastron.repo.publish import PublishableResource
 
@@ -12,27 +12,24 @@ from plastron.repo.publish import PublishableResource
 @pytest.fixture
 def post_data():
     return {
-        "@context": [
-            "https://www.w3.org/ns/activitystreams",
+        '@context': [
+            'https://www.w3.org/ns/activitystreams',
             {
-                "umdact": "http://vocab.lib.umd.edu/activity#",
-                "Publish": "umdact:Publish",
-                "PublishHidden": "umdact:PublishHidden",
-                "Unpublish": "umdact:Unpublish"
-            }
+                'umdact': 'http://vocab.lib.umd.edu/activity#',
+                'Publish': 'umdact:Publish',
+                'PublishHidden': 'umdact:PublishHidden',
+                'Unpublish': 'umdact:Unpublish',
+            },
         ],
-        "type": "Publish",
-        "object": ["http://fcrepo-local:8080/fcrepo/rest/test/obj"]
+        'type': 'Publish',
+        'object': ['http://fcrepo-local:8080/fcrepo/rest/test/obj'],
     }
 
 
 @pytest.fixture
 def request_headers():
     mimetype = 'application/json'
-    return {
-        'Content-Type': mimetype,
-        'Accept': mimetype
-    }
+    return {'Content-Type': mimetype, 'Accept': mimetype}
 
 
 @pytest.fixture
@@ -59,56 +56,50 @@ def mock_context(mock_resource):
         (
             # json input
             {
-                "@context": [
-                    "https://www.w3.org/ns/activitystreams",
+                '@context': [
+                    'https://www.w3.org/ns/activitystreams',
                     {
-                        "umdact": "http://vocab.lib.umd.edu/activity#",
-                        "Publish": "umdact:Publish",
-                        "PublishHidden": "umdact:PublishHidden",
-                        "Unpublish": "umdact:Unpublish"
-                    }
+                        'umdact': 'http://vocab.lib.umd.edu/activity#',
+                        'Publish': 'umdact:Publish',
+                        'PublishHidden': 'umdact:PublishHidden',
+                        'Unpublish': 'umdact:Unpublish',
+                    },
                 ],
-                "type": "Publish",
-                "object": ["http://fcrepo-local:8080/fcrepo/rest/test/obj"]
+                'type': 'Publish',
+                'object': ['http://fcrepo-local:8080/fcrepo/rest/test/obj'],
             },
             # expected args
-            {
-                'force_hidden': False,
-                'force_visible': False
-            },
+            {'force_hidden': False, 'force_visible': False},
         ),
         (
             # json input
             {
-                "@context": [
-                    "https://www.w3.org/ns/activitystreams",
+                '@context': [
+                    'https://www.w3.org/ns/activitystreams',
                     {
-                        "umdact": "http://vocab.lib.umd.edu/activity#",
-                        "Publish": "umdact:Publish",
-                        "PublishHidden": "umdact:PublishHidden",
-                        "Unpublish": "umdact:Unpublish"
-                    }
+                        'umdact': 'http://vocab.lib.umd.edu/activity#',
+                        'Publish': 'umdact:Publish',
+                        'PublishHidden': 'umdact:PublishHidden',
+                        'Unpublish': 'umdact:Unpublish',
+                    },
                 ],
-                "type": "PublishHidden",
-                "object": ["http://fcrepo-local:8080/fcrepo/rest/test/obj"]
+                'type': 'PublishHidden',
+                'object': ['http://fcrepo-local:8080/fcrepo/rest/test/obj'],
             },
             # expected args
-            {
-                'force_hidden': True,
-                'force_visible': False
-            },
+            {'force_hidden': True, 'force_visible': False},
         ),
     ],
 )
 def test_new_activity_publish(
-        app,
-        app_client,
-        mock_context,
-        mock_resource,
-        post_data,
-        request_headers,
-        input_json,
-        expected_args,
+    app,
+    app_client,
+    mock_context,
+    mock_resource,
+    post_data,
+    request_headers,
+    input_json,
+    expected_args,
 ):
     app.config['CONTEXT'] = mock_context
 
@@ -125,35 +116,32 @@ def test_new_activity_publish(
         (
             # json input
             {
-                "@context": [
-                    "https://www.w3.org/ns/activitystreams",
+                '@context': [
+                    'https://www.w3.org/ns/activitystreams',
                     {
-                        "umdact": "http://vocab.lib.umd.edu/activity#",
-                        "Publish": "umdact:Publish",
-                        "PublishHidden": "umdact:PublishHidden",
-                        "Unpublish": "umdact:Unpublish"
-                    }
+                        'umdact': 'http://vocab.lib.umd.edu/activity#',
+                        'Publish': 'umdact:Publish',
+                        'PublishHidden': 'umdact:PublishHidden',
+                        'Unpublish': 'umdact:Unpublish',
+                    },
                 ],
-                "type": "Unpublish",
-                "object": ["http://fcrepo-local:8080/fcrepo/rest/test/obj"]
+                'type': 'Unpublish',
+                'object': ['http://fcrepo-local:8080/fcrepo/rest/test/obj'],
             },
             # expected args
-            {
-                'force_hidden': False,
-                'force_visible': False
-            },
+            {'force_hidden': False, 'force_visible': False},
         )
     ],
 )
 def test_new_activity_unpublish(
-        app,
-        app_client,
-        mock_context,
-        mock_resource,
-        post_data,
-        request_headers,
-        input_json,
-        expected_args,
+    app,
+    app_client,
+    mock_context,
+    mock_resource,
+    post_data,
+    request_headers,
+    input_json,
+    expected_args,
 ):
     app.config['CONTEXT'] = mock_context
 
@@ -169,44 +157,44 @@ def test_new_activity_unpublish(
     [
         # Missing type
         {
-            "@context": [
-                "https://www.w3.org/ns/activitystreams",
+            '@context': [
+                'https://www.w3.org/ns/activitystreams',
                 {
-                    "umdact": "http://vocab.lib.umd.edu/activity#",
-                    "Publish": "umdact:Publish",
-                    "PublishHidden": "umdact:PublishHidden",
-                    "Unpublish": "umdact:Unpublish"
-                }
+                    'umdact': 'http://vocab.lib.umd.edu/activity#',
+                    'Publish': 'umdact:Publish',
+                    'PublishHidden': 'umdact:PublishHidden',
+                    'Unpublish': 'umdact:Unpublish',
+                },
             ],
-            "object": ["http://fcrepo-local:8080/fcrepo/rest/test/obj"]
+            'object': ['http://fcrepo-local:8080/fcrepo/rest/test/obj'],
         },
         # Invalid type
         {
-            "@context": [
-                "https://www.w3.org/ns/activitystreams",
+            '@context': [
+                'https://www.w3.org/ns/activitystreams',
                 {
-                    "umdact": "http://vocab.lib.umd.edu/activity#",
-                    "Publish": "umdact:Publish",
-                    "PublishHidden": "umdact:PublishHidden",
-                    "Unpublish": "umdact:Unpublish"
-                }
+                    'umdact': 'http://vocab.lib.umd.edu/activity#',
+                    'Publish': 'umdact:Publish',
+                    'PublishHidden': 'umdact:PublishHidden',
+                    'Unpublish': 'umdact:Unpublish',
+                },
             ],
-            "type": "foo",
-            "object": ["http://fcrepo-local:8080/fcrepo/rest/test/obj"]
+            'type': 'foo',
+            'object': ['http://fcrepo-local:8080/fcrepo/rest/test/obj'],
         },
         # Missing target object
         {
-            "@context": [
-                "https://www.w3.org/ns/activitystreams",
+            '@context': [
+                'https://www.w3.org/ns/activitystreams',
                 {
-                    "umdact": "http://vocab.lib.umd.edu/activity#",
-                    "Publish": "umdact:Publish",
-                    "PublishHidden": "umdact:PublishHidden",
-                    "Unpublish": "umdact:Unpublish"
-                }
+                    'umdact': 'http://vocab.lib.umd.edu/activity#',
+                    'Publish': 'umdact:Publish',
+                    'PublishHidden': 'umdact:PublishHidden',
+                    'Unpublish': 'umdact:Unpublish',
+                },
             ],
-            "type": "Publish",
-        }
+            'type': 'Publish',
+        },
     ],
 )
 def test_new_activity_invalid_input(app_client, post_data, request_headers, input_json):

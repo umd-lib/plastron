@@ -3,9 +3,9 @@ import os
 import threading
 from contextlib import contextmanager
 from http import HTTPStatus
-from typing import Optional, Any
+from typing import Any
 
-from rdflib import URIRef, Graph
+from rdflib import Graph, URIRef
 from requests import ConnectionError, Response
 
 from plastron.client.base import Client, ClientError
@@ -96,7 +96,7 @@ class TransactionClient(Client):
 
     def __init__(self, endpoint: Endpoint, **kwargs):
         super().__init__(endpoint, **kwargs)
-        self.tx: Optional[Transaction] = None
+        self.tx: Transaction | None = None
         """The transaction"""
 
     def request(self, method: str, url: str, **kwargs) -> Response:
@@ -110,7 +110,7 @@ class TransactionClient(Client):
         request_url = str(self.insert_transaction_uri(URIRef(url)))
         return super().request(method, request_url, **kwargs)
 
-    def get_location(self, response: Response) -> Optional[str]:
+    def get_location(self, response: Response) -> str | None:
         """Removes the transaction id from the ``Location`` header returned by requests
         to create resources."""
         try:
@@ -170,7 +170,7 @@ class TransactionClient(Client):
             return URIRef(uri.replace(self.tx.uri, self.endpoint.url))
         return uri
 
-    def insert_transaction_uri_for_graph(self, graph: Optional[Graph]) -> Optional[Graph]:
+    def insert_transaction_uri_for_graph(self, graph: Graph | None) -> Graph | None:
         if graph is None:
             return None
         for s, p, o in graph:
@@ -182,7 +182,7 @@ class TransactionClient(Client):
                 graph.remove((s, p, o))
         return graph
 
-    def remove_transaction_uri_for_graph(self, graph: Optional[Graph]) -> Optional[Graph]:
+    def remove_transaction_uri_for_graph(self, graph: Graph | None) -> Graph | None:
         if graph is None:
             return None
         for s, p, o in graph:
@@ -243,9 +243,7 @@ class TransactionClient(Client):
             logger.info(f'Committed transaction {self.tx}')
             return response
         else:
-            raise TransactionError(
-                f'Failed to commit transaction {self.tx}: {response.status_code} {response.reason}'
-            )
+            raise TransactionError(f'Failed to commit transaction {self.tx}: {response.status_code} {response.reason}')
 
     def rollback(self):
         """Rolls back the transaction. Raises a `TransactionError` if the transaction is
@@ -289,7 +287,7 @@ class TransactionKeepAlive(threading.Thread):
         self.failed: threading.Event = threading.Event()
         """Flag indicating whether this transaction has failed."""
 
-        self.exception: Optional[TransactionError] = None
+        self.exception: TransactionError | None = None
         """If this transaction could not be maintained, this holds the
         raised `TransactionError`."""
 
@@ -315,4 +313,3 @@ class TransactionKeepAlive(threading.Thread):
 
 class TransactionError(Exception):
     """Raised when a transaction fails."""
-    pass

@@ -4,7 +4,7 @@ from pathlib import Path
 import pytest
 
 
-@pytest.mark.skipif(not os.environ.get('INTEGRATION_TESTS', False), reason='integration test')
+@pytest.mark.skipif(not os.environ.get('INTEGRATION_TESTS', None), reason='integration test')
 def test_export(datadir, stomp_client):
     headers = {
         'PlastronJobId': 'test-export',

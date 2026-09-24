@@ -5,13 +5,18 @@ from urllib.error import HTTPError
 import httpretty
 import pytest
 from httpretty import GET
-from rdflib import URIRef, Literal
+from rdflib import Literal, URIRef
 
 from plastron.namespaces import rdfs
 from plastron.rdfmapping.descriptors import DataProperty
 from plastron.rdfmapping.resources import RDFResourceBase
-from plastron.validation.rules import is_edtf_formatted, is_handle, is_valid_iso639_code, is_iso_8601_date
-from plastron.validation.vocabularies import get_vocabulary_graph, Vocabulary
+from plastron.validation.rules import (
+    is_edtf_formatted,
+    is_handle,
+    is_iso_8601_date,
+    is_valid_iso639_code,
+)
+from plastron.validation.vocabularies import Vocabulary, get_vocabulary_graph
 
 
 @pytest.mark.parametrize(
@@ -31,7 +36,7 @@ from plastron.validation.vocabularies import get_vocabulary_graph, Vocabulary
         ([1.0], True),
         # any empty string fails
         (['foo', ''], False),
-    ]
+    ],
 )
 def test_required(values, expected):
     class SimpleResource(RDFResourceBase):
@@ -42,7 +47,8 @@ def test_required(values, expected):
 
 
 @pytest.mark.parametrize(
-    'datetime_string', [
+    'datetime_string',
+    [
         # dates at 11pm fail in edtf 4.0.1
         # these pass when using edtf-validate 1.1.0
         '2020-07-10T23:44:38Z',
@@ -56,16 +62,18 @@ def test_required(values, expected):
         '2020-07-24T22:46:17Z',
         # the empty string should validate
         '',
-    ])
+    ],
+)
 def test_is_edtf_formatted(datetime_string):
     assert is_edtf_formatted(datetime_string)
 
 
 @pytest.mark.parametrize(
-    'code', [
+    'code',
+    [
         'en',
         'eng',
-    ]
+    ],
 )
 def test_is_valid_iso639_code(code):
     assert is_valid_iso639_code(code)
@@ -79,33 +87,18 @@ def test_is_valid_iso639_code(code):
         ('2024-01', False),
         ('01-23', False),
         ('2024/01/23', False),
-    ]
+    ],
 )
 def test_is_iso_8601_date(value, expected):
     assert is_iso_8601_date(value) == expected
 
 
-@pytest.mark.parametrize(
-    'handle', [
-        'hdl:1903.1/foobar',
-        'hdl:1903.1/327',
-        'hdl:1903.1/asdf',
-        'hdl:1234.5/example'
-    ]
-)
+@pytest.mark.parametrize('handle', ['hdl:1903.1/foobar', 'hdl:1903.1/327', 'hdl:1903.1/asdf', 'hdl:1234.5/example'])
 def test_is_handle(handle):
     assert is_handle(handle)
 
 
-@pytest.mark.parametrize(
-    'handle', [
-        '',
-        '     ',
-        '1903.1/foobar',
-        'not_a_handle',
-        'HDL:1903.1/foobar'
-    ]
-)
+@pytest.mark.parametrize('handle', ['', '     ', '1903.1/foobar', 'not_a_handle', 'HDL:1903.1/foobar'])
 def test_not_handle(handle):
     assert not is_handle(handle)
 
@@ -140,24 +133,20 @@ def test_remote_vocab_308_redirect(shared_datadir):
         uri='http://vocab.lib.umd.edu/form',
         method=GET,
         status=308,
-        adding_headers={
-            'Location': 'https://vocab.lib.umd.edu/form'
-        }
+        adding_headers={'Location': 'https://vocab.lib.umd.edu/form'},
     )
     httpretty.register_uri(
         uri='https://vocab.lib.umd.edu/form',
         method=GET,
         status=303,
-        adding_headers={
-            'Location': 'https://vocab.lib.umd.edu/form.json'
-        }
+        adding_headers={'Location': 'https://vocab.lib.umd.edu/form.json'},
     )
     httpretty.register_uri(
         uri='https://vocab.lib.umd.edu/form.json',
         method=GET,
         status=200,
         body=(shared_datadir / 'form.json').read_text(),
-        content_type='application/ld+json'
+        content_type='application/ld+json',
     )
     vocab = Vocabulary('http://vocab.lib.umd.edu/form')
     assert URIRef('http://vocab.lib.umd.edu/form#slides_photographs') in vocab

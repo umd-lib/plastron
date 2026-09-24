@@ -1,18 +1,13 @@
 import pytest
 
-from plastron.client import Endpoint, Client
+from plastron.client import Client, Endpoint
 from plastron.client.auth import get_authenticator
 
 
 @pytest.fixture
 def repo_base_config():
     """Required parameters for Repository configuration"""
-    return {
-        'REST_ENDPOINT': 'http://localhost:9999',
-        'RELPATH': '/pcdm',
-        'LOG_DIR': '/logs',
-        'AUTH_TOKEN': 'foobar'
-    }
+    return {'REST_ENDPOINT': 'http://localhost:9999', 'RELPATH': '/pcdm', 'LOG_DIR': '/logs', 'AUTH_TOKEN': 'foobar'}
 
 
 @pytest.fixture

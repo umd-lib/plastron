@@ -1,7 +1,7 @@
 import logging
 from argparse import Namespace
 from collections import defaultdict
-from typing import Iterable, Type
+from collections.abc import Iterable
 
 from rdflib import Literal
 
@@ -21,13 +21,15 @@ def configure_cli(subparsers):
         description='Set property values on objects',
     )
     parser.add_argument(
-        '-m', '--model',
+        '-m',
+        '--model',
         dest='model_name',
         required=True,
         help='name of the model class of the objects',
     )
     parser.add_argument(
-        '-F', '--field',
+        '-F',
+        '--field',
         action='append',
         nargs=2,
         dest='fields_to_set',
@@ -52,7 +54,7 @@ class Command(BaseCommand):
         return set_fields(ctx, args.model_name, args.fields_to_set, args.uris)
 
 
-def get_new_values(model_class: Type[RDFResourceBase], fields_to_set: Iterable[tuple[str, str]]) -> dict[str, set]:
+def get_new_values(model_class: type[RDFResourceBase], fields_to_set: Iterable[tuple[str, str]]) -> dict[str, set]:
     values = defaultdict(set)
     for field_name, value in fields_to_set:
         prop = getattr(model_class, field_name)

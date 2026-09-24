@@ -1,5 +1,5 @@
 import pytest
-from rdflib import URIRef, Literal
+from rdflib import Literal, URIRef
 
 from plastron.namespaces import xsd
 from plastron.rdfmapping.descriptors import DataProperty
@@ -33,7 +33,7 @@ from plastron.serializers.csv import ColumnHeader, get_literal
             '[@de]der Hund',
             Literal('der Hund', datatype=None, lang='de'),
         ),
-    ]
+    ],
 )
 def test_get_literal(descriptor, column_header, value, expected_literal):
     assert get_literal(column_header, descriptor, value) == expected_literal

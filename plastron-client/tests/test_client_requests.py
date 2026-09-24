@@ -20,7 +20,7 @@ class MockOKResponse:
         ('put', 'PUT'),
         ('patch', 'PATCH'),
         ('delete', 'DELETE'),
-    ]
+    ],
 )
 def test_client_requests(endpoint, method, expected_http_method):
     session = MagicMock(spec=Session)

@@ -1,25 +1,31 @@
-from typing import Callable, Any, Iterable, TypeVar, Type, Iterator, Container
+from collections.abc import Callable, Container, Iterable, Iterator
+from typing import Any, TypeVar
 
 from rdflib import Literal, URIRef
-from rdflib.term import Identifier, BNode
+from rdflib.term import BNode, Identifier
 
 from plastron.rdfmapping.embed import EmbeddedObject
-from plastron.rdfmapping.validation import ValidationResult, ValidationFailure, ValidationSuccess
+from plastron.rdfmapping.validation import (
+    ValidationFailure,
+    ValidationResult,
+    ValidationSuccess,
+)
 
 T = TypeVar('T')
 
 
 class RDFProperty:
     """An RDF property"""
+
     def __init__(
-            self,
-            resource,
-            attr_name: str,
-            predicate: URIRef,
-            required: bool = False,
-            repeatable: bool = False,
-            values_from: Container = None,
-            validate: Callable[[Any], bool] = None,
+        self,
+        resource,
+        attr_name: str,
+        predicate: URIRef,
+        required: bool = False,
+        repeatable: bool = False,
+        values_from: Container | None = None,
+        validate: Callable[[Any], bool] | None = None,
     ):
         self.resource = resource
         self.attr_name = attr_name
@@ -124,16 +130,17 @@ class RDFProperty:
 
 class RDFDataProperty(RDFProperty):
     """An RDF property whose values are always RDF literals"""
+
     def __init__(
-            self,
-            resource,
-            attr_name: str,
-            predicate: URIRef,
-            required: bool = False,
-            repeatable: bool = False,
-            values_from: Container = None,
-            validate: Callable[[Any], bool] = None,
-            datatype: URIRef = None,
+        self,
+        resource,
+        attr_name: str,
+        predicate: URIRef,
+        required: bool = False,
+        repeatable: bool = False,
+        values_from: Container | None = None,
+        validate: Callable[[Any], bool] | None = None,
+        datatype: URIRef = None,
     ):
         super().__init__(resource, attr_name, predicate, required, repeatable, values_from, validate)
         self.datatype: URIRef = datatype
@@ -183,17 +190,18 @@ class RDFDataProperty(RDFProperty):
 
 class RDFObjectProperty(RDFProperty):
     """An RDF property whose values are always URIRefs or RDF blank nodes"""
+
     def __init__(
-            self,
-            resource,
-            attr_name: str,
-            predicate: URIRef,
-            required: bool = False,
-            repeatable: bool = False,
-            values_from: Container = None,
-            validate: Callable[[Any], bool] = None,
-            object_class: Type[T] = None,
-            embedded: bool = False,
+        self,
+        resource,
+        attr_name: str,
+        predicate: URIRef,
+        required: bool = False,
+        repeatable: bool = False,
+        values_from: Container | None = None,
+        validate: Callable[[Any], bool] | None = None,
+        object_class: type[T] | None = None,
+        embedded: bool = False,
     ):
         super().__init__(resource, attr_name, predicate, required, repeatable, values_from, validate)
         self.object_class = object_class
@@ -256,7 +264,7 @@ class RDFObjectProperty(RDFProperty):
         if not is_valid_result:
             return is_valid_result
         # all values must be URIRefs
-        if not all(isinstance(v, URIRef) or isinstance(v, BNode) for v in self.values):
+        if not all(isinstance(v, (URIRef, BNode)) for v in self.values):
             return ValidationFailure(self, 'all values must be URIs or BNodes')
         return ValidationSuccess(self)
 

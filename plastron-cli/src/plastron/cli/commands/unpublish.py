@@ -1,6 +1,6 @@
 import logging
 from argparse import FileType, Namespace
-from typing import Iterable
+from collections.abc import Iterable
 
 from plastron.cli import get_uris
 from plastron.cli.commands import BaseCommand
@@ -27,10 +27,7 @@ def configure_cli(subparsers):
         help='remove the "Hidden" state from these objects',
     )
     parser.add_argument(
-        '-f', '--uris-file',
-        action='store',
-        type=FileType(),
-        help='file containing URIs of objects to publish'
+        '-f', '--uris-file', action='store', type=FileType(), help='file containing URIs of objects to publish'
     )
     parser.add_argument(
         'uris',

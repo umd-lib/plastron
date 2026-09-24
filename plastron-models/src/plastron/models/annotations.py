@@ -1,8 +1,8 @@
-from rdflib import RDF, URIRef, Literal
+from rdflib import RDF, Literal, URIRef
 
 from plastron.namespaces import dcterms, oa, prov, sc
 from plastron.rdfmapping.decorators import rdf_type
-from plastron.rdfmapping.descriptors import ObjectProperty, DataProperty
+from plastron.rdfmapping.descriptors import DataProperty, ObjectProperty
 from plastron.rdfmapping.embed import embedded
 from plastron.rdfmapping.resources import RDFResource
 
@@ -80,10 +80,7 @@ class TextblockOnPage(Annotation):
     def from_textblock(cls, textblock, page, scale, ocr_file):
         xywh = ','.join([str(i) for i in textblock.xywh(scale)])
         return cls(
-            body=embedded(TextualBody)(
-                value=textblock.text(scale=scale),
-                content_type='text/plain'
-            ),
+            body=embedded(TextualBody)(value=textblock.text(scale=scale), content_type='text/plain'),
             target=embedded(SpecificResource)(
                 source=URIRef(page.url),
                 selector=embedded(FragmentSelector)(
@@ -95,5 +92,5 @@ class TextblockOnPage(Annotation):
                 source=URIRef(ocr_file.url),
                 selector=embedded(XPathSelector)(value=f'//*[@ID="{textblock.id}"]'),
             ),
-            motivation=sc.painting
+            motivation=sc.painting,
         )

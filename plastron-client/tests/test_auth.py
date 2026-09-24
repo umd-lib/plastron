@@ -1,7 +1,7 @@
 from base64 import b64encode
 
 import pytest
-from requests import Session, Request
+from requests import Request, Session
 from requests.auth import HTTPBasicAuth
 from requests_jwtauth import HTTPBearerAuth, JWTSecretAuth
 
@@ -15,7 +15,7 @@ def get_request():
 
 def test_auth_factory_no_config():
     with pytest.raises(TypeError):
-        get_authenticator(None)  # noqa
+        get_authenticator(None)
 
 
 def test_auth_factory_empty_config():
@@ -70,7 +70,7 @@ def test_auth_factory_fedora_user(get_request):
     session = Session()
     session.auth = auth
     r = session.prepare_request(get_request)
-    basic_credentials = b64encode(f"{config['FEDORA_USER']}:{config['FEDORA_PASSWORD']}".encode()).decode()
+    basic_credentials = b64encode(f'{config["FEDORA_USER"]}:{config["FEDORA_PASSWORD"]}'.encode()).decode()
     assert r.headers['Authorization'] == f'Basic {basic_credentials}'
 
 

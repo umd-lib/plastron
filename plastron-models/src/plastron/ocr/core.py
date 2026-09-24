@@ -1,4 +1,5 @@
-from typing import NamedTuple, Iterator, TypeVar, Optional, Iterable
+from collections.abc import Iterable, Iterator
+from typing import NamedTuple, TypeVar
 
 # noinspection PyProtectedMember
 from lxml.etree import _Element
@@ -18,6 +19,7 @@ class XYWH(NamedTuple):
 
     ```
     """
+
     x: int
     """X-axis coordinate of the top-left corner of the region"""
     y: int
@@ -60,6 +62,7 @@ class BBox(NamedTuple):
 
     ```
     """
+
     x1: int
     """X-axis coordinate of the top-left corner of the region"""
     y1: int
@@ -97,6 +100,7 @@ class Scale(NamedTuple):
     * `mm10` (1/10 of a millimeter)
     * `pixel`
     """
+
     x: float
     """Horizontal scaling factor"""
     y: float
@@ -144,6 +148,7 @@ class OCRResource:
     * `get_block_node()`
     * `get_block()`
     """
+
     def __iter__(self) -> Iterator[B]:
         return self.blocks
 
@@ -153,7 +158,7 @@ class OCRResource:
         for node in self.get_block_nodes():
             yield self.get_block(node)
 
-    def block(self, identifier: str) -> Optional[B]:
+    def block(self, identifier: str) -> B | None:
         """Retrieve an individual block by identifier."""
         try:
             return self.get_block(self.get_block_node(identifier))
@@ -185,8 +190,7 @@ class OCRResource:
         this OCR resource."""
         for block in self.blocks:
             for line in block.lines():
-                for word in line.words():
-                    yield word
+                yield from line.words()
 
 
 class RegionBase:
@@ -243,6 +247,7 @@ class BlockRegion(RegionBase):
 class LineRegion(RegionBase):
     """Base class for classes representing a single line in an OCR
     resource (e.g., ALTO `TextLine` or hOCR `ocr_line`)."""
+
     def __str__(self):
         return ' '.join(str(w) for w in self.words())
 
@@ -273,6 +278,7 @@ class LineRegion(RegionBase):
 class WordRegion(RegionBase):
     """Base class for classes representing a single word within the
     OCR resource."""
+
     def __str__(self):
         return self.content
 
@@ -290,7 +296,6 @@ class WordRegion(RegionBase):
 
 class OCRError(Exception):
     """OCR-related error"""
-    pass
 
 
 class OCRFileError(OCRError):

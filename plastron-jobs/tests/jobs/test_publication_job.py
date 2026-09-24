@@ -1,17 +1,17 @@
-from typing import Callable
+from collections.abc import Callable
 from unittest.mock import MagicMock
 
 import pytest
 
 from plastron.context import PlastronContext
 from plastron.handles import HandleInfo
-from plastron.jobs.publicationjob import PublicationJob, PublicationAction
+from plastron.jobs.publicationjob import PublicationAction, PublicationJob
 from plastron.repo import Repository, RepositoryError
 from plastron.repo.publish import PublishableResource
 
 
 class JobRunner:
-    def __init__(self, job, callback: Callable = None):
+    def __init__(self, job, callback: Callable | None = None):
         self.job = job
         self.callback = callback
         self.result = None
@@ -34,7 +34,7 @@ class JobRunner:
         (PublicationAction.PUBLISH, True, 'publish_incomplete', 1, 1),
         (PublicationAction.UNPUBLISH, True, 'unpublish_incomplete', 1, 1),
         ('bad_action', True, 'error', 0, 2),
-    ]
+    ],
 )
 def test_publication_job(action, with_errors, expected_status, expected_done, expected_errors):
     mock_resource = MagicMock(spec=PublishableResource)
@@ -60,7 +60,7 @@ def test_publication_job(action, with_errors, expected_status, expected_done, ex
         uris=[
             'http://fcrepo-local:8080/fcrepo/rest/foo',
             'http://fcrepo-local:8080/fcrepo/rest/bar',
-        ]
+        ],
     )
 
     def check_status(status):

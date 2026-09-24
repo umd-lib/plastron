@@ -1,15 +1,15 @@
 import logging
+from collections.abc import Iterator
 from os.path import basename
-from typing import Optional, Iterator
 
 from rdflib import Literal, URIRef
 from urlobject import URLObject
 
 from plastron.client.utils import random_slug
-from plastron.files import BinarySource, FileGroup, BinaryResource
+from plastron.files import BinaryResource, BinarySource, FileGroup
 from plastron.models.annotations import Annotation
 from plastron.models.ldp import LDPContainer
-from plastron.models.pcdm import PCDMObject, PCDMFile
+from plastron.models.pcdm import PCDMFile, PCDMObject
 from plastron.models.umd import Page
 from plastron.repo import ContainerResource, Repository
 from plastron.repo.aggregation import AggregationResource
@@ -22,7 +22,7 @@ DEFAULT_BINARY_MIME_TYPE = 'application/octet-stream'
 class WebAnnotationBearingResource(ContainerResource):
     """A container that has an annotations container, containing Web Annotations."""
 
-    def __init__(self, repo: Repository, path: str = None):
+    def __init__(self, repo: Repository, path: str | None = None):
         super().__init__(repo, path)
         self.annotations_container = self.get_resource('a', ContainerResource)
         self.annotation_urls: set[URLObject] = set()
@@ -35,7 +35,7 @@ class WebAnnotationBearingResource(ContainerResource):
                 self.annotation_urls.add(URLObject(annotation_uri))
         return self
 
-    def create_annotation(self, description: Annotation, slug: str = None) -> ContainerResource:
+    def create_annotation(self, description: Annotation, slug: str | None = None) -> ContainerResource:
         if slug is None:
             slug = random_slug()
 
@@ -56,7 +56,7 @@ class WebAnnotationBearingResource(ContainerResource):
 class PCDMFileBearingResource(ContainerResource):
     """A container that has files, related by the pcdm:hasFile/pcdm:fileOf predicates."""
 
-    def __init__(self, repo: Repository, path: str = None):
+    def __init__(self, repo: Repository, path: str | None = None):
         super().__init__(repo, path)
         self.files_container = self.get_resource('f', ContainerResource)
         self.file_urls: set[URLObject] = set()
@@ -71,9 +71,9 @@ class PCDMFileBearingResource(ContainerResource):
     def create_file(
         self,
         source: BinarySource,
-        slug: str = None,
-        rdf_types: set = None,
-        mime_type: str = None,
+        slug: str | None = None,
+        rdf_types: set | None = None,
+        mime_type: str | None = None,
     ) -> BinaryResource:
         """Create a single file from the given source as a `pcdm:fileOf` this resource.
         If no slug is provided, one is generated using `random_slug()`. Any values provided
@@ -122,18 +122,21 @@ class PCDMFileBearingResource(ContainerResource):
         logger.debug(f'Created file: {file_resource.url} {title}')
         return file_resource
 
-    def get_files(self, rdf_type: Optional[URIRef] = None, mime_type: Optional[str] = None) -> list[BinaryResource]:
+    def get_files(self, rdf_type: URIRef | None = None, mime_type: str | None = None) -> list[BinaryResource]:
         """Return a list of BinaryResource objects that match either the
         given RDF type or MIME type. If neither is given, includes all files
         for this resource."""
         matched_resources = []
         if rdf_type is not None or mime_type is not None:
+
             def matches(resource):
                 file = resource.describe(PCDMFile)
                 return rdf_type in file.rdf_type.values or Literal(mime_type) in file.mime_type.values
         else:
+
             def matches(_resource):
                 return True
+
         for file_url in self.read().file_urls:
             file_resource = self.repo[file_url:BinaryResource].read()
             if matches(file_resource):
@@ -144,7 +147,7 @@ class PCDMFileBearingResource(ContainerResource):
         )
         return matched_resources
 
-    def get_file(self, rdf_type: Optional[URIRef] = None, mime_type: Optional[str] = None) -> Optional[BinaryResource]:
+    def get_file(self, rdf_type: URIRef | None = None, mime_type: str | None = None) -> BinaryResource | None:
         """Return the BinaryResource for the first file of this resource
         matching the given criteria, or None if no such file is found."""
         files = self.read().get_files(rdf_type=rdf_type, mime_type=mime_type)
@@ -156,7 +159,8 @@ class PCDMFileBearingResource(ContainerResource):
 
 class PCDMObjectResource(PCDMFileBearingResource, AggregationResource):
     """A PCDM Object resource"""
-    def __init__(self, repo: Repository, path: str = None):
+
+    def __init__(self, repo: Repository, path: str | None = None):
         super().__init__(repo, path)
         self.members_container = self.get_resource('m', ContainerResource)
         self.member_urls: set[URLObject] = set()
@@ -170,7 +174,7 @@ class PCDMObjectResource(PCDMFileBearingResource, AggregationResource):
     def get_members(self) -> list['PCDMObjectResource']:
         return [self.repo[url:PCDMObjectResource] for url in self.member_urls]
 
-    def create_page(self, number: int, file_group: FileGroup, slug: str = None) -> 'PCDMPageResource':
+    def create_page(self, number: int, file_group: FileGroup, slug: str | None = None) -> 'PCDMPageResource':
         """Create a page with the given number, as a pcdm:memberOf
         this resource. Files to attach are specified in the file_group.
         If no slug is provided, one is generated using random_slug()."""

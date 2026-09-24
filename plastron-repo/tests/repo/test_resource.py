@@ -3,7 +3,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from plastron.client import Endpoint
-from plastron.repo import RepositoryResource, Repository, RepositoryError
+from plastron.repo import Repository, RepositoryError, RepositoryResource
 from plastron.repo.pcdm import PCDMObjectResource
 
 
@@ -29,7 +29,7 @@ class NotARepoResource:
 def test_convert_to_unsuitable_class(mock_repo):
     resource = RepositoryResource(mock_repo, '/bar')
     with pytest.raises(RepositoryError) as e:
-        resource.convert_to(NotARepoResource)  # noqa
+        resource.convert_to(NotARepoResource)
         assert 'Unable to convert' in str(e.value)
 
 
@@ -38,7 +38,7 @@ def test_convert_to_unsuitable_class(mock_repo):
     [
         ('/foo', 'http://example.com/fcrepo/foo'),
         ('/bar/fcr:fixity', 'http://example.com/fcrepo/bar/fcr:fixity'),
-    ]
+    ],
 )
 def test_resource_url(mock_repo, path, expected_url):
     resource = RepositoryResource(mock_repo, path)

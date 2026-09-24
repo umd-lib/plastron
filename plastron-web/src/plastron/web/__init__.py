@@ -7,14 +7,14 @@ from pathlib import Path
 
 import yaml
 from flask import Flask, url_for
-from werkzeug.exceptions import NotFound, HTTPException
+from werkzeug.exceptions import HTTPException, NotFound
 
-from plastron.web.flask_problem import problem_detail_response
 from plastron.context import PlastronContext
-from plastron.jobs import JobError, JobConfigError, JobNotFoundError, Jobs
+from plastron.jobs import JobConfigError, JobError, JobNotFoundError, Jobs
 from plastron.jobs.importjob import ImportJob
 from plastron.utils import envsubst
 from plastron.web.blueprints import activitystream_blueprint, resources_blueprint
+from plastron.web.flask_problem import problem_detail_response
 
 __version__ = importlib.metadata.version('plastron-web')
 
@@ -26,10 +26,7 @@ def job_url(job_id):
 
 
 def items(log):
-    return {
-        'count': len(log),
-        'items': [c for c in log]
-    }
+    return {'count': len(log), 'items': [c for c in log]}
 
 
 def latest_dropped_items(job: ImportJob):
@@ -40,13 +37,13 @@ def latest_dropped_items(job: ImportJob):
     return {
         'timestamp': latest_run.timestamp,
         'failed': items(latest_run.failed_items),
-        'invalid': items(latest_run.invalid_items)
+        'invalid': items(latest_run.invalid_items),
     }
 
 
 def create_app(config_file: str):
     app = Flask(__name__)
-    with open(config_file, "r") as stream:
+    with open(config_file, 'r') as stream:
         config = envsubst(yaml.safe_load(stream))
         app.config['CONTEXT'] = PlastronContext(config=config, args=Namespace(delegated_user=None))
         app.config['CONTEXT'].client.ua_string = f'plastrond-http/{__version__}'
@@ -90,7 +87,7 @@ def create_app(config_file: str):
                 'runs': job.runs,
                 'completed': items(job.completed_log),
                 'dropped': latest_dropped_items(job),
-                'total': job.get_metadata().total
+                'total': job.get_metadata().total,
             }
         except JobError as e:
             raise NotFound from e

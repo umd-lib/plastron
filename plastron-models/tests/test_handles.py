@@ -1,10 +1,16 @@
-from http import HTTPStatus
 import json
+from http import HTTPStatus
+
 import httpretty
 import pytest
 from rdflib import Literal
 
-from plastron.handles import HandleBearingResource, HandleServerError, HandleServiceClient, HandleInfo
+from plastron.handles import (
+    HandleBearingResource,
+    HandleInfo,
+    HandleServerError,
+    HandleServiceClient,
+)
 from plastron.namespaces import umdtype
 
 
@@ -53,9 +59,7 @@ def test_get_handle_error(handle_client):
 @httpretty.activate
 def test_get_handle_does_not_exist(handle_client):
     httpretty.register_uri(
-        httpretty.GET,
-        uri='http://handle-local:3000/handles/exists',
-        body=json.dumps({'exists': False})
+        httpretty.GET, uri='http://handle-local:3000/handles/exists', body=json.dumps({'exists': False})
     )
     assert not handle_client.find_handle('http://example.com/foobar').exists
 
@@ -65,7 +69,7 @@ def test_get_handle_exists(handle_client):
     httpretty.register_uri(
         httpretty.GET,
         uri='http://handle-local:3000/handles/exists',
-        body=json.dumps({'exists': True, 'prefix': '1903.1', 'suffix': '123', 'url': 'http://example.com/foobar'})
+        body=json.dumps({'exists': True, 'prefix': '1903.1', 'suffix': '123', 'url': 'http://example.com/foobar'}),
     )
     handle = handle_client.find_handle('http://example.com/foobar')
     assert handle.prefix == '1903.1'
@@ -78,9 +82,7 @@ def test_create_handle_success(handle_client):
     httpretty.register_uri(
         httpretty.POST,
         uri='http://handle-local:3000/handles',
-        body=json.dumps(
-            {'suffix': '123', 'request': {'url': 'http://example.com/foobar', 'prefix': '1903.1'}}
-        )
+        body=json.dumps({'suffix': '123', 'request': {'url': 'http://example.com/foobar', 'prefix': '1903.1'}}),
     )
     handle = handle_client.create_handle(repo_id='http://localhost/fcrepo/foobar', url='http://example.com/foobar')
     assert handle.prefix == '1903.1'
@@ -104,9 +106,7 @@ def test_update_handle(handle, handle_client):
     httpretty.register_uri(
         httpretty.PATCH,
         uri='http://handle-local:3000/handles/1903.1/123',
-        body=json.dumps(
-            {'suffix': '123', 'request': {'url': 'http://example.com/foobar', 'prefix': '1903.1'}}
-        )
+        body=json.dumps({'suffix': '123', 'request': {'url': 'http://example.com/foobar', 'prefix': '1903.1'}}),
     )
     updated_handle = handle_client.update_handle(handle_info=handle, url='http://example.com/new-url')
     assert updated_handle.url == 'http://example.com/new-url'

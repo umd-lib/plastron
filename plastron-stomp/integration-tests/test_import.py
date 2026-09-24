@@ -5,7 +5,7 @@ import pytest
 from plastron.utils import datetimestamp
 
 
-@pytest.mark.skipif(not os.environ.get('INTEGRATION_TESTS', False), reason='integration test')
+@pytest.mark.skipif(not os.environ.get('INTEGRATION_TESTS', None), reason='integration test')
 def test_import(datadir, stomp_client):
     headers = {
         'PlastronJobId': f'test-import-{datetimestamp()}',

@@ -1,7 +1,8 @@
 import io
 import logging
 from argparse import ArgumentTypeError
-from typing import Any, Generator, Optional
+from collections.abc import Generator
+from typing import Any
 
 from rdflib import URIRef
 
@@ -14,7 +15,7 @@ from plastron.utils import datetimestamp, strtobool, uri_or_curie
 logger = logging.getLogger(__name__)
 
 
-def get_access_uri(access) -> Optional[URIRef]:
+def get_access_uri(access) -> URIRef | None:
     if access is None:
         return None
     try:
@@ -24,8 +25,8 @@ def get_access_uri(access) -> Optional[URIRef]:
 
 
 def importcommand(
-        context: PlastronContext,
-        message: PlastronCommandMessage,
+    context: PlastronContext,
+    message: PlastronCommandMessage,
 ) -> Generator[dict[str, Any], None, dict[str, Any]]:
     """
     Performs the import
@@ -61,7 +62,7 @@ def importcommand(
 
     if job_id is None:
         # TODO: generate a more unique id? add in user and hostname?
-        job_id = f"import-{datetimestamp()}"
+        job_id = f'import-{datetimestamp()}'
 
     config = context.config.get('COMMANDS', {}).get('IMPORT', {})
     jobs = Jobs(directory=config.get('JOBS_DIR', 'jobs'))

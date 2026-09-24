@@ -1,21 +1,29 @@
 import logging
+from collections.abc import Callable
 from http import HTTPStatus
 from pathlib import Path
-from typing import Optional, Any, Callable
+from typing import Any
 
 from rdflib import Graph
-from requests import Session, Response, ConnectionError
+from requests import ConnectionError, Response, Session
 from requests.auth import AuthBase
 
 from plastron.client.endpoint import Endpoint
-from plastron.client.utils import SessionHeaderAttribute, TypedText, OMIT_SERVER_MANAGED_TRIPLES, ResourceURI, \
-    serialize, build_sparql_update
+from plastron.client.utils import (
+    OMIT_SERVER_MANAGED_TRIPLES,
+    ResourceURI,
+    SessionHeaderAttribute,
+    TypedText,
+    build_sparql_update,
+    serialize,
+)
 
 logger = logging.getLogger(__name__)
 
 
 class Client:
     """HTTP client for interacting with a Fedora repository."""
+
     ua_string = SessionHeaderAttribute('User-Agent')
     """`User-Agent` header value"""
     delegated_user = SessionHeaderAttribute('On-Behalf-Of')
@@ -29,9 +37,9 @@ class Client:
         self,
         endpoint: Endpoint,
         auth: AuthBase = None,
-        server_cert: str = None,
-        ua_string: str = None,
-        on_behalf_of: str = None,
+        server_cert: str | None = None,
+        ua_string: str | None = None,
+        on_behalf_of: str | None = None,
         load_binaries: bool = True,
         session: Session = None,
     ):
@@ -100,10 +108,7 @@ class Client:
         return self.request('DELETE', url, **kwargs)
 
     def get_description(
-            self,
-            url: str,
-            accept: str = 'application/n-triples',
-            include_server_managed: bool = True
+        self, url: str, accept: str = 'application/n-triples', include_server_managed: bool = True
     ) -> TypedText:
         """Get the content at `url` by issuing an HTTP GET request. Defaults to
         sending an `Accept: application/n-triples` header, but that can be
@@ -124,7 +129,7 @@ class Client:
             headers['Prefer'] = OMIT_SERVER_MANAGED_TRIPLES
         response = self.get(url, headers=headers, stream=True)
         if not response.ok:
-            logger.error(f"Unable to get {headers['Accept']} representation of {url}")
+            logger.error(f'Unable to get {headers["Accept"]} representation of {url}')
             raise ClientError(response=response)
         return TypedText(response.headers['Content-Type'], response.text)
 
@@ -166,11 +171,11 @@ class Client:
     def test_connection(self):
         """Test the connection to the repository using `is_reachable()`. If
         it returns false, raises a `ConnectionError`."""
-        logger.debug(f"Endpoint = {self.endpoint.url}")
-        logger.debug(f"Default container path = {self.endpoint.relpath}")
-        logger.info(f"Testing connection to {self.endpoint.url}")
+        logger.debug(f'Endpoint = {self.endpoint.url}')
+        logger.debug(f'Default container path = {self.endpoint.relpath}')
+        logger.info(f'Testing connection to {self.endpoint.url}')
         if self.is_reachable():
-            logger.info("Connection successful.")
+            logger.info('Connection successful.')
         else:
             raise ConnectionError(f'Unable to connect to {self.endpoint.url}')
 
@@ -199,7 +204,7 @@ class Client:
                 to_create.insert(0, ancestor)
         return to_create
 
-    def get_location(self, response: Response) -> Optional[str]:
+    def get_location(self, response: Response) -> str | None:
         """Return the value of the `Location` HTTP header in `response`,
         or `None` if there is no such header."""
         try:
@@ -209,12 +214,12 @@ class Client:
             return None
 
     def create(
-            self,
-            path: str = None,
-            url: str = None,
-            container_path: str = None,
-            slug: str = None,
-            **kwargs,
+        self,
+        path: str | None = None,
+        url: str | None = None,
+        container_path: str | None = None,
+        slug: str | None = None,
+        **kwargs,
     ) -> ResourceURI:
         if url is not None:
             response = self.put(url, **kwargs)
@@ -248,11 +253,7 @@ class Client:
             logger.info(f'Creating {path}')
             if path == target_path and graph:
                 resource = self.create(
-                    path=str(path),
-                    headers={
-                        'Content-Type': 'text/turtle'
-                    },
-                    data=serialize(graph, format='turtle')
+                    path=str(path), headers={'Content-Type': 'text/turtle'}, data=serialize(graph, format='turtle')
                 )
             else:
                 resource = self.create(path=str(path))
@@ -268,10 +269,8 @@ class Client:
         if graph:
             resource = self.create(
                 container_path=str(container_path),
-                headers={
-                    'Content-Type': 'text/turtle'
-                },
-                data=serialize(graph, format='turtle')
+                headers={'Content-Type': 'text/turtle'},
+                data=serialize(graph, format='turtle'),
             )
         else:
             resource = self.create(container_path=str(container_path))
@@ -279,7 +278,7 @@ class Client:
         logger.info(f'Created {resource}')
         return resource
 
-    def create_all(self, container_path: str, resources: list[Any], name_function: Callable = None):
+    def create_all(self, container_path: str, resources: list[Any], name_function: Callable | None = None):
         # ensure the container exists
         if len(resources) > 0 and not self.path_exists(container_path):
             self.create(path=container_path)
@@ -298,7 +297,7 @@ class Client:
             headers={
                 'Content-Type': 'application/n-triples',
             },
-            data=graph.serialize(format='application/n-triples')
+            data=graph.serialize(format='application/n-triples'),
         )
 
     def patch_graph(self, url, deletes: Graph, inserts: Graph) -> Response:
@@ -306,15 +305,14 @@ class Client:
         logger.debug(sparql_update)
         return self.patch(
             url,
-            headers={
-                'Content-Type': 'application/sparql-update'
-            },
+            headers={'Content-Type': 'application/sparql-update'},
             data=sparql_update,
         )
 
 
 class ClientError(Exception):
     """Raised when a `Client` receives an HTTP error response (4xx or 5xx)."""
+
     def __init__(self, response: Response, *args):
         super().__init__(*args)
 

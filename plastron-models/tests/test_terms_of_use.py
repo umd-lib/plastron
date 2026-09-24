@@ -1,41 +1,35 @@
-from plastron.models.umd import Item
+import pytest
+from rdflib import Graph, URIRef
+
 from plastron.models.letter import Letter
 from plastron.models.newspaper import Issue
 from plastron.models.poster import Poster
+from plastron.models.umd import Item
 from plastron.namespaces import dcterms
-from rdflib import Graph, URIRef
-
-import pytest
 
 base_uri = 'http://example.com/xyz'
 
 
-@pytest.mark.parametrize("model_class", [Item, Letter, Poster, Issue])
+@pytest.mark.parametrize('model_class', [Item, Letter, Poster, Issue])
 def test_model_with_terms_of_use(model_class):
-    model = create_model_with_terms_of_use(
-        model_class, base_uri, 'foo'
-    )
+    model = create_model_with_terms_of_use(model_class, base_uri, 'foo')
 
     assert model.terms_of_use.value == URIRef('http://vocab.lib.umd.edu/termsOfUse#foo')
 
 
-@pytest.mark.parametrize("model_class", [Item, Letter, Poster, Issue])
+@pytest.mark.parametrize('model_class', [Item, Letter, Poster, Issue])
 def test_model_validation_with_valid_terms_of_use(model_class):
-    model = create_model_with_terms_of_use(
-        model_class, base_uri, 'test'
-    )
+    model = create_model_with_terms_of_use(model_class, base_uri, 'test')
     assert model.terms_of_use.is_valid
 
 
-@pytest.mark.parametrize("model_class", [Item, Letter, Poster, Issue])
+@pytest.mark.parametrize('model_class', [Item, Letter, Poster, Issue])
 def test_model_validation_with_invalid_terms_of_use(model_class):
-    model = create_model_with_terms_of_use(
-        model_class, base_uri, 'not_valid'
-    )
+    model = create_model_with_terms_of_use(model_class, base_uri, 'not_valid')
     assert not model.terms_of_use.is_valid
 
 
-@pytest.mark.parametrize("model_class", [Item, Letter, Poster, Issue])
+@pytest.mark.parametrize('model_class', [Item, Letter, Poster, Issue])
 def test_terms_of_use_can_be_set_on_model(model_class):
     model = model_class(uri=base_uri)
     model.terms_of_use = URIRef('http://vocab.lib.umd.edu/termsOfUse#test')
@@ -43,6 +37,7 @@ def test_terms_of_use_can_be_set_on_model(model_class):
     expected = (URIRef(base_uri), dcterms.license, URIRef('http://vocab.lib.umd.edu/termsOfUse#test'))
     assert expected in model.graph
     assert model.terms_of_use.is_valid
+
 
 # Helper Functions
 

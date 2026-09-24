@@ -1,8 +1,13 @@
 import pytest
-from rdflib import URIRef, Literal
+from rdflib import Literal, URIRef
 
 from plastron.client import Endpoint
-from plastron.client.transactions import transaction, TransactionClient, Transaction, TransactionError
+from plastron.client.transactions import (
+    Transaction,
+    TransactionClient,
+    TransactionError,
+    transaction,
+)
 
 
 @pytest.fixture()
@@ -28,7 +33,7 @@ def txn_client(endpoint):
         # do nothing if it is not a URIRef
         ('bar', 'bar'),
         (Literal('bar'), Literal('bar')),
-    ]
+    ],
 )
 def test_remove_transaction_uri(txn_client, value, expected_uri):
     assert txn_client.remove_transaction_uri(value) == expected_uri
@@ -45,15 +50,14 @@ def test_remove_transaction_uri(txn_client, value, expected_uri):
         # do nothing if it is not a URIRef
         ('bar', 'bar'),
         (Literal('bar'), Literal('bar')),
-    ]
+    ],
 )
 def test_insert_transaction_uri(txn_client, value, expected_uri):
     assert txn_client.insert_transaction_uri(value) == expected_uri
 
 
 def test_cannot_nest_transactions(txn_client):
-    with pytest.raises(TransactionError) as e:
-        with transaction(txn_client):
-            pass
+    with pytest.raises(TransactionError) as e, transaction(txn_client):
+        pass
 
     assert str(e.value).startswith('Failed to create transaction')

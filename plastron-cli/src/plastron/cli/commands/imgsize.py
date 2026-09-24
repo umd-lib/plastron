@@ -4,8 +4,8 @@ from argparse import Namespace
 from PIL import Image
 
 from plastron.cli.commands import BaseCommand
-from plastron.models.pcdm import PCDMImageFile
 from plastron.files import BinaryResource
+from plastron.models.pcdm import PCDMImageFile
 from plastron.repo.utils import context
 
 Image.MAX_IMAGE_PIXELS = None
@@ -14,22 +14,14 @@ logger = logging.getLogger(__name__)
 
 
 def configure_cli(subparsers):
-    parser = subparsers.add_parser(
-        name='imgsize',
-        description='Add width and height to image resources'
-    )
-    parser.add_argument(
-        'uris',
-        nargs='*',
-        help='URIs of repository objects to get image info'
-    )
+    parser = subparsers.add_parser(name='imgsize', description='Add width and height to image resources')
+    parser.add_argument('uris', nargs='*', help='URIs of repository objects to get image info')
     parser.set_defaults(cmd_name='imgsize')
 
 
 class Command(BaseCommand):
     def __call__(self, args: Namespace):
         for uri in args.uris:
-
             file_resource: BinaryResource = self.context.repo[uri:BinaryResource].read()
             file = file_resource.describe(PCDMImageFile)
 

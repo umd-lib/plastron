@@ -1,13 +1,22 @@
 from plastron.handles import HandleBearingResource
 from plastron.models import ContentModeledResource
-from plastron.models.authorities import Agent, Subject, Place, DCMI_TYPES, UMD_RIGHTS_STATEMENTS, UMD_FORMATS, \
-    UMD_ARCHIVAL_COLLECTIONS, UMD_PRESENTATION_SETS, UMD_TERMS_OF_USE_STATEMENTS
+from plastron.models.authorities import (
+    DCMI_TYPES,
+    UMD_ARCHIVAL_COLLECTIONS,
+    UMD_FORMATS,
+    UMD_PRESENTATION_SETS,
+    UMD_RIGHTS_STATEMENTS,
+    UMD_TERMS_OF_USE_STATEMENTS,
+    Agent,
+    Place,
+    Subject,
+)
 from plastron.models.fedora import FedoraResource
 from plastron.models.page import File, Page
 from plastron.models.pcdm import PCDMObject
-from plastron.namespaces import dc, dcterms, edm, pcdm, ore, schema, umdtype, umd
+from plastron.namespaces import dc, dcterms, edm, ore, pcdm, schema, umd, umdtype
 from plastron.rdfmapping.decorators import rdf_type
-from plastron.rdfmapping.descriptors import ObjectProperty, DataProperty
+from plastron.rdfmapping.descriptors import DataProperty, ObjectProperty
 from plastron.rdfmapping.resources import RDFResource
 from plastron.validation.rules import is_edtf_formatted, is_valid_iso639_code
 from plastron.validation.vocabularies import ControlledVocabularyProperty

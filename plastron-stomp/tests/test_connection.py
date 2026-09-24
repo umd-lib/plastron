@@ -7,7 +7,7 @@ from coilmq.server.socket_server import StompServer
 from coilmq.store.memory import MemoryQueue
 from coilmq.topic import TopicManager
 
-from plastron.messaging.broker import ServerTuple, Broker
+from plastron.messaging.broker import Broker, ServerTuple
 from plastron.stomp.daemon import STOMPDaemon
 
 
@@ -27,7 +27,7 @@ def broker(server_address, shared_datadir) -> Broker:
             'JOB_STATUS': '/queue/plastron.jobs.status',
             'SYNCHRONOUS_JOBS': '/queue/plastron.jobs.synchronous',
             'REINDEXING': '/queue/reindex',
-        }
+        },
     )
 
 

@@ -10,19 +10,9 @@ from plastron.client.proxied import ProxiedClient
 @pytest.mark.parametrize(
     ('endpoint_url', 'origin_endpoint_url', 'expected_proto', 'expected_host'),
     [
-        (
-            'https://example.com/fcrepo/rest',
-            'http://localhost:8080/fcrepo/rest',
-            'https',
-            'example.com'
-        ),
-        (
-            'http://example.net:8080/fcrepo/rest',
-            'http://localhost:8080/fcrepo/rest',
-            'http',
-            'example.net:8080'
-        ),
-    ]
+        ('https://example.com/fcrepo/rest', 'http://localhost:8080/fcrepo/rest', 'https', 'example.com'),
+        ('http://example.net:8080/fcrepo/rest', 'http://localhost:8080/fcrepo/rest', 'http', 'example.net:8080'),
+    ],
 )
 def test_proxied_client_headers(endpoint_url, origin_endpoint_url, expected_proto, expected_host):
     client = ProxiedClient(

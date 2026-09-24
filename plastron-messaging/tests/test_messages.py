@@ -1,5 +1,9 @@
-from plastron.messaging.messages import PlastronCommandMessage, PlastronErrorMessage, PlastronMessage, \
-    PlastronResponseMessage
+from plastron.messaging.messages import (
+    PlastronCommandMessage,
+    PlastronErrorMessage,
+    PlastronMessage,
+    PlastronResponseMessage,
+)
 
 
 def test_plastron_message_no_body():

@@ -6,7 +6,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from plastron.cli.commands.publish import Command, publish
-from plastron.client import Endpoint, Client
+from plastron.client import Client, Endpoint
 from plastron.client.utils import TypedText
 from plastron.context import PlastronContext
 from plastron.handles import HandleInfo, HandleServerError
@@ -74,11 +74,11 @@ class MockHandleClient:
     def get_info(self, prefix: str, suffix: str) -> HandleInfo:
         return self.GET_HANDLE_LOOKUP.get(f'{prefix}/{suffix}', HandleInfo(exists=False))
 
-    def find_handle(self, repo_id: str, _repo: str = None) -> HandleInfo:
+    def find_handle(self, repo_id: str, _repo: str | None = None) -> HandleInfo:
         return self.FIND_HANDLE_LOOKUP.get(repo_id, HandleInfo(exists=False))
 
     @staticmethod
-    def create_handle(repo_id: str, url: str, prefix: str = None, _repo: str = None) -> HandleInfo:
+    def create_handle(repo_id: str, url: str, prefix: str | None = None, _repo: str | None = None) -> HandleInfo:
         if repo_id.endswith('NO_HANDLE'):
             raise HandleServerError('no handle')
         return HandleInfo(exists=True, prefix=prefix, suffix=str(randint(1000, 10000)), url=url)
@@ -100,7 +100,7 @@ def get_mock_context(obj, path):
         spec=PlastronContext,
         repo=mock_repo,
         handle_client=MockHandleClient(),
-        get_public_url=lambda res: res.url.replace('fcrepo-local:8080/fcrepo/rest', 'digital-local')
+        get_public_url=lambda res: res.url.replace('fcrepo-local:8080/fcrepo/rest', 'digital-local'),
     )
 
 

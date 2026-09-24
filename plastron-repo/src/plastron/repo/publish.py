@@ -1,10 +1,15 @@
 import logging
 
-from plastron.handles import HandleBearingResource, HandleServiceClient, HandleServerError, parse_handle_string, \
-    HandleInfo
+from plastron.handles import (
+    HandleBearingResource,
+    HandleInfo,
+    HandleServerError,
+    HandleServiceClient,
+    parse_handle_string,
+)
 from plastron.namespaces import umdaccess
 from plastron.rdfmapping.resources import RDFResource
-from plastron.repo import RepositoryResource, RepositoryError
+from plastron.repo import RepositoryError, RepositoryResource
 
 logger = logging.getLogger(__name__)
 
@@ -28,11 +33,11 @@ class PublishableResource(RepositoryResource):
         return get_publication_status(self.describe(RDFResource))
 
     def publish(
-            self,
-            handle_client: HandleServiceClient,
-            public_url: str,
-            force_hidden: bool = False,
-            force_visible: bool = False,
+        self,
+        handle_client: HandleServiceClient,
+        public_url: str,
+        force_hidden: bool = False,
+        force_visible: bool = False,
     ) -> HandleInfo:
         obj = self.describe(HandleBearingResource)
 

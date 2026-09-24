@@ -4,7 +4,7 @@ import click
 from dotenv import load_dotenv
 from waitress import serve
 
-from plastron.web import create_app, __version__
+from plastron.web import __version__, create_app
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -18,7 +18,8 @@ logger = logging.getLogger(__name__)
     metavar='[ADDRESS]:PORT',
 )
 @click.option(
-    '-c', '--config-file',
+    '-c',
+    '--config-file',
     type=click.Path(exists=True),
     help='Configuration file',
     required=True,
@@ -38,5 +39,5 @@ def run(listen: bool, config_file: str):
         raise SystemExit(1) from e
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     run()

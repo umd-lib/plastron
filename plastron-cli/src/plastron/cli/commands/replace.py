@@ -4,7 +4,7 @@ from argparse import Namespace
 from rdflib import Literal
 
 from plastron.cli.commands import BaseCommand
-from plastron.files import LocalFileSource, BinaryResource
+from plastron.files import BinaryResource, LocalFileSource
 from plastron.models.pcdm import PCDMFile
 from plastron.repo import Repository, RepositoryError
 
@@ -12,10 +12,7 @@ logger = logging.getLogger(__name__)
 
 
 def configure_cli(subparsers):
-    parser = subparsers.add_parser(
-        name='replace',
-        description='Replace a binary resource in the repository'
-    )
+    parser = subparsers.add_parser(name='replace', description='Replace a binary resource in the repository')
     parser.add_argument(
         '--binary-file',
         help='local path to the binary file',
@@ -39,7 +36,7 @@ class Command(BaseCommand):
         return replace(ctx, location=args.location, binary_filename=args.binary_file, mime_type=args.mime_type)
 
 
-def replace(ctx, location: str, binary_filename: str, mime_type: str = None):
+def replace(ctx, location: str, binary_filename: str, mime_type: str | None = None):
     repo: Repository = ctx.obj.repo
     try:
         resource = repo.get_resource(location, BinaryResource).read()

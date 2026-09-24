@@ -1,8 +1,8 @@
-from typing import Optional, ItemsView
+from collections.abc import ItemsView
 
 
 class ValidationResult:
-    def __init__(self, prop: Optional[object] = None, message: Optional[str] = ''):
+    def __init__(self, prop: object | None = None, message: str | None = ''):
         self.prop = prop
         self.message = message
 

@@ -1,7 +1,7 @@
 import pytest
 
 from plastron.jobs import ItemLog
-from plastron.jobs.logs import AppendableSequence, NullLog, ItemLogError
+from plastron.jobs.logs import AppendableSequence, ItemLogError, NullLog
 
 
 @pytest.fixture

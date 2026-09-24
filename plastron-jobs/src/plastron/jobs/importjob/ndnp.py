@@ -2,29 +2,33 @@
 
 import logging
 import sys
+from collections.abc import Iterator
 from csv import DictWriter
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Iterator, Optional
+from typing import Any
 
 from lxml import etree
 
 # noinspection PyProtectedMember
 from lxml.etree import QName, XMLSyntaxError, _Element, _ElementTree
+
 from plastron.files import FileSpec
 from plastron.repo import DataReadError
 
 logger = logging.getLogger(__name__)
 
-ISSUE_FIELDNAMES = ['Title',
-                    'Date',
-                    'Volume',
-                    'Issue',
-                    'Edition',
-                    'Rights Statement',
-                    'Presentation Set',
-                    'FILES',
-                    'ITEM_FILES']
+ISSUE_FIELDNAMES = [
+    'Title',
+    'Date',
+    'Volume',
+    'Issue',
+    'Edition',
+    'Rights Statement',
+    'Presentation Set',
+    'FILES',
+    'ITEM_FILES',
+]
 
 
 class XMLNS:
@@ -42,6 +46,7 @@ class XMLNS:
 
     ```
     """
+
     def __init__(self, uri: str):
         self.uri = uri
         """Namespace URI"""
@@ -101,27 +106,28 @@ class NDNPIssue:
         """Get the issue title as a string."""
         return self.mets_doc.getroot().get('LABEL')
 
-    def _get_detail_number(self, type_attr: str) -> Optional[str]:
+    def _get_detail_number(self, type_attr: str) -> str | None:
         try:
             return self.mets_doc.find(f'.//MODS:detail[@type="{type_attr}"]/MODS:number', namespaces=xmlns).text
         except AttributeError:
             return None
 
-    def get_volume(self) -> Optional[str]:
+    def get_volume(self) -> str | None:
         """Get the issue's volume number as a string, or `None` if it cannot be found."""
         return self._get_detail_number('volume')
 
-    def get_issue(self) -> Optional[str]:
+    def get_issue(self) -> str | None:
         """Get the issue's issue number as a string, or `None` if it cannot be found."""
         return self._get_detail_number('issue')
 
-    def get_edition(self) -> Optional[str]:
+    def get_edition(self) -> str | None:
         """Get the issue's edition number as a string, or `None` if it cannot be found."""
         return self._get_detail_number('edition')
 
 
 class NDNPBatch:
     """Class representing a batch of newspaper issues in NDNP format."""
+
     root_dir: Path
     """Root directory of the NDNP package"""
     batch_file: Path
@@ -133,11 +139,13 @@ class NDNPBatch:
     """Rights Statement URI for this batch. Defaults to `http://vocab.lib.umd.edu/rightsStatement#InC-NC`
     if not provided from the convert-options parameter from the command line."""
 
-    def __init__(self,
-                 dir: str | Path,
-                 batch_file: str = 'batch.xml',
-                 rights: str = 'http://vocab.lib.umd.edu/rightsStatement#InC-NC',
-                 presentation_set: str = ''):
+    def __init__(
+        self,
+        dir: str | Path,
+        batch_file: str = 'batch.xml',
+        rights: str = 'http://vocab.lib.umd.edu/rightsStatement#InC-NC',
+        presentation_set: str = '',
+    ):
         self.root_dir = Path(dir)
         self.presentation_set = presentation_set
         self.rights = rights
@@ -193,14 +201,8 @@ def get_issue_data(issue: NDNPIssue) -> dict[str, str]:
 
     # get item-level files: METS metadata for the issue and for the articles
     item_files = [
-        FileSpec(
-            name=str(issue.mets_path.relative_to(issue.batch.root_dir)),
-            usage='metadata'
-        ),
-        FileSpec(
-            name=str(issue.article_mets_path.relative_to(issue.batch.root_dir)),
-            usage='metadata'
-        ),
+        FileSpec(name=str(issue.mets_path.relative_to(issue.batch.root_dir)), usage='metadata'),
+        FileSpec(name=str(issue.article_mets_path.relative_to(issue.batch.root_dir)), usage='metadata'),
     ]
     # get pages and page-level files
     files = []
@@ -236,17 +238,14 @@ def get_article_data(article_path) -> Iterator[dict[str, Any]]:
     try:
         article_tree = etree.parse(article_path)
     except OSError:
-        raise DataReadError(f"Unable to read {article_path}")
+        raise DataReadError(f'Unable to read {article_path}')
     except XMLSyntaxError:
-        raise DataReadError(f"Unable to parse {article_path} as XML")
+        raise DataReadError(f'Unable to parse {article_path} as XML')
 
     article_root = article_tree.getroot()
     for article in article_root.findall(METS.div + '[@TYPE="article"]'):
         article_title = article.get('LABEL')
-        page_numbers = sorted(list(set(
-            int(area.get('FILEID').replace('ocrFile', ''))
-            for area in article.findall(METS.area)
-        )))
+        page_numbers = sorted({int(area.get('FILEID').replace('ocrFile', '')) for area in article.findall(METS.area)})
         yield {
             'Title': article_title,
             'First page': page_numbers[0],

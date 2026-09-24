@@ -4,8 +4,8 @@ import httpretty
 import pytest
 from rdflib import Graph, Literal
 
-from plastron.cli.commands.find import find, Command
-from plastron.namespaces import rdf, pcdm, dcterms, ldp
+from plastron.cli.commands.find import Command, find
+from plastron.namespaces import dcterms, ldp, pcdm, rdf
 
 
 @pytest.mark.parametrize(
@@ -15,18 +15,20 @@ from plastron.namespaces import rdf, pcdm, dcterms, ldp
         (all, [(rdf.type, pcdm.Object)], 1),
         (all, [(rdf.type, pcdm.Object), (dcterms.title, Literal('Moonpig'))], 0),
         (any, [(rdf.type, pcdm.Object), (dcterms.title, Literal('Moonpig'))], 2),
-    ]
+    ],
 )
 @httpretty.activate
 def test_find(datadir, repo, simulate_repo, matcher, properties, expected_count):
     graph = Graph().parse(file=(datadir / 'graph.ttl').open())
     simulate_repo(graph)
-    resources = list(find(
-        start_resource=repo['/container'],
-        matcher=matcher,
-        traverse=[ldp.contains],
-        properties=properties,
-    ))
+    resources = list(
+        find(
+            start_resource=repo['/container'],
+            matcher=matcher,
+            traverse=[ldp.contains],
+            properties=properties,
+        )
+    )
     assert len(resources) == expected_count
 
 
@@ -57,7 +59,7 @@ def test_find(datadir, repo, simulate_repo, matcher, properties, expected_count)
                 match_any=False,
                 uris=['/container'],
             ),
-            ['/container/1']
+            ['/container/1'],
         ),
         (
             Namespace(
@@ -70,9 +72,9 @@ def test_find(datadir, repo, simulate_repo, matcher, properties, expected_count)
                 match_any=True,
                 uris=['/container'],
             ),
-            ['/container/1', '/container/2']
+            ['/container/1', '/container/2'],
         ),
-    ]
+    ],
 )
 @httpretty.activate
 def test_find_command(capsys, datadir, repo, plastron_context, simulate_repo, args, expected_paths):

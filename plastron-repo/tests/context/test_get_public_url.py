@@ -41,7 +41,7 @@ from plastron.repo import RepositoryResource
             'http://fcrepo-test/fcrepo/rest/pcdm',
             'http://digital-test/search/id/fcrepo:pcdm:f4:f0:46:77:f4f04677-6ebe-4166-b30d-232fd2ad4e10',
         ),
-    ]
+    ],
 )
 def test_get_public_url(public_url_pattern, resource_url, container_url, expected_public_url):
     resource = MagicMock(
@@ -55,7 +55,7 @@ def test_get_public_url(public_url_pattern, resource_url, container_url, expecte
         },
         'PUBLICATION_WORKFLOW': {
             'PUBLIC_URL_PATTERN': public_url_pattern,
-        }
+        },
     }
     context = PlastronContext(config)
     assert context.get_public_url(resource) == expected_public_url

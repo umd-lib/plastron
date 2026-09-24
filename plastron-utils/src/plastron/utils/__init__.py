@@ -3,8 +3,8 @@ import os
 import platform
 import re
 from argparse import ArgumentTypeError
-from datetime import datetime
-from typing import Mapping, Optional
+from collections.abc import Mapping
+from datetime import datetime, timezone
 
 from rdflib import URIRef
 from rdflib.term import Node
@@ -15,45 +15,25 @@ from plastron import namespaces
 DEFAULT_LOGGING_OPTIONS = {
     'version': 1,
     'formatters': {
-        'full': {
-            'format': '%(levelname)s|%(asctime)s|%(threadName)s|%(name)s|%(message)s'
-        },
-        'messageonly': {
-            'format': '%(message)s'
-        }
+        'full': {'format': '%(levelname)s|%(asctime)s|%(threadName)s|%(name)s|%(message)s'},
+        'messageonly': {'format': '%(message)s'},
     },
     'handlers': {
         'console': {
             'class': 'logging.StreamHandler',
             'level': 'INFO',
             'formatter': 'messageonly',
-            'stream': 'ext://sys.stderr'
+            'stream': 'ext://sys.stderr',
         },
-        'file': {
-            'class': 'logging.FileHandler',
-            'level': 'DEBUG',
-            'formatter': 'full'
-        }
+        'file': {'class': 'logging.FileHandler', 'level': 'DEBUG', 'formatter': 'full'},
     },
     'loggers': {
-        '__main__': {
-            'level': 'DEBUG',
-            'handlers': ['console', 'file'],
-            'propagate': False
-        },
-        'plastron': {
-            'level': 'DEBUG',
-            'handlers': ['console', 'file'],
-            'propagate': False
-        },
+        '__main__': {'level': 'DEBUG', 'handlers': ['console', 'file'], 'propagate': False},
+        'plastron': {'level': 'DEBUG', 'handlers': ['console', 'file'], 'propagate': False},
         # suppress logging output from paramiko by default
-        'paramiko': {
-            'propagate': False
-        }
+        'paramiko': {'propagate': False},
     },
-    'root': {
-        'level': 'DEBUG'
-    }
+    'root': {'level': 'DEBUG'},
 }
 logger = logging.getLogger(__name__)
 
@@ -71,14 +51,14 @@ def datetimestamp(digits_only: bool = True) -> str:
     '2023-11-17T15:20:57'
     ```
     """
-    now = str(datetime.utcnow().isoformat(timespec='seconds'))
+    now = str(datetime.now(timezone.utc).isoformat(timespec='seconds'))
     if digits_only:
         return re.sub(r'[^0-9]', '', now)
     else:
         return now
 
 
-def envsubst(value: str | list | dict, env: Mapping[str, str] = None) -> str | list | dict:
+def envsubst(value: str | list | dict, env: Mapping[str, str] | None = None) -> str | list | dict:
     """
     Recursively replace `${VAR_NAME}` placeholders in value with the values of the
     corresponding keys of env. If env is not given, it defaults to the environment
@@ -119,7 +99,7 @@ def envsubst(value: str | list | dict, env: Mapping[str, str] = None) -> str | l
 
 def check_python_version():
     # check Python version
-    major, minor, patch = (int(v) for v in platform.python_version_tuple())
+    _major, minor, _patch = (int(v) for v in platform.python_version_tuple())
     if minor < 8:
         logger.warning(
             f'You appear to be running Python {platform.python_version()}. '
@@ -148,7 +128,7 @@ def strtobool(val: str) -> int:
     elif val in ('n', 'no', 'f', 'false', 'off', '0'):
         return 0
     else:
-        raise ValueError("invalid truth value %r" % (val,))
+        raise ValueError(f'invalid truth value {val!r}')
 
 
 def uri_or_curie(arg: str) -> URIRef:
@@ -157,19 +137,19 @@ def uri_or_curie(arg: str) -> URIRef:
     parse it as a CURIE (e.g., "dcterms:title") and return the expanded
     URI. If the prefix is not recognized, or if `from_n3()` returns anything
     but a URIRef, raises `ArgumentTypeError`."""
-    if arg and (arg.startswith('http://') or arg.startswith('https://')):
+    if arg and (arg.startswith(('http://', 'https://'))):
         # looks like an absolute HTTP URI
         return URIRef(arg)
     try:
         term = from_n3(arg, nsm=namespaces.get_manager())
     except KeyError:
-        raise ArgumentTypeError(f'"{arg[:arg.index(":") + 1]}" is not a known prefix')
+        raise ArgumentTypeError(f'"{arg[: arg.index(":") + 1]}" is not a known prefix')
     if not isinstance(term, URIRef):
         raise ArgumentTypeError(f'"{arg}" must be a URI or CURIE')
     return term
 
 
-def parse_predicate_list(string: str, delimiter: str = ',') -> Optional[list[Node]]:
+def parse_predicate_list(string: str, delimiter: str = ',') -> list[Node] | None:
     if string is None:
         return None
     manager = namespaces.get_manager()

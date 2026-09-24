@@ -2,10 +2,11 @@ import logging
 import os
 import sys
 from threading import Event, Thread
-from typing import TextIO, Any
+from typing import Any, TextIO
 
 import click
 import yaml
+
 from stomp.listener import HeartbeatListener
 
 from plastron.context import PlastronContext
@@ -65,13 +66,15 @@ class STOMPDaemon(Thread):
 
 @click.command
 @click.option(
-    '-c', '--config-file',
+    '-c',
+    '--config-file',
     type=click.File(),
     help='Configuration file',
     required=True,
 )
 @click.option(
-    '-v', '--verbose',
+    '-v',
+    '--verbose',
     is_flag=True,
     help='increase the verbosity of the status output',
     deprecated='Set an explicit log level using the "LOG_LEVEL" environment variable.',
@@ -100,5 +103,5 @@ def main(config_file: TextIO, verbose: bool):
     sys.exit()
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()

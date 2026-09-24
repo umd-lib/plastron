@@ -1,5 +1,6 @@
 import logging
-from typing import Generator, Any
+from collections.abc import Generator
+from typing import Any
 
 from plastron.context import PlastronContext
 from plastron.jobs.exportjob import ExportJob
@@ -10,8 +11,8 @@ logger = logging.getLogger(__name__)
 
 
 def export(
-        context: PlastronContext,
-        message: PlastronCommandMessage,
+    context: PlastronContext,
+    message: PlastronCommandMessage,
 ) -> Generator[dict[str, Any], None, dict[str, Any]]:
     ssh_key = context.config.get('COMMANDS', {}).get('EXPORT', {}).get('SSH_PRIVATE_KEY', None)
     export_job = ExportJob(

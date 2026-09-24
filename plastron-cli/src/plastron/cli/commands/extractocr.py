@@ -1,54 +1,39 @@
 import logging
 from argparse import FileType, Namespace
-from datetime import datetime
+from datetime import datetime, timezone
 
 from lxml import etree
 
 from plastron.cli import get_uris
-from plastron.repo.utils import context
 from plastron.cli.commands import BaseCommand
+from plastron.jobs import ItemLog
 from plastron.models.annotations import TextblockOnPage
 from plastron.namespaces import pcdmuse
 from plastron.ocr.alto import ALTOResource
 from plastron.repo.pcdm import PCDMPageResource
-from plastron.jobs import ItemLog
+from plastron.repo.utils import context
 
 logger = logging.getLogger(__name__)
-now = datetime.utcnow().strftime('%Y%m%d%H%M%S')
+now = datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')
 
 
 def configure_cli(subparsers):
     parser = subparsers.add_parser(
-        name='extractocr',
-        description='Create annotations from OCR data stored in the repository'
+        name='extractocr', description='Create annotations from OCR data stored in the repository'
     )
+    parser.add_argument('--ignore', '-i', help='file listing items to ignore', action='store')
     parser.add_argument(
-        '--ignore', '-i',
-        help='file listing items to ignore',
-        action='store'
-    )
-    parser.add_argument(
-        '--no-transactions', '--no-txn',
+        '--no-transactions',
+        '--no-txn',
         help='run the annotation process without using transactions',
         action='store_false',
-        dest='use_transactions'
+        dest='use_transactions',
     )
+    parser.add_argument('--completed', help='file recording the URIs of processed resources', action='store')
     parser.add_argument(
-        '--completed',
-        help='file recording the URIs of processed resources',
-        action='store'
+        '-f', '--file', dest='uris_file', type=FileType(mode='r'), help='File containing a list of URIs', action='store'
     )
-    parser.add_argument(
-        '-f', '--file',
-        dest='uris_file',
-        type=FileType(mode='r'),
-        help='File containing a list of URIs',
-        action='store'
-    )
-    parser.add_argument(
-        'uris', nargs='*',
-        help='Repository URIs'
-    )
+    parser.add_argument('uris', nargs='*', help='Repository URIs')
     parser.set_defaults(cmd_name='extractocr')
 
 
@@ -86,7 +71,7 @@ class Command(BaseCommand):
                 extracted_text_file = page_resource.get_file(rdf_type=pcdmuse.ExtractedText)
                 if extracted_text_file is None:
                     logger.error(f'Resource {page_resource.url} has no OCR file; skipping')
-                    skipped.append({'uri': uri, 'timestamp': str(datetime.utcnow())})
+                    skipped.append({'uri': uri, 'timestamp': str(datetime.now(timezone.utc))})
                     continue
 
                 # TODO: currently assuming all extracted text files are ALTO

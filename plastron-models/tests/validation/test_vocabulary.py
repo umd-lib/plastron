@@ -1,10 +1,10 @@
 from unittest.mock import MagicMock
 
 import pytest
-from rdflib import Graph, URIRef, Literal
+from rdflib import Graph, Literal, URIRef
 
 import plastron.validation.vocabularies
-from plastron.namespaces import rdfs, dcterms, rdf, owl
+from plastron.namespaces import dcterms, owl, rdf, rdfs
 from plastron.validation.vocabularies import Vocabulary, VocabularyTerm
 
 
@@ -64,7 +64,7 @@ def test_vocabulary_term(monkeypatch, vocabulary_graph):
         ('http://example.com/things#', None, 'ThingsVocabularyTerm'),
         ('http://example.com/things/', None, 'ThingsVocabularyTerm'),
         ('http://example.com/things#', 'NewClassName', 'NewClassName'),
-    ]
+    ],
 )
 def test_vocabulary_term_from_vocab(vocab_uri, name_param, expected_name):
     vocabulary = Vocabulary(vocab_uri)

@@ -9,6 +9,7 @@ class MessageHeader:
     """
     Descriptor to map a STOMP message header name to a Python attribute.
     """
+
     def __init__(self, header_name: str):
         self.header_name = header_name
 
@@ -78,7 +79,7 @@ class Message:
 class PlastronMessage(Message):
     job_id = MessageHeader('PlastronJobId')
 
-    def __init__(self, job_id: str = None, **kwargs):
+    def __init__(self, job_id: str | None = None, **kwargs):
         super().__init__(**kwargs)
         # Plastron message are persistent by default
         if 'persistent' not in self.headers:
@@ -91,7 +92,7 @@ class PlastronResponseMessage(PlastronMessage):
     state = MessageHeader('PlastronJobState')
     status_url = MessageHeader('PlastronStatusURL')
 
-    def __init__(self, state: str = None, status_url: str = None, **kwargs):
+    def __init__(self, state: str | None = None, status_url: str | None = None, **kwargs):
         super().__init__(**kwargs)
         if state is not None:
             self.state = state
@@ -103,7 +104,7 @@ class PlastronErrorMessage(PlastronMessage):
     error = MessageHeader('PlastronJobError')
     status_url = MessageHeader('PlastronStatusURL')
 
-    def __init__(self, error: str = None, status_url: str = None, **kwargs):
+    def __init__(self, error: str | None = None, status_url: str | None = None, **kwargs):
         super().__init__(**kwargs)
         if error is not None:
             self.error = error
@@ -115,7 +116,7 @@ class PlastronCommandMessage(PlastronMessage):
     command = MessageHeader('PlastronCommand')
     status_url = MessageHeader('PlastronStatusURL')
 
-    def __init__(self, command: str = None, status_url: str = None, args: dict = None, **kwargs):
+    def __init__(self, command: str | None = None, status_url: str | None = None, args: dict | None = None, **kwargs):
         super().__init__(**kwargs)
         if command is not None:
             self.command = command

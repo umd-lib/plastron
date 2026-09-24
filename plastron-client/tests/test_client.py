@@ -5,13 +5,13 @@ from pathlib import Path
 from unittest.mock import MagicMock
 
 import pytest
-from requests import Session, Request
+from requests import Request, Session
 from requests.exceptions import ConnectionError
 from requests_jwtauth import HTTPBearerAuth
 
-from plastron.client import Endpoint, Client, ClientError
+from plastron.client import Client, ClientError, Endpoint
 from plastron.client.auth import ClientCertAuth
-from plastron.client.utils import random_slug, ResourceURI
+from plastron.client.utils import ResourceURI, random_slug
 
 
 @pytest.fixture()
@@ -26,7 +26,7 @@ def repo_base_config():
         'REST_ENDPOINT': 'http://base-host.com:8080/rest',
         'RELPATH': '/pcdm',
         'LOG_DIR': '/logs',
-        'AUTH_TOKEN': 'abcd-1234'
+        'AUTH_TOKEN': 'abcd-1234',
     }
 
 

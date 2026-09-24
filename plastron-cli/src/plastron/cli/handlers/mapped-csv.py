@@ -4,13 +4,13 @@ import os
 from collections import OrderedDict
 
 import yaml
-from plastron.cli import ConfigError
-from plastron.files import LocalFileSource, RemoteFileSource
-from plastron.rdf import pcdm, rdf
 from rdflib import Literal, URIRef
 from rdflib.util import from_n3
 
 from plastron import namespaces
+from plastron.cli import ConfigError
+from plastron.files import LocalFileSource, RemoteFileSource
+from plastron.rdf import pcdm, rdf
 
 nsm = namespaces.get_manager()
 
@@ -56,7 +56,7 @@ class Batch:
 
         key_column = get_flagged_column(self.mapping, 'key')
         if key_column is not None:
-            self.length = len(set([line[key_column] for line in self.rows]))
+            self.length = len({line[key_column] for line in self.rows})
         else:
             self.length = len(self.rows)
 
@@ -75,7 +75,7 @@ class Batch:
             for key in keys:
                 # add an item for each unique key
                 sub_lines = [line for line in lines if line[key_column] == key]
-                attrs = {column: get_column_value(sub_lines[0], column, mapping) for column in mapping.keys()}
+                attrs = {column: get_column_value(sub_lines[0], column, mapping) for column in mapping}
                 item = cls(**attrs)
                 item.path = key
                 item.ordered = False
@@ -131,7 +131,7 @@ class Batch:
                 if dirname is not None:
                     members = {}
                     for entry in os.scandir(os.path.join(self.file_path, dirname)):
-                        base, ext = os.path.splitext(entry.name)
+                        base, _ext = os.path.splitext(entry.name)
                         if base not in members:
                             members[base] = []
                         members[base].append(entry)
@@ -163,7 +163,7 @@ class Batch:
             # each line is its own (implicit) subject
             # for an Item resource
             for line in lines:
-                attrs = {column: get_column_value(line, column, mapping) for column in mapping.keys()}
+                attrs = {column: get_column_value(line, column, mapping) for column in mapping}
                 item = cls(**attrs)
                 yield item
 
@@ -237,7 +237,7 @@ def set_value(item, column, conf, line):
 def get_flagged_column(mapping, flag):
     cols = [col for col in mapping if flag in mapping[col] and mapping[col][flag]]
     if len(cols) > 1:
-        raise ConfigError(f"Only one {flag} column per mapping level is allowed")
+        raise ConfigError(f'Only one {flag} column per mapping level is allowed')
     elif len(cols) == 1:
         return cols[0]
     else:

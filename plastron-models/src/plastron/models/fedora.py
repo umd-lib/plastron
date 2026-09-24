@@ -22,6 +22,7 @@ class FedoraBinary(FedoraResource):
 
 class FixityDetails(RDFResource):
     """Details of a single fixity check."""
+
     outcome = DataProperty(premis.hasEventOutcome)
     digest = ObjectProperty(premis.hasMessageDigest)
     digest_algorithm = DataProperty(premis.hasMessageDigestAlgorithm)
@@ -47,4 +48,5 @@ class FixityDetails(RDFResource):
 class FixityCheck(RDFResource):
     """Model of the resource returned from a Fedora "/fcr:fixity" endpoint
     that contains an embedded object with the details of the fixity check."""
+
     fixity_details = ObjectProperty(premis.hasFixity, cls=FixityDetails, embed=True)

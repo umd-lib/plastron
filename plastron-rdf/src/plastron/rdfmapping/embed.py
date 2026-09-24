@@ -1,4 +1,5 @@
-from typing import TypeVar, Callable, Type, Mapping, Any
+from collections.abc import Callable, Mapping
+from typing import Any, TypeVar
 from uuid import uuid4
 
 from rdflib import URIRef
@@ -11,8 +12,9 @@ class EmbeddedObject:
     """Wrapper object to delay instantiation of inline-specified objects
     that should be embedded in their parent instance (i.e., share a graph
     object)."""
-    def __init__(self, cls: Type[T], fragment_id: str = None, **kwargs):
-        self.cls: Type[T] = cls
+
+    def __init__(self, cls: type[T], fragment_id: str | None = None, **kwargs):
+        self.cls: type[T] = cls
         """Model class to use for the embedded object"""
 
         self.fragment_id: str = fragment_id or str(uuid4())
@@ -32,7 +34,7 @@ class EmbeddedObject:
         )
 
 
-def embedded(cls: Type[T]) -> Callable[..., EmbeddedObject]:
+def embedded(cls: type[T]) -> Callable[..., EmbeddedObject]:
     """Function to support an alternative syntax of calling the EmbeddedObject
     constructor. Instead of:
 
@@ -55,6 +57,8 @@ def embedded(cls: Type[T]) -> Callable[..., EmbeddedObject]:
     )
     ```
     """
+
     def _embedded(**kwargs):
         return EmbeddedObject(cls, **kwargs)
+
     return _embedded

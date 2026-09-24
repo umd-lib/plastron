@@ -1,21 +1,26 @@
-from typing import Any, Callable, Container
+from collections.abc import Callable, Container
+from typing import Any
 
-from rdflib import URIRef, Literal
+from rdflib import Literal, URIRef
 
 from plastron.rdfmapping.embed import EmbeddedObject
-from plastron.rdfmapping.properties import RDFDataProperty, RDFObjectProperty, RDFProperty
+from plastron.rdfmapping.properties import (
+    RDFDataProperty,
+    RDFObjectProperty,
+    RDFProperty,
+)
 
 OBJECT_CLASSES = {}
 
 
 class Property:
     def __init__(
-            self,
-            predicate: URIRef,
-            required: bool = False,
-            repeatable: bool = False,
-            values_from: Container = None,
-            validate: Callable[[Any], bool] = None,
+        self,
+        predicate: URIRef,
+        required: bool = False,
+        repeatable: bool = False,
+        values_from: Container | None = None,
+        validate: Callable[[Any], bool] | None = None,
     ):
         self.predicate = predicate
         self.required = required
@@ -56,14 +61,14 @@ class Property:
 
 class ObjectProperty(Property):
     def __init__(
-            self,
-            predicate: URIRef,
-            required: bool = False,
-            repeatable: bool = False,
-            values_from: Container = None,
-            validate: Callable[[Any], bool] = None,
-            cls: type | str = None,
-            embed: bool = False,
+        self,
+        predicate: URIRef,
+        required: bool = False,
+        repeatable: bool = False,
+        values_from: Container | None = None,
+        validate: Callable[[Any], bool] | None = None,
+        cls: type | str | None = None,
+        embed: bool = False,
     ):
         super().__init__(predicate, required, repeatable, values_from, validate)
         self.object_class = cls
@@ -95,13 +100,13 @@ class ObjectProperty(Property):
 
 class DataProperty(Property):
     def __init__(
-            self,
-            predicate: URIRef,
-            required: bool = False,
-            repeatable: bool = False,
-            values_from: Container = None,
-            validate: Callable[[Any], bool] = None,
-            datatype: URIRef = None,
+        self,
+        predicate: URIRef,
+        required: bool = False,
+        repeatable: bool = False,
+        values_from: Container | None = None,
+        validate: Callable[[Any], bool] | None = None,
+        datatype: URIRef = None,
     ):
         super().__init__(predicate, required, repeatable, values_from, validate)
         self.datatype = datatype

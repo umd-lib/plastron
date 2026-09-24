@@ -51,6 +51,7 @@ from rdflib import URIRef
 from plastron.rdfmapping.descriptors import DataProperty
 from plastron.rdfmapping.resources import RDFResourceBase
 
+
 # an RDF resource class inherits from the RDFResourceBase abstract class,
 # or another subclass thereof
 class Book(RDFResourceBase):
@@ -82,21 +83,21 @@ Using that object, you can manipulate and query its values:
 
 ```pycon
 >>> book.title = 'Good Omens'  # set the title
->>> str(book.title)            # get it back as a string
+>>> str(book.title)  # get it back as a string
 'Good Omens'
->>> len(book.title)            # get the number of values for this attribute
+>>> len(book.title)  # get the number of values for this attribute
 1
->>> book.title.add(            # add a second value
+>>> book.title.add(  # add a second value
 ...     Literal('The Nice and Accurate Prophecies of Agnes Nutter')
 ... )
->>> len(book.title)            # see the length change
+>>> len(book.title)  # see the length change
 2
->>> book.title.remove(         # remove the second value
+>>> book.title.remove(  # remove the second value
 ...     Literal('The Nice and Accurate Prophecies of Agnes Nutter')
 ... )
->>> len(book.title)            # and the length changes back again
+>>> len(book.title)  # and the length changes back again
 1
->>> book.title.clear()         # clear all the values
+>>> book.title.clear()  # clear all the values
 >>> len(book.title)
 0
 >>> book.title = 'Good Omens'  # back where we started
@@ -110,7 +111,7 @@ ValidationSuccess (which evaluates to True in a boolean context) or
 ValidationFailure (which evaluates to False).
 
 ```pycon
->>> book.is_valid       # this is False, because we have not added any authors
+>>> book.is_valid  # this is False, because we have not added any authors
 False
 >>> book.label.is_valid
 <plastron.rdfmapping.properties.ValidationSuccess object at ...>
@@ -118,7 +119,7 @@ False
 <plastron.rdfmapping.properties.ValidationFailure object at ...>
 >>> bool(book.author.is_valid)  # bool-ifies to False
 False
->>> str(book.author.is_valid)   # stringifies to a validation message
+>>> str(book.author.is_valid)  # stringifies to a validation message
 'is required'
 ```
 

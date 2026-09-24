@@ -1,4 +1,4 @@
-from copy import deepcopy, copy
+from copy import copy, deepcopy
 
 from rdflib import Literal
 

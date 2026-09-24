@@ -1,13 +1,13 @@
 import pytest
-from rdflib import URIRef, Literal
+from rdflib import Literal, URIRef
 
 from plastron.models import ContentModeledResource
 from plastron.models.authorities import Place
 from plastron.models.umd import Item
-from plastron.namespaces import umdaccess, dcterms, dcmitype
+from plastron.namespaces import dcmitype, dcterms, umdaccess
 from plastron.rdfmapping.decorators import rdf_type
 from plastron.rdfmapping.descriptors import DataProperty
-from plastron.rdfmapping.embed import embedded, EmbeddedObject
+from plastron.rdfmapping.embed import EmbeddedObject, embedded
 from plastron.rdfmapping.resources import RDFResource
 from plastron.serializers import CSVSerializer
 from plastron.serializers.csv import unflatten
@@ -38,7 +38,7 @@ from plastron.serializers.csv import unflatten
             ),
             {'PUBLISH': 'True', 'HIDDEN': 'True', 'Presentation Set': 'http://vocab.lib.umd.edu/set#test'},
         ),
-    ]
+    ],
 )
 def test_write(resource, expected_values):
     serializer = CSVSerializer()

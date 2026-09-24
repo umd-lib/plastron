@@ -2,24 +2,25 @@ import csv
 import logging
 import re
 from collections import defaultdict
-from collections.abc import Container, Sized
+from collections.abc import Container, Iterator, Mapping, Sized
 from dataclasses import dataclass
 from itertools import chain
 from os.path import basename, splitext
 from pathlib import Path
 from typing import (
     Generic,
-    Iterator,
-    Mapping,
     NamedTuple,
-    Optional,
     Protocol,
-    Type,
     TypeVar,
 )
 from uuid import uuid4
 
+from rdflib import URIRef
+from rdflib.util import from_n3
+
 from plastron.files import FileGroup, FileSpec, parse_label, parse_usage_tag
+from plastron.models import ContentModeledResource
+from plastron.namespaces import get_manager
 from plastron.rdfmapping.descriptors import DataProperty, Property
 from plastron.rdfmapping.embed import EmbeddedObject
 from plastron.rdfmapping.resources import RDFResourceBase, RDFResourceType
@@ -31,11 +32,6 @@ from plastron.serializers.csv import (
     unflatten,
 )
 from plastron.utils import strtobool
-from rdflib import URIRef
-from rdflib.util import from_n3
-
-from plastron.models import ContentModeledResource
-from plastron.namespaces import get_manager
 
 nsm = get_manager()
 logger = logging.getLogger(__name__)
@@ -46,8 +42,8 @@ class ColumnSpec:
     attrs: str
     header: str
     prop: Property
-    lang_code: Optional[str] = None
-    datatype: Optional[URIRef] = None
+    lang_code: str | None = None
+    datatype: URIRef | None = None
 
 
 class MetadataError(Exception):
@@ -57,6 +53,7 @@ class MetadataError(Exception):
 class LineReference(NamedTuple):
     """Filename-line number pairing. Stringifies to `{filename}:{line number}`
     (e.g., `job-0123/import.csv:29`)"""
+
     filename: str
     line_number: int
 
@@ -84,13 +81,15 @@ def build_fields(fieldnames, model_class) -> dict[str, list[ColumnSpec]]:
             # if the language label isn't a name in the LANGUAGE_CODES table,
             # assume that it is itself a language code
             lang_code = CSVSerializer.LANGUAGE_CODES.get(language_label, language_label)
-            fields[attrs].append(ColumnSpec(
-                attrs=attrs,
-                header=header,
-                prop=get_final_prop(model_class, attrs.split('.')),
-                lang_code=lang_code,
-                datatype=None,
-            ))
+            fields[attrs].append(
+                ColumnSpec(
+                    attrs=attrs,
+                    header=header,
+                    prop=get_final_prop(model_class, attrs.split('.')),
+                    lang_code=lang_code,
+                    datatype=None,
+                )
+            )
         elif '{' in header:
             # this field has a datatype
             # header format is "Header Label {Datatype Label}"
@@ -108,13 +107,15 @@ def build_fields(fieldnames, model_class) -> dict[str, list[ColumnSpec]]:
             except KeyError as e:
                 raise DataReadError(f'Unknown datatype "{datatype_label}" in "{header}" in import file.') from e
 
-            fields[attrs].append(ColumnSpec(
-                attrs=attrs,
-                header=header,
-                prop=get_final_prop(model_class, attrs.split('.')),
-                lang_code=None,
-                datatype=datatype_uri,
-            ))
+            fields[attrs].append(
+                ColumnSpec(
+                    attrs=attrs,
+                    header=header,
+                    prop=get_final_prop(model_class, attrs.split('.')),
+                    lang_code=None,
+                    datatype=datatype_uri,
+                )
+            )
         else:
             # no language tag or datatype
             if header not in property_attrs:
@@ -126,17 +127,19 @@ def build_fields(fieldnames, model_class) -> dict[str, list[ColumnSpec]]:
                 datatype_uri = prop.datatype
             else:
                 datatype_uri = None
-            fields[attrs].append(ColumnSpec(
-                attrs=attrs,
-                header=header,
-                prop=prop,
-                lang_code=None,
-                datatype=datatype_uri,
-            ))
+            fields[attrs].append(
+                ColumnSpec(
+                    attrs=attrs,
+                    header=header,
+                    prop=prop,
+                    lang_code=None,
+                    datatype=datatype_uri,
+                )
+            )
     return fields
 
 
-def get_final_prop(model_class: Type[RDFResourceType], attrs: list[str]) -> Property:
+def get_final_prop(model_class: type[RDFResourceType], attrs: list[str]) -> Property:
     next_attr_name = attrs.pop(0)
     next_attr = getattr(model_class, next_attr_name)
     if not attrs:
@@ -203,15 +206,13 @@ def build_file_groups(filenames_string: str, grouping_strategy: str = 'rootname'
             # Use the full filename as the key to ensure uniqueness
             group_key = filename
             file_groups[group_key] = FileGroup(
-                rootname=filename,
-                label=label or f'Page {idx}',
-                files=[FileSpec(name=filename, usage=usage)]
+                rootname=filename, label=label or f'Page {idx}', files=[FileSpec(name=filename, usage=usage)]
             )
     else:
         for filename in filenames_string.split(';'):
             filename, label = parse_label(filename)
             filename, usage = parse_usage_tag(filename)
-            root, ext = splitext(basename(filename))
+            root, _ext = splitext(basename(filename))
             if root not in file_groups:
                 file_groups[root] = FileGroup(rootname=root, label=label)
             file_group = file_groups[root]
@@ -262,12 +263,12 @@ ModelType = TypeVar('ModelType', bound=ContentModeledResource)
 
 class Row(Generic[ModelType]):
     def __init__(
-            self,
-            spreadsheet: 'MetadataSpreadsheet[ModelType]',
-            line_reference: LineReference,
-            row_number: int,
-            data: Mapping[str, str],
-            identifier_column: str,
+        self,
+        spreadsheet: 'MetadataSpreadsheet[ModelType]',
+        line_reference: LineReference,
+        row_number: int,
+        data: Mapping[str, str],
+        identifier_column: str,
     ):
         self.spreadsheet = spreadsheet
         self.line_reference = line_reference
@@ -275,8 +276,7 @@ class Row(Generic[ModelType]):
         self.data = data
         self.identifier_column = identifier_column
         self._file_groups = build_file_groups(
-            self.data.get('FILES', ''),
-            grouping_strategy=spreadsheet.file_grouping_strategy
+            self.data.get('FILES', ''), grouping_strategy=spreadsheet.file_grouping_strategy
         )
         self._filenames = list(chain(*[group.filenames for group in self._file_groups.values()]))
 
@@ -367,7 +367,9 @@ class MetadataSpreadsheet(Generic[ModelType]):
     Iterable sequence of rows from the metadata CSV file of an import job.
     """
 
-    def __init__(self, metadata_filename: Path | str, model_class: Type[ModelType], file_grouping_strategy: str = 'rootname'):
+    def __init__(
+        self, metadata_filename: Path | str, model_class: type[ModelType], file_grouping_strategy: str = 'rootname'
+    ):
         self.metadata_filename = metadata_filename
         self.metadata_file = None
         self.model_class = model_class
@@ -424,18 +426,16 @@ class MetadataSpreadsheet(Generic[ModelType]):
 
     def _handle_invalid_row(self, line_reference: LineReference, reason: str) -> InvalidRow:
         self.errors += 1
-        self.validation_reports.append({
-            'line': line_reference,
-            'is_valid': False,
-            'error': f'Line {line_reference}: {reason}'
-        })
+        self.validation_reports.append(
+            {'line': line_reference, 'is_valid': False, 'error': f'Line {line_reference}: {reason}'}
+        )
         return InvalidRow(line_reference=line_reference, reason=reason)
 
     def rows(
-            self,
-            limit: int = None,
-            percentage: int = None,
-            completed: Bucket = None,
+        self,
+        limit: int | None = None,
+        percentage: int | None = None,
+        completed: Bucket = None,
     ) -> Iterator[Row[ModelType] | InvalidRow]:
         """Iterator over the rows in this spreadsheet.
 
@@ -452,16 +452,14 @@ class MetadataSpreadsheet(Generic[ModelType]):
             if not self.metadata_file.seekable():
                 raise RuntimeError('Cannot execute a percentage load using a non-seekable file')
             identifier_column = self.model_class.HEADER_MAP['identifier']
-            identifiers = [
-                row[identifier_column] for row in self.csv_file if row[identifier_column] not in completed
-            ]
+            identifiers = [row[identifier_column] for row in self.csv_file if row[identifier_column] not in completed]
             self._rewind_csv_file()
 
             if len(identifiers) == 0:
                 logger.info('No items remaining to load')
                 self.subset_to_load = []
             else:
-                target_count = int(((percentage / 100) * self.total))
+                target_count = int((percentage / 100) * self.total)
                 logger.info(f'Attempting to load {target_count} items ({percentage}% of {self.total})')
                 if len(identifiers) > target_count:
                     # evenly space the items to load among the remaining items

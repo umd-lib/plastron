@@ -1,13 +1,24 @@
 """[ALTO](https://www.loc.gov/standards/alto/) (Analyzed Layout and Text Object) OCR classes"""
 
-from typing import Union, Iterator
+from collections.abc import Iterator
+from typing import Union
 
 # noinspection PyProtectedMember
-from lxml.etree import _Element, _ElementTree, QName
+from lxml.etree import QName, _Element, _ElementTree
 
-from plastron.ocr.core import XYWH, BBox, Scale, RegionBase, OCRError, OCRResource, BlockRegion, LineRegion, WordRegion
+from plastron.ocr.core import (
+    XYWH,
+    BBox,
+    BlockRegion,
+    LineRegion,
+    OCRError,
+    OCRResource,
+    RegionBase,
+    Scale,
+    WordRegion,
+)
 
-XMLNS = {"alto": "http://www.loc.gov/standards/alto/ns-v2#"}
+XMLNS = {'alto': 'http://www.loc.gov/standards/alto/ns-v2#'}
 
 
 class ALTOResource(OCRResource):
@@ -25,12 +36,12 @@ class ALTOResource(OCRResource):
 
     def get_block_nodes(self):
         """Get the `<TextBlock>` descendant elements of this resource."""
-        return self.doc.xpath("//alto:TextBlock", namespaces=XMLNS)
+        return self.doc.xpath('//alto:TextBlock', namespaces=XMLNS)
 
     def get_block_node(self, identifier: str):
         """Get the `<TextBlock>` descendant element whose `@ID` matches
         the given `identifier`."""
-        return self.doc.xpath("//alto:TextBlock[@ID=$id]", id=identifier, namespaces=XMLNS)[0]
+        return self.doc.xpath('//alto:TextBlock[@ID=$id]', id=identifier, namespaces=XMLNS)[0]
 
     def get_block(self, node: _Element) -> 'TextBlock':
         """Get the `TextBlock` object wrapping the given `<TextBlock>` element."""
@@ -39,6 +50,7 @@ class ALTOResource(OCRResource):
 
 class ALTORegion(RegionBase):
     """Region within an `ALTOResource`"""
+
     def __init__(self, element: _Element, scale: Scale):
         self.element = element
         self.scale = scale

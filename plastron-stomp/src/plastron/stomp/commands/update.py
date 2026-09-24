@@ -1,12 +1,13 @@
 import json
 import logging
-from typing import Generator, Any
+from collections.abc import Generator
+from typing import Any
 
 from plastron.context import PlastronContext
 from plastron.jobs.updatejob import UpdateJob
 from plastron.messaging.messages import PlastronCommandMessage
 from plastron.models import get_model_from_name
-from plastron.utils import strtobool, parse_predicate_list
+from plastron.utils import parse_predicate_list, strtobool
 
 logger = logging.getLogger(__name__)
 
@@ -21,7 +22,7 @@ def parse_message(message: PlastronCommandMessage) -> dict[str, Any]:
     recursive = message.args.get('recursive', None)
 
     if validate and not model:
-        raise RuntimeError("Model must be provided when performing validation")
+        raise RuntimeError('Model must be provided when performing validation')
 
     # Retrieve the model to use for validation
     model_class = get_model_from_name(model) if model else None
@@ -39,7 +40,7 @@ def parse_message(message: PlastronCommandMessage) -> dict[str, Any]:
 
 
 def update(
-        context: PlastronContext,
-        message: PlastronCommandMessage,
+    context: PlastronContext,
+    message: PlastronCommandMessage,
 ) -> Generator[dict[str, str], None, dict[str, Any]]:
     return UpdateJob(repo=context.repo, **parse_message(message)).run()

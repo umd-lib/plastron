@@ -1,4 +1,4 @@
-from plastron.namespaces import ore, dcterms, iana
+from plastron.namespaces import dcterms, iana, ore
 from plastron.rdfmapping.decorators import rdf_type
 from plastron.rdfmapping.descriptors import DataProperty, ObjectProperty
 from plastron.rdfmapping.resources import RDFResource, RDFResourceBase

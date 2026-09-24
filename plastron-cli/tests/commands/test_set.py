@@ -2,12 +2,12 @@ import logging
 from unittest.mock import MagicMock
 
 import pytest
-from rdflib import URIRef, Literal
+from rdflib import Literal, URIRef
 
 from plastron.cli.commands.set import get_new_values, set_fields
 from plastron.models.umd import Item
 from plastron.rdfmapping.resources import RDFResource
-from plastron.repo import RepositoryResource, Repository
+from plastron.repo import Repository, RepositoryResource
 
 
 @pytest.mark.parametrize(
@@ -23,7 +23,7 @@ from plastron.repo import RepositoryResource, Repository
             {
                 'rdf_type': {URIRef('http://xmlns.com/foaf/0.1/Agent')},
                 'label': {Literal('foobar')},
-            }
+            },
         ),
         (
             RDFResource,
@@ -35,9 +35,9 @@ from plastron.repo import RepositoryResource, Repository
             {
                 'rdf_type': {URIRef('http://xmlns.com/foaf/0.1/Agent')},
                 'label': {Literal('foo'), Literal('bar')},
-            }
+            },
         ),
-    ]
+    ],
 )
 def test_get_new_values(model_class, fields_to_set, expected_values):
     assert get_new_values(model_class, fields_to_set) == expected_values
@@ -77,7 +77,6 @@ def test_get_new_values(model_class, fields_to_set, expected_values):
             False,
         ),
     ],
-
 )
 def test_set_fields(monkeypatch, caplog, fields_to_set, expected_log_message, should_update):
     caplog.set_level(logging.INFO)

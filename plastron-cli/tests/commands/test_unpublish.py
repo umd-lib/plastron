@@ -2,9 +2,9 @@ from argparse import Namespace
 from unittest.mock import MagicMock
 
 from plastron.cli.commands.unpublish import Command, unpublish
+from plastron.client import Client, Endpoint
 from plastron.client.utils import TypedText
 from plastron.context import PlastronContext
-from plastron.client import Endpoint, Client
 from plastron.models.umd import Item
 from plastron.namespaces import umdaccess
 from plastron.repo import Repository, RepositoryError
@@ -22,7 +22,7 @@ def get_mock_context(obj):
     return MagicMock(
         spec=PlastronContext,
         repo=mock_repo,
-        get_public_url=lambda uri: uri.replace('fcrepo-local:8080/fcrepo/rest', 'digital-local')
+        get_public_url=lambda uri: uri.replace('fcrepo-local:8080/fcrepo/rest', 'digital-local'),
     )
 
 

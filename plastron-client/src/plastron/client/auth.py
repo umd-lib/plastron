@@ -1,4 +1,5 @@
-from typing import Mapping, Any, Optional
+from collections.abc import Mapping
+from typing import Any
 
 from requests import PreparedRequest
 from requests.auth import AuthBase, HTTPBasicAuth
@@ -15,17 +16,12 @@ class ClientCertAuth(AuthBase):
         return request
 
 
-def get_authenticator(config: Mapping[str, Any]) -> Optional[AuthBase]:
+def get_authenticator(config: Mapping[str, Any]) -> AuthBase | None:
     if 'AUTH_TOKEN' in config:
         return HTTPBearerAuth(token=config['AUTH_TOKEN'])
     elif 'JWT_SECRET' in config:
         return JWTSecretAuth(
-            secret=config['JWT_SECRET'],
-            claims={
-                'sub': 'plastron',
-                'iss': 'plastron',
-                'role': 'fedoraAdmin'
-            }
+            secret=config['JWT_SECRET'], claims={'sub': 'plastron', 'iss': 'plastron', 'role': 'fedoraAdmin'}
         )
     elif 'CLIENT_CERT' in config and 'CLIENT_KEY' in config:
         return ClientCertAuth(

@@ -2,7 +2,7 @@ from rdflib import Graph, Literal, URIRef
 
 from plastron.models.authorities import Agent
 from plastron.models.umd import Item
-from plastron.namespaces import dcterms, umdtype, rdfs
+from plastron.namespaces import dcterms, rdfs, umdtype
 from plastron.rdfmapping.embed import embedded
 
 
@@ -14,10 +14,7 @@ def test_identifier_distinct_from_accession_number():
         '<> dcterms:identifier "1212XN1"^^umdtype:accessionNumber .'
     )
     base_uri = 'http://example.com/xyz'
-    item = Item(
-        graph=Graph().parse(data=rdf, format='turtle', publicID=base_uri),
-        uri=base_uri
-    )
+    item = Item(graph=Graph().parse(data=rdf, format='turtle', publicID=base_uri), uri=base_uri)
     assert len(item.identifier) == 1
     assert item.identifier.value == Literal('foo')
 

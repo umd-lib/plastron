@@ -68,8 +68,15 @@ members = ["plastron-*"]
 [tool.pytest.ini_options]
 # these warnings are coming from third-party code
 filterwarnings = [
-   'ignore:ConjunctiveGraph is deprecated:DeprecationWarning',
+    "ignore:ConjunctiveGraph is deprecated:DeprecationWarning",
+    "ignore:'.*' (argument is )?deprecated:pyparsing.PyparsingDeprecationWarning",
 ]
+
+[tool.ruff]
+line-length = 120
+
+[tool.ruff.format]
+quote-style = "single"
 
 [tool.ruff.lint]
 # for now, using the pre-0.16 default ruleset in ruff

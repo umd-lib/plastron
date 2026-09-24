@@ -172,10 +172,10 @@ def build_sparql_update(delete_graph: Graph = None, insert_graph: Graph = None) 
         inserts = None
 
     if deletes is not None and inserts is not None:
-        return f"DELETE {{ {deletes} }} INSERT {{ {inserts} }} WHERE {{}}"
+        return f'DELETE {{ {deletes} }} INSERT {{ {inserts} }} WHERE {{}}'
     elif deletes is not None:
-        return f"DELETE DATA {{ {deletes} }}"
+        return f'DELETE DATA {{ {deletes} }}'
     elif inserts is not None:
-        return f"INSERT DATA {{ {inserts} }}"
+        return f'INSERT DATA {{ {inserts} }}'
     else:
         return ''

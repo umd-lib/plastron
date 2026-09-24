@@ -1,4 +1,5 @@
 import pytest
+
 from plastron.jobs.importjob.ndnp import NDNPBatch, get_issue_data, write_import_csv
 from plastron.repo import DataReadError
 
@@ -42,28 +43,28 @@ def test_get_issue_data(datadir):
         'Edition': '1',
         'Rights Statement': 'http://vocab.lib.umd.edu/rightsStatement#InC-NC',
         'Presentation Set': '',
-        'FILES': ';'.join([
-            '<preservation>sn90057049/7637/1926011201/0002.tif',
-            '<service>sn90057049/7637/1926011201/0002.jp2',
-            '<derivative>sn90057049/7637/1926011201/0002.pdf',
-            '<ocr>sn90057049/7637/1926011201/0002.xml',
-            '<preservation>sn90057049/7637/1926011201/0003.tif',
-            '<service>sn90057049/7637/1926011201/0003.jp2',
-            '<derivative>sn90057049/7637/1926011201/0003.pdf',
-            '<ocr>sn90057049/7637/1926011201/0003.xml',
-            '<preservation>sn90057049/7637/1926011201/0004.tif',
-            '<service>sn90057049/7637/1926011201/0004.jp2',
-            '<derivative>sn90057049/7637/1926011201/0004.pdf',
-            '<ocr>sn90057049/7637/1926011201/0004.xml',
-            '<preservation>sn90057049/7637/1926011201/0005.tif',
-            '<service>sn90057049/7637/1926011201/0005.jp2',
-            '<derivative>sn90057049/7637/1926011201/0005.pdf',
-            '<ocr>sn90057049/7637/1926011201/0005.xml',
-        ]),
-        'ITEM_FILES': ';'.join([
-            '<metadata>sn90057049/7637/1926011201/1926011201_1.xml',
-            '<metadata>Article-Level/sn90057049/7637/1926011201/1926011201.xml',
-        ]),
+        'FILES': (
+            '<preservation>sn90057049/7637/1926011201/0002.tif;'
+            '<service>sn90057049/7637/1926011201/0002.jp2;'
+            '<derivative>sn90057049/7637/1926011201/0002.pdf;'
+            '<ocr>sn90057049/7637/1926011201/0002.xml;'
+            '<preservation>sn90057049/7637/1926011201/0003.tif;'
+            '<service>sn90057049/7637/1926011201/0003.jp2;'
+            '<derivative>sn90057049/7637/1926011201/0003.pdf;'
+            '<ocr>sn90057049/7637/1926011201/0003.xml;'
+            '<preservation>sn90057049/7637/1926011201/0004.tif;'
+            '<service>sn90057049/7637/1926011201/0004.jp2;'
+            '<derivative>sn90057049/7637/1926011201/0004.pdf;'
+            '<ocr>sn90057049/7637/1926011201/0004.xml;'
+            '<preservation>sn90057049/7637/1926011201/0005.tif;'
+            '<service>sn90057049/7637/1926011201/0005.jp2;'
+            '<derivative>sn90057049/7637/1926011201/0005.pdf;'
+            '<ocr>sn90057049/7637/1926011201/0005.xml'
+        ),
+        'ITEM_FILES': (
+            '<metadata>sn90057049/7637/1926011201/1926011201_1.xml;'
+            '<metadata>Article-Level/sn90057049/7637/1926011201/1926011201.xml'
+        ),
     }
 
 

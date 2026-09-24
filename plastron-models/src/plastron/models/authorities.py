@@ -1,4 +1,4 @@
-from plastron.namespaces import rdfs, owl
+from plastron.namespaces import owl, rdfs
 from plastron.rdfmapping.descriptors import DataProperty, ObjectProperty
 from plastron.rdfmapping.resources import RDFResource
 from plastron.validation.vocabularies import Vocabulary

@@ -21,7 +21,7 @@ from plastron.context import PlastronContext
             },
             ProxiedClient,
         ),
-    ]
+    ],
 )
 def test_client_class(repo_config, expected_class):
     config = {'REPOSITORY': repo_config}

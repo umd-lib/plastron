@@ -4,11 +4,11 @@ from pathlib import Path
 
 import httpretty
 import pytest
-from httpretty import HEAD, GET, DELETE
+from httpretty import DELETE, GET, HEAD
 
 from plastron.cli.commands.delete import Command
-from plastron.repo import RepositoryError
 from plastron.jobs import ItemLog
+from plastron.repo import RepositoryError
 
 
 def register_responses(responses, uri):
@@ -69,7 +69,7 @@ def register_responses(responses, uri):
             },
             pytest.raises(RepositoryError),
         ),
-    ]
+    ],
 )
 @httpretty.activate
 def test_delete_command(plastron_context, register_transaction, path, responses, expectation):

@@ -69,6 +69,7 @@ members = ["plastron-*"]
 # these warnings are coming from third-party code
 filterwarnings = [
     "ignore:ConjunctiveGraph is deprecated:DeprecationWarning",
+    "ignore:'.*' (argument is )?deprecated:pyparsing.PyparsingDeprecationWarning",
 ]
 
 [tool.ruff]

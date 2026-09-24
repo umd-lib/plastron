@@ -1,0 +1,45 @@
+@startuml
+'https://plantuml.com/sequence-diagram
+
+title Fedora 6 Transaction
+
+actor client
+entity root as "</>"
+entity tx_endpoint as "<{TX_ENDPOINT}>"
+entity tx_url as "<{TX_URL}>"
+entity resources as "</{path/to/resources}>"
+
+== get transaction endpoint ==
+
+client -> root : HEAD
+root --> client : 200 OK / Link: rel="fedora_tx:endpoint", url=<{TX_ENDPOINT}>
+
+== create transaction ==
+
+client -> tx_endpoint : POST
+tx_endpoint --> client : 201 Created / Location: <TX_URL>
+
+== update content and maintain transaction ==
+
+client -> resources : [GET|POST|PUT|PATCH|DELETE] / Atomic-ID: <TX_URL>
+resources --> client : [200 OK|204 No Content]
+...
+client -> tx_url : POST
+tx_url --> client : 204 No Content / Atomic-Expires: {EXPIRATION_TIME}
+...
+client -> resources : [GET|POST|PUT|PATCH|DELETE] / Atomic-ID: <TX_URL>
+resources --> client : [200 OK|204 No Content]
+...
+client -> tx_url : POST
+tx_url --> client : 204 No Content / Atomic-Expires: {EXPIRATION_TIME}
+
+== finish transaction ==
+
+alt commit
+client -> tx_url : PUT
+tx_url --> client : 204 No Content
+else roll back
+client -> tx_url : DELETE
+tx_url --> client : 204 No Content
+end
+@enduml

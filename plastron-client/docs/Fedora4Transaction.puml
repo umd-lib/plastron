@@ -1,0 +1,52 @@
+@startuml
+'https://plantuml.com/sequence-diagram
+title Fedora 4 Transaction
+
+actor client
+entity root as "</>"
+entity tx_endpoint as "<{TX_ENDPOINT}>"
+entity resources as "<{TX_URL}/{path/to/resources}>"
+entity tx_maintain as "<{TX_URL}/fcr:tx>"
+entity tx_commit as "<{TX_URL}/fcr:tx/fcr:commit>"
+entity tx_rollback as "<{TX_URL}/fcr:tx/fcr:rollback>"
+
+== get transaction endpoint ==
+
+client -> root : GET
+root --> client : 200 OK
+
+note over client
+parse body as RDF to get the object of the triple
+with the predicate "fedora:hasTransactionProvider";
+assign this value to TX_ENDPOINT
+endnote
+
+== create transaction ==
+
+client -> tx_endpoint : POST
+tx_endpoint --> client : 201 Created / Location: <TX_URL>
+
+== update content and maintain transaction ==
+
+client -> resources : [GET|POST|PUT|PATCH|DELETE]
+resources --> client : [200 OK|204 No Content]
+...
+client -> tx_maintain : POST
+tx_maintain --> client : 204 No Content / Expires: {EXPIRATION_TIME}
+...
+client -> resources : [GET|POST|PUT|PATCH|DELETE]
+resources --> client : [200 OK|204 No Content]
+...
+client -> tx_maintain : POST
+tx_maintain --> client : 204 No Content / Expires: {EXPIRATION_TIME}
+
+== finish transaction ==
+
+alt commit
+client -> tx_commit : POST
+tx_commit --> client : 204 No Content
+else roll back
+client -> tx_rollback : POST
+tx_rollback --> client : 204 No Content
+end
+@enduml

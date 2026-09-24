@@ -4,11 +4,14 @@ from base64 import urlsafe_b64encode
 from collections import namedtuple
 from typing import NamedTuple
 
-from rdflib import Graph, Literal, URIRef
+from rdflib import Graph, Namespace
 
 logger = logging.getLogger(__name__)
 
 OMIT_SERVER_MANAGED_TRIPLES = 'return=representation; omit="http://fedora.info/definitions/v4/repository#ServerManaged"'
+
+fedora = Namespace('http://fedora.info/definitions/v4/repository#')
+fedora_tx = Namespace('http://fedora.info/definitions/v4/transaction#')
 
 
 def random_slug(length: int = 6) -> str:
@@ -18,9 +21,6 @@ def random_slug(length: int = 6) -> str:
 
 
 def serialize(graph: Graph, **kwargs):
-    p: URIRef
-    o: URIRef | Literal
-
     logger.info('Including properties:')
     for _, p, o in graph:
         pred = p.n3(namespace_manager=graph.namespace_manager)
@@ -151,7 +151,7 @@ class SessionHeaderAttribute:
             pass
 
 
-def build_sparql_update(delete_graph: Graph = None, insert_graph: Graph = None) -> str:
+def build_sparql_update(delete_graph: Graph | None = None, insert_graph: Graph | None = None) -> str:
     """Build a SPARQL Update Query given the two graphs:
 
     * If there are no deletes (i.e., `delete_graph` contains no triples, or

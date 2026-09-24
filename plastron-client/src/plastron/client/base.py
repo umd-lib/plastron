@@ -1,10 +1,11 @@
 import logging
 from collections.abc import Callable
+from functools import cached_property
 from http import HTTPStatus
 from pathlib import Path
 from typing import Any
 
-from rdflib import Graph
+from rdflib import Graph, URIRef
 from requests import ConnectionError, Response, Session
 from requests.auth import AuthBase
 
@@ -16,6 +17,8 @@ from plastron.client.utils import (
     TypedText,
     build_sparql_update,
     serialize,
+    fedora,
+    fedora_tx,
 )
 
 logger = logging.getLogger(__name__)
@@ -36,12 +39,12 @@ class Client:
     def __init__(
         self,
         endpoint: Endpoint,
-        auth: AuthBase = None,
+        auth: AuthBase | None = None,
         server_cert: str | None = None,
         ua_string: str | None = None,
         on_behalf_of: str | None = None,
         load_binaries: bool = True,
-        session: Session = None,
+        session: Session | None = None,
     ):
         self.endpoint: Endpoint = endpoint
         """Fedora repository endpoint"""
@@ -140,7 +143,7 @@ class Client:
         graph.parse(data=text.value, format=text.media_type)
         return graph
 
-    def get_description_uri(self, uri: str, response: Response = None) -> str:
+    def get_description_uri(self, uri: str, response: Response | None = None) -> str:
         """Check the `response` for a `Link` header with `rel="describedby"`. If
         present, returns that URI. Otherwise, assume the resource describes
         itself, and return the original `uri` argument.
@@ -241,7 +244,7 @@ class Client:
         else:
             raise ClientError(response)
 
-    def create_at_path(self, target_path: Path, graph: Graph = None):
+    def create_at_path(self, target_path: Path, graph: Graph | None = None):
         all_paths = self.paths_to_create(target_path)
 
         if len(all_paths) == 0:
@@ -262,7 +265,7 @@ class Client:
 
         return resource
 
-    def create_in_container(self, container_path: Path, graph: Graph = None):
+    def create_in_container(self, container_path: Path, graph: Graph | None = None):
         if not self.path_exists(str(container_path)):
             logger.error(f'Container path "{container_path}" not found')
             return None
@@ -291,7 +294,10 @@ class Client:
                 slug = name_function() if callable(name_function) else None
                 obj.create(self, container_path=container_path, slug=slug)
 
-    def put_graph(self, url, graph: Graph) -> Response:
+    def put_graph(self, url, graph: Graph | None) -> Response:
+        if graph is None:
+            raise RuntimeError('Graph must be provided')
+
         return self.put(
             self.get_description_uri(url),
             headers={
@@ -300,7 +306,7 @@ class Client:
             data=graph.serialize(format='application/n-triples'),
         )
 
-    def patch_graph(self, url, deletes: Graph, inserts: Graph) -> Response:
+    def patch_graph(self, url, deletes: Graph | None, inserts: Graph | None) -> Response:
         sparql_update = build_sparql_update(deletes, inserts)
         logger.debug(sparql_update)
         return self.patch(
@@ -308,6 +314,30 @@ class Client:
             headers={'Content-Type': 'application/sparql-update'},
             data=sparql_update,
         )
+
+    @cached_property
+    def transaction_endpoint(self) -> str:
+        """Send an HTTP POST request to this URL to create a new transaction.
+
+        The first time this property is accessed, it will attempt to determine
+        the endpoint by querying the server. If it is able to determine the
+        location of a transaction endpoint (either for Fedora 4 or Fedora 6+
+        style transactions), it caches and returns that endpoint. Otherwise,
+        it raises a `RuntimeError`."""
+
+        # first check for a Fedora 6+ link header pointing to the endpoint
+        response = self.head(self.endpoint.url)
+        if str(fedora_tx.endpoint) in response.links:
+            return response.links[str(fedora_tx.endpoint)]['url']
+
+        # then check for a Fedora 4 fedora:hasTransactionProvider triple in the repo root's graph
+        graph = self.get_graph(self.endpoint.url)
+        repo_root = URIRef(self.endpoint.url + '/')
+        if tx_endpoint := graph.value(repo_root, fedora.hasTransactionProvider, None):
+            assert isinstance(tx_endpoint, URIRef)
+            return str(tx_endpoint)
+
+        raise RuntimeError('No transaction endpoint can be found')
 
 
 class ClientError(Exception):

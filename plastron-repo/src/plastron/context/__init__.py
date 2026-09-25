@@ -62,6 +62,7 @@ class PlastronContext:
                     auth=authenticator,
                     ua_string=f'plastron/{self.version}',
                     on_behalf_of=delegated_user,
+                    digest_algorithm=repo_config.get('DIGEST_ALGORITHM', 'sha1'),
                 )
             else:
                 return Client(
@@ -69,6 +70,7 @@ class PlastronContext:
                     auth=authenticator,
                     ua_string=f'plastron/{self.version}',
                     on_behalf_of=delegated_user,
+                    digest_algorithm=repo_config.get('DIGEST_ALGORITHM', 'sha1'),
                 )
         except KeyError as e:
             raise RuntimeError(f"Missing configuration key {e} in section 'REPOSITORY'")

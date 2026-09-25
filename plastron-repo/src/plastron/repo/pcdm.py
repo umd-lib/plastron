@@ -95,7 +95,7 @@ class PCDMFileBearingResource(ContainerResource):
         # first create the binary with its data
         headers = {
             'Content-Type': mime_type or source.mimetype() or DEFAULT_BINARY_MIME_TYPE,
-            'Digest': source.digest(),
+            'Digest': source.digest(self.client.digest_algorithm),
             'Content-Disposition': f'attachment; filename="{source.filename}"',
         }
         with source.open() as stream:

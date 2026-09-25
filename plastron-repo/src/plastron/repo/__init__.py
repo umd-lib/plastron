@@ -46,11 +46,16 @@ class Repository:
             url=config['REST_ENDPOINT'],
             default_path=config.get('RELPATH', '/'),
         )
-        client = Client(endpoint=endpoint, auth=get_authenticator(config), server_cert=config.get('SERVER_CERT', None))
+        client = Client(
+            endpoint=endpoint,
+            auth=get_authenticator(config),
+            server_cert=config.get('SERVER_CERT', None),
+            digest_algorithm=config.get('DIGEST_ALGORITHM', 'sha1'),
+        )
         return cls(client=client)
 
     @classmethod
-    def from_url(cls, url: str, auth: AuthBase = None) -> 'Repository':
+    def from_url(cls, url: str, auth: AuthBase | None = None) -> 'Repository':
         endpoint = Endpoint(url=url)
         client = Client(endpoint=endpoint, auth=auth)
         return cls(client=client)

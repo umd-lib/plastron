@@ -14,13 +14,25 @@ from plastron.files import (
     RemoteFileSource,
     StringSource,
     ZipFileSource,
+    BinarySourceNotFoundError,
+    BinarySourceError,
 )
 from plastron.namespaces import pcdmuse
 
 
+def test_string_source():
+    f = StringSource('foobar')
+    assert f.exists()
+    assert f.filename == '<str>'
+    assert str(f) == '<str>'
+    assert f.mimetype() == 'application/octet-stream'
+
+
 def test_local_file():
-    f = LocalFileSource('/foo/bar')
-    assert f.localpath == '/foo/bar'
+    f = LocalFileSource('/foo/bar.jpg')
+    assert f.localpath == '/foo/bar.jpg'
+    assert str(f) == '/foo/bar.jpg'
+    assert f.mimetype() == 'image/jpeg'
 
 
 def test_remote_file():
@@ -28,6 +40,7 @@ def test_remote_file():
     assert f.sftp_uri.username == 'user'
     assert f.sftp_uri.hostname == 'example.com'
     assert f.sftp_uri.path == '/foo/bar.jpg'
+    assert str(f) == 'sftp://user@example.com/foo/bar.jpg'
 
 
 def test_zip_file():
@@ -44,16 +57,27 @@ def test_remote_zip_file():
     assert f.path == 'bar.jpg'
 
 
+@httpretty.activate
 def test_http_file():
+    httpretty.register_uri(
+        uri='http://example.com/test.jpg',
+        method=httpretty.HEAD,
+        status=HTTPStatus.OK,
+        adding_headers={'Content-Type': 'image/jpeg'},
+    )
     f = HTTPFileSource('http://example.com/test.jpg')
     assert f.uri == 'http://example.com/test.jpg'
+    assert str(f) == 'http://example.com/test.jpg'
     assert f.filename == 'test.jpg'
+    assert f.mimetype() == 'image/jpeg'
 
 
 def test_nonexistent_local_file_source():
     # pick a random filename string that is unlikely to exist
     f = LocalFileSource(str(uuid4()))
     assert not f.exists()
+    with pytest.raises(BinarySourceNotFoundError):
+        f.open()
 
 
 def test_nonexistent_zip_file_source():
@@ -73,6 +97,28 @@ def test_nonexistent_http_file_source():
     )
     f = HTTPFileSource(uri)
     assert not f.exists()
+
+
+@httpretty.activate
+@pytest.mark.parametrize(
+    ('status', 'expected_exception_class'),
+    [
+        (HTTPStatus.NOT_FOUND, BinarySourceNotFoundError),
+        (HTTPStatus.BAD_REQUEST, BinarySourceError),
+        (HTTPStatus.INTERNAL_SERVER_ERROR, BinarySourceError),
+    ],
+)
+def test_open_http_file_error(status, expected_exception_class):
+    uri = f'http://www.example.com/{uuid4()}'
+    httpretty.register_uri(
+        uri=uri,
+        method=httpretty.GET,
+        status=status,
+    )
+    f = HTTPFileSource(uri)
+    with pytest.raises(expected_exception_class):
+        with f.open() as _stream:
+            pass
 
 
 def test_zip_file_source_exists(datadir):

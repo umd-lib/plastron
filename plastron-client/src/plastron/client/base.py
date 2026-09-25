@@ -45,10 +45,12 @@ class Client:
         on_behalf_of: str | None = None,
         load_binaries: bool = True,
         session: Session | None = None,
+        digest_algorithm: str = 'sha1',
     ):
         self.endpoint: Endpoint = endpoint
         """Fedora repository endpoint"""
         self.load_binaries: bool = load_binaries
+        self.digest_algorithm: str = digest_algorithm
 
         if session is None:
             # defaults to a basic requests.Session object

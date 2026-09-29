@@ -62,10 +62,17 @@ def transaction(client: Client, keep_alive: int = 90) -> Generator['TransactionC
 
 
 class Transaction:
+    """A single transaction."""
     def __init__(self, client: 'TransactionClientBase', uri: str, keep_alive: int = 90, active: bool = True):
         self.uri: str = uri
+        """The URI of the transaction."""
+
         self.keep_alive: TransactionKeepAlive = TransactionKeepAlive(client, keep_alive)
+        """Keep-alive thread. Default interval between keep-alive requests is 90 seconds."""
+
         self.active: bool = active
+        """Whether this transaction is active. Defaults to `true`."""
+
         if self.active:
             self.keep_alive.start()
 
@@ -108,8 +115,8 @@ class TransactionClientBase(Client, ABC):
 
     def __init__(self, tx_uri: str, keep_alive: int = 90, **kwargs):
         super().__init__(**kwargs)
-        self.tx = Transaction(client=self, uri=tx_uri, keep_alive=keep_alive)
-        """The transaction"""
+        self.tx: Transaction = Transaction(client=self, uri=tx_uri, keep_alive=keep_alive)
+        """The `Transaction`"""
 
     @property
     def transaction_endpoint(self) -> str:
@@ -123,13 +130,13 @@ class TransactionClientBase(Client, ABC):
 
     @abstractmethod
     def request_maintain(self) -> Response:
-        """Implement this method with the API call needed to maintain the transaction."""
+        """Subclasses must implement this method with the API call needed to maintain the transaction."""
         raise NotImplementedError
 
     @abstractmethod
     def get_expiration(self, response: Response) -> str:
-        """Implement this method to extract the expiration timestamp from the response
-        returned by the `maintain()` method."""
+        """Subclasses must implement this method to extract the expiration timestamp from the response
+        returned by the `request_maintain()` method."""
         raise NotImplementedError
 
     def maintain(self):
@@ -155,7 +162,7 @@ class TransactionClientBase(Client, ABC):
 
     @abstractmethod
     def request_commit(self) -> Response:
-        """Implement this method with the API call needed to commit the transaction."""
+        """Subclasses must implement this method with the API call needed to commit the transaction."""
         raise NotImplementedError
 
     def commit(self):
@@ -181,7 +188,7 @@ class TransactionClientBase(Client, ABC):
 
     @abstractmethod
     def request_rollback(self) -> Response:
-        """Implement this method with the API call needed to roll back the transaction."""
+        """Subclasses must implement this method with the API call needed to roll back the transaction."""
         raise NotImplementedError
 
     def rollback(self):
@@ -241,7 +248,8 @@ class Fedora4TransactionClient(TransactionClientBase):
 
     def request(self, method: str, url: str, **kwargs) -> Response:
         """Makes sure the transaction keep-alive thread hasn't failed, and inserts the transaction
-        id into the request URL. Then calls the `Client.request()` method with the same arguments.
+        id into the request URL. Then calls the `plastron.client.base.Client.request()` method with
+        the same arguments.
 
         Raises a `RuntimeError` if the transaction keep-alive thread has failed."""
         if self.tx.keep_alive.failed.is_set():
@@ -265,6 +273,10 @@ class Fedora4TransactionClient(TransactionClientBase):
         accept: str = 'application/n-triples',
         include_server_managed: bool = True,
     ) -> TypedText:
+        """Inserts the transaction id in to the request URL and calls
+        `plastron.client.base.Client.get_description()` with the modified
+        arguments. Then strips the transaction IDs out of the returned
+        RDF and returns it to the caller."""
         text = super().get_description(
             url=str(self.insert_transaction_uri(URIRef(url))),
             accept=accept,
@@ -275,14 +287,19 @@ class Fedora4TransactionClient(TransactionClientBase):
         return TypedText(text.media_type, value)
 
     def put_graph(self, url, graph: Graph | None) -> Response:
+        """Insert the transaction id into the request URL and `graph`, then calls
+        `plastron.client.base.Client.put_graph()` method with the modified arguments."""
         return super().put_graph(
-            url=url,
+            url=str(self.insert_transaction_uri(URIRef(url))),
             graph=self.insert_transaction_uri_for_graph(graph),
         )
 
     def patch_graph(self, url, deletes: Graph | None, inserts: Graph | None) -> Response:
+        """Insert the transaction id into the request URL and the `inserts` and `deletes`
+        graphs, then calls `plastron.client.base.Client.patch_graph()` method with the
+        modified arguments."""
         return super().patch_graph(
-            url=url,
+            url=str(self.insert_transaction_uri(URIRef(url))),
             deletes=self.insert_transaction_uri_for_graph(deletes),
             inserts=self.insert_transaction_uri_for_graph(inserts),
         )
@@ -363,7 +380,7 @@ class Fedora6TransactionClient(TransactionClientBase):
 
     def request(self, method: str, url: str, **kwargs) -> Response:
         """Makes sure the transaction keep-alive thread hasn't failed, and adds the transaction
-        URI into the request headers as the `Atomic-ID`. Then calls the `Client.request()` method
+        URI into the request headers as the `Atomic-ID`. Then calls `plastron.client.base.Client.request()`
         with the same arguments.
 
         Raises a `RuntimeError` if the transaction keep-alive thread has failed."""

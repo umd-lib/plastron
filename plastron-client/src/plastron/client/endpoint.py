@@ -42,7 +42,7 @@ class Endpoint:
         """
         return uri.startswith(self.url)
 
-    def repo_path(self, resource_uri: str) -> str | None:
+    def repo_path(self, resource_uri: str | None) -> str | None:
         """
         Returns the repository path for the given resource URI, i.e. the
         path with the ``url`` removed. For example:
@@ -58,8 +58,3 @@ class Endpoint:
             return None
         else:
             return resource_uri.replace(self.url, '')
-
-    @property
-    def transaction_endpoint(self) -> str:
-        """Send an HTTP POST request to this URL to create a new transaction."""
-        return self.url + '/fcr:tx'

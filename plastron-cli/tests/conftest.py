@@ -9,6 +9,7 @@ from rdflib import Graph
 from plastron.client import Client, Endpoint
 from plastron.client.auth import get_authenticator
 from plastron.context import PlastronContext
+from plastron.namespaces import fedora
 from plastron.repo import Repository
 
 
@@ -51,6 +52,19 @@ def register_root(endpoint: Endpoint):
             uri=endpoint.url.with_path('/'),
             method=httpretty.HEAD,
             status=status,
+        )
+        httpretty.register_uri(
+            uri=endpoint.url.with_path('/'),
+            method=httpretty.GET,
+            status=status,
+            adding_headers={
+                'Content-Type': 'application/n-triples',
+            },
+            body=(
+                f'<{endpoint.url.with_path("/")}> '
+                f'<{fedora.hasTransactionProvider}> '
+                f'<{endpoint.url.with_path("/fcr:tx")}> .'
+            ),
         )
 
     return _register_root
@@ -100,7 +114,7 @@ def register_transaction(register_root, endpoint):
         txn_url = endpoint.url.with_path(f'/tx:{txn_id}')
         # creating a new transaction
         httpretty.register_uri(
-            uri=endpoint.transaction_endpoint,
+            uri=endpoint.url + '/fcr:tx',
             method=httpretty.POST,
             status=201,
             adding_headers={

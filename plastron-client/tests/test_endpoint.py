@@ -21,7 +21,3 @@ def test_not_contains(endpoint):
 def test_default_path_adds_slash():
     endpoint = Endpoint(url='http://localhost:8080/fcrepo/rest', default_path='foo')
     assert endpoint.relpath == '/foo'
-
-
-def test_transaction_endpoint(endpoint):
-    assert endpoint.transaction_endpoint == 'http://localhost:8080/fcrepo/rest/fcr:tx'

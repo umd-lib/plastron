@@ -72,7 +72,8 @@ def register_responses(responses, uri):
     ],
 )
 @httpretty.activate
-def test_delete_command(plastron_context, register_transaction, path, responses, expectation):
+def test_delete_command(plastron_context, register_transaction, register_root, path, responses, expectation):
+    register_root()
     txn_url = register_transaction()
     uri = txn_url.add_path_segment(path)
     register_responses(
@@ -95,7 +96,8 @@ def test_delete_command(plastron_context, register_transaction, path, responses,
 
 
 @httpretty.activate
-def test_completed_log(datadir, repo, plastron_context, register_transaction):
+def test_completed_log(datadir, repo, plastron_context, register_transaction, register_root):
+    register_root()
     txn_url = register_transaction()
     url = txn_url.add_path_segment('test')
     deleted_url = str(repo['/test'].url)

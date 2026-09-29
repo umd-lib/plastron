@@ -3,10 +3,9 @@ from rdflib import Literal, URIRef
 
 from plastron.client import Endpoint
 from plastron.client.transactions import (
-    Transaction,
-    TransactionClient,
     TransactionError,
     transaction,
+    Fedora4TransactionClient,
 )
 
 
@@ -17,8 +16,7 @@ def endpoint():
 
 @pytest.fixture()
 def txn_client(endpoint):
-    txn_client = TransactionClient(endpoint=endpoint)
-    txn_client.tx = Transaction(client=txn_client, uri='http://example.com/repo/tx:123456')
+    txn_client = Fedora4TransactionClient(endpoint=endpoint, tx_uri='http://example.com/repo/tx:123456')
     yield txn_client
     # after the tests are done, make sure the keep-alive thread stops
     txn_client.tx.stop()
@@ -60,4 +58,4 @@ def test_cannot_nest_transactions(txn_client):
     with pytest.raises(TransactionError) as e, transaction(txn_client):
         pass
 
-    assert str(e.value).startswith('Failed to create transaction')
+    assert 'Cannot nest transactions' in str(e.value)

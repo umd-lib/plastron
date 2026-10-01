@@ -1301,6 +1301,7 @@ provides-extras = ["test"]
 name = "plastron-repo"
 source = { editable = "plastron-repo" }
 dependencies = [
+    { name = "cryptography" },
     { name = "paramiko" },
     { name = "plastron-client" },
     { name = "plastron-messaging" },
@@ -1324,6 +1325,7 @@ test = [
 
 [package.metadata]
 requires-dist = [
+    { name = "cryptography" },
     { name = "freezegun", marker = "extra == 'test'" },
     { name = "paramiko" },
     { name = "plastron-client", editable = "plastron-client" },

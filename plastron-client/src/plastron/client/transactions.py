@@ -63,6 +63,7 @@ def transaction(client: Client, keep_alive: int = 90) -> Generator['TransactionC
 
 class Transaction:
     """A single transaction."""
+
     def __init__(self, client: 'TransactionClientBase', uri: str, keep_alive: int = 90, active: bool = True):
         self.uri: str = uri
         """The URI of the transaction."""
@@ -109,6 +110,7 @@ class TransactionClientBase(Client, ABC):
             ua_string=client.ua_string,
             on_behalf_of=client.delegated_user,
             load_binaries=client.load_binaries,
+            digest_algorithm=client.digest_algorithm,
             tx_uri=tx_uri,
             keep_alive=keep_alive,
         )

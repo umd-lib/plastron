@@ -1,4 +1,3 @@
-import hashlib
 import io
 import logging
 import re
@@ -14,6 +13,7 @@ from os.path import basename, isfile, splitext
 from typing import Any, Protocol
 from urllib.parse import urlsplit
 
+from cryptography.hazmat.primitives.hashes import Hash, SHA1, SHA256, SHA512, SHA512_256, MD5
 from paramiko import AutoAddPolicy, SFTPClient, SSHClient, SSHException
 from paramiko.config import SSH_PORT
 from rdflib import URIRef
@@ -31,6 +31,16 @@ USAGE_TAGS: dict[str, set[URIRef]] = {
     'preservation': {pcdmuse.PreservationMasterFile},
     'ocr': {pcdmuse.ExtractedText},
     'metadata': {fabio.MetadataFile},
+}
+
+HASH_ALGORITHMS = {
+    'md5': MD5,
+    'sha1': SHA1,
+    'sha': SHA1,
+    'sha256': SHA256,
+    'sha-256': SHA256,
+    'sha-512': SHA512,
+    'sha-512/256': SHA512_256,
 }
 
 
@@ -84,7 +94,7 @@ class BinaryResource(RepositoryResource):
         try:
             headers = {
                 'Content-Type': mime_type or source.mimetype() or 'application/octet-stream',
-                'Digest': source.digest(),
+                'Digest': source.digest(self.client.digest_algorithm),
                 'Content-Disposition': f'attachment; filename="{source.filename}"',
             }
             logger.info(f'Updating binary content at {self.url}')
@@ -166,6 +176,17 @@ class BinarySourceNotFoundError(BinarySourceError):
     """Raised when a binary source cannot be found."""
 
 
+class UnsupportedHashAlgorithm(BinarySourceError):
+    """Raised when an unsupported hash algorithm is requested."""
+
+    def __init__(self, algorithm: str, *args):
+        super().__init__(*args)
+        self.algorithm = algorithm
+
+    def __str__(self):
+        return f'Unsupported hash algorithm: {self.algorithm}'
+
+
 class BinarySource:
     """
     Base class for reading binary content from arbitrary locations.
@@ -188,7 +209,7 @@ class BinarySource:
         the file-like object returned by `open()`"""
         raise NotImplementedError()
 
-    def mimetype(self) -> str:
+    def mimetype(self) -> str | None:
         """Returns the MIME type of this binary source. It is left up to
         the individual implementations of `BinarySource` to decide how to
         best determine this information."""
@@ -198,14 +219,24 @@ class BinarySource:
         """Returns `True` if this source exists, otherwise returns `False`."""
         raise NotImplementedError()
 
-    def digest(self) -> str:
-        """Generates the SHA-1 checksum. Returns a hex-encoded SHA-1 digest,
-        prepended with the string "sha1="."""
-        sha1 = hashlib.sha1()
+    def digest(self, algorithm: str = 'sha1'):
+        """Generates a hash of this source's contents, using the specified hash
+        algorithm. Returns a hex-encoded digest, prepended with the `algorithm`
+        and an "=" sign. (e.g., `sha1=40f916e6a391d60f0ff67fb80fdb102b5aa12780`).
+
+        The `algorithm` chosen must be listed in the `HASH_ALGORITHMS` dictionary.
+        Raises a `BinarySourceError` if the given `algorithm` is not supported.
+
+        The default `algorithm` is `sha1`."""
+        try:
+            hash_algorithm = HASH_ALGORITHMS[algorithm]
+        except KeyError:
+            raise UnsupportedHashAlgorithm(algorithm)
+        hash_obj = Hash(hash_algorithm())
         with self.open() as stream:
             for block in stream:
-                sha1.update(block)
-        return 'sha1=' + sha1.hexdigest()
+                hash_obj.update(block)
+        return f'{algorithm}={hash_obj.finalize().hex()}'
 
     @property
     def rdf_types(self) -> set[URIRef]:
@@ -287,7 +318,7 @@ class LocalFileSource(BinarySource):
         if self._file is not None:
             self._file.close()
 
-    def mimetype(self) -> str:
+    def mimetype(self) -> str | None:
         """Returns the MIME type set in the constructor."""
         return self._mimetype
 
@@ -325,6 +356,7 @@ class HTTPFileSource(BinarySource):
             self._mimetype = response.headers['Content-Type']
         return self._mimetype
 
+    @contextmanager
     def open(self, chunk_size: int = 512):
         """Returns an iterator over the source's data, with the given
         `chunk_size` (defaults to `512`).
@@ -338,7 +370,7 @@ class HTTPFileSource(BinarySource):
                 raise BinarySourceNotFoundError(f'{response.status_code} {response.reason}: {self.uri}')
             else:
                 raise BinarySourceError(response)
-        return response.iter_content(chunk_size)
+        yield response.iter_content(chunk_size)
 
     def close(self):
         """This method does nothing (there is no special cleanup for HTTP requests)."""
@@ -348,12 +380,44 @@ class HTTPFileSource(BinarySource):
         return self.request('HEAD').ok
 
 
-class RepositoryFileSource(HTTPFileSource):
-    """A binary stored in a repository."""
+def get_openssl_algorithm(algorithm: str) -> str:
+    """Return the OpenSSL spelling of the given algorithm name.
 
-    def __init__(self, uri: str, client: DoesHTTPRequest, **kwargs):
-        super().__init__(uri, **kwargs)
-        self._client = client
+    These have different spellings:
+
+    ```pycon
+    >>> get_openssl_algorithm('sha')
+    'sha1'
+
+    >>> get_openssl_algorithm('sha-256')
+    'sha256'
+
+    >>> get_openssl_algorithm('sha-512')
+    'sha512'
+
+    >>> get_openssl_algorithm('sha-512/256')
+    'sha512-256'
+
+    ```
+
+    While these are the same:
+
+    ```pycon
+    >>> get_openssl_algorithm('md5')
+    'md5'
+
+    >>> get_openssl_algorithm('sha1')
+    'sha1'
+
+    """
+    if algorithm == 'sha':
+        return 'sha1'
+    elif algorithm == 'sha-512/256':
+        return 'sha512-256'
+    elif algorithm.startswith('sha-'):
+        return 'sha' + algorithm[4:]
+    else:
+        return algorithm
 
 
 class RemoteFileSource(BinarySource):
@@ -422,9 +486,9 @@ class RemoteFileSource(BinarySource):
             self._mimetype = self.ssh_exec(f'file --mime-type -F "" "{self.sftp_uri.path}"').split()[1]
         return self._mimetype
 
-    def digest(self) -> str:
-        sha1sum = self.ssh_exec(f'sha1sum "{self.sftp_uri.path}"').split()[0]
-        return 'sha1=' + sha1sum
+    def digest(self, algorithm: str = 'sha1') -> str:
+        digest = self.ssh_exec(f'openssl dgst -{get_openssl_algorithm(algorithm)} "{self.sftp_uri.path}"').split()[0]
+        return f'{algorithm}={digest}'
 
     def exists(self) -> bool:
         (_, stdout, _) = self.ssh().exec_command(f'test -f "{self.sftp_uri.path}"')
@@ -516,9 +580,9 @@ class ZipFileSource(BinarySource):
 @dataclass
 class FileSpec:
     name: str
-    label: str = None
-    usage: str = None
-    source: BinarySource | BinaryResource = None
+    label: str | None = None
+    usage: str | None = None
+    source: BinarySource | BinaryResource | None = None
 
     @classmethod
     def parse(cls, spec_string: str):
@@ -545,14 +609,14 @@ class FileSpec:
     @property
     def rdf_types(self) -> set[URIRef]:
         if self.usage is not None:
-            return USAGE_TAGS.get(self.usage.lower(), None)
+            return USAGE_TAGS.get(self.usage.lower(), set())
         return set()
 
 
 @dataclass
 class FileGroup:
     rootname: str
-    label: str = None
+    label: str | None = None
     files: list[FileSpec] = field(default_factory=list)
 
     def __str__(self):

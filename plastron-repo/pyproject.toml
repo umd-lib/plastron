@@ -13,6 +13,7 @@ authors = [
 readme = "README.md"
 requires-python = ">= 3.10"
 dependencies = [
+    "cryptography",
     "paramiko",
     "plastron-client",
     "plastron-messaging",
@@ -41,3 +42,10 @@ build-backend = "setuptools.build_meta"
 
 [tool.setuptools.dynamic]
 version = { "file" = "VERSION" }
+
+[tool.pytest.ini_options]
+addopts = "--doctest-modules"
+# these warnings are coming from third-party code
+filterwarnings = [
+    "ignore:'.*' (argument is )?deprecated:pyparsing.PyparsingDeprecationWarning",
+]

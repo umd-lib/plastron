@@ -16,7 +16,7 @@ class MockRepo(Repository):
 
 @pytest.fixture
 def mock_client():
-    return MagicMock(spec=Client, endpoint=Endpoint('http://localhost:8080/rest'))
+    return MagicMock(spec=Client, endpoint=Endpoint('http://localhost:8080/rest'), digest_algorithm='sha1')
 
 
 @pytest.fixture

@@ -1,9 +1,7 @@
 import logging
-from collections.abc import Callable
 from functools import cached_property
 from http import HTTPStatus
 from pathlib import Path
-from typing import Any
 
 from rdflib import Graph, URIRef
 from requests import ConnectionError, Response, Session
@@ -224,19 +222,22 @@ class Client:
         url: str | None = None,
         container_path: str | None = None,
         slug: str | None = None,
+        archival_group: bool = False,
         **kwargs,
     ) -> ResourceURI:
+        headers = kwargs.pop('headers', {})
+        if archival_group:
+            headers['Link'] = f'<{fedora.ArchivalGroup}>; rel="type"'
+
         if url is not None:
-            response = self.put(url, **kwargs)
+            response = self.put(url, headers=headers, **kwargs)
         elif path is not None:
-            response = self.put(self.endpoint.url + path, **kwargs)
+            response = self.put(self.endpoint.url + path, headers=headers, **kwargs)
         else:
-            if 'headers' not in kwargs:
-                kwargs['headers'] = {}
             if slug is not None:
-                kwargs['headers']['Slug'] = slug
+                headers['Slug'] = slug
             container_uri = self.endpoint.url + (container_path or self.endpoint.relpath)
-            response = self.post(container_uri, **kwargs)
+            response = self.post(container_uri, headers=headers, **kwargs)
 
         if response.status_code == HTTPStatus.CREATED:
             created_uri = self.get_location(response) or url
@@ -246,7 +247,12 @@ class Client:
         else:
             raise ClientError(response)
 
-    def create_at_path(self, target_path: Path, graph: Graph | None = None):
+    def create_at_path(
+        self,
+        target_path: Path,
+        graph: Graph | None = None,
+        archival_group: bool = False,
+    ) -> ResourceURI | None:
         all_paths = self.paths_to_create(target_path)
 
         if len(all_paths) == 0:
@@ -258,7 +264,10 @@ class Client:
             logger.info(f'Creating {path}')
             if path == target_path and graph:
                 resource = self.create(
-                    path=str(path), headers={'Content-Type': 'text/turtle'}, data=serialize(graph, format='turtle')
+                    path=str(path),
+                    archival_group=archival_group,
+                    headers={'Content-Type': 'text/turtle'},
+                    data=serialize(graph, format='turtle'),
                 )
             else:
                 resource = self.create(path=str(path))
@@ -267,34 +276,27 @@ class Client:
 
         return resource
 
-    def create_in_container(self, container_path: Path, graph: Graph | None = None):
+    def create_in_container(
+        self,
+        container_path: Path,
+        graph: Graph | None = None,
+        archival_group: bool = False,
+    ) -> ResourceURI | None:
         if not self.path_exists(str(container_path)):
             logger.error(f'Container path "{container_path}" not found')
             return None
         if graph:
             resource = self.create(
                 container_path=str(container_path),
+                archival_group=archival_group,
                 headers={'Content-Type': 'text/turtle'},
                 data=serialize(graph, format='turtle'),
             )
         else:
-            resource = self.create(container_path=str(container_path))
+            resource = self.create(container_path=str(container_path), archival_group=archival_group)
 
         logger.info(f'Created {resource}')
         return resource
-
-    def create_all(self, container_path: str, resources: list[Any], name_function: Callable | None = None):
-        # ensure the container exists
-        if len(resources) > 0 and not self.path_exists(container_path):
-            self.create(path=container_path)
-
-        for obj in resources:
-            if obj.created or obj.exists_in_repo(self):
-                obj.created = True
-                logger.debug(f'Object "{obj}" exists. Skipping.')
-            else:
-                slug = name_function() if callable(name_function) else None
-                obj.create(self, container_path=container_path, slug=slug)
 
     def put_graph(self, url, graph: Graph | None) -> Response:
         if graph is None:

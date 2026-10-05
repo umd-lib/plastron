@@ -19,7 +19,7 @@ def configure_cli(subparsers):
     parser.add_argument(
         '-D',
         '--data-property',
-        help=('an RDF data property to set on the newly created resource; VALUE is treated as a Literal; repeatable'),
+        help='an RDF data property to set on the newly created resource; VALUE is treated as a Literal; repeatable',
         action='append',
         nargs=2,
         dest='data_properties',
@@ -59,6 +59,11 @@ def configure_cli(subparsers):
         action='store',
         dest='collection_name',
     )
+    parser.add_argument(
+        '--archival-group',
+        help='create this resource as an Archival Group (Fedora 6+ only)',
+        action='store_true',
+    )
     container_or_path = parser.add_mutually_exclusive_group(required=True)
     container_or_path.add_argument('path', nargs='?', help='path to the new resource', action='store')
     container_or_path.add_argument(
@@ -92,6 +97,6 @@ class Command(BaseCommand):
             graph.add((URIRef(''), p, o))
 
         if args.path is not None:
-            self.context.client.create_at_path(Path(args.path), graph)
+            self.context.client.create_at_path(Path(args.path), graph, archival_group=args.archival_group)
         elif args.container is not None:
-            self.context.client.create_in_container(Path(args.container), graph)
+            self.context.client.create_in_container(Path(args.container), graph, archival_group=args.archival_group)

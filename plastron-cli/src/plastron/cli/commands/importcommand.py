@@ -118,7 +118,7 @@ def configure_cli(subparsers):
     )
     parser.add_argument(
         '--container',
-        help=('parent container for new items; defaults to the RELPATH in the repo configuration file'),
+        help='parent container for new items; defaults to the RELPATH in the repo configuration file',
         metavar='PATH',
         action='store',
     )
@@ -131,7 +131,7 @@ def configure_cli(subparsers):
     parser.add_argument(
         '--extract-text-from',
         '-x',
-        help=('extract text from binaries of the given MIME types, and add as annotations'),
+        help='extract text from binaries of the given MIME types, and add as annotations',
         dest='extract_text_types',
         metavar='MIME_TYPES',
         action='store',

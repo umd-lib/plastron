@@ -541,7 +541,7 @@ class ImportRow:
             # then do a PATCH update of an existing item
             try:
                 resource: PublishableObjectResource = self.context.repo[
-                    self.item.uri : PublishableObjectResource
+                    self.item.uri: PublishableObjectResource
                 ].read()
                 resource.attach_description(self.item)
                 resource.update()
@@ -584,7 +584,7 @@ class ImportRow:
 
         logger.debug(f'Creating resources in container: {self.job.config.container}')
         logger.debug(f'Repo: {self.context.repo}')
-        container: ContainerResource = self.context.repo[self.job.config.container : ContainerResource]
+        container: ContainerResource = self.context.repo[self.job.config.container:ContainerResource]
 
         try:
             with self.context.repo.transaction():

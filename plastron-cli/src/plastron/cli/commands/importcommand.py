@@ -149,6 +149,11 @@ def configure_cli(subparsers):
         action='store',
     )
     parser.add_argument(
+        '--use-archival-groups',
+        help='whether to create items as Fedora Archival Groups (Fedora 6+)',
+        action='store_true',
+    )
+    parser.add_argument(
         '--publish',
         help='automatically publish all items in this import',
         action='store_true',
@@ -213,6 +218,7 @@ class Command(BaseCommand):
                             container=args.container,
                             binaries_location=str(batch.root_dir),
                             file_grouping_strategy=args.file_grouping_strategy,
+                            use_archival_groups=args.use_archival_groups,
                         ),
                     )
                     with job.metadata_file.open(mode='w') as fh:
@@ -238,6 +244,7 @@ class Command(BaseCommand):
                         container=args.container,
                         binaries_location=args.binaries_location,
                         file_grouping_strategy=args.file_grouping_strategy,
+                        use_archival_groups=args.use_archival_groups,
                     ),
                 )
 

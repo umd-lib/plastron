@@ -59,9 +59,10 @@ class MockContainer:
     _resource_class = None
     path = '/foo'
 
-    def create_child(self, resource_class, description):
+    def create_child(self, resource_class, description, archival_group=False):
         self.obj = description
         self._resource_class = resource_class
+        self._archival_group = archival_group
         mock_resource = MagicMock(spec=PublishableObjectResource, url='/foo/bar')
         mock_resource.publish = lambda *args, **kwargs: self.obj.rdf_type.add(umdaccess.Published)
         return mock_resource

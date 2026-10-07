@@ -1,12 +1,15 @@
 import re
 from pathlib import Path
+from unittest.mock import Mock
 from uuid import uuid4
 
 import pytest
 from flask import url_for
 from http_server_mock import HttpServerMock
+from requests import Session
 
-from plastron.client import Client, Endpoint
+from plastron.client import Client, Endpoint, ClientError
+from plastron.client.utils import fedora
 
 
 @pytest.fixture
@@ -73,3 +76,85 @@ def test_create_in_container(client: Client, repo_app):
         resource = client.create_in_container(Path('/foo'))
         assert resource.uri
         assert re.match('http://localhost:9999/foo/.+', str(resource.uri))
+
+
+class MockCreatedResponse:
+    ok = True
+    status_code = 201
+    reason = 'Created'
+    headers = {'Location': 'http://example.com/repo/foo'}
+    links = {}
+
+
+def test_create_using_mock(endpoint: Endpoint):
+    session = Mock(spec=Session)
+    session.request.return_value = MockCreatedResponse()
+    client = Client(endpoint=endpoint, session=session)
+    client.create()
+    session.request.assert_called_with(
+        'POST',
+        'http://example.com/repo/',
+        headers={},
+    )
+
+
+class MockBadRequestResponse:
+    ok = False
+    status_code = 400
+    reason = 'Bad Request'
+
+
+def test_create_using_mock_fails(endpoint: Endpoint):
+    session = Mock(spec=Session)
+    session.request.return_value = MockBadRequestResponse()
+    client = Client(endpoint=endpoint, session=session)
+    with pytest.raises(ClientError):
+        client.create(path='/foo')
+
+
+def test_create_with_slug_using_mock(endpoint: Endpoint):
+    session = Mock(spec=Session)
+    session.request.return_value = MockCreatedResponse()
+    client = Client(endpoint=endpoint, session=session)
+    client.create(container_path='/foo', slug='bar')
+    session.request.assert_called_with(
+        'POST',
+        'http://example.com/repo/foo',
+        headers={'Slug': 'bar'},
+    )
+
+
+def test_create_with_url_using_mock(endpoint: Endpoint):
+    session = Mock(spec=Session)
+    session.request.return_value = MockCreatedResponse()
+    client = Client(endpoint=endpoint, session=session)
+    client.create(url='http://example.com/repo/foo')
+    session.request.assert_called_with(
+        'PUT',
+        'http://example.com/repo/foo',
+        headers={},
+    )
+
+
+def test_create_with_path_using_mock(endpoint: Endpoint):
+    session = Mock(spec=Session)
+    session.request.return_value = MockCreatedResponse()
+    client = Client(endpoint=endpoint, session=session)
+    client.create(path='/foo')
+    session.request.assert_called_with(
+        'PUT',
+        'http://example.com/repo/foo',
+        headers={},
+    )
+
+
+def test_create_as_archival_group_using_mock(endpoint: Endpoint):
+    session = Mock(spec=Session)
+    session.request.return_value = MockCreatedResponse()
+    client = Client(endpoint=endpoint, session=session)
+    client.create(path='/foo', archival_group=True)
+    session.request.assert_called_with(
+        'PUT',
+        'http://example.com/repo/foo',
+        headers={'Link': f'<{fedora.ArchivalGroup}>; rel="type"'},
+    )

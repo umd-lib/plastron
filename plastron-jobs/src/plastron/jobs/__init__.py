@@ -37,7 +37,7 @@ class JobConfig:
         return cls(**config)
 
     def save(self, filename: str | Path):
-        config = {k: str(v) if v is not None else v for k, v in vars(self).items()}
+        config = {k: v if v is not None else v for k, v in vars(self).items()}
         with open(filename, mode='w') as file:
             yaml.dump(data=config, stream=file)
 

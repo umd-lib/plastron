@@ -64,6 +64,7 @@ class ImportConfig(JobConfig):
     binaries_location: str | None = None
     extract_text_types: str | None = None
     file_grouping_strategy: str = 'rootname'
+    use_archival_groups: bool = False
 
 
 def get_loggable_uri(item):
@@ -540,7 +541,7 @@ class ImportRow:
             # then do a PATCH update of an existing item
             try:
                 resource: PublishableObjectResource = self.context.repo[
-                    self.item.uri : PublishableObjectResource
+                    self.item.uri: PublishableObjectResource
                 ].read()
                 resource.attach_description(self.item)
                 resource.update()
@@ -583,7 +584,7 @@ class ImportRow:
 
         logger.debug(f'Creating resources in container: {self.job.config.container}')
         logger.debug(f'Repo: {self.context.repo}')
-        container: ContainerResource = self.context.repo[self.job.config.container : ContainerResource]
+        container: ContainerResource = self.context.repo[self.job.config.container:ContainerResource]
 
         try:
             with self.context.repo.transaction():
@@ -592,6 +593,7 @@ class ImportRow:
                 resource = container.create_child(
                     resource_class=PublishableObjectResource,
                     description=self.item,
+                    archival_group=self.job.config.use_archival_groups,
                 )
                 # add pages and files to those pages
                 if self.row.has_files:

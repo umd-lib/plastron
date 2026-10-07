@@ -118,7 +118,7 @@ def configure_cli(subparsers):
     )
     parser.add_argument(
         '--container',
-        help=('parent container for new items; defaults to the RELPATH in the repo configuration file'),
+        help='parent container for new items; defaults to the RELPATH in the repo configuration file',
         metavar='PATH',
         action='store',
     )
@@ -131,7 +131,7 @@ def configure_cli(subparsers):
     parser.add_argument(
         '--extract-text-from',
         '-x',
-        help=('extract text from binaries of the given MIME types, and add as annotations'),
+        help='extract text from binaries of the given MIME types, and add as annotations',
         dest='extract_text_types',
         metavar='MIME_TYPES',
         action='store',
@@ -147,6 +147,11 @@ def configure_cli(subparsers):
         default='rootname',
         dest='file_grouping_strategy',
         action='store',
+    )
+    parser.add_argument(
+        '--use-archival-groups',
+        help='whether to create items as Fedora Archival Groups (Fedora 6+)',
+        action='store_true',
     )
     parser.add_argument(
         '--publish',
@@ -213,6 +218,7 @@ class Command(BaseCommand):
                             container=args.container,
                             binaries_location=str(batch.root_dir),
                             file_grouping_strategy=args.file_grouping_strategy,
+                            use_archival_groups=args.use_archival_groups,
                         ),
                     )
                     with job.metadata_file.open(mode='w') as fh:
@@ -238,6 +244,7 @@ class Command(BaseCommand):
                         container=args.container,
                         binaries_location=args.binaries_location,
                         file_grouping_strategy=args.file_grouping_strategy,
+                        use_archival_groups=args.use_archival_groups,
                     ),
                 )
 

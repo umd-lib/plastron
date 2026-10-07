@@ -2,11 +2,12 @@ import logging
 import re
 from http.client import RemoteDisconnected
 from pathlib import Path
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, Mock
 
 import pytest
-from requests import Request, Session
+from requests import Request, Session, Response
 from requests.exceptions import ConnectionError
+from requests.structures import CaseInsensitiveDict
 from requests_jwtauth import HTTPBearerAuth
 
 from plastron.client import Client, ClientError, Endpoint
@@ -48,6 +49,11 @@ class MockNoDescribedbyHeaderResponse(MockOKResponse):
 
 class MockDescribedbyHeaderResponse(MockOKResponse):
     links = {'describedby': {'url': 'describedby_url'}}
+
+
+def test_set_server_cert(endpoint):
+    client = Client(endpoint=endpoint, server_cert='foobar')
+    assert client.session.verify == 'foobar'
 
 
 def test_get_description_uri_failed_response(monkeypatch_request, client):
@@ -226,3 +232,30 @@ def test_client_test_connection_error(endpoint):
     client = Client(endpoint=endpoint, session=session)
     with pytest.raises(ConnectionError):
         client.test_connection()
+
+
+@pytest.mark.parametrize(
+    ('headers', 'expected_location'),
+    [
+        ({}, None),
+        ({'Location': 'http://localhost:9999/'}, 'http://localhost:9999/'),
+        ({'location': 'http://localhost:9999/'}, 'http://localhost:9999/'),
+        ({'Other-header': 'http://localhost:9999/'}, None),
+    ],
+)
+def test_client_get_location(endpoint, headers, expected_location):
+    client = Client(endpoint=endpoint)
+    response = Mock(spec=Response, headers=CaseInsensitiveDict(headers))
+    assert client.get_location(response) == expected_location
+
+
+def test_client_put_graph_no_graph(client):
+    with pytest.raises(RuntimeError):
+        client.put_graph('/foo', graph=None)
+
+
+def test_client_create_in_container_using_mock_not_found(endpoint):
+    session = MagicMock(spec=Session)
+    session.request.return_value = MockNotFoundResponse()
+    client = Client(endpoint=endpoint, session=session)
+    assert client.create_in_container(container_path=Path('/foo')) is None

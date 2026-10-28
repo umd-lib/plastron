@@ -2,12 +2,11 @@ import logging
 from argparse import Namespace
 from os import getpid, uname
 
-from plastron.cli import get_uris
+from plastron.cli import get_uris, version
 from plastron.cli.commands import BaseCommand
 from plastron.messaging.messages import Message
 from plastron.rdfmapping.resources import RDFResource
 from plastron.repo import Tombstone
-from plastron.stomp import __version__
 from plastron.utils import parse_predicate_list
 
 logger = logging.getLogger(__name__)
@@ -52,7 +51,7 @@ class Command(BaseCommand):
     def __call__(self, args: Namespace):
         routing_headers = self.get_routing_headers(args.index)
         logger.info(f'Indexing to {args.index}')
-        if self.context.broker.connect(client_id=f'plastrond/{__version__}-{uname().nodename}-{getpid()}'):
+        if self.context.broker.connect(client_id=f'plastrond/{version}-{uname().nodename}-{getpid()}'):
             reindexing_queue = self.context.broker.destination('reindexing')
             indexing_queue = self.context.broker.destination('indexing')
             username = args.delegated_user or 'plastron'

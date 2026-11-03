@@ -1,10 +1,8 @@
 from argparse import ArgumentParser, ArgumentTypeError
 
 import pytest
-from rdflib.term import Literal, URIRef
+from rdflib.term import URIRef
 
-from plastron.cli import parse_data_property, parse_object_property
-from plastron.namespaces import dcterms, pcdm, rdf
 from plastron.utils import uri_or_curie
 
 INVALID_URI_OR_CURIE_ARGS = [
@@ -55,26 +53,3 @@ def test_given_invalid_uri_or_curie_type__parse_args_exits(arg_value):
     parser.add_argument('--access', type=uri_or_curie)
     with pytest.raises(SystemExit):
         parser.parse_args(('--access', arg_value))
-
-
-@pytest.mark.parametrize(
-    ('p', 'o', 'expected'),
-    [
-        ('dcterms:title', 'Foobar', (dcterms.title, Literal('Foobar'))),
-        ('dcterms:title', '"der Hund"@de', (dcterms.title, Literal('der Hund', lang='de'))),
-    ],
-)
-def test_parse_data_property(p, o, expected):
-    assert parse_data_property(p, o) == expected
-
-
-@pytest.mark.parametrize(
-    ('p', 'o', 'expected'),
-    [
-        ('rdf:type', 'pcdm:Object', (rdf.type, pcdm.Object)),
-        ('dcterms:creator', 'https://www.lib.umd.edu/', (dcterms.creator, URIRef('https://www.lib.umd.edu/'))),
-        ('dcterms:creator', '<https://www.lib.umd.edu/>', (dcterms.creator, URIRef('https://www.lib.umd.edu/'))),
-    ],
-)
-def test_parse_object_property(p, o, expected):
-    assert parse_object_property(p, o) == expected

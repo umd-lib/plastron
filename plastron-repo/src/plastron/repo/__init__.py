@@ -5,19 +5,19 @@ from contextlib import contextmanager
 from http import HTTPStatus
 from math import inf
 from typing import TypeVar, Union
+from urllib.parse import urljoin
 from uuid import uuid4
 
 import yaml
-from rdflib import Namespace, URIRef
-from requests import Response
-from requests.auth import AuthBase
-from urlobject import URLObject
-
 from plastron.client import Client, ClientError, Endpoint
 from plastron.client.auth import get_authenticator
 from plastron.client.transactions import transaction
 from plastron.rdfmapping.graph import TrackChangesGraph
 from plastron.rdfmapping.resources import RDFResourceBase, RDFResourceType
+from rdflib import Namespace, URIRef
+from requests import Response
+from requests.auth import AuthBase
+from urlobject import URLObject
 
 logger = logging.getLogger(__name__)
 ldp = Namespace('http://www.w3.org/ns/ldp#')
@@ -202,6 +202,32 @@ class RepositoryResource:
     def headers(self):
         return self._headers
 
+    def get_acl(self) -> 'ACLResource | None':
+        try:
+            response = self._head()
+            if not response.ok:
+                raise RepositoryError(f'Unable to get ACL link for {self.url}', response=response)
+
+            acl_link = next(
+                (link['url'] for link in response.links.values() if link.get('rel') == 'acl'),
+                None,
+            )
+            if acl_link is None:
+                return None
+
+            acl_resource = ACLResource(repo=self.repo, path=urljoin(str(self.url), acl_link))
+            response = acl_resource._head()
+
+            if response.status_code == HTTPStatus.NOT_FOUND:
+                return None
+            if not response.ok:
+                raise RepositoryError(f'Unable to read ACL {acl_resource.url}', response=response)
+            return acl_resource
+        except RepositoryError:
+            raise
+        except Exception as e:
+            raise RepositoryError(f'Unable to get ACL for {self.url}: {e}') from e
+
     def _head(self) -> Response:
         if self.url is None:
             raise RepositoryError('Resource has no URL')
@@ -298,6 +324,14 @@ class RepositoryResource:
                         max_depth=max_depth,
                         _current_depth=_current_depth + 1,
                     )
+
+
+class ACLResource(RepositoryResource):
+    @property
+    def url(self) -> URLObject | None:
+        if self.path is not None and is_http_uri(self.path):
+            return URLObject(self.path)
+        return super().url
 
 
 class Tombstone:
